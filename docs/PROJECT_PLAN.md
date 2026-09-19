@@ -190,8 +190,8 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 
 ```text
 minSdk: 26
-compileSdk: 36
-targetSdk: 使用启动开发时可发布的最新稳定版本
+compileSdk: 37
+targetSdk: 37
 JDK: 17 或构建工具要求的更新稳定版本
 ```
 
