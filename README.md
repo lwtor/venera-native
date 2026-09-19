@@ -38,7 +38,7 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 技术基线
 
-- Android Gradle Plugin 9.4 + Gradle 9.7.1
+- Android Gradle Plugin 9.2.1 + Gradle 9.4.1
 - AGP 内置 Kotlin + JDK 17
 - compileSdk / targetSdk 37，minSdk 26
 - Jetpack Compose + Material 3

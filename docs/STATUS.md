@@ -13,7 +13,7 @@
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 最近基线提交 | `054e654 build: scaffold Android multi-module project` |
-| 工作基线 | AGP 9.4、Gradle 9.7.1、JDK 17、SDK 37、minSdk 26 |
+| 工作基线 | AGP 9.2.1、Gradle 9.4.1、JDK 17、SDK 37、minSdk 26 |
 
 ## 已经完成
 
@@ -57,6 +57,11 @@
 ```text
 2026-09-19
 ./gradlew lintDebug :core:model:testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL
+
+2026-09-19（Android Studio 兼容基线调整）
+./gradlew lintDebug testDebugUnitTest :app:assembleDebug
+工具链：AGP 9.2.1 + Gradle 9.4.1 + JDK 17 + API 37
 结果：BUILD SUCCESSFUL
 APK：app/build/outputs/apk/debug/app-debug.apk
 ```

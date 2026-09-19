@@ -25,6 +25,8 @@ internal fun ApplicationExtension.configureVeneraAndroidApplication() {
         abortOnError = true
         checkReleaseBuilds = true
         warningsAsErrors = true
+        // Pinned to the newest AGP supported by the project Android Studio baseline.
+        disable += "AndroidGradlePluginVersion"
     }
 }
 
@@ -47,5 +49,7 @@ internal fun LibraryExtension.configureVeneraAndroidLibrary(compose: Boolean) {
     lint {
         abortOnError = true
         warningsAsErrors = true
+        // Pinned to the newest AGP supported by the project Android Studio baseline.
+        disable += "AndroidGradlePluginVersion"
     }
 }
