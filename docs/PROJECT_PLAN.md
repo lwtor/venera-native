@@ -6,13 +6,15 @@
 | --- | --- |
 | 项目名称 | Venera Native |
 | 项目类型 | Android 原生漫画阅读器 |
-| 当前阶段 | 架构与开发规划 |
+| 当前阶段 | Stage 0：技术验证 |
 | 目标平台 | Android 手机、平板、折叠屏、ChromeOS |
 | UI 技术 | Jetpack Compose + Material 3 |
 | 架构方向 | 多 Module + 分层架构 + MVI/UDF |
 | 上游项目 | https://github.com/venera-app/venera |
 
 Venera Native 是一个受 Venera 启发的非官方 Android 原生重构项目。项目以兼容 Venera 漫画源生态为重要目标，同时重新设计领域模型、数据层、下载系统和阅读器，使其符合现代 Android 平台能力与长期维护要求。
+
+> 本文是长期产品与技术蓝图。实时进度、当前唯一下一任务和逐项验收标准分别见 `STATUS.md` 与 `IMPLEMENTATION_PLAN.md`；模块硬边界见 `ARCHITECTURE.md`。
 
 ## 2. 产品目标
 
@@ -651,8 +653,8 @@ Release 流水线：
 - [ ] 确认 GitHub 组织或用户名与最终 applicationId。
 - [ ] 确认项目许可证和 Venera 名称使用方式。
 - [ ] 创建全新 Logo 和 Material 3 视觉基线。
-- [ ] 创建 Gradle Version Catalog 与 Convention Plugins。
-- [ ] 创建基础 Module 和依赖规则检查。
+- [x] 创建 Gradle Version Catalog 与 Convention Plugins。
+- [x] 创建基础 Module；依赖规则的自动检查仍待补充。
 - [ ] 建立 CI、代码格式、Lint 和测试任务。
 - [ ] 选取不包含敏感账号的漫画源兼容测试样例。
 - [ ] 完成 JavaScriptEngine PoC。

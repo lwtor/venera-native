@@ -6,9 +6,19 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-项目处于阶段 0（技术验证）。基础多模块工程已经建立，下一步是完成 JavaScript 漫画源运行时与 Compose 阅读器原型。
+项目处于阶段 0（技术验证）。基础多模块工程已经建立，当前唯一下一任务是 **S0-02：JavaScript Runtime 最小执行闭环**。
 
-- [完整项目规划](docs/PROJECT_PLAN.md)
+开发接管入口：
+
+- [Agent 接管规则](AGENTS.md)
+- [当前状态与下一任务](docs/STATUS.md)
+- [可执行实施计划](docs/IMPLEMENTATION_PLAN.md)
+- [架构与模块边界](docs/ARCHITECTURE.md)
+- [完整产品规划](docs/PROJECT_PLAN.md)
+- [架构决策记录](docs/adr/README.md)
+
+上游参考：
+
 - 原项目：[venera-app/venera](https://github.com/venera-app/venera)
 - 原漫画源协议：[Comic Source](https://github.com/venera-app/venera/blob/master/doc/comic_source.md)
 - 原 JavaScript API：[JavaScript API](https://github.com/venera-app/venera/blob/master/doc/js_api.md)
