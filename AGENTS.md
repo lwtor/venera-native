@@ -45,7 +45,7 @@
 3. 核对任务的依赖项是否已经完成。
 4. 阅读将要修改的模块，确认依赖方向。
 5. 对不稳定的 Android API 或依赖版本查阅官方文档，禁止凭记忆猜测。
-6. 先明确本次切片的验收命令，再开始实现。
+6. 先明确本次切片的编译命令，再开始实现；非关键节点不得自行扩大验证范围。
 
 如果当前任务过大，应按 `docs/IMPLEMENTATION_PLAN.md` 中的子任务边界拆分，但不要同时铺开多个未完成架构。
 
@@ -89,22 +89,36 @@
 
 要求 JDK 17。Windows 若 `JAVA_HOME` 不正确，可为当前命令临时指定 JDK 17，但不得提交本机绝对路径。
 
-常用命令：
+### 默认策略：只保证编译
+
+普通开发任务、功能切片和中间提交只执行与改动直接相关的编译：
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat lintDebug
 ```
 
-提交前最低验证：
+如果改动不经过 `:app`，可改为对应模块的 `assembleDebug`、`compileDebugKotlin` 或测试 APK 编译任务。默认不运行全量 Lint、全量单元测试、instrumentation test、压力测试、benchmark、安装 APK 或实机验证。
+
+编写测试代码属于实现工作，但普通节点只要求测试源码能够编译；除非用户明确要求，不因为新增了测试就自动执行完整测试。
+
+提交前最低检查：
 
 ```powershell
-.\gradlew.bat lintDebug testDebugUnitTest :app:assembleDebug
+.\gradlew.bat :app:assembleDebug
 git diff --check
 ```
 
-如果任务包含 instrumentation test、截图测试或 benchmark，必须执行任务验收项指定的额外命令。无法执行时，在 `docs/STATUS.md` 明确记录原因和剩余风险，不得写成“已验证”。
+### 关键节点才做完整验证
+
+仅在以下情况执行 Lint、单元测试、instrumentation test、压力测试、benchmark、安装 APK 或实机验证：
+
+- 一个 Stage 或明确里程碑准备退出；
+- Release Candidate 或正式发布前；
+- 用户明确要求执行；
+- 当前任务本身就是专项验证任务；
+- 编译无法定位问题，必须运行最小相关测试才能继续。
+
+即使处于关键节点，也只执行计划明确要求的验证，不擅自增加重复验证。耗时验证开始前应确认它对当前交付确有必要。无法执行的关键验证在 `docs/STATUS.md` 记录原因和风险，不得写成“已验证”。
 
 ## 8. 完成任务后的文档协议
 
@@ -134,8 +148,8 @@ git diff --check
 一个任务只有同时满足以下条件才可标记为 `DONE`：
 
 - 验收标准逐项满足。
-- 所需测试已添加并通过。
-- Lint、相关单元测试和受影响模块构建通过。
+- 所需测试代码已添加并能够编译；仅关键节点要求实际运行并通过。
+- 受影响模块编译通过；Lint 和完整测试仅按第 7 节的关键节点策略执行。
 - 没有越过模块边界或引入循环依赖。
 - 没有提交本机配置、缓存、构建产物、凭据或真实用户数据。
 - 文档状态与代码事实一致。
