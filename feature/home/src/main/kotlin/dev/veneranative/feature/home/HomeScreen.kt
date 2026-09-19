@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -17,13 +18,16 @@ import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 
 @Composable
-fun HomeRoute() {
-    HomeScreen()
+fun HomeRoute(onOpenReader: () -> Unit) {
+    HomeScreen(onOpenReader = onOpenReader)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun HomeScreen(modifier: Modifier = Modifier) {
+internal fun HomeScreen(
+    onOpenReader: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Scaffold(
         modifier = modifier,
         topBar = { TopAppBar(title = { Text("Venera Native") }) },
@@ -33,7 +37,7 @@ internal fun HomeScreen(modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .padding(contentPadding)
                 .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
@@ -41,9 +45,12 @@ internal fun HomeScreen(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                text = "Next: JavaScript source runtime and reader prototypes",
+                text = "Reader prototype uses an in-memory page provider.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Button(onClick = onOpenReader) {
+                Text("Open reader prototype")
+            }
         }
     }
 }
@@ -52,6 +59,6 @@ internal fun HomeScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun HomeScreenPreview() {
     VeneraNativeTheme {
-        HomeScreen()
+        HomeScreen(onOpenReader = {})
     }
 }

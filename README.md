@@ -6,7 +6,7 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-项目处于阶段 0（技术验证）。异步 Host API 与受控网络桥已经实现，当前唯一下一任务是 **S0-04：Runtime 限制、二进制和压力验证**。
+项目处于阶段 0（技术验证）。阅读器原型已经可以运行（纵向连续阅读、横向 LTR/RTL 翻页、页码与邻近预取），当前唯一下一任务是 **S0-06：超长图、缩放和内存验证**。
 
 开发接管入口：
 
@@ -31,9 +31,12 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 :core:designsystem
 :core:model
 :core:navigation
+:core:network
 :feature:home
+:feature:reader
 :source:api
 :source:engine
+:source:network
 ```
 
 ## 技术基线

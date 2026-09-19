@@ -140,9 +140,13 @@
 - JavaScriptEngine 采用、限制使用或增加 QuickJS fallback 的初步结论。
 - 更新 ADR-0002。
 
-### S0-05 Compose 阅读器基础原型 — TODO
+### S0-05 Compose 阅读器基础原型 — DONE
 
 依赖：S0-01。可在 S0-02 至 S0-04 完成后开始，避免并行产生多个长期分支。
+
+实际执行：新增 `:feature:reader` 与 `ComicPage` 页面描述符，交付纵向连续阅读、横向 LTR/RTL
+翻页、页码与失败重试、邻近预取、Fake PageProvider 与 Compose 测试。真实图片解码管线不在本
+任务范围，由 S0-06 决定。详见 `docs/STATUS.md`。
 
 计划新增模块：
 

@@ -42,6 +42,7 @@ immutable UiState
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:core:navigation` | 类型安全 Route | Navigation 3、`:core:model` |
 | `:feature:home` | 首页占位 UI | Design System、Navigation、领域契约 |
+| `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码与预取骨架 | Design System、`:core:model` |
 | `:source:api` | Runtime、包、调用和结果契约 | `:core:model`、`:core:common` |
 | `:source:engine` | AndroidX JavaScriptEngine 与 MessagePort 适配 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |

@@ -25,6 +25,7 @@ include(
     ":core:network",
     ":core:navigation",
     ":feature:home",
+    ":feature:reader",
     ":source:api",
     ":source:engine",
     ":source:network",

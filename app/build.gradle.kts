@@ -20,8 +20,10 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:model"))
     implementation(project(":core:navigation"))
     implementation(project(":feature:home"))
+    implementation(project(":feature:reader"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.activity.compose)

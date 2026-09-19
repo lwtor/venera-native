@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-19 |
 | 当前阶段 | Stage 0：技术验证 |
-| 当前任务 | S0-05：Compose 阅读器基础原型 |
-| 当前任务状态 | TODO（S0-04 已按“决策所需最小验证”收尾） |
+| 当前任务 | S0-06：超长图、缩放和内存验证 |
+| 当前任务状态 | TODO（S0-05 已交付并通过编译验证） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -122,18 +122,56 @@ V2337A / Android 16：
 设备 JavaScript Sandbox 不支持 JS_FEATURE_MESSAGE_PORTS，Host 桥测试按能力条件跳过。
 ```
 
+### S0-05 Compose 阅读器基础原型 — DONE
+
+已完成：
+
+- 新增 `:feature:reader`，这是第一个用户可见的交互切片。
+- `:core:model` 增加 `ChapterKey` 与 `ComicPage` 页面描述符；描述符只带尺寸与不透明
+  `imageRef`，不持有 Bitmap，可安全放入 Compose State。
+- 定义 `PageProvider` 契约与 `FakePageProvider`（内存、确定性，供预览、演示与测试）。
+- 实现 `ReaderRoute` / `ReaderScreen` / `ReaderViewModel` / `ReaderUiState` / `ReaderAction`；
+  状态走 `StateFlow`，Compose 只渲染状态并发送 Action。
+- 纵向连续阅读（`LazyColumn`）与横向单页翻页（`HorizontalPager`）最小切换，RTL 由
+  `reverseLayout` 表达。
+- 章节标题、页码、加载中与失败重试状态。
+- 以可见页为中心的邻近预取（默认半径 1），按页索引去重。
+- `:app` 首页增加入口，可用内存 Provider 直接打开阅读器。
+
+有意排除：
+
+- 真实图片解码与图像管线（Coil 或子采样方案由 S0-06 决定）。
+- 下载、本地压缩包、真实漫画源、持久化阅读进度。
+- 缩放手势与正式视觉设计。
+
+验证记录：
+
+```text
+2026-09-19（编译级，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+.\gradlew.bat :app:assembleDebug :feature:reader:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin
+结果：BUILD SUCCESSFUL
+说明：ReaderViewModelTest 与 ReaderScreenTest 只编译通过，未执行；实际执行留给关键节点
+```
+
+构建期间 Gradle daemon 因原生内存耗尽崩溃（`hs_err` 报告 malloc 失败）并损坏 file-access
+缓存，已清理缓存并用 `--no-daemon --max-workers=2` 完成验证。本机资源紧张时建议沿用该参数。
+
 ## 当前代码事实
 
-- `:app` 目前直接展示 `HomeRoute`，尚未建立完整根导航。
+- `:app` 目前用本地状态在 `HomeRoute` 与 `ReaderRoute` 之间切换，尚未建立完整根导航。
 - `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
+- `:feature:reader` 已能渲染页面描述符、切换阅读方向并调度邻近预取，但页面是尺寸占位块，
+  没有任何真实图片解码。
 - `:source:api` 已有最小 Runtime 契约，但还不是完整 Venera 漫画源协议。
 - `:source:engine` 已能执行隔离 fixture、结构化调用、超时、取消和生命周期恢复。
 - Runtime 当前为每来源串行调用；支持非 Binder 传输时结果上限配置为 1 MiB。
 - Runtime 已有 MessagePort Host API、HTTP 文本请求、每来源 Cookie 和取消链路，尚无二进制通道。
 - S0-04 已在 V2337A / SDK 36 取得决策所需的实机结论；压力测量 harness 取得结论后已删除，未保留为长期资产。
-- 尚未引入 Hilt、Room、DataStore、OkHttp、Coil、Paging、WorkManager。
+- 尚未引入 Hilt、Room、DataStore、Coil、Paging、WorkManager；OkHttp 已在 `:core:network` 使用。
 - 尚未创建 CI、许可证文件、正式图标或发布配置。
-- 当前有领域模型/Runtime JVM 测试和 8 个 Runtime 实机测试。
+- 当前有领域模型、Runtime 与阅读器 JVM 测试，以及 8 个 Runtime 实机测试和 3 个阅读器
+  Compose 测试；本轮只保证编译，均未执行。
 - `applicationId = dev.veneranative` 仍是暂定值。
 
 ## 最近完成：S0-04 Runtime 限制、二进制和压力验证 — DONE
@@ -240,43 +278,40 @@ adb logcat -d -s VeneraStress:I
 
 ## 当前唯一下一任务
 
-### S0-05：Compose 阅读器基础原型 — TODO
+### S0-06：超长图、缩放和内存验证 — TODO
 
-目标：交付第一个可交互的阅读界面原型，验证阅读器架构骨架。
+目标：确定大图与超长图在 Compose 中是否可用，决定是否引入子采样或分块解码。
 
-计划新增模块：
+必须验证：
 
-- `:feature:reader`
+- 常见图片、超长条图、超高分辨率图。
+- 快速滚动、连续翻页、旋转、后台恢复。
+- 双指缩放与滚动手势冲突。
+- 不同预取窗口的峰值内存与卡顿。
+- Coil 常规解码是否足够；何时切换子采样或分块方案。
 
-必须交付：
+产出：
 
-- 统一 `ComicPage` 描述符的最小版本。
-- 纵向连续阅读。
-- 横向 LTR/RTL 翻页的最小切换。
-- 页码、当前章节、加载和错误状态。
-- 当前页附近的有限预取。
-- 不在 Compose State 中持有 Bitmap。
-- Fake PageProvider 与 Compose 测试。
+- 固定生成的测试图片或生成脚本，禁止提交版权内容。
+- 测试设备/配置、内存数据和复现步骤。
+- `docs/adr/0004-large-image-strategy.md`。
 
-不在范围：
+执行前须知：
 
-- 下载、本地压缩包、真实漫画源和持久化进度。
-- 完整手势设置和正式视觉设计。
-- 真实图片解码管线（由 S0-06 决定 Coil 或子采样方案）。
-
-验证命令（普通节点只要求编译）：
+- 本任务本身是专项验证，允许实机测量，但**开始实机前必须先与用户确认范围**，
+  避免再次长时间占用设备而不产出可交付结论（S0-04 的教训）。
+- 引入 Coil 属于“新的图片主框架”，需要先补 ADR，不允许悄悄加依赖。
 
 ```powershell
-.\gradlew.bat :feature:reader:assembleDebug :app:assembleDebug
+.\gradlew.bat :app:assembleDebug
 ```
 
 ## 紧随其后的任务
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S0-05 | Compose 阅读器基础原型 | S0-01 |
-| 2 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
-| 3 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
+| 1 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
+| 2 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
 
 ## 已知风险与待确认
 
