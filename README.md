@@ -6,7 +6,7 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-项目处于阶段 0（技术验证）。基础多模块工程已经建立，当前唯一下一任务是 **S0-02：JavaScript Runtime 最小执行闭环**。
+项目处于阶段 0（技术验证）。JavaScript Runtime 最小执行闭环已经通过实机测试，当前唯一下一任务是 **S0-03：异步 Host API 与受控网络桥 PoC**。
 
 开发接管入口：
 

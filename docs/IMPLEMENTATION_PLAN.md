@@ -53,7 +53,7 @@
 
 验收：`lintDebug`、`:core:model:testDebugUnitTest`、`:app:assembleDebug` 通过。
 
-### S0-02 JavaScript Runtime 最小执行闭环 — TODO
+### S0-02 JavaScript Runtime 最小执行闭环 — DONE
 
 依赖：S0-01。
 

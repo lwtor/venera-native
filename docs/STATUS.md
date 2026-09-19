@@ -8,11 +8,11 @@
 | --- | --- |
 | 最后更新 | 2026-09-19 |
 | 当前阶段 | Stage 0：技术验证 |
-| 当前任务 | S0-02：JavaScript Runtime 最小执行闭环 |
+| 当前任务 | S0-03：异步 Host API 与受控网络桥 PoC |
 | 当前任务状态 | TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
-| 最近基线提交 | `054e654 build: scaffold Android multi-module project` |
+| 当前代码基线 | `main`（以 Git HEAD 为准） |
 | 工作基线 | AGP 9.2.1、Gradle 9.4.1、JDK 17、SDK 37、minSdk 26 |
 
 ## 已经完成
@@ -66,80 +66,110 @@
 APK：app/build/outputs/apk/debug/app-debug.apk
 ```
 
+### S0-02 JavaScript Runtime 最小执行闭环 — DONE
+
+已完成：
+
+- 将 `:source:api` 细化为类型化函数调用、JSON 结果和稳定 Runtime 错误模型。
+- 来源包安装前校验版本、脚本和 SHA-256。
+- 使用一个 `JavaScriptSandbox` 和每来源独立 `JavaScriptIsolate`。
+- 实现安装、调用、超时、显式取消、卸载和 Runtime 关闭。
+- 超时或取消后丢弃当前 isolate，下次调用自动重新加载来源。
+- 要求 Promise Return 和 Isolate Termination 能力，不满足时显式返回 `EngineUnavailable`。
+- 增加无网络、无第三方内容的固定 JavaScript fixture。
+- 记录 `docs/adr/0002-javascript-runtime.md`。
+
+验证记录：
+
+```text
+./gradlew :source:api:testDebugUnitTest :source:engine:testDebugUnitTest :source:engine:assembleDebugAndroidTest
+结果：BUILD SUCCESSFUL
+
+./gradlew :source:engine:connectedDebugAndroidTest
+设备：V2337A / Android 16
+结果：8 tests，BUILD SUCCESSFUL
+
+./gradlew --no-daemon --max-workers=2 lintDebug
+./gradlew --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL
+```
+
 ## 当前代码事实
 
 - `:app` 目前直接展示 `HomeRoute`，尚未建立完整根导航。
 - `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
-- `:source:api` 只有初始模型，不代表最终兼容协议。
-- `:source:engine` 目前只能检查 JavaScriptEngine 是否受支持，尚不能创建沙箱或执行脚本。
+- `:source:api` 已有最小 Runtime 契约，但还不是完整 Venera 漫画源协议。
+- `:source:engine` 已能执行隔离 fixture、结构化调用、超时、取消和生命周期恢复。
+- Runtime 当前为每来源串行调用；支持非 Binder 传输时结果上限配置为 1 MiB。
+- Runtime 尚无 Host API、HTTP、Cookie、消息桥或二进制通道。
 - 尚未引入 Hilt、Room、DataStore、OkHttp、Coil、Paging、WorkManager。
 - 尚未创建 CI、许可证文件、正式图标或发布配置。
-- 目前唯一测试是 `ComicKeyTest`。
+- 当前有领域模型/Runtime JVM 测试和 8 个 Runtime 实机测试。
 - `applicationId = dev.veneranative` 仍是暂定值。
 
 ## 当前唯一下一任务
 
-### S0-02：JavaScript Runtime 最小执行闭环 — TODO
+### S0-03：异步 Host API 与受控网络桥 PoC — TODO
 
-目标：在 `:source:engine` 中使用 AndroidX JavaScriptEngine 建立可测试的最小沙箱执行链路，并通过 `:source:api` 暴露稳定、与具体引擎无关的接口。
+目标：证明来源脚本可以通过显式允许列表异步请求 Kotlin Host API，由 OkHttp 完成网络请求并把结构化响应送回脚本，同时保持超时、取消、来源隔离和脱敏语义。
 
 必须交付：
 
-1. 细化 `SourcePackage`、`SourceCall`、`SourceResult` 和错误模型，使最小脚本执行无需 UI 拼接 JavaScript。
-2. 增加引擎生命周期：创建、加载、调用、取消、卸载和关闭。
-3. 每个已加载来源拥有隔离的命名空间或沙箱实例；实现中必须明确生命周期所有权。
-4. 实现 JSON 参数和 JSON 结果往返。
-5. 处理不支持 JavaScriptEngine、脚本语法错误、执行错误、超时、取消和已卸载来源。
-6. 增加仓库内测试 fixture；不得依赖在线漫画站点。
-7. 增加单元测试；必须依赖 Android Runtime 的部分增加 instrumentation test。
-8. 用 ADR 记录 AndroidX JavaScriptEngine API 选型、限制和仍待验证的 fallback 条件。
+1. 新建 `:core:network`，提供 OkHttp Client 基础配置、Dispatcher 和通用网络错误映射。
+2. 新建 `:source:network`，提供 `SourceHttpRequest`、`SourceHttpResponse`、每来源 CookieJar 和网络执行器。
+3. 在 `:source:api` 定义与具体网络库无关的 Host API 契约；不得泄漏 OkHttp 类型。
+4. 在 `:source:engine` 实现带请求 ID 的 JS ↔ Kotlin 异步消息桥，并进行 Host 方法允许列表校验。
+5. 支持 GET、POST、Header、UTF-8 文本 Body、状态码和文本响应。
+6. 调用超时或取消时必须向下取消对应 OkHttp Call。
+7. 日志和错误不得包含 Authorization、Cookie、Token 明文。
+8. 使用 MockWebServer 和本地 fixture 测试，不访问真实漫画站点。
+9. 明确记录 Message Ports 能力要求、payload 限制和 S0-04 待验证项。
 
 验收场景：
 
-- 加载一个最小 fixture 后调用纯函数并得到结构化结果。
-- 两个来源的全局变量互不污染。
-- 语法错误和运行时错误映射为稳定错误类型。
-- 超时后调用结束，后续调用仍可控。
-- 取消调用不会错误返回成功。
-- 卸载后不能继续调用该来源。
-- 不支持引擎的设备返回显式能力错误，不崩溃。
+- fixture 脚本通过 Host API 完成 GET 和 POST，并收到状态码、Header 和文本 Body。
+- HTTP 4xx/5xx 作为结构化 HTTP 响应返回，连接失败映射为稳定网络错误。
+- 调用取消后底层 MockWebServer 请求或 OkHttp Call 被取消，不产生成功结果。
+- 两个来源的 Cookie 互不可见。
+- 未在允许列表中的 Host 方法被拒绝。
+- 并发超限得到可识别错误，不无限排队。
+- 测试 Token 不出现在捕获日志和错误信息中。
 
 建议验证命令：
 
 ```powershell
-.\gradlew.bat :source:api:testDebugUnitTest :source:engine:testDebugUnitTest
+.\gradlew.bat :core:network:testDebugUnitTest :source:network:testDebugUnitTest
+.\gradlew.bat :source:engine:testDebugUnitTest
 .\gradlew.bat :source:engine:connectedDebugAndroidTest
 .\gradlew.bat lintDebug :app:assembleDebug
 ```
 
-不在 S0-02 范围：
+不在 S0-03 范围：
 
-- 真实 HTTP Host API。
-- Cookie、登录、HTML 解析或图片请求。
-- 安装远程漫画源的 UI。
-- 完整 Venera 协议兼容。
-- QuickJS fallback 的实现。
-- Reader UI。
+- 真实商业漫画源或真实账户。
+- WebView 登录、验证码和账户 UI。
+- HTML DOM/CSS Selector Host API。
+- 图片加载、原始二进制和下载。
+- QuickJS fallback、完整 Venera 协议和 Reader UI。
 
-完成 S0-02 后，将当前任务推进为 S0-03。
+完成 S0-03 后，将当前任务推进为 S0-04。
 
 ## 紧随其后的任务
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S0-03 | 异步 Host API 与受控网络桥 PoC | S0-02 |
-| 2 | S0-04 | Runtime 限制、二进制和压力验证 | S0-03 |
-| 3 | S0-05 | Compose 阅读器基础原型 | S0-01 |
-| 4 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
-| 5 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
+| 1 | S0-04 | Runtime 限制、二进制和压力验证 | S0-03 |
+| 2 | S0-05 | Compose 阅读器基础原型 | S0-01 |
+| 3 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
+| 4 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
 
 ## 已知风险与待确认
 
 | 项目 | 状态 | 解除条件 |
 | --- | --- | --- |
-| AndroidX JavaScriptEngine 是否满足异步 Host API 和二进制需求 | 验证中 | 完成 S0-02 至 S0-04 |
+| AndroidX JavaScriptEngine 是否满足异步 Host API 和二进制需求 | 基础执行已通过，Host/二进制验证中 | 完成 S0-03 至 S0-04 |
 | 超长图是否需要专用子采样组件 | 未验证 | 完成 S0-05 至 S0-06 |
-| QuickJS fallback 是否必要 | 暂缓决定 | JavaScriptEngine PoC 形成数据后写 ADR |
+| QuickJS fallback 是否必要 | S0-02 暂不引入 | S0-04 按 ADR-0002 fallback 条件复核 |
 | GPL-3.0 衍生边界和最终许可证 | 待确认 | 复用上游实现前完成许可证 ADR |
 | 最终 applicationId | 待用户确认 | 发布配置开始前确认 |
 | Venera 名称与正式视觉标识 | 待确认 | 首个公开测试版前完成品牌审查 |
