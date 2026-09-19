@@ -82,7 +82,7 @@
 
 验收：详见 `STATUS.md` 的当前任务章节。
 
-### S0-03 异步 Host API 与受控网络桥 PoC — TODO
+### S0-03 异步 Host API 与受控网络桥 PoC — DONE
 
 依赖：S0-02。
 

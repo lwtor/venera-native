@@ -38,11 +38,13 @@ immutable UiState
 | `:app` | MainActivity、应用 Theme、根装配 | Feature、Core、实现模块 |
 | `:core:common` | 通用 Result 与非业务工具 | Kotlin/Coroutines 基础 |
 | `:core:model` | 稳定领域 ID 与跨层模型 | 尽量只依赖 Kotlin |
+| `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:core:navigation` | 类型安全 Route | Navigation 3、`:core:model` |
 | `:feature:home` | 首页占位 UI | Design System、Navigation、领域契约 |
 | `:source:api` | Runtime、包、调用和结果契约 | `:core:model`、`:core:common` |
-| `:source:engine` | AndroidX JavaScriptEngine 适配 | `:source:api`、受控 Host API |
+| `:source:engine` | AndroidX JavaScriptEngine 与 MessagePort 适配 | `:source:api`、受控 Host API |
+| `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
 
 当前实现仍是 Stage 0 骨架；表中“职责”是边界，不表示功能已经完成。
 

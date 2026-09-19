@@ -6,6 +6,7 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | --- | --- | --- |
 | [ADR-0001](0001-module-boundaries.md) | 多模块边界与依赖方向 | Accepted |
 | [ADR-0002](0002-javascript-runtime.md) | JavaScript Runtime 与 fallback 条件 | Accepted |
+| [ADR-0003](0003-host-api-network-bridge.md) | MessagePort Host API 与来源网络桥 | Accepted |
 | ADR-0003 | Venera 漫画源兼容范围 | Stage 1 前待创建 |
 | ADR-0004 | 超长图与子采样策略 | Stage 0 待创建 |
 | ADR-0005 | 跨 Android 版本的下载执行策略 | Stage 2 前待创建 |

@@ -22,8 +22,10 @@ include(
     ":core:common",
     ":core:designsystem",
     ":core:model",
+    ":core:network",
     ":core:navigation",
     ":feature:home",
     ":source:api",
     ":source:engine",
+    ":source:network",
 )

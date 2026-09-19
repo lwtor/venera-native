@@ -10,6 +10,7 @@ import androidx.javascriptengine.SandboxUnsupportedException
 import com.google.common.util.concurrent.ListenableFuture
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.source.api.SourceCall
+import dev.veneranative.source.api.SourceHostApi
 import dev.veneranative.source.api.SourceInstallResult
 import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceResult
@@ -37,6 +38,7 @@ class AndroidJavaScriptRuntime(
     private val installTimeoutMillis: Long = DEFAULT_INSTALL_TIMEOUT_MILLIS,
     private val maxEvaluationReturnSizeBytes: Int = DEFAULT_MAX_RESULT_BYTES,
     private val engineSupported: () -> Boolean = JavaScriptSandbox::isSupported,
+    private val hostApi: SourceHostApi? = null,
 ) : dev.veneranative.source.api.SourceScriptRuntime {
     private val applicationContext = context.applicationContext
     private val lifecycleMutex = Mutex()
@@ -67,7 +69,7 @@ class AndroidJavaScriptRuntime(
                 return@withLock SourceInstallResult.Failed(SourceRuntimeError.RuntimeClosed())
             }
 
-            val newIsolate =
+            val loadedIsolate =
                 try {
                     withTimeout(installTimeoutMillis) { createLoadedIsolate(source) }
                 } catch (_: TimeoutCancellationException) {
@@ -84,7 +86,7 @@ class AndroidJavaScriptRuntime(
                     return@withLock SourceInstallResult.Failed(mapEngineFailure(failure))
                 }
 
-            val replacement = SourceSession(source, newIsolate)
+            val replacement = SourceSession(source, loadedIsolate)
             sessions.put(source.sourceId, replacement)?.invalidate()
             SourceInstallResult.Installed(source.sourceId, source.version)
         }
@@ -117,9 +119,10 @@ class AndroidJavaScriptRuntime(
             }
 
             try {
-                val isolate = session.isolate ?: createLoadedIsolate(session.source).also {
-                    session.isolate = it
-                }
+                val isolate =
+                    (session.loadedIsolate ?: createLoadedIsolate(session.source).also {
+                        session.loadedIsolate = it
+                    }).isolate
                 if (activeCall.cancelled.get()) {
                     session.invalidate()
                     return@withLock typedCall.failure(SourceRuntimeError.Cancelled())
@@ -129,6 +132,7 @@ class AndroidJavaScriptRuntime(
                     SourceInvocationScript.build(
                         functionName = typedCall.functionName,
                         argumentsJson = typedCall.argumentsJson,
+                        invocationId = typedCall.callId,
                     )
                 val future = isolate.evaluateJavaScriptAsync(invocationScript)
                 activeCall.attach(future)
@@ -198,7 +202,7 @@ class AndroidJavaScriptRuntime(
         }
     }
 
-    private suspend fun createLoadedIsolate(source: SourcePackage): JavaScriptIsolate {
+    private suspend fun createLoadedIsolate(source: SourcePackage): LoadedIsolate {
         val currentSandbox = getOrCreateSandbox()
         if (!currentSandbox.isFeatureSupported(JavaScriptSandbox.JS_FEATURE_PROMISE_RETURN)) {
             throw RuntimeFailure(
@@ -211,6 +215,16 @@ class AndroidJavaScriptRuntime(
             throw RuntimeFailure(
                 SourceRuntimeError.EngineUnavailable(
                     "JavaScript engine does not support reliable isolate termination.",
+                ),
+            )
+        }
+        if (
+            hostApi != null &&
+            !currentSandbox.isFeatureSupported(JavaScriptSandbox.JS_FEATURE_MESSAGE_PORTS)
+        ) {
+            throw RuntimeFailure(
+                SourceRuntimeError.EngineUnavailable(
+                    "JavaScript engine does not support MessagePort Host APIs.",
                 ),
             )
         }
@@ -232,7 +246,12 @@ class AndroidJavaScriptRuntime(
                 throw RuntimeFailure(mapEngineFailure(failure))
             }
 
+        var hostBridge: SourceHostBridge? = null
         try {
+            if (hostApi != null) {
+                hostBridge = SourceHostBridge(source.sourceId, currentSandbox, isolate, hostApi)
+                hostBridge.initialize()
+            }
             val loadScript = source.script + "\n;\"" + SOURCE_LOADED_SENTINEL + "\";"
             val result = isolate.evaluateJavaScriptAsync(loadScript).awaitCancellable()
             if (result != SOURCE_LOADED_SENTINEL) {
@@ -242,8 +261,9 @@ class AndroidJavaScriptRuntime(
                     ),
                 )
             }
-            return isolate
+            return LoadedIsolate(isolate, hostBridge)
         } catch (failure: Throwable) {
+            hostBridge?.close()
             isolate.close()
             throw failure
         }
@@ -333,15 +353,25 @@ class AndroidJavaScriptRuntime(
 
     private class SourceSession(
         val source: SourcePackage,
-        @Volatile var isolate: JavaScriptIsolate?,
+        @Volatile var loadedIsolate: LoadedIsolate?,
     ) {
         val invocationMutex = Mutex()
 
         fun invalidate() {
             synchronized(this) {
-                isolate?.close()
-                isolate = null
+                loadedIsolate?.close()
+                loadedIsolate = null
             }
+        }
+    }
+
+    private class LoadedIsolate(
+        val isolate: JavaScriptIsolate,
+        val hostBridge: SourceHostBridge?,
+    ) : AutoCloseable {
+        override fun close() {
+            hostBridge?.close()
+            isolate.close()
         }
     }
 

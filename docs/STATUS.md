@@ -8,7 +8,7 @@
 | --- | --- |
 | 最后更新 | 2026-09-19 |
 | 当前阶段 | Stage 0：技术验证 |
-| 当前任务 | S0-03：异步 Host API 与受控网络桥 PoC |
+| 当前任务 | S0-04：Runtime 限制、二进制和压力验证 |
 | 当前任务状态 | TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
@@ -94,6 +94,34 @@ APK：app/build/outputs/apk/debug/app-debug.apk
 结果：BUILD SUCCESSFUL
 ```
 
+### S0-03 异步 Host API 与受控网络桥 PoC — DONE
+
+已完成：
+
+- 新增 `:core:network` 和 `:source:network`。
+- 引入 OkHttp 5.5.0，提供 Dispatcher、稳定错误映射和可取消请求。
+- 实现 GET、POST、Header、UTF-8 文本 Body、结构化状态码与响应。
+- 实现每来源 CookieJar、每来源并发上限和 1 MiB 响应限制。
+- 在 `:source:api` 增加与引擎、OkHttp 无关的 Host API 契约。
+- 使用 JavaScriptEngine MessagePort 实现带调用 ID、请求 ID和允许列表的异步桥。
+- Runtime 取消、超时、卸载和关闭会继续取消 Host 协程及 OkHttp Call。
+- 增加 MockWebServer、脱敏、Cookie、并发、取消和端到端桥接测试。
+- 新增 ADR-0003。
+
+验证记录：
+
+```text
+./gradlew :core:network:lintDebug :source:network:lintDebug :source:engine:lintDebug testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL
+
+./gradlew :source:network:assembleDebugAndroidTest :source:engine:assembleDebugAndroidTest
+结果：BUILD SUCCESSFUL
+
+V2337A / Android 16：
+原有 Runtime 8 tests PASS。
+设备 JavaScript Sandbox 不支持 JS_FEATURE_MESSAGE_PORTS，Host 桥测试按能力条件跳过。
+```
+
 ## 当前代码事实
 
 - `:app` 目前直接展示 `HomeRoute`，尚未建立完整根导航。
@@ -101,7 +129,7 @@ APK：app/build/outputs/apk/debug/app-debug.apk
 - `:source:api` 已有最小 Runtime 契约，但还不是完整 Venera 漫画源协议。
 - `:source:engine` 已能执行隔离 fixture、结构化调用、超时、取消和生命周期恢复。
 - Runtime 当前为每来源串行调用；支持非 Binder 传输时结果上限配置为 1 MiB。
-- Runtime 尚无 Host API、HTTP、Cookie、消息桥或二进制通道。
+- Runtime 已有 MessagePort Host API、HTTP 文本请求、每来源 Cookie 和取消链路，尚无二进制通道。
 - 尚未引入 Hilt、Room、DataStore、OkHttp、Coil、Paging、WorkManager。
 - 尚未创建 CI、许可证文件、正式图标或发布配置。
 - 当前有领域模型/Runtime JVM 测试和 8 个 Runtime 实机测试。
@@ -109,50 +137,44 @@ APK：app/build/outputs/apk/debug/app-debug.apk
 
 ## 当前唯一下一任务
 
-### S0-03：异步 Host API 与受控网络桥 PoC — TODO
+### S0-04：Runtime 限制、二进制和压力验证 — TODO
 
-目标：证明来源脚本可以通过显式允许列表异步请求 Kotlin Host API，由 OkHttp 完成网络请求并把结构化响应送回脚本，同时保持超时、取消、来源隔离和脱敏语义。
+目标：量化 JavaScriptEngine 方案的边界，决定是否可进入 Stage 1。
 
 必须交付：
 
-1. 新建 `:core:network`，提供 OkHttp Client 基础配置、Dispatcher 和通用网络错误映射。
-2. 新建 `:source:network`，提供 `SourceHttpRequest`、`SourceHttpResponse`、每来源 CookieJar 和网络执行器。
-3. 在 `:source:api` 定义与具体网络库无关的 Host API 契约；不得泄漏 OkHttp 类型。
-4. 在 `:source:engine` 实现带请求 ID 的 JS ↔ Kotlin 异步消息桥，并进行 Host 方法允许列表校验。
-5. 支持 GET、POST、Header、UTF-8 文本 Body、状态码和文本响应。
-6. 调用超时或取消时必须向下取消对应 OkHttp Call。
-7. 日志和错误不得包含 Authorization、Cookie、Token 明文。
-8. 使用 MockWebServer 和本地 fixture 测试，不访问真实漫画站点。
-9. 明确记录 Message Ports 能力要求、payload 限制和 S0-04 待验证项。
+1. 实测大 JSON 参数与结果上限。
+2. 确定图片或二进制响应跨桥接传递策略。
+3. 验证单调用超时、队列上限、每来源并发和全局并发。
+4. 验证沙箱异常终止后的恢复与连续加载/卸载后的资源释放。
+5. 验证前后台切换、进程回收和 API 26 至当前目标版本的可用性策略。
+6. 产出可重复压力测试、测试数据表和 JavaScriptEngine/QuickJS 初步结论。
+7. 根据实测结果更新 ADR-0002。
 
 验收场景：
 
-- fixture 脚本通过 Host API 完成 GET 和 POST，并收到状态码、Header 和文本 Body。
-- HTTP 4xx/5xx 作为结构化 HTTP 响应返回，连接失败映射为稳定网络错误。
-- 调用取消后底层 MockWebServer 请求或 OkHttp Call 被取消，不产生成功结果。
-- 两个来源的 Cookie 互不可见。
-- 未在允许列表中的 Host 方法被拒绝。
-- 并发超限得到可识别错误，不无限排队。
-- 测试 Token 不出现在捕获日志和错误信息中。
+- 压力测试可重复执行并输出量化结果。
+- 沙箱崩溃、超时和取消后可以恢复，不持续泄漏资源。
+- 明确记录 Message Ports 设备兼容性和 fallback 触发条件。
+- 给出是否进入 Stage 1 的可审查结论。
 
 建议验证命令：
 
 ```powershell
-.\gradlew.bat :core:network:testDebugUnitTest :source:network:testDebugUnitTest
-.\gradlew.bat :source:engine:testDebugUnitTest
+.\gradlew.bat :source:engine:testDebugUnitTest :source:engine:assembleDebugAndroidTest
 .\gradlew.bat :source:engine:connectedDebugAndroidTest
 .\gradlew.bat lintDebug :app:assembleDebug
 ```
 
-不在 S0-03 范围：
+不在 S0-04 范围：
 
 - 真实商业漫画源或真实账户。
 - WebView 登录、验证码和账户 UI。
 - HTML DOM/CSS Selector Host API。
-- 图片加载、原始二进制和下载。
-- QuickJS fallback、完整 Venera 协议和 Reader UI。
+- 正式 Reader UI 和下载功能。
+- 在结论得出前实现完整 QuickJS fallback。
 
-完成 S0-03 后，将当前任务推进为 S0-04。
+完成 S0-04 后，将当前任务推进为 S0-05。
 
 ## 紧随其后的任务
 

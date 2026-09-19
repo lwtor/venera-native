@@ -6,11 +6,16 @@ internal object SourceInvocationScript {
     fun validateFunctionName(functionName: String): Boolean =
         functionNamePattern.matches(functionName)
 
-    fun build(functionName: String, argumentsJson: String): String {
+    fun build(
+        functionName: String,
+        argumentsJson: String,
+        invocationId: String,
+    ): String {
         require(validateFunctionName(functionName)) { "Invalid JavaScript function name." }
 
         val quotedFunctionName = quote(functionName)
         val quotedArguments = quote(argumentsJson)
+        val quotedInvocationId = quote(invocationId)
         return """
             (function() {
               const fn = globalThis[$quotedFunctionName];
@@ -21,9 +26,19 @@ internal object SourceInvocationScript {
               if (!Array.isArray(args)) {
                 throw new Error("Source function arguments must be a JSON array.");
               }
-              return Promise.resolve(fn.apply(undefined, args)).then(function(value) {
-                return JSON.stringify({ value: value === undefined ? null : value });
-              });
+              const previousInvocationId = globalThis.__veneraInvocationId;
+              globalThis.__veneraInvocationId = $quotedInvocationId;
+              return Promise.resolve(fn.apply(undefined, args))
+                .then(function(value) {
+                  return JSON.stringify({ value: value === undefined ? null : value });
+                })
+                .finally(function() {
+                  if (previousInvocationId === undefined) {
+                    delete globalThis.__veneraInvocationId;
+                  } else {
+                    globalThis.__veneraInvocationId = previousInvocationId;
+                  }
+                });
             })()
         """.trimIndent()
     }

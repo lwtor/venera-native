@@ -21,12 +21,14 @@ class SourceInvocationScriptTest {
             SourceInvocationScript.build(
                 functionName = "echo",
                 argumentsJson = """["a\"b",{"page":2}]""",
+                invocationId = "test-call",
             )
 
         assertTrue(invocation.contains("""globalThis["echo"]"""))
         assertTrue(invocation.contains("JSON.parse("))
         assertTrue(invocation.contains("Promise.resolve("))
         assertTrue(invocation.contains("JSON.stringify({ value:"))
+        assertTrue(invocation.contains("__veneraInvocationId"))
         assertFalse(invocation.contains("""globalThis.echo("""))
     }
 }
