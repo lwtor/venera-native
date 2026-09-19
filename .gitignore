@@ -1,0 +1,36 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+local.properties
+
+# Android build outputs
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.hprof
+
+# Signing and secrets
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+
+# Native build
+.cxx/
+.externalNativeBuild/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
