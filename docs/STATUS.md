@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-19 |
 | 当前阶段 | Stage 0：技术验证 |
-| 当前任务 | S0-04：Runtime 限制、二进制和压力验证 |
-| 当前任务状态 | TODO |
+| 当前任务 | S0-05：Compose 阅读器基础原型 |
+| 当前任务状态 | TODO（S0-04 已按“决策所需最小验证”收尾） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -130,33 +130,89 @@ V2337A / Android 16：
 - `:source:engine` 已能执行隔离 fixture、结构化调用、超时、取消和生命周期恢复。
 - Runtime 当前为每来源串行调用；支持非 Binder 传输时结果上限配置为 1 MiB。
 - Runtime 已有 MessagePort Host API、HTTP 文本请求、每来源 Cookie 和取消链路，尚无二进制通道。
+- S0-04 已在 V2337A / SDK 36 取得决策所需的实机结论；压力测量 harness 取得结论后已删除，未保留为长期资产。
 - 尚未引入 Hilt、Room、DataStore、OkHttp、Coil、Paging、WorkManager。
 - 尚未创建 CI、许可证文件、正式图标或发布配置。
 - 当前有领域模型/Runtime JVM 测试和 8 个 Runtime 实机测试。
 - `applicationId = dev.veneranative` 仍是暂定值。
 
-## 当前唯一下一任务
-
-### S0-04：Runtime 限制、二进制和压力验证 — TODO
+## 最近完成：S0-04 Runtime 限制、二进制和压力验证 — DONE
 
 目标：量化 JavaScriptEngine 方案的边界，决定是否可进入 Stage 1。
 
-必须交付：
+本轮执行方式与范围裁剪：
 
-1. 实测大 JSON 参数与结果上限。
-2. 确定图片或二进制响应跨桥接传递策略。
-3. 验证单调用超时、队列上限、每来源并发和全局并发。
-4. 验证沙箱异常终止后的恢复与连续加载/卸载后的资源释放。
-5. 验证前后台切换、进程回收和 API 26 至当前目标版本的可用性策略。
-6. 产出可重复压力测试、测试数据表和 JavaScriptEngine/QuickJS 初步结论。
-7. 根据实测结果更新 ADR-0002。
+- 曾新增 4 个压力测试文件（`SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`、
+  `stress_fixture.js`）并在 V2337A 上执行一轮，取得下方结论后已全部删除。
+- 删除理由：这些测试覆盖的超时、队列、并发、加载卸载 churn 等项测的是 Runtime 自身逻辑而非引擎，
+  后续应在 JVM 单测中用假引擎和注入时钟覆盖，不值得长期保留实机 harness。
+- S0-04 按“决策所需最小验证”收尾：只保留真正影响架构的引擎结论，不追求边界数字收敛。
 
-验收场景：
+第一轮实测结果（设备 vivo V2337A / SDK 36，2026-09-19，25 个测试全部通过）：
 
-- 压力测试可重复执行并输出量化结果。
-- 沙箱崩溃、超时和取消后可以恢复，不持续泄漏资源。
-- 明确记录 Message Ports 设备兼容性和 fallback 触发条件。
-- 给出是否进入 Stage 1 的可审查结论。
+| 场景 | 实测结果 |
+| --- | --- |
+| 沙箱能力 | `isolateTermination=true`、`promiseReturn=true`、`evaluateWithoutTransactionLimit=true`、`provideConsumeArrayBuffer=true`、**`messagePorts=false`** |
+| 脚本内建能力 | `ArrayBuffer`/`Uint8Array`/`Promise` 可用；**`btoa`/`atob`/`TextEncoder`/`setTimeout` 均不可用** |
+| 大参数 | 64 KiB 至 8 MiB 全部成功（8 MiB 耗时 489 ms），未触到失败点 |
+| 大结果 | 在 1 MiB 与 8 MiB 两种配置下，8 MiB 结果均成功；**配置的结果上限在真机上未生效** |
+| 每来源并发 | 32 次并发全成功，153 ms（串行，约 4.8 ms/次） |
+| 跨来源并发 | 4 源 × 8 = 32 次全成功，54 ms（真实并行） |
+| 顺序吞吐 | 100 次调用 375 ms，平均 3.75 ms/次 |
+| 队列深度 | 200 次排队全成功，1045 ms |
+| 单调用超时 | 配置 300 ms，实测 307 ms，返回 `Timeout`；超时后 isolate 重建 |
+| 沙箱异常终止 | 1287 ms 后 `EngineTerminated`；**同一 runtime 复用仍失败，重装来源也失败，只有新建 runtime 才恢复** |
+| 加载/卸载 churn | 30 轮 0 失败；应用进程 PSS 79 → 82 KiB |
+| 沙箱重连 | 关闭后新建 sandbox 计数归 1，可正常使用 |
+
+注：沙箱运行在独立进程，应用 PSS 不含 isolate 内存，PSS 数据只能作为趋势参考。
+
+由实测得到的三条硬结论：
+
+1. **二进制只能走 ArrayBuffer。** `messagePorts=false`，且脚本侧没有 `btoa`/`atob`/`TextEncoder`，
+   Base64 字符串通道在真机上不可用；图片等二进制数据必须使用 `provideConsumeArrayBuffer`。
+2. **超时是可靠护栏，内存上限不是。** 超时误差在 2% 以内；但配置的结果大小上限真机上没有生效，
+   不能当作内存保护，Runtime 需要自行计数与截断。
+3. **沙箱终止后必须重建整个 runtime。** 终止后复用 runtime 与重新安装来源都无法恢复。
+
+本轮未验证（需要后续实机轮次）：
+
+- 大参数与大结果上限的真实收敛点（8 MiB 内未触底）。
+- 前后台切换、进程回收后的 Runtime 行为。
+- API 26 至当前目标版本的低版本可用性。
+
+实机验证按 `AGENTS.md` 第 7 节只在关键节点执行；上述未验证项不在本轮范围，不得写成“已验证”。
+
+验收状态（裁剪后）：
+
+| 原验收项 | 状态 |
+| --- | --- |
+| 大 JSON 参数与结果上限 | 部分完成：8 MiB 内全部通过，未收敛到具体边界；判定为无需继续收敛 |
+| 二进制跨桥接传递策略 | 完成：只能走 `provideConsumeArrayBuffer` |
+| 超时、队列、每来源并发、全局并发 | 完成（见上方数据表）；对应测试已删除，后续转 JVM 单测 |
+| 沙箱异常终止恢复与资源释放 | 完成：终止后必须重建整个 runtime |
+| 前后台切换、进程回收、API 26 可用性 | 未验证，转入已知风险 |
+| 可重复压力测试与数据表 | 数据表保留在上方；harness 已删除，不作为长期资产 |
+| 更新 ADR-0002 | 待办，转入已知风险 |
+
+是否进入 Stage 1 的结论：**可以进入**。S0-02 已证明脚本执行、超时、取消与生命周期可用；
+本轮补充确认了二进制通道与终止恢复路径。剩余不确定项不影响 Stage 1 的 UI 与数据层推进。
+
+验证记录（本轮）：
+
+```text
+2026-09-19（编译级）
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+./gradlew :source:engine:assembleDebugAndroidTest
+结果：BUILD SUCCESSFUL
+
+2026-09-19（实机级，设备安装限制解除后执行）
+adb install -r -t engine-debug-androidTest.apk → Success
+adb shell am instrument -w dev.veneranative.source.engine.test/androidx.test.runner.AndroidJUnitRunner
+结果：OK (25 tests)
+数据：adb logcat -s VeneraStress:I，已归档为本文件上方实测表
+说明：按 AGENTS.md 第 7 节，本轮只针对 S0-04 这一专项验证任务执行实机测量
+```
 
 建议验证命令：
 
@@ -164,6 +220,14 @@ V2337A / Android 16：
 .\gradlew.bat :source:engine:testDebugUnitTest :source:engine:assembleDebugAndroidTest
 .\gradlew.bat :source:engine:connectedDebugAndroidTest
 .\gradlew.bat lintDebug :app:assembleDebug
+```
+
+实测数据收集命令（后续实机轮次，需连接设备）：
+
+```powershell
+adb logcat -c
+adb shell am instrument -w -e class dev.veneranative.source.engine.SourceRuntimeLimitsTest dev.veneranative.source.engine.test/androidx.test.runner.AndroidJUnitRunner
+adb logcat -d -s VeneraStress:I
 ```
 
 不在 S0-04 范围：
@@ -174,24 +238,56 @@ V2337A / Android 16：
 - 正式 Reader UI 和下载功能。
 - 在结论得出前实现完整 QuickJS fallback。
 
-完成 S0-04 后，将当前任务推进为 S0-05。
+## 当前唯一下一任务
+
+### S0-05：Compose 阅读器基础原型 — TODO
+
+目标：交付第一个可交互的阅读界面原型，验证阅读器架构骨架。
+
+计划新增模块：
+
+- `:feature:reader`
+
+必须交付：
+
+- 统一 `ComicPage` 描述符的最小版本。
+- 纵向连续阅读。
+- 横向 LTR/RTL 翻页的最小切换。
+- 页码、当前章节、加载和错误状态。
+- 当前页附近的有限预取。
+- 不在 Compose State 中持有 Bitmap。
+- Fake PageProvider 与 Compose 测试。
+
+不在范围：
+
+- 下载、本地压缩包、真实漫画源和持久化进度。
+- 完整手势设置和正式视觉设计。
+- 真实图片解码管线（由 S0-06 决定 Coil 或子采样方案）。
+
+验证命令（普通节点只要求编译）：
+
+```powershell
+.\gradlew.bat :feature:reader:assembleDebug :app:assembleDebug
+```
 
 ## 紧随其后的任务
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S0-04 | Runtime 限制、二进制和压力验证 | S0-03 |
-| 2 | S0-05 | Compose 阅读器基础原型 | S0-01 |
-| 3 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
-| 4 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
+| 1 | S0-05 | Compose 阅读器基础原型 | S0-01 |
+| 2 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
+| 3 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
 
 ## 已知风险与待确认
 
 | 项目 | 状态 | 解除条件 |
 | --- | --- | --- |
-| AndroidX JavaScriptEngine 是否满足异步 Host API 和二进制需求 | 基础执行已通过，Host/二进制验证中 | 完成 S0-03 至 S0-04 |
+| 异步 Host API 在真机缺少 MessagePort | V2337A 上 `messagePorts=false`，S0-03 的桥按能力跳过 | Stage 1 决定异步桥实现方式时处理 |
+| 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
+| 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
+| ADR-0002 未按实测结论更新 | 待办 | 下次触及 Runtime 决策时更新 |
 | 超长图是否需要专用子采样组件 | 未验证 | 完成 S0-05 至 S0-06 |
-| QuickJS fallback 是否必要 | S0-02 暂不引入 | S0-04 按 ADR-0002 fallback 条件复核 |
+| QuickJS fallback 是否必要 | S0-02 暂不引入 | 与 MessagePort 缺失问题一并决策 |
 | GPL-3.0 衍生边界和最终许可证 | 待确认 | 复用上游实现前完成许可证 ADR |
 | 最终 applicationId | 待用户确认 | 发布配置开始前确认 |
 | Venera 名称与正式视觉标识 | 待确认 | 首个公开测试版前完成品牌审查 |
