@@ -1,13 +1,5 @@
 package dev.veneranative.core.model
 
-/** Identifies a chapter inside a comic. */
-@JvmInline
-value class ChapterKey(val value: String) {
-    init {
-        require(value.isNotBlank()) { "ChapterKey must not be blank" }
-    }
-}
-
 /**
  * Describes a single page without holding decoded pixel data.
  *

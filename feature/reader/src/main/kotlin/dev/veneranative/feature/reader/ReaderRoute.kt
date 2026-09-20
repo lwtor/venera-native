@@ -24,7 +24,9 @@ fun ReaderRoute(
     modifier: Modifier = Modifier,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
 ) {
-    val viewModel: ReaderViewModel = viewModel(key = chapter.value) {
+    val viewModelKey =
+        "${chapter.comicKey.sourceId.value}:${chapter.comicKey.remoteId.value}:${chapter.remoteId.value}"
+    val viewModel: ReaderViewModel = viewModel(key = viewModelKey) {
         ReaderViewModel(chapter = chapter, provider = provider)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()

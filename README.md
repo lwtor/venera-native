@@ -6,7 +6,12 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-**Stage 0（技术验证）已完成**，下一任务是 **S1-01：稳定领域模型与 Source Core 协议**。
+**Stage 0（技术验证）已完成，正在执行 Stage 1（核心阅读闭环）**，当前任务是
+**S1-01：稳定领域模型与 Source Core 协议**。
+
+Stage 1 的两项前置决策已经落地：[ADR-0007](docs/adr/0007-source-protocol-compatibility.md) 划定
+承诺兼容的源协议子集，[ADR-0008](docs/adr/0008-async-host-transport.md) 决定用自有引擎替代
+WebView 系引擎来提供异步 Host API。
 
 阅读器原型可以直接运行（纵向连续阅读、横向 LTR/RTL 翻页、页码、邻近预取、双指缩放），
 并且在生成测试图后会走真实解码管线。大图问题已收敛为可验证的算术结论：确定性测试图生成器

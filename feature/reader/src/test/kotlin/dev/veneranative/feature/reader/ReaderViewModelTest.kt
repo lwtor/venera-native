@@ -1,6 +1,10 @@
 package dev.veneranative.feature.reader
 
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.core.model.RemoteComicId
+import dev.veneranative.core.model.SourceId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -18,6 +22,11 @@ class ReaderViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    private val chapterKey = ChapterKey(
+        comicKey = ComicKey(SourceId("test-source"), RemoteComicId("comic-1")),
+        remoteId = RemoteChapterId("chapter-1"),
+    )
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
@@ -30,7 +39,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `reports ready state with the first page after loading`() = runTest(dispatcher) {
-        val viewModel = ReaderViewModel(ChapterKey("c1"), FakePageProvider(pageCount = 5))
+        val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 5))
         advanceUntilIdle()
 
         val state = viewModel.state.value
@@ -42,7 +51,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `visible page updates the page number`() = runTest(dispatcher) {
-        val viewModel = ReaderViewModel(ChapterKey("c1"), FakePageProvider(pageCount = 5))
+        val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 5))
         advanceUntilIdle()
 
         viewModel.onAction(ReaderAction.PageShown(3))
@@ -52,7 +61,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `page index is clamped to the loaded range`() = runTest(dispatcher) {
-        val viewModel = ReaderViewModel(ChapterKey("c1"), FakePageProvider(pageCount = 5))
+        val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 5))
         advanceUntilIdle()
 
         viewModel.onAction(ReaderAction.PageShown(99))
@@ -63,7 +72,7 @@ class ReaderViewModelTest {
     @Test
     fun `prefetches the neighbourhood of the visible page`() = runTest(dispatcher) {
         val provider = FakePageProvider(pageCount = 5)
-        val viewModel = ReaderViewModel(ChapterKey("c1"), provider)
+        val viewModel = ReaderViewModel(chapterKey, provider)
         advanceUntilIdle()
 
         viewModel.onAction(ReaderAction.PageShown(1))
@@ -75,7 +84,7 @@ class ReaderViewModelTest {
     @Test
     fun `never prefetches the same page twice`() = runTest(dispatcher) {
         val provider = FakePageProvider(pageCount = 5)
-        val viewModel = ReaderViewModel(ChapterKey("c1"), provider)
+        val viewModel = ReaderViewModel(chapterKey, provider)
         advanceUntilIdle()
 
         viewModel.onAction(ReaderAction.PageShown(2))
@@ -88,7 +97,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `provider failure becomes a domain failure state`() = runTest(dispatcher) {
-        val viewModel = ReaderViewModel(ChapterKey("c1"), FailingPageProvider())
+        val viewModel = ReaderViewModel(chapterKey, FailingPageProvider())
         advanceUntilIdle()
 
         assertEquals(ReaderStatus.Failed, viewModel.state.value.status)
@@ -96,7 +105,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `retry after a failure loads the chapter`() = runTest(dispatcher) {
-        val viewModel = ReaderViewModel(ChapterKey("c1"), FakePageProvider(pageCount = 2))
+        val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 2))
         advanceUntilIdle()
 
         viewModel.onAction(ReaderAction.Retry)
@@ -108,7 +117,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `direction change is reflected in state`() = runTest(dispatcher) {
-        val viewModel = ReaderViewModel(ChapterKey("c1"), FakePageProvider(pageCount = 3))
+        val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 3))
         advanceUntilIdle()
 
         viewModel.onAction(ReaderAction.ChangeDirection(ReadingDirection.RightToLeft))

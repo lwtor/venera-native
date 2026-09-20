@@ -225,8 +225,8 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 
 ### Stage 0 结论对 Stage 1 的修改
 
-1. **S1-01 之前增加一项 ADR**：异步 Host API 的传输方式（MessagePort 可选 + 替代通道）。
-   它决定 Core 协议里超时、取消与并发如何表达，必须在实现 Pages/Explore 前定案。
+1. **协议先行、传输后置**：ADR-0008 已把协议/控制面与传输解耦，并把引擎切到自有实现（QuickJS）；
+   S1-01 与 S1-02 不依赖 Host API，新增的 S1-08 必须在 S1-03 之前完成。
 2. **图片管线归属确定**：S1-05 建立 `:core:image` 时迁移 `:feature:reader` 的 `PageImageDecoder`
    与 `PageTiling`；Coil 只承担网络获取与缓存，超长图解码仍由自有解码器负责。
 3. **导航契约后移**：`:core:navigation` 已在 S0-07 删除，在 S1-03 首次需要类型安全 Route 时重建。
@@ -234,7 +234,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 5. **不再安排引擎边界收敛任务**：Stage 0 已把引擎能力、二进制通道、终止恢复与吞吐量级写成结论；
    Stage 1 只在出现设备相关症状时按 `docs/STATUS.md` 的命令补测。
 
-### S1-01 稳定领域模型与 Source Core 协议 — TODO
+### S1-01 稳定领域模型与 Source Core 协议 — IN_PROGRESS
 
 依赖：S0-07。
 
@@ -244,6 +244,14 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - Explore、Search、Detail、Chapters、Pages 五个 Core 能力。
 - 序列化与协议兼容测试。
 - `ComicKey = SourceId + RemoteComicId` 全链路使用。
+
+实际执行（2026-09-20，本轮完成模型与协议基础）：
+
+- 新增 ADR-0007（源协议兼容范围）与 ADR-0008（异步 Host 传输与引擎选择），两项都是本任务的前置。
+- `:core:model` 落地 `Comic`、`ComicDetail`、`Chapter`、`PagedResult`/`PageCursor`、`SourceFilter`
+  与 `FilterValue`、`SourceCapability`/`SourceCapabilities`；`ChapterKey` 升级为 `ComicKey + RemoteChapterId`。
+- 协议语义测试 17 项（分页游标、筛选值三态、章节标识作用域），全量单测 56 项通过。
+- 仍待完成：`:source:api` 的五个 Core 能力契约与契约测试；协议 DTO 依赖 ADR-0007 第 4 节的字段确认。
 
 ### S1-02 来源包安装与管理 — TODO
 
@@ -261,9 +269,23 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - 安装失败不污染已有可运行版本。
 - 来源列表的加载、空、错误和成功状态。
 
+### S1-08 自有引擎（QuickJS）落地 — TODO
+
+依赖：S1-02。**阻塞 S1-03**。
+
+背景：ADR-0008 已确认 WebView 系引擎在没有 MessagePort 的设备上无法提供异步 Host API，
+而参考设备正是这种情况。
+
+交付物：
+
+- `:source:engine` 的自有引擎实现，满足 `:source:api` 契约（引擎实现由装配层选择）。
+- 仓库内测试源（含 `async`/`await` 网络调用）跑通 Explore、Search、Detail、Chapters、Pages。
+- 按 ADR-0008 第 3 节判据产出的数据：调用取消、调用超时、二进制通道、ABI 与体积、许可证登记。
+- 通过后按 ADR-0008 §2.4 处置现有 WebView 实现，并更新 ADR-0002 的引擎状态。
+
 ### S1-03 探索与搜索纵向切片 — TODO
 
-依赖：S1-01、S1-02。
+依赖：S1-01、S1-02、S1-08。
 
 计划模块：
 

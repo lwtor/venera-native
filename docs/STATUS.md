@@ -9,7 +9,7 @@
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
 | 当前任务 | S1-01：稳定领域模型与 Source Core 协议 |
-| 当前任务状态 | TODO（Stage 0 已完成；设备侧验证推迟，见已知风险） |
+| 当前任务状态 | IN_PROGRESS（领域模型与协议基础已完成，Source Core 契约待做） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -394,26 +394,45 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - 正式 Reader UI 和下载功能。
 - 在结论得出前实现完整 QuickJS fallback。
 
-## 当前唯一下一任务
+## 当前唯一执行任务
 
-### S1-01：稳定领域模型与 Source Core 协议 — TODO
+### S1-01：稳定领域模型与 Source Core 协议 — IN_PROGRESS
 
 依赖：S0-07（已完成）。
 
-交付物（摘自 `docs/IMPLEMENTATION_PLAN.md`）：
+本轮已完成（2026-09-20，领域模型与协议基础）：
 
-- Comic、Chapter、Page、分页结果、筛选项和来源能力模型。
-- Explore、Search、Detail、Chapters、Pages 五个 Core 能力。
-- 序列化与协议兼容测试。
-- `ComicKey = SourceId + RemoteComicId` 全链路使用。
+- `docs/adr/0007-source-protocol-compatibility.md`（Accepted）：划定 Stage 1 承诺兼容的上游协议子集
+  （类基础字段、`init`、`explore`、`search`、`comic.loadInfo`、`comic.loadEp`），把 `category`、
+  `account`、`favorites`、评论与社交互动明确排除在 Stage 1 之外；固定两套分页语义与三种筛选值形态。
+- `docs/adr/0008-async-host-transport.md`（Accepted）：确认 AndroidX JavaScriptEngine 的 JS → Kotlin
+  方向只有 MessagePort，参考设备缺失该能力时无法实现异步 Host API；否决重放式桥，决定 Stage 1
+  引入自有引擎（QuickJS），并给出 spike 通过判据。
+- `:core:model` 新增稳定领域模型：`Comic`、`ComicDetail`、`Chapter`、`PagedResult` / `PageCursor`、
+  `SourceFilter`（select / multi-select / dropdown）与 `FilterValue`、`SourceCapability` /
+  `SourceCapabilities`。
+- `ChapterKey` 升级为 `ComicKey + RemoteChapterId`，`ComicKey` 现在贯穿章节标识；阅读器、示例装配
+  与测试同步更新。
+- 新增协议语义测试：`PagingTest`（6）、`SourceFilterTest`（8）、`ChapterKeyTest`（3）。
 
-开始前必须先处理的两项遗留（来自 Stage 0）：
+验证记录：
 
-1. **异步 Host API 传输方式定案。** 参考设备 `messagePorts=false`，ADR-0003 已把 MessagePort
-   降级为可选通道，替代传输需要一个独立 ADR（脚本侧拉取式轮询，或把 Host 调用改为同步
-   请求-响应）。这决定 Core 协议里超时、取消与并发的表达方式，必须在实现 Pages/Explore 之前定案。
-2. **`:core:common` 是否重建。** 如果 S1-01 确实需要统一的 Result/错误聚合类型，按
-   `docs/ARCHITECTURE.md` 第 5 节的准则创建，不要照搬 Stage 0 的空壳。
+```text
+2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+.\gradlew.bat --no-daemon --max-workers=2 :core:model:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL
+全量单元测试 56 项，failures=0 errors=0 skipped=0
+  core:model 18 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
+```
+
+仍待完成：
+
+- `:source:api` 的五个 Core 能力契约（Explore、Search、Detail、Chapters、Pages）与可执行契约测试。
+- 协议 DTO 与 JSON 兼容测试，依赖 ADR-0007 第 4 节的字段级确认。
+- `ComicKey` 全链路使用在 Feature / Data 层的落实，随 S1-03 建立 `:data:comic` 完成。
+
+下一轮从 `:source:api` 的 Core 契约开始。
 
 编译检查：
 
@@ -425,8 +444,10 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S1-01 | 稳定领域模型与 Source Core 协议 | S0-07（已完成） |
+| 1 | S1-01 | 稳定领域模型与 Source Core 协议（进行中：Source Core 契约待做） | S0-07（已完成） |
 | 2 | S1-02 | 来源包安装与管理 | S1-01 |
+| 3 | S1-08 | 自有引擎（QuickJS）落地，阻塞 S1-03 | S1-02 |
+| 4 | S1-03 | 探索与搜索纵向切片 | S1-01、S1-02、S1-08 |
 
 ## 已知风险与待确认
 
@@ -435,7 +456,8 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 | 异步 Host API 在真机缺少 MessagePort | V2337A 上 `messagePorts=false`，S0-03 的桥按能力跳过 | Stage 1 决定异步桥实现方式时处理 |
 | 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
-| 异步 Host 桥的替代传输未定案 | ADR-0003 已把 MessagePort 降级为可选通道，替代形式未选 | Stage 1 需要独立 ADR，且必须在实现 Pages/Explore 之前定案 |
+| WebView 引擎在参考设备上无法提供异步 Host API | ADR-0008 已定案转向自有引擎（QuickJS），spike 尚未执行 | spike 必须通过 ADR-0008 第 3 节全部判据；未通过前 S1-03 不得叠加临时方案 |
+| 上游协议字段级细节未核对 | ADR-0007 第 4 节列出待确认项（`ComicDetails` 字段、章节来源、Host API 签名） | 写协议 DTO 之前必须补齐，且以 `js_api.md` 为准 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
 | 导航契约模块已删除 | `:core:navigation` 零引用，S0-07 删除以符合模块创建准则 | S1-03 首次需要类型安全 Route 时重建 |
 | 大图策略的设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突） | 规则已由 JVM 预算测试保证，设备数据缺失，未验证 | Stage 0 退出门禁；需要时按 S0-06 记录的命令采集 |

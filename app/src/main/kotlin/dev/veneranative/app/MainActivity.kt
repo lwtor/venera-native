@@ -12,6 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.core.model.RemoteComicId
+import dev.veneranative.core.model.SourceId
 import dev.veneranative.feature.home.HomeRoute
 import dev.veneranative.feature.reader.AssetFixturePageProvider
 import dev.veneranative.feature.reader.FakePageProvider
@@ -50,9 +54,16 @@ class MainActivity : ComponentActivity() {
                 }
 
                 var readerOpen by rememberSaveable { mutableStateOf(false) }
+                val demoChapter = remember {
+                    ChapterKey(
+                        comicKey = ComicKey(SourceId("demo"), RemoteComicId("demo-comic")),
+                        remoteId = RemoteChapterId("demo-chapter"),
+                    )
+                }
+
                 if (readerOpen) {
                     ReaderRoute(
-                        chapter = ChapterKey("demo-1"),
+                        chapter = demoChapter,
                         provider = provider,
                         onBack = { readerOpen = false },
                         decoderFactory = decoderFactory,
