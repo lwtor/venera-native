@@ -15,6 +15,7 @@ import dev.veneranative.data.source.SourceRepository
 @Composable
 fun SourcesRoute(
     repository: SourceRepository,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository) }
@@ -22,6 +23,7 @@ fun SourcesRoute(
     SourcesScreen(
         state = state,
         onAction = viewModel::onAction,
+        onBack = onBack,
         modifier = modifier,
     )
 }

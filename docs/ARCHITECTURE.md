@@ -39,8 +39,12 @@ immutable UiState
 | `:core:model` | 稳定领域 ID 与跨层模型 | 尽量只依赖 Kotlin |
 | `:data:source` | 来源包的安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
+| `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |
+| `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）与来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
-| `:feature:home` | 首页占位 UI | Design System、领域契约 |
+| `:feature:home` | 首页占位 UI：来源、探索、搜索与阅读器的入口 | Design System、领域契约 |
+| `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
+| `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
 | `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架，以及 S0-06 的解码策略原型（`PageImageDecoder`、有界缓存、缩放与分块） | Design System、`:core:model` |
 | `:feature:sources` | 来源列表：安装、启停、卸载，以及加载 / 空 / 失败 / 成功四种页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |

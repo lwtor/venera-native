@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
-| 当前任务 | S1-03：探索与搜索纵向切片 |
-| 当前任务状态 | IN_PROGRESS（引擎约定与地基已完成；SourceCore 实现与三个 Feature 模块待做） |
+| 当前任务 | S1-04：漫画详情与章节 |
+| 当前任务状态 | TODO（S1-03 已完成；`ComicDetails` 路由已就绪，详情屏是它唯一缺的实现） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -396,7 +396,7 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 
 ## 当前唯一执行任务
 
-### S1-03：探索与搜索纵向切片 — IN_PROGRESS
+### S1-03：探索与搜索纵向切片 — DONE
 
 依赖：S1-01、S1-02、S1-08。
 
@@ -424,9 +424,33 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
   `SourceProtocolParserTest` 补 3 项（游标列表与游标探索页），`SourceProtocolTest` 改为显式的
   `searchLoad` / `searchLoadNext`（分页形态由源声明决定，不再由调用方的游标类型决定）。
 
-仍待完成（S1-03 的主体）：
+- **数据层 `:data:comic`**：`ComicCatalog` 承担两件 feature 不该各自重做的事——"哪些源对某个能力可用"
+  （已安装 + 已启用 + 声明了该能力，能力读不到就排除而不是让整张列表失败）与"源的两种分页怎么变成
+  Paging 3"。Paging 键用 `PageKey.Start / At(cursor)` 表达"首页不是游标"：首页让**源**决定（页码源从 1 开始、
+  游标源收到 null token），Paging 与 UI 都不需要知道源是哪种。只提供向前分页（`prevKey` 恒为 null），
+  因为游标源无法回退，页码源回退需要另一种请求形态。
+- **`SourceLoadException`** 把领域错误穿过 Paging 3（它只能以 Throwable 失败），错误对象仍可取到，
+  所以 UI 映射的是产品文案而不是异常信息。
+- **两个 feature**：`:feature:explore`（来源选择 + 该源声明的探索页标签 + 分页内容，页面形状按源给的
+  原样渲染：单列表 / 带标题分区 / 混合）与 `:feature:search`（来源选择 + 关键词 + 分页结果）。
+  两者都只提供声明了对应能力的源；列表的加载/失败/空状态取自 Paging 本身（失败在列表上重试），
+  文案由各自 feature 提供（feature 之间不互相依赖，也不共享字符串表）。
+- **类型安全路由 `:core:navigation`**：`AppRoute` 是带类型的封闭集合，`ComicDetails(ComicKey)` 携带
+  来源与远端 id（同一个远端 id 在不同来源可以是不同漫画）。路由与 `encode()`/`decodeAppRoute()` 分离，
+  后者是纯函数并处理 id 里的 `:` 与 `%`，`:app` 用它把导航状态存进 `rememberSaveable`。
+- **`:app` 装配**：一个 `QuickJsRuntime` 同时服务来源仓库与目录；`EngineSourceCore` 挂在它上面；
+  首页新增 Explore/Search 入口，搜索结果与探索结果都发 `ComicDetails` 路由。
 
-- `:data:comic`、`:feature:explore`、`:feature:search` 与 Paging 3 适配、类型安全路由。
+S1-03 已知缺口（不是遗漏，是明确留给后续）：
+
+- 详情屏本身属于 S1-04：`:app` 目前渲染一个**明确标注**的占位屏（它显示路由里的 comic key），
+  路由链路已经端到端打通。
+- 筛选器的 **UI** 未做：筛选值已能从源声明读取、按声明顺序编码并随请求发出（有测试），
+  但界面上还没有控件，用户暂时只能用默认值。
+- 探索页筛选：上游把筛选挂在**单个探索页**上，我们的 `ExplorePage` 还没有该字段，Stage 1 的
+  探索调用也不带筛选（ADR-0007 §2.1）。
+- Paging 的加载路径由 `:data:comic` 直接驱动 `PagingSource.load` 覆盖；VM 层验证"选择 → 请求"的
+  纯函数。用 `paging-testing` 的 presenter 做端到端 paging 断言是可选的后续加固。
 
 验证记录：
 
@@ -434,12 +458,12 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 .\gradlew.bat --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug
+              :feature:sources:compileDebugAndroidTestKotlin
 结果：BUILD SUCCESSFUL
-全量单元测试 168 项，failures=0 errors=0
-  source:engine 39（QuickJsRuntimeTest 20、QuickJsMetadataReaderTest 7、QuickJsBridgeSpikeTest 3、
-  SourceClassConventionTest 3、SourceInvocationScriptTest 3、SourcePackageValidatorTest 3）
-  source:core 13（EngineSourceCoreTest，用真实引擎跑上游形态的源）
-  source:api 33（SourceProtocolTest 9、SourceProtocolParserTest 15、SourceCoreTest 9）
+全量单元测试 191 项，failures=0 errors=0
+  source:engine 39、source:core 13、source:api 33、core:model 24、core:navigation 3、
+  data:comic 7、data:source 16、feature:search 7、feature:explore 6、feature:sources 9、
+  feature:reader 26、source:network 6、core:network 1
 ```
 
 ## 上一任务：S1-08 自有引擎（QuickJS）落地 — 代码部分完成
@@ -625,8 +649,8 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S1-03 | 探索与搜索纵向切片（进行中：约定与地基已完成） | S1-01、S1-02、S1-08 |
-| 2 | S1-04 | 漫画详情与章节 | S1-03 |
+| 1 | S1-04 | 漫画详情与章节（替换 `:app` 里的 `ComicDetailsPlaceholder`） | S1-03（已完成） |
+| 2 | S1-05 | Coil 漫画图片管线 | S0-06、S1-01 |
 
 S1-08 剩余部分（不阻塞 S1-03，见已知风险）：设备侧 ABI 与 APK 体积实测、二进制请求体通道、
 许可证登记、WebView 实现的最终处置。

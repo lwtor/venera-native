@@ -13,6 +13,7 @@ quickjs = "1.0.5"
 # boundaries need a real implementation on the classpath.
 json = "20231013"
 lifecycle = "2.11.0"
+paging = "3.5.1"
 navigation3 = "1.1.7"
 okhttp = "5.5.0"
 
@@ -23,6 +24,8 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
 androidx-javascriptengine = { module = "androidx.javascriptengine:javascriptengine", version.ref = "javascriptEngine" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
+androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
+androidx-paging-compose = { module = "androidx.paging:paging-compose", version.ref = "paging" }
 androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-navigation3-runtime = { module = "androidx.navigation3:navigation3-runtime", version.ref = "navigation3" }
 androidx-navigation3-ui = { module = "androidx.navigation3:navigation3-ui", version.ref = "navigation3" }

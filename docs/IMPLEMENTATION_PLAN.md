@@ -319,22 +319,24 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - 按 ADR-0008 第 3 节判据产出的数据：调用取消、调用超时、二进制通道、ABI 与体积、许可证登记。
 - 通过后按 ADR-0008 §2.4 处置现有 WebView 实现，并更新 ADR-0002 的引擎状态。
 
-### S1-03 探索与搜索纵向切片 — TODO
+### S1-03 探索与搜索纵向切片 — DONE
 
 依赖：S1-01、S1-02、S1-08。
 
-计划模块：
+实际执行：先补上了三个前置——自有引擎（S1-08）、上游源加载约定（ADR-0007 §4.4）、
+`SourceCore` 的引擎实现（新增 `:source:core`）——然后落地本任务的模块。
 
-- `:data:comic`
-- `:feature:explore`
-- `:feature:search`
+新增模块：`:source:core`、`:data:comic`、`:core:navigation`、`:feature:explore`、`:feature:search`。
 
 交付物：
 
-- 单源探索、搜索、页码或 token 分页。
-- Paging 3 与来源分页适配。
-- 单源失败、重试和取消。
-- 搜索结果跳转详情的类型安全 Route。
+- 单源探索与搜索，页码与 token 两种分页都由**源声明**决定（`load` 优先于 `loadNext`）。
+- Paging 3 适配：`PageKey.Start` / `At(cursor)`，仅向前分页，领域错误经 `SourceLoadException` 穿透。
+- 单源失败、重试（在列表上重试）与"能力不可用"作为产品状态而非源故障。
+- 类型安全 Route：`AppRoute.ComicDetails(ComicKey)`，可编码进 `rememberSaveable`。
+
+已知缺口：详情屏本身（S1-04，当前为标注清楚的占位）、筛选器的 UI（编码链路已完成）、
+探索页筛选（`ExplorePage` 尚无该字段）。详见 `docs/STATUS.md`。
 
 ### S1-04 漫画详情与章节 — TODO
 

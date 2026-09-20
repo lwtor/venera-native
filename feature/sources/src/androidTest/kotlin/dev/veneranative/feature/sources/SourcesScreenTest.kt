@@ -27,7 +27,11 @@ class SourcesScreenTest {
     fun `loading shows progress`() {
         composeRule.setContent {
             VeneraNativeTheme {
-                SourcesScreen(state = SourcesUiState(status = SourcesStatus.Loading), onAction = {})
+                SourcesScreen(
+                    state = SourcesUiState(status = SourcesStatus.Loading),
+                    onAction = {},
+                    onBack = {},
+                )
             }
         }
 
@@ -41,6 +45,7 @@ class SourcesScreenTest {
                 SourcesScreen(
                     state = SourcesUiState(status = SourcesStatus.Ready),
                     onAction = {},
+                    onBack = {},
                 )
             }
         }
@@ -59,6 +64,7 @@ class SourcesScreenTest {
                         message = "The source list could not be read.",
                     ),
                     onAction = { actions += it },
+                    onBack = {},
                 )
             }
         }
@@ -76,6 +82,7 @@ class SourcesScreenTest {
                 SourcesScreen(
                     state = SourcesUiState(status = SourcesStatus.Ready, sources = listOf(SOURCE)),
                     onAction = {},
+                    onBack = {},
                 )
             }
         }
@@ -88,7 +95,11 @@ class SourcesScreenTest {
     fun `install stays disabled until a location is typed`() {
         composeRule.setContent {
             VeneraNativeTheme {
-                SourcesScreen(state = SourcesUiState(status = SourcesStatus.Ready), onAction = {})
+                SourcesScreen(
+                    state = SourcesUiState(status = SourcesStatus.Ready),
+                    onAction = {},
+                    onBack = {},
+                )
             }
         }
 

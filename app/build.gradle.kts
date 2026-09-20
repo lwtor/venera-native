@@ -21,13 +21,18 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:model"))
+    implementation(project(":core:navigation"))
+    implementation(project(":data:comic"))
     implementation(project(":data:source"))
+    implementation(project(":feature:explore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:reader"))
+    implementation(project(":feature:search"))
     implementation(project(":feature:sources"))
     // The assembly layer names engine contracts directly, so it declares them instead of relying on
     // transitive exposure from the implementation modules.
     implementation(project(":source:api"))
+    implementation(project(":source:core"))
     implementation(project(":source:engine"))
     // The Host API implementation lives with the network stack (ADR-0001); the assembly layer is
     // what pairs it with an engine.

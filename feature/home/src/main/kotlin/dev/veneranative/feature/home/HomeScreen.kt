@@ -27,8 +27,15 @@ import dev.veneranative.core.designsystem.VeneraNativeTheme
 fun HomeRoute(
     onOpenReader: () -> Unit,
     onOpenSources: () -> Unit,
+    onOpenExplore: () -> Unit,
+    onOpenSearch: () -> Unit,
 ) {
-    HomeScreen(onOpenReader = onOpenReader, onOpenSources = onOpenSources)
+    HomeScreen(
+        onOpenReader = onOpenReader,
+        onOpenSources = onOpenSources,
+        onOpenExplore = onOpenExplore,
+        onOpenSearch = onOpenSearch,
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +43,8 @@ fun HomeRoute(
 internal fun HomeScreen(
     onOpenReader: () -> Unit,
     onOpenSources: () -> Unit,
+    onOpenExplore: () -> Unit,
+    onOpenSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -55,11 +64,17 @@ internal fun HomeScreen(
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                text = "Install a comic source, or open the reader prototype with built-in pages.",
+                text = "Install a comic source, then browse or search it.",
                 style = MaterialTheme.typography.bodyMedium,
             )
             Button(onClick = onOpenSources) {
                 Text("Sources")
+            }
+            Button(onClick = onOpenExplore) {
+                Text("Explore")
+            }
+            Button(onClick = onOpenSearch) {
+                Text("Search")
             }
             Button(onClick = onOpenReader) {
                 Text("Open reader prototype")
@@ -72,6 +87,6 @@ internal fun HomeScreen(
 @Composable
 private fun HomeScreenPreview() {
     VeneraNativeTheme {
-        HomeScreen(onOpenReader = {}, onOpenSources = {})
+        HomeScreen(onOpenReader = {}, onOpenSources = {}, onOpenExplore = {}, onOpenSearch = {})
     }
 }

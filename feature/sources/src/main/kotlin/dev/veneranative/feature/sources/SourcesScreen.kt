@@ -50,13 +50,19 @@ import dev.veneranative.core.model.SourceId
 fun SourcesScreen(
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var pendingUninstall by remember { mutableStateOf<InstalledSource?>(null) }
 
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("Sources") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Sources") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+            )
+        },
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -273,6 +279,7 @@ private fun SourcesScreenPreview() {
                 ),
             ),
             onAction = {},
+            onBack = {},
         )
     }
 }
