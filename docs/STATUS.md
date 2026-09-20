@@ -413,10 +413,19 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
   `QuickJsRuntimeTest` 扩到 20 项（注册表、`this` 绑定、`init` 执行、`loadSetting` 默认值、
   路径成员、未知成员、key 不一致被拒、缩进声明被拒等）。
 
+- **`SourceCore` 的引擎实现已落地**（新增 `:source:core` 模块）：`EngineSourceCore` 读取源声明的能力
+  （引擎侧新增通用结构探针 `__venera.probe`，只报告形状、不解释协议），据此决定调用形态：
+  有 `load` 就不用 `loadNext`、探索页按**位置**寻址（`explore.0.load` 这种带下标段的成员路径）、
+  未声明的能力返回 `UnsupportedCapability` 而不是尝试调用。能力每个源只探测一次并缓存。
+- 这一轮又抓到**两个真实缺陷**：协议层给 `explore[i].load(page)` 多传了一个页面 key 参数
+  （上游只传一个页面参数，页面靠位置标识）；适配器把"源没有探索能力"误判成"未知页面"。
+  两个都是只有拿上游形态的源真跑才会暴露的问题。
+- 测试：新增 `EngineSourceCoreTest`（13 项，用真实引擎跑上游形态的源），
+  `SourceProtocolParserTest` 补 3 项（游标列表与游标探索页），`SourceProtocolTest` 改为显式的
+  `searchLoad` / `searchLoadNext`（分页形态由源声明决定，不再由调用方的游标类型决定）。
+
 仍待完成（S1-03 的主体）：
 
-- `SourceCore` 的引擎实现：把 Explore / Search / Detail / Chapters / Pages 映射成协议调用并解析响应
-  （S1-01 已备好 `SourceProtocol` 与 `SourceProtocolParser`，约定已可用）。
 - `:data:comic`、`:feature:explore`、`:feature:search` 与 Paging 3 适配、类型安全路由。
 
 验证记录：
@@ -426,9 +435,11 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 .\gradlew.bat --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug
 结果：BUILD SUCCESSFUL
-全量单元测试 151 项，failures=0 errors=0
+全量单元测试 168 项，failures=0 errors=0
   source:engine 39（QuickJsRuntimeTest 20、QuickJsMetadataReaderTest 7、QuickJsBridgeSpikeTest 3、
   SourceClassConventionTest 3、SourceInvocationScriptTest 3、SourcePackageValidatorTest 3）
+  source:core 13（EngineSourceCoreTest，用真实引擎跑上游形态的源）
+  source:api 33（SourceProtocolTest 9、SourceProtocolParserTest 15、SourceCoreTest 9）
 ```
 
 ## 上一任务：S1-08 自有引擎（QuickJS）落地 — 代码部分完成

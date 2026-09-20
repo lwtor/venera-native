@@ -104,6 +104,35 @@ object SourceProtocolParser {
         )
     }
 
+    /**
+     * `{comics, next}`: the cursor-shaped list response, which is what `loadNext` forms return.
+     * A null or empty token means the source has no further pages.
+     */
+    fun parseCursorComicList(sourceId: SourceId, payload: String): PagedResult<Comic> {
+        val root = payload.objectOrNull() ?: return PagedResult(emptyList())
+        return PagedResult.cursor(parseComics(sourceId, root["comics"]), root["next"].stringOrNull())
+    }
+
+    /**
+     * The cursor-shaped explore response.
+     *
+     * `mixed` pages carry their items under `data`; page-numbered pages under `comics`. A
+     * `multiPartPage` is a single page by definition, so it has no cursor to return.
+     */
+    fun parseExplorePageCursor(
+        sourceId: SourceId,
+        page: ExplorePage,
+        payload: String,
+    ): PagedResult<ExploreItem> {
+        val root = payload.objectOrNull() ?: return PagedResult(emptyList())
+        val items = when (page.kind) {
+            ExploreKind.MULTI_PAGE -> listOf(ExploreItem.Comics(parseComics(sourceId, root["comics"])))
+            ExploreKind.MIXED -> parseMixedItems(sourceId, root["data"])
+            ExploreKind.MULTI_PART -> return PagedResult(items = parseSections(sourceId, payload))
+        }
+        return PagedResult.cursor(items, root["next"].stringOrNull())
+    }
+
     /** `{images: [...]}`: sources return URLs, so pages carry no dimensions. */
     fun parseImages(payload: String): List<SourcePage> {
         val root = payload.objectOrNull() ?: return emptyList()

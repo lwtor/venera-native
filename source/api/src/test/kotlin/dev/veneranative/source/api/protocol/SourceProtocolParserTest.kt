@@ -189,4 +189,40 @@ class SourceProtocolParserTest {
         assertEquals(listOf("A"), (result.items.single() as ExploreItem.Comics).comics.map { it.title })
         assertEquals(PageCursor.Page(2), result.next)
     }
+
+    @Test
+    fun `a cursor list reports the token instead of a page count`() {
+        val payload = """{"comics":[{"id":"c1","title":"A"}],"next":"t2"}"""
+
+        val page = SourceProtocolParser.parseCursorComicList(sourceId, payload)
+
+        assertEquals(listOf("A"), page.items.map { it.title })
+        assertEquals(PageCursor.Token("t2"), page.next)
+        assertNull(page.totalPages)
+    }
+
+    @Test
+    fun `a cursor list without a token has no next page`() {
+        val page = SourceProtocolParser.parseCursorComicList(
+            sourceId,
+            """{"comics":[{"id":"c1","title":"A"}],"next":null}""",
+        )
+
+        assertNull(page.next)
+        assertEquals(false, page.hasMore)
+    }
+
+    @Test
+    fun `a cursor explore page reads the shape that matches its kind`() {
+        val mixed = SourceProtocolParser.parseExplorePageCursor(
+            sourceId = sourceId,
+            page = ExplorePage.of("Frontpage", ExploreKind.MIXED),
+            payload = """{"data":[[{"id":"c1","title":"A"}],{"title":"Hot","comics":[{"id":"c2","title":"B"}]}],"next":"t3"}""",
+        )
+
+        assertEquals(2, mixed.items.size)
+        assertTrue(mixed.items[0] is ExploreItem.Comics)
+        assertEquals("Hot", (mixed.items[1] as ExploreItem.Section).title)
+        assertEquals(PageCursor.Token("t3"), mixed.next)
+    }
 }

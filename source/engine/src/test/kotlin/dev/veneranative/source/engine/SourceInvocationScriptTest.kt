@@ -13,8 +13,12 @@ class SourceInvocationScriptTest {
         assertTrue(SourceInvocationScript.validateMember("comic.loadEp"))
         assertTrue(SourceInvocationScript.validateMember("_private2"))
         assertTrue(SourceInvocationScript.validateMember("\$host"))
+        assertTrue(SourceInvocationScript.validateMember("explore.0.load"))
+        assertTrue(SourceInvocationScript.validateMember("explore.12.loadNext"))
 
         assertFalse(SourceInvocationScript.validateMember(""))
+        // A path ends in the name of the function being called, never in an index.
+        assertFalse(SourceInvocationScript.validateMember("explore.0"))
         assertFalse(SourceInvocationScript.validateMember("search..load"))
         assertFalse(SourceInvocationScript.validateMember(".search"))
         assertFalse(SourceInvocationScript.validateMember("search."))
@@ -32,6 +36,13 @@ class SourceInvocationScriptTest {
             )
 
         assertTrue(invocation.contains("""const path = ["search", "load"]"""))
+        assertTrue(
+            SourceInvocationScript.build(
+                member = "explore.0.load",
+                argumentsJson = "[]",
+                invocationId = "call-2",
+            ).contains("""const path = ["explore", "0", "load"]"""),
+        )
         assertTrue(invocation.contains("let target = globalThis"))
         assertTrue(invocation.contains("fn.apply(target, args)"))
         assertTrue(invocation.contains("JSON.parse("))

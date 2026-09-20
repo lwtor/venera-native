@@ -39,8 +39,10 @@ data class SourceProtocolCall(
  */
 object SourceProtocol {
 
-    const val MEMBER_LOAD_INFO = "loadInfo"
-    const val MEMBER_LOAD_EP = "loadEp"
+    // Details and pages live under `comic`, not at the top level: upstream calls
+    // `ComicSource.sources[key].comic.loadInfo(id)` (ADR-0007 §4.4).
+    const val MEMBER_LOAD_INFO = "comic.loadInfo"
+    const val MEMBER_LOAD_EP = "comic.loadEp"
     const val MEMBER_SEARCH_LOAD = "search.load"
     const val MEMBER_SEARCH_LOAD_NEXT = "search.loadNext"
     const val MEMBER_EXPLORE_LOAD = "explore.load"
@@ -62,35 +64,46 @@ object SourceProtocol {
     )
 
     /**
-     * Search, either page-numbered or cursor-based.
+     * Page-numbered search: `search.load(keyword, options, page)`.
      *
-     * A token cursor maps to `search.loadNext`, which upstream sources only implement when they have
-     * no page-numbered `load`; an implementation must therefore prefer the cursor the caller got
-     * back rather than inventing one.
+     * Which of the two forms to use is decided by what the source declares, not by the caller:
+     * upstream ignores `loadNext` whenever `load` exists (ADR-0007 §2.2). The caller that knows the
+     * declaration picks the function; this one only encodes it.
      */
-    fun search(filters: List<SourceFilter>, request: SearchRequest): SourceProtocolCall {
-        val options = JsonArray(
-            encodeFilterSelection(filters, request.filters).map(::encodeFilterValue),
-        )
-        return when (val cursor = request.cursor) {
-            is PageCursor.Token -> call(
-                MEMBER_SEARCH_LOAD_NEXT,
-                JsonPrimitive(request.keyword),
-                options,
-                JsonPrimitive(cursor.value),
-            )
+    fun searchLoad(
+        filters: List<SourceFilter>,
+        request: SearchRequest,
+        pageNumber: Int,
+    ): SourceProtocolCall = call(
+        MEMBER_SEARCH_LOAD,
+        JsonPrimitive(request.keyword),
+        optionsArray(filters, request),
+        JsonPrimitive(pageNumber),
+    )
 
-            else -> call(
-                MEMBER_SEARCH_LOAD,
-                JsonPrimitive(request.keyword),
-                options,
-                JsonPrimitive(pageNumber(cursor, firstPage = FIRST_PAGE)),
-            )
-        }
-    }
+    /**
+     * Cursor search: `search.loadNext(keyword, options, next)`.
+     *
+     * The token is the one the previous page returned; upstream passes `null` on the first page, so
+     * [token] is nullable rather than required.
+     */
+    fun searchLoadNext(
+        filters: List<SourceFilter>,
+        request: SearchRequest,
+        token: String?,
+    ): SourceProtocolCall = call(
+        MEMBER_SEARCH_LOAD_NEXT,
+        JsonPrimitive(request.keyword),
+        optionsArray(filters, request),
+        token?.let(::JsonPrimitive) ?: JsonNull,
+    )
 
     /**
      * Explore: `load(page)` where the page argument depends on the page kind.
+     *
+     * The page itself is identified by **position** in the source's declared array, so it is not an
+     * argument: upstream calls `ComicSource.sources[key].explore[i].load(page)` with the page number
+     * as the only argument (ADR-0007 §4.4). The caller rewrites the member path with the index.
      *
      * `multiPartPage` is a single page and receives null; `mixed` indexes pages from zero. Sending
      * the wrong base silently shifts the whole list by one page, so the kind decides, not the caller.
@@ -103,7 +116,7 @@ object SourceProtocol {
 
             ExploreKind.MIXED -> JsonPrimitive(pageNumber(request.cursor, firstPage = FIRST_MIXED_INDEX))
         }
-        return call(MEMBER_EXPLORE_LOAD, JsonPrimitive(page.key), pageArgument)
+        return call(MEMBER_EXPLORE_LOAD, pageArgument)
     }
 
     /** A filter value as it appears inside the positional options array. */
@@ -119,6 +132,10 @@ object SourceProtocol {
 
         FilterValue.Unselected -> JsonNull
     }
+
+    /** The positional options array: order comes from the declared filters, values from the user. */
+    private fun optionsArray(filters: List<SourceFilter>, request: SearchRequest): JsonArray =
+        JsonArray(encodeFilterSelection(filters, request.filters).map(::encodeFilterValue))
 
     private fun pageNumber(cursor: PageCursor?, firstPage: Int): Int =
         (cursor as? PageCursor.Page)?.number ?: firstPage

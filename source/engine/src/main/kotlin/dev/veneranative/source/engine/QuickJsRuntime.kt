@@ -377,6 +377,7 @@ class QuickJsRuntime(
                 )
             }
 
+            engine.evaluate<Any?>(SourceClassConvention.PROBE_ATTACHMENT_SCRIPT)
             engine.evaluate<Any?>(SourceClassConvention.INIT_SCRIPT)
         }
 

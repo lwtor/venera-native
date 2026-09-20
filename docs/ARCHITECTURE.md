@@ -44,6 +44,7 @@ immutable UiState
 | `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架，以及 S0-06 的解码策略原型（`PageImageDecoder`、有界缓存、缩放与分块） | Design System、`:core:model` |
 | `:feature:sources` | 来源列表：安装、启停、卸载，以及加载 / 空 / 失败 / 成功四种页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
+| `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |
 | `:source:engine` | AndroidX JavaScriptEngine 与 MessagePort 适配 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
 

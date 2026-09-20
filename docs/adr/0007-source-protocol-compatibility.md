@@ -153,6 +153,7 @@ Stage 3/4 的内容提前拖进 Stage 1。
 | 读元数据 | 从实例读 `name` / `key` / `version`（三者必填）/ `minAppVersion` / `url`；`key` 只允许 `[A-Za-z0-9_]+` |
 | 注册 | `ComicSource.sources[key] = 实例`，此后一律通过该注册表调用成员 |
 | 成员调用 | **路径**形式：`ComicSource.sources[key].comic.loadInfo(id)`、`.search.load(kw, options, page)`、`.explore[i].load(page)` —— 因此成员的 `this` 是**声明它的那个对象**，不是全局对象 |
+| 探索页调用 | `explore[i].load(page)`：页面由**位置**标识，`load` 只收一个参数（页面号或 `null`）。把页面 key 当参数传会直接改变源的返回值——这是实现中实际踩到并修正的坑（见 §4.6） |
 | `init()` | 只有存在时才调用；上游在解析完成后异步延迟 50ms 触发 |
 
 基类 `ComicSource` 由宿主在 JS 侧提供（上游在 `assets/init.js`），成员包括身份字段、

@@ -374,5 +374,5 @@ internal object QuickJsHostScript {
             version: ${jsQuote(appVersion)}
           });
         })();
-    """.trimIndent() + "\n\n" + SourceBaseScript.script
+    """.trimIndent() + "\n\n" + SourceBaseScript.script + "\n\n" + SourceProbeScript.script
 }

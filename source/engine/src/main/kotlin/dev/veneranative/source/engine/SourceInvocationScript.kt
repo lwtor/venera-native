@@ -12,13 +12,21 @@ package dev.veneranative.source.engine
  * single-segment path on the global object is the same thing.
  */
 internal object SourceInvocationScript {
-    private val segmentPattern = Regex("^[A-Za-z_$][A-Za-z0-9_$]*$")
+    private val namePattern = Regex("^[A-Za-z_$][A-Za-z0-9_$]*$")
+
+    /** Explore pages are declared as an array, so their position addresses them: `explore.0.load`. */
+    private val indexPattern = Regex("^[0-9]{1,6}$")
 
     /** `root` is a JavaScript expression the member path is resolved against. */
     const val DEFAULT_ROOT = "globalThis"
 
-    fun validateMember(member: String): Boolean =
-        member.isNotEmpty() && member.split('.').all(segmentPattern::matches)
+    fun validateMember(member: String): Boolean {
+        if (member.isEmpty()) return false
+        val segments = member.split('.')
+        // Whatever the path walks through, it ends in the name of the function being called.
+        if (!namePattern.matches(segments.last())) return false
+        return segments.all { namePattern.matches(it) || indexPattern.matches(it) }
+    }
 
     fun build(
         member: String,

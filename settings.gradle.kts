@@ -27,6 +27,7 @@ include(
     ":feature:reader",
     ":feature:sources",
     ":source:api",
+    ":source:core",
     ":source:engine",
     ":source:network",
 )

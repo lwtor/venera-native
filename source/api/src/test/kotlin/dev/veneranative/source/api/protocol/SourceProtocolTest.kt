@@ -52,6 +52,8 @@ class SourceProtocolTest {
         val call = SourceProtocol.loadInfo(comicKey)
 
         assertEquals(SourceProtocol.MEMBER_LOAD_INFO, call.member)
+        // Pinned literally: upstream reaches details through `comic`, not at the top level.
+        assertEquals("comic.loadInfo", call.member)
         assertEquals(listOf("comic-1"), call.arguments().map { it.jsonPrimitive.content })
     }
 
@@ -60,6 +62,7 @@ class SourceProtocolTest {
         val call = SourceProtocol.loadEp(chapterKey)
 
         assertEquals(SourceProtocol.MEMBER_LOAD_EP, call.member)
+        assertEquals("comic.loadEp", call.member)
         assertEquals(listOf("comic-1", "chapter-1"), call.arguments().map { it.jsonPrimitive.content })
     }
 
@@ -72,7 +75,7 @@ class SourceProtocolTest {
             filters = FilterSelection(mapOf("sort" to listOf("1"), "genre" to listOf("comedy", "action"))),
         )
 
-        val call = SourceProtocol.search(listOf(sort, genres), request)
+        val call = SourceProtocol.searchLoad(listOf(sort, genres), request, pageNumber = 2)
         val arguments = call.arguments()
 
         assertEquals(SourceProtocol.MEMBER_SEARCH_LOAD, call.member)
@@ -84,24 +87,38 @@ class SourceProtocolTest {
     }
 
     @Test
-    fun `a search without a cursor asks for the first page`() {
-        val call = SourceProtocol.search(
+    fun `searchLoad sends the page number the caller decided on`() {
+        val call = SourceProtocol.searchLoad(
             filters = listOf(sort),
             request = SearchRequest(sourceId = sourceId, keyword = "x"),
+            pageNumber = 1,
         )
 
+        assertEquals(SourceProtocol.MEMBER_SEARCH_LOAD, call.member)
         assertEquals(1, call.arguments()[2].jsonPrimitive.int)
     }
 
     @Test
-    fun `a token cursor uses loadNext instead of a page number`() {
-        val call = SourceProtocol.search(
+    fun `searchLoadNext sends the previous token`() {
+        val call = SourceProtocol.searchLoadNext(
             filters = emptyList(),
-            request = SearchRequest(sourceId = sourceId, keyword = "x", cursor = PageCursor.Token("t1")),
+            request = SearchRequest(sourceId = sourceId, keyword = "x"),
+            token = "t1",
         )
 
         assertEquals(SourceProtocol.MEMBER_SEARCH_LOAD_NEXT, call.member)
         assertEquals("t1", call.arguments()[2].jsonPrimitive.content)
+    }
+
+    @Test
+    fun `the first cursor page is sent as null`() {
+        val call = SourceProtocol.searchLoadNext(
+            filters = emptyList(),
+            request = SearchRequest(sourceId = sourceId, keyword = "x"),
+            token = null,
+        )
+
+        assertEquals(JsonNull, call.arguments()[2])
     }
 
     @Test
@@ -112,9 +129,10 @@ class SourceProtocolTest {
             options = listOf(FilterOption("done", "Done")),
         )
 
-        val call = SourceProtocol.search(
+        val call = SourceProtocol.searchLoad(
             filters = listOf(status),
             request = SearchRequest(sourceId = sourceId, keyword = "x"),
+            pageNumber = 1,
         )
 
         assertEquals(JsonNull, call.arguments()[1].jsonArray[0])
@@ -134,11 +152,12 @@ class SourceProtocolTest {
         val mixedFirst = SourceProtocol.explore(mixed, ExploreRequest(sourceId, mixed.key))
         val singlePage = SourceProtocol.explore(sections, ExploreRequest(sourceId, sections.key))
 
-        assertEquals(1, firstPage.arguments()[1].jsonPrimitive.int)
-        assertEquals(3, thirdPage.arguments()[1].jsonPrimitive.int)
-        assertEquals(0, mixedFirst.arguments()[1].jsonPrimitive.int)
-        assertEquals(JsonNull, singlePage.arguments()[1])
-        assertEquals(popular.key, firstPage.arguments()[0].jsonPrimitive.content)
+        // The page is identified by position, so the page argument is the only argument.
+        assertEquals(1, firstPage.arguments()[0].jsonPrimitive.int)
+        assertEquals(3, thirdPage.arguments()[0].jsonPrimitive.int)
+        assertEquals(0, mixedFirst.arguments()[0].jsonPrimitive.int)
+        assertEquals(JsonNull, singlePage.arguments()[0])
+        assertEquals(1, firstPage.arguments().size)
     }
 
     @Test

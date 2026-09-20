@@ -76,6 +76,23 @@ internal object SourceClassConvention {
     fun fieldScript(field: String): String =
         "JSON.stringify(typeof $INSTANCE.$field === \"string\" ? $INSTANCE.$field : null)"
 
+    /**
+     * Makes the host's structure probe reachable through the instance.
+     *
+     * Member calls resolve against the instance, so a host-side helper has to live there to be
+     * callable; `enumerable: false` keeps it out of the source's own enumeration, and therefore out
+     * of the descriptions the probe produces.
+     */
+    val PROBE_ATTACHMENT_SCRIPT: String =
+        """
+        Object.defineProperty($INSTANCE, "__venera", {
+          value: globalThis.__venera,
+          enumerable: false,
+          writable: false,
+          configurable: false
+        });
+        """.trimIndent()
+
     /** Calls `init()` when the source declares one; sources without it must not fail. */
     val INIT_SCRIPT: String =
         """
