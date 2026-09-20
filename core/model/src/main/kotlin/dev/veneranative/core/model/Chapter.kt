@@ -30,3 +30,19 @@ data class Chapter(
         require(title.isNotBlank()) { "title must not be blank" }
     }
 }
+
+/**
+ * Builds a chapter list from the upstream `ComicDetails.chapters` shape: a map of chapter id to
+ * title, where the source controls the order.
+ *
+ * Keeping the map order matters: sources that publish newest-first rely on it, so the index is the
+ * position in the map rather than something callers re-sort later.
+ */
+fun chaptersOf(comicKey: ComicKey, chapterTitles: Map<String, String>): List<Chapter> =
+    chapterTitles.entries.mapIndexed { index, (chapterId, title) ->
+        Chapter(
+            key = ChapterKey(comicKey = comicKey, remoteId = RemoteChapterId(chapterId)),
+            title = title,
+            index = index,
+        )
+    }

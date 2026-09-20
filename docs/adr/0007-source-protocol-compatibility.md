@@ -1,6 +1,6 @@
 # ADR-0007：Venera 漫画源协议兼容范围
 
-- 状态：Accepted（字段级细节待补，见第 4 节）
+- 状态：Accepted（字段级已核对 `js_api.md`；剩余待确认项见第 4.3 节）
 - 日期：2026-09-20
 - 决策者：项目维护者
 - 关联任务：S1-01、S1-02、S1-03、S1-04
@@ -33,7 +33,7 @@ Stage 3/4 的内容提前拖进 Stage 1。
 | `init()` | 是 | 加载来源后、首次调用前执行 |
 | `explore` | 是 | 仅 `multiPartPage`、`multiPageComicList`、`mixed` 三种 type |
 | `search` | 是 | `load` 与 `loadNext`，含 `optionList` 筛选 |
-| `comic.loadInfo` | 是 | 详情 |
+| `comic.loadInfo` | 是 | 详情，章节列表随该响应返回（`ComicDetails.chapters`） |
 | `comic.loadEp` | 是 | 章节页图片列表 |
 | `category` / `categoryComics` | 否（Stage 2+） | 分类与排行榜 |
 | `account` | 否（Stage 3+） | 登录、Cookie 校验、WebView 登录 |
@@ -89,16 +89,53 @@ Stage 3/4 的内容提前拖进 Stage 1。
   会出现能力缺失，产品上必须以“能力不可用”而不是“源不可用”呈现。
 - 两套分页语义会一直存在于适配层，不能合并。
 
-## 4. 待确认（字段级）
+## 4. 字段级确认
 
-以下内容在 `js_api.md` 中定义，本 ADR 尚未核对，必须在写协议 DTO（S1-03 的源绑定）之前补齐：
+已核对 `js_api.md`（2026-09-20），确认以下内容：
 
-- `Comic` 与 `ComicDetails` 的字段清单，以及章节列表来自 `loadInfo` 还是独立调用。
-- `ImageLoadingConfig` 的字段与 `onImageLoad` 的调用时机（影响 S1-05 图片管线）。
-- `Network` 等 Host API 的签名与返回形态（影响 ADR-0008 的 adapter 设计）。
-- 错误约定：例如收藏相关方法抛出字符串 `Login expired` 触发自动重登。
+### 4.1 `Comic` 与 `ComicDetails`
 
-补齐后本节应替换为完整的字段映射表，而不是保留“待确认”。
+`Comic`：`id`、`title`、`subtitle`/`subTitle`、`cover`、`tags`、`description`、`maxPage?`、
+`language?`、`favoriteId?`（仅收藏页来源）、`stars?`。
+
+`ComicDetails`：`title`、`subtitle`、`cover`、`description?`、`tags`（`Map<string, string[]>`）、
+**`chapters`（`Map<chapterId, chapterTitle>`）**、`isFavorite?`、`subId?`、`thumbnails?`、
+`recommend?`、`commentCount?`、`likesCount?`、`isLiked?`、`uploader?`、`updateTime?`、
+`uploadTime?`、`url?`、`stars?`、`maxPage?`、`comments?`。
+
+由此确定两条实现约束：
+
+1. **章节列表与详情同源**：章节随 `loadInfo` 的响应返回，不需要也不能假设一次额外的调用。
+   章节顺序由源决定（`Map` 迭代序），App 不得重排。
+2. `subtitle` 与 `subTitle` 是同一字段的两种写法，解析时必须都接受。
+
+### 4.2 Host API
+
+| 方法 | 参数 | 响应 `body` |
+| --- | --- | --- |
+| `Network.get` | `(url, headers)` | string |
+| `Network.post` / `put` / `patch` | `(url, headers, data: ArrayBuffer)` | string |
+| `Network.delete` | `(url, headers)` | string |
+| `Network.fetchBytes` | `(method, url, headers, data: ArrayBuffer)` | **ArrayBuffer** |
+| `Network.setCookies` / `getCookies` / `deleteCookies` | `(url, ...)` | void / Cookie[] |
+
+所有网络方法返回 Promise，响应统一为 `{status, headers, body}`；非 2xx 不抛错，由脚本自行判断
+`status`。
+
+两条对本项目有直接影响的结论：
+
+- **请求体是 `ArrayBuffer`**，与 ADR-0002 的实测结论一致：Host 桥必须支持二进制进出，
+  Base64 通道不可用。
+- 源与宿主的通用通信入口是 `sendMessage({method: ...})`，与 ADR-0003 的允许列表模型一致。
+
+### 4.3 仍待确认
+
+- `loadInfo`、`loadEp`、`loadThumbnails` 的**完整签名**：`comic_source.md` 与 `js_api.md` 都只给出
+  了 `loadEp(comicId, epId?) → {images: string[]}` 这一类用法，没有参数与返回的权威定义。
+  **必须在写 Pages 能力的协议 DTO 之前，以 `venera-configs` 中的真实源实现为准核对。**
+- `Comment` 与 `ImageLoadingConfig` 的字段（分别影响 Stage 3 评论与 S1-05 图片管线）。
+- 错误约定：文档没有专门章节，只在 `favorites` 系列出现“抛出字符串 `Login expired` 触发重登”
+  这一处约定；Stage 1 范围不涉及，记录备查。
 
 ## 5. 替代方案
 

@@ -7,6 +7,9 @@ data class Comic(
     val subtitle: String? = null,
     val coverUrl: String? = null,
     val tags: List<String> = emptyList(),
+    /** Page count of the last opened chapter, when the source reports one. */
+    val maxPage: Int? = null,
+    val language: String? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }
@@ -16,11 +19,15 @@ data class Comic(
 /**
  * A comic with detail-level metadata.
  *
- * Chapters are not embedded here: they load through the Chapters capability, so opening a detail
- * page does not force every chapter list to be fetched.
+ * Chapters are embedded because upstream returns them in the same `loadInfo` response
+ * (`ComicDetails.chapters` is a map of chapter id to title); the separate Chapters capability exists
+ * so callers can refresh the list, and an implementation may answer it from a cached detail.
  */
 data class ComicDetail(
     val comic: Comic,
     val description: String? = null,
+    val chapters: List<Chapter> = emptyList(),
     val metadata: Map<String, String> = emptyMap(),
+    /** Cover images when the source exposes more than one; empty means "use [Comic.coverUrl]". */
+    val thumbnails: List<String> = emptyList(),
 )

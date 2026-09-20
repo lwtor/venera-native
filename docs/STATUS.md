@@ -400,7 +400,7 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 
 依赖：S0-07（已完成）。
 
-本轮已完成（2026-09-20，领域模型与协议基础）：
+已完成（2026-09-20）：
 
 - `docs/adr/0007-source-protocol-compatibility.md`（Accepted）：划定 Stage 1 承诺兼容的上游协议子集
   （类基础字段、`init`、`explore`、`search`、`comic.loadInfo`、`comic.loadEp`），把 `category`、
@@ -414,25 +414,37 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - `ChapterKey` 升级为 `ComicKey + RemoteChapterId`，`ComicKey` 现在贯穿章节标识；阅读器、示例装配
   与测试同步更新。
 - 新增协议语义测试：`PagingTest`（6）、`SourceFilterTest`（8）、`ChapterKeyTest`（3）。
+- 补齐 ADR-0007 的字段级确认：核对 `js_api.md` 后确认**章节列表与详情同源**
+  （`ComicDetails.chapters` 是 `Map<chapterId, title>`，顺序由源决定），并确认 Host 网络 API 的
+  请求体是 `ArrayBuffer`、源与宿主通过 `sendMessage({method})` 通信。
+- `:core:model` 增加 `ExplorePage` / `ExploreKind` / `ExploreItem`（三种探索页形态）与
+  `chaptersOf()`（把上游 map 形态转成有序章节列表）；`ComicDetail` 内嵌章节。
+- `:source:api` 新增 `SourceCore` 契约（Explore、Search、Detail、Chapters、Pages）与 `SourceOutcome`，
+  固定两项产品规则：**缺失能力返回 `UnsupportedCapability` 而不是源故障**、
+  **源失败以值返回而不是异常**。
+- `:source:api` 新增 `FakeSourceCore` 与 `SourceCoreTest`（9 项）作为契约语义的可执行定义；
+  真机引擎实现落地后应复用同一组断言，而不是另写一套。
 
 验证记录：
 
 ```text
 2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
-.\gradlew.bat --no-daemon --max-workers=2 :core:model:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug
+.\gradlew.bat --no-daemon --max-workers=2 :core:model:testDebugUnitTest :source:api:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug
 结果：BUILD SUCCESSFUL
-全量单元测试 56 项，failures=0 errors=0 skipped=0
-  core:model 18 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
+全量单元测试 65 项，failures=0 errors=0 skipped=0
+  core:model 18 / source:api 9 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
 ```
 
 仍待完成：
 
-- `:source:api` 的五个 Core 能力契约（Explore、Search、Detail、Chapters、Pages）与可执行契约测试。
-- 协议 DTO 与 JSON 兼容测试，依赖 ADR-0007 第 4 节的字段级确认。
+- 协议 DTO 与 JSON 兼容测试：把 `SourceCore` 契约映射到 `sendMessage` / `loadInfo` / `loadEp` 等上游调用。
+  前置是 ADR-0007 第 4.3 节：`loadInfo` 与 `loadEp` 的完整签名必须用 `venera-configs` 中的真实源
+  实现核对，不能从两份文档的用法片段推断。
+- `SourceCore` 的引擎实现（依赖 S1-08 引擎落地），落地后复用 `SourceCoreTest` 的断言。
 - `ComicKey` 全链路使用在 Feature / Data 层的落实，随 S1-03 建立 `:data:comic` 完成。
 
-下一轮从 `:source:api` 的 Core 契约开始。
+下一轮从协议 DTO 的前置核对开始：拉取 `venera-configs` 中的真实源实现，确认 `loadInfo` / `loadEp` 签名。
 
 编译检查：
 
@@ -457,7 +469,7 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 | 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
 | WebView 引擎在参考设备上无法提供异步 Host API | ADR-0008 已定案转向自有引擎（QuickJS），spike 尚未执行 | spike 必须通过 ADR-0008 第 3 节全部判据；未通过前 S1-03 不得叠加临时方案 |
-| 上游协议字段级细节未核对 | ADR-0007 第 4 节列出待确认项（`ComicDetails` 字段、章节来源、Host API 签名） | 写协议 DTO 之前必须补齐，且以 `js_api.md` 为准 |
+| `loadInfo` / `loadEp` 的完整签名未确认 | 两份上游文档只给了用法片段，不足以定义协议 DTO | 写 Detail / Pages 的协议 DTO 之前，以 `venera-configs` 真实源实现核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
 | 导航契约模块已删除 | `:core:navigation` 零引用，S0-07 删除以符合模块创建准则 | S1-03 首次需要类型安全 Route 时重建 |
 | 大图策略的设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突） | 规则已由 JVM 预算测试保证，设备数据缺失，未验证 | Stage 0 退出门禁；需要时按 S0-06 记录的命令采集 |

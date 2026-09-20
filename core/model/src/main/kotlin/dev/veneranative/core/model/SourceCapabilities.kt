@@ -16,16 +16,20 @@ enum class SourceCapability {
 }
 
 /**
- * What a loaded source can do, together with the filters it declares.
+ * What a loaded source can do, together with what it declares.
  *
- * [filters] applies to search; explore filters belong to the individual explore page once explore
- * pages are modelled.
+ * [explorePages] is empty when the source has no explore support; [searchFilters] applies to search,
+ * because explore filters belong to the individual explore page.
  */
 data class SourceCapabilities(
     val supported: Set<SourceCapability>,
-    val filters: List<SourceFilter> = emptyList(),
+    val explorePages: List<ExplorePage> = emptyList(),
+    val searchFilters: List<SourceFilter> = emptyList(),
 ) {
     fun supports(capability: SourceCapability): Boolean = capability in supported
+
+    /** The explore page registered under [key], or null when the source does not declare it. */
+    fun explorePage(key: String): ExplorePage? = explorePages.firstOrNull { it.key == key }
 
     companion object {
         val None = SourceCapabilities(supported = emptySet())

@@ -245,13 +245,18 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - 序列化与协议兼容测试。
 - `ComicKey = SourceId + RemoteComicId` 全链路使用。
 
-实际执行（2026-09-20，本轮完成模型与协议基础）：
+实际执行（2026-09-20）：
 
-- 新增 ADR-0007（源协议兼容范围）与 ADR-0008（异步 Host 传输与引擎选择），两项都是本任务的前置。
-- `:core:model` 落地 `Comic`、`ComicDetail`、`Chapter`、`PagedResult`/`PageCursor`、`SourceFilter`
-  与 `FilterValue`、`SourceCapability`/`SourceCapabilities`；`ChapterKey` 升级为 `ComicKey + RemoteChapterId`。
-- 协议语义测试 17 项（分页游标、筛选值三态、章节标识作用域），全量单测 56 项通过。
-- 仍待完成：`:source:api` 的五个 Core 能力契约与契约测试；协议 DTO 依赖 ADR-0007 第 4 节的字段确认。
+- 新增 ADR-0007（源协议兼容范围，含 `js_api.md` 字段级核对）与 ADR-0008（异步 Host 传输与引擎选择），
+  两项都是本任务的前置。
+- `:core:model` 落地 `Comic`、`ComicDetail`（内嵌章节）、`Chapter`、`PagedResult`/`PageCursor`、
+  `ExplorePage`/`ExploreKind`/`ExploreItem`、`SourceFilter` 与 `FilterValue`、`SourceCapability`/
+  `SourceCapabilities`；`ChapterKey` 升级为 `ComicKey + RemoteChapterId`。
+- `:source:api` 落地 `SourceCore` 五个能力契约与 `SourceOutcome`，并新增 `FakeSourceCore` +
+  `SourceCoreTest` 把契约语义（缺失能力可降级、失败以值返回、分页终止、章节顺序）变成可执行断言。
+- 测试：模型协议语义 18 项 + 契约 9 项，全量单测 65 项通过。
+- 仍待完成：协议 DTO 与 JSON 兼容测试（前置为 ADR-0007 第 4.3 节的 `loadInfo`/`loadEp` 签名核对）；
+  `SourceCore` 的引擎实现依赖 S1-08；`ComicKey` 在 Feature/Data 的全链路使用随 S1-03 落地。
 
 ### S1-02 来源包安装与管理 — TODO
 

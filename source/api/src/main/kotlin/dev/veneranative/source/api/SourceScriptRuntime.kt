@@ -1,5 +1,6 @@
 package dev.veneranative.source.api
 
+import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
 
 /**
@@ -114,6 +115,19 @@ sealed interface SourceRuntimeError {
 
     data class ScriptExecution(
         override val message: String,
+    ) : SourceRuntimeError {
+        override val retryable: Boolean = false
+    }
+
+    /**
+     * The source does not implement the requested capability.
+     *
+     * This is a product state, not an engine failure: the caller must hide or disable the feature
+     * for that source instead of retrying or reporting the source as broken.
+     */
+    data class UnsupportedCapability(
+        val capability: SourceCapability,
+        override val message: String = "This source does not support ${capability.name.lowercase()}.",
     ) : SourceRuntimeError {
         override val retryable: Boolean = false
     }
