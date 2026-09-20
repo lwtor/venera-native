@@ -38,3 +38,6 @@ Thumbs.db
 # S0-06 large-image fixtures: generated locally, never committed
 tools/test-images/out/
 feature/reader/src/main/assets/fixtures/
+
+# Local agent workspace (machine-specific notes, not shared)
+.workbuddy/
