@@ -40,6 +40,9 @@
 :source:engine
 ```
 
+其中 `:core:common` 与 `:core:navigation` 已在 S0-07 因零引用删除（见下）；这里记录的是 S0-01
+当时的结果，不是当前模块清单。当前清单以 `README.md` 与 `docs/ARCHITECTURE.md` 为准。
+
 已完成：
 
 - Gradle Kotlin DSL、Version Catalog、Convention Plugins。
