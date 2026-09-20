@@ -6,8 +6,9 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-**Stage 0（技术验证）已完成，正在执行 Stage 1（核心阅读闭环）**，当前任务是
-**S1-01：稳定领域模型与 Source Core 协议**。
+**Stage 0（技术验证）已完成，正在执行 Stage 1（核心阅读闭环）**。已完成的切片：S1-01 稳定领域模型与
+Source Core 协议、S1-02 来源包安装与管理、S1-03 探索与搜索、S1-04 漫画详情与章节。当前任务以
+[`docs/STATUS.md`](docs/STATUS.md) 的“当前唯一执行任务”为准，本文件不再重复任务编号。
 
 Stage 1 的两项前置决策已经落地：[ADR-0007](docs/adr/0007-source-protocol-compatibility.md) 划定
 承诺兼容的源协议子集，[ADR-0008](docs/adr/0008-async-host-transport.md) 决定用自有引擎替代
@@ -42,12 +43,18 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 :app
 :core:designsystem
 :core:model
+:core:navigation
 :core:network
+:data:comic
 :data:source
+:feature:details
+:feature:explore
 :feature:home
 :feature:reader
+:feature:search
 :feature:sources
 :source:api
+:source:core
 :source:engine
 :source:network
 ```

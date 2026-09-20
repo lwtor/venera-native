@@ -2,6 +2,8 @@ package dev.veneranative.data.comic
 
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.Comic
+import dev.veneranative.core.model.ComicDetail
+import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.PageCursor
@@ -30,6 +32,22 @@ interface ComicCatalog {
     suspend fun explorableSources(): List<InstalledSource>
 
     suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities>
+
+    /**
+     * One comic's details, chapters included.
+     *
+     * Upstream answers metadata and chapters in the same call (`loadInfo`), so refreshing details
+     * refreshes the chapter list too rather than asking the source twice for the same response.
+     */
+    suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail>
+
+    /**
+     * The installed source behind [sourceId], or null when it is gone or switched off.
+     *
+     * A comic the user reached from a list stays addressable after its source is removed, so the
+     * screen has to say the source is unavailable instead of presenting it as a source failure.
+     */
+    suspend fun enabledSource(sourceId: SourceId): InstalledSource?
 
     /** A fresh paging source per request; a [PagingSource] is single-use. */
     fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem>

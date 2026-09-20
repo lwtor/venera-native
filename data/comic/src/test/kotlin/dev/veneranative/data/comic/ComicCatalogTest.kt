@@ -146,6 +146,53 @@ class ComicCatalogTest {
         )
     }
 
+    @Test
+    fun `details are passed through unchanged`() = runTest {
+        val detail = ComicDetail(comic = comic("c1"), description = "desc")
+        val core = FakeSourceCore().apply { detailResponse = SourceOutcome.Success(detail) }
+        val catalog = DefaultComicCatalog(FakeSourceRepository(emptyList()), core)
+
+        val outcome = catalog.detail(detail.comic.key)
+
+        assertEquals(SourceOutcome.Success(detail), outcome)
+    }
+
+    @Test
+    fun `a source failure reaches the caller as the same domain error`() = runTest {
+        val failure = SourceRuntimeError.UnsupportedCapability(SourceCapability.DETAIL)
+        val core = FakeSourceCore().apply { detailResponse = SourceOutcome.Failure(failure) }
+        val catalog = DefaultComicCatalog(FakeSourceRepository(emptyList()), core)
+
+        assertEquals(SourceOutcome.Failure(failure), catalog.detail(comic("c1").key))
+    }
+
+    @Test
+    fun `a disabled source is not a reachable source`() = runTest {
+        val enabled = source("enabled")
+        val disabled = source("disabled", enabled = false)
+        val catalog = DefaultComicCatalog(
+            sources = FakeSourceRepository(listOf(enabled, disabled)),
+            core = FakeSourceCore(),
+        )
+
+        assertEquals(enabled, catalog.enabledSource(enabled.sourceId))
+        assertNull(catalog.enabledSource(disabled.sourceId))
+        assertNull(catalog.enabledSource(SourceId("never-installed")))
+    }
+
+    @Test
+    fun `reachability is read from the installed list, not from the engine`() = runTest {
+        // A source whose capabilities cannot be read is still installed: the screen needs to tell
+        // "the source is gone" apart from "the source could not answer".
+        val unreadable = source("unreadable")
+        val catalog = DefaultComicCatalog(
+            sources = FakeSourceRepository(listOf(unreadable)),
+            core = FakeSourceCore(),
+        )
+
+        assertEquals(unreadable, catalog.enabledSource(unreadable.sourceId))
+    }
+
     private fun source(id: String, enabled: Boolean = true) = InstalledSource(
         sourceId = SourceId(id),
         name = id,
@@ -195,6 +242,7 @@ class ComicCatalogTest {
         var exploreItems: List<ExploreItem> = emptyList()
         var next: PageCursor? = null
         var error: SourceRuntimeError? = null
+        var detailResponse: SourceOutcome<ComicDetail>? = null
 
         override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
             declaredCapabilities[sourceId]
@@ -213,7 +261,8 @@ class ComicCatalogTest {
         }
 
         override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
-            SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(comicKey.sourceId))
+            detailResponse
+                ?: SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(comicKey.sourceId))
 
         override suspend fun chapters(comicKey: ComicKey): SourceOutcome<List<Chapter>> =
             SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(comicKey.sourceId))

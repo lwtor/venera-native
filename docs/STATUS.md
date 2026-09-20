@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
-| 当前任务 | S1-04：漫画详情与章节 |
-| 当前任务状态 | TODO（S1-03 已完成；`ComicDetails` 路由已就绪，详情屏是它唯一缺的实现） |
+| 当前任务 | S1-05：Coil 漫画图片管线 |
+| 当前任务状态 | TODO（S1-04 已完成；详情与章节已可用，图片管线是阅读链路剩下的最后一环） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -268,8 +268,14 @@ instrumentation 与实机验证本轮未执行（按用户决定不做实机测�
 
 ## 当前代码事实
 
-- `:app` 目前用本地状态在 `HomeRoute` 与 `ReaderRoute` 之间切换，尚未建立完整根导航。
+- `:app` 用一个 `AppRoute` 状态切换六个目的地（Home / Sources / Explore / Search / ComicDetails /
+  Reader），路由经 `encode()` / `decodeAppRoute()` 存进 `rememberSaveable`；还没有返回栈。
 - `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
+- 来源链路已可用：安装 / 启停 / 卸载（`:feature:sources` + `:data:source`）、探索与搜索
+  （`:feature:explore` / `:feature:search` + `:data:comic` + Paging 3，仅向前分页）、详情与章节
+  （`:feature:details`）。
+- `:feature:details` 的封面槽位是**占位块**：`coverUrl` 已在状态里，但解码与加载依赖尚未建立的
+  图片管线（S1-05）。
 - `:feature:reader` 已能渲染页面描述符、切换阅读方向并调度邻近预取；当 `assets/fixtures`
   存在时会改用 `AssetFixturePageProvider` 与真实解码管线，否则退回尺寸占位块。
 - `:feature:reader` 的解码实现处于原型阶段：`PageImageDecoder` 有 `Sampled`（整页降采样，
@@ -277,15 +283,21 @@ instrumentation 与实机验证本轮未执行（按用户决定不做实机测�
   可在阅读器底部栏运行时切换；解码结果只存在于有界 `PageImageCache`，不进入 `ReaderUiState`。
 - 图片解码代码目前位于 `:feature:reader`，与“图片管线属于 core”的目标边界不一致；
   S1-05 建立 `:core:image` 时必须迁移，已在 ADR-0004 记为技术债。
-- `:source:api` 已有最小 Runtime 契约，但还不是完整 Venera 漫画源协议。
-- `:source:engine` 已能执行隔离 fixture、结构化调用、超时、取消和生命周期恢复。
+- 阅读器仍由 fixture / 占位 `PageProvider` 驱动，**尚无 source-backed 实现**：`ComicPage` 需要
+  `widthPx`/`heightPx`，而源只给 URL，尺寸只能由图片管线解析（S1-05）。
+- `:source:api` 是唯一稳定契约：Runtime 契约 + `SourceCore` 五能力 + 上游协议编解码；
+  `:source:core` 是它的引擎实现，`:source:engine` 提供 QuickJS 运行时。
 - Runtime 当前为每来源串行调用；支持非 Binder 传输时结果上限配置为 1 MiB。
-- Runtime 已有 MessagePort Host API、HTTP 文本请求、每来源 Cookie 和取消链路，尚无二进制通道。
-- S0-04 已在 V2337A / SDK 36 取得决策所需的实机结论；压力测量 harness 取得结论后已删除，未保留为长期资产。
-- 尚未引入 Hilt、Room、DataStore、Coil、Paging、WorkManager；OkHttp 已在 `:core:network` 使用。
+- Runtime 已有 Host API 兼容层（全局 `fetch` 与 `Network.*`）、HTTP 文本请求、每来源 Cookie 与取消链路，
+  尚无二进制通道。
+- 引擎已从 AndroidX JavaScriptEngine 切到自有 QuickJS（ADR-0008）；WebView 实现仍留在 `:source:engine`
+  及其 androidTest 中，等待判据补齐后按 ADR-0008 §2.4 处置。
+- 已引入 OkHttp、Paging 3、kotlinx.serialization 与 QuickJS 绑定；尚未引入 Hilt、Room、DataStore、
+  Coil、WorkManager。
 - 尚未创建 CI、许可证文件、正式图标或发布配置。
-- 当前有领域模型、Runtime 与阅读器 JVM 测试，以及 8 个 Runtime 实机测试和 3 个阅读器
-  Compose 测试；本轮只保证编译，均未执行。
+- 当前 JVM 单元测试 208 项（最近一次全量执行 0 失败，见 S1-04 记录）；Compose 与 instrumentation
+  测试源码会随改动编译，但本轮没有执行 androidTest。
+- S0-04 已在 V2337A / SDK 36 取得决策所需的实机结论；压力测量 harness 取得结论后已删除，未保留为长期资产。
 - `applicationId = dev.veneranative` 仍是暂定值。
 
 ## 最近完成：S0-04 Runtime 限制、二进制和压力验证 — DONE
@@ -394,7 +406,62 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - 正式 Reader UI 和下载功能。
 - 在结论得出前实现完整 QuickJS fallback。
 
-## 当前唯一执行任务
+## 最近完成
+
+### S1-04：漫画详情与章节 — DONE
+
+依赖：S1-03（已完成）。
+
+已完成（2026-09-20）：
+
+- 新增 `:feature:details`：`DetailsRoute` / `DetailsScreen` / `DetailsViewModel` / `DetailsUiState` /
+  `DetailsAction`。`:app` 里那个标注为占位的 `ComicDetailsPlaceholder` 已删除，路由链路现在是真实实现。
+- **详情与章节一次取回**：上游把元数据与章节放在同一个 `loadInfo` 响应里，所以刷新详情就是刷新章节，
+  不为同一份数据发第二次请求。`ComicCatalog` 因此只暴露 `detail`，不重复暴露 `chapters`。
+- **章节列表按源声明的样子渲染**：单列与带组名分区两种形状都支持，组名和组的顺序都来自源。
+  显示顺序提供「源顺序 / 倒序」，**不做按标题或序号重排**——`Chapter.index` 是源顺序里的位置，
+  部分源按新→旧发布，重排会呈现源从未描述过的顺序（`DetailsChaptersTest` 把它写成断言）。
+- **四种状态**：加载、成功、失败可重试、来源失效（已卸载或已停用）。来源失效在详情请求**之前**判定，
+  因为"源不在了"和"源答不出来"对用户不是同一件事，只有后者值得重试（`catalog.enabledSource`）；
+  源返回空章节算**部分结果**而不是失败。
+- **失败文案在 feature 内穷举映射**：`when` 覆盖 `SourceRuntimeError` 的全部分支，兜底是通用文案而不是
+  下层的 `message`，因此引擎诊断文本不会进界面（有测试断言 `TypeError` 不出现在文案里）。
+- **边界**：详情屏只把选中的 `ChapterKey` 通过 `onOpenChapter` 交给装配层，不依赖 `:feature:reader`；
+  `:app` 负责把它接到 Reader 路由。
+- `:data:comic` 新增 `detail(comicKey)` 与 `enabledSource(sourceId)`。后者从已安装列表解析而不是问运行时，
+  因为运行时只会回答 "not loaded"，那是引擎细节而不是用户看到的理由。
+- 测试：`DetailsViewModelTest`（8）+ `DetailsChaptersTest`（5）+ `ComicCatalogTest` 新增 4 项（现共 11）。
+
+已知缺口（明确留给后续，不是遗漏）：
+
+- **封面的像素渲染依赖 S1-05**：`coverUrl` 已在状态里，但把它变成图片需要图片管线（`:core:image` + Coil）。
+  详情屏的封面槽位按最终尺寸占位并显示标题，与 `:feature:reader` 在没有 fixture 时退回占位块的既有做法一致。
+- **章节选择生成 `PageProvider` 需要 S1-05 先解决尺寸**：`ComicPage` 要求 `widthPx`/`heightPx` > 0，而源只给
+  URL（`SourcePage` 只有 `imageRef`），source-backed 的 `PageProvider` 无法在 S1-04 内诚实实现。
+  当前 `:app` 仍用 fixture/占位 Provider，真实链路随 S1-05 接通。
+- 详情屏的返回键回 Home，与 `:app` 现有单一 `route` 状态一致；完整返回栈仍待后续。
+
+验证记录：
+
+```text
+2026-09-20（编译级 + JVM 单测）
+JAVA_HOME 临时指向本机 JDK 17（C:\Users\11196859\.jdks\jbr-17.0.14，仅当前命令，不入库）
+.\gradlew.bat --no-daemon --max-workers=2 :app:assembleDebug
+              :feature:details:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin
+              :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin
+结果：BUILD SUCCESSFUL in 41s
+
+.\gradlew.bat --no-daemon --max-workers=2 testDebugUnitTest
+结果：BUILD SUCCESSFUL in 31s
+全量单元测试 208 项，failures=0 errors=0 skipped=0
+  feature:details 13（DetailsViewModelTest 8 + DetailsChaptersTest 5）/ data:comic 11 /
+  其余模块与 S1-03 记录一致（191 → 208）
+
+git diff --check：无空白错误；改动文件换行符已按 .gitattributes 统一为 LF
+```
+
+本轮改了 `ComicCatalog` 这个被三个模块共享的接口（`explore`、`search`、`details`），所以虽然按普通节点
+策略只要求编译，仍补跑了全量 JVM 单测确认没有连带影响。instrumentation 与实机验证本轮未执行。
 
 ### S1-03：探索与搜索纵向切片 — DONE
 
@@ -645,14 +712,34 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 - `ComicKey` 在 Feature / Data 层的端到端使用，随 S1-02 建立 `:data:source`、S1-03 建立 `:data:comic` 落地。
 - `loadThumbnails` 签名核对（S1-05 多页缩略图需要）。
 
+## 当前唯一执行任务
+
+### S1-05：Coil 漫画图片管线 — TODO
+
+依赖：S0-06、S1-01（均已完成）。
+
+计划模块：`:core:image`（名字以实际复用边界为准，见 ADR-0004）。
+
+必须交付：Coil 3 与共享 OkHttp 连接池、`ComicImageRequest`（含影响响应的 Header / Referer / Cookie /
+Method / Body 与 transform 标识）、自定义 Fetcher 与稳定 Cache Key、鉴权不同的请求不会错误复用缓存。
+
+本任务同时解除两项 S1-04 留下的缺口：
+
+- 详情屏的**封面**（`ComicDetail.comic.coverUrl` 已在状态里，缺的是解码与加载）。
+- **章节选择生成 source-backed `PageProvider`**：`ComicPage` 需要真实的 `widthPx`/`heightPx`，
+  而源只给 URL，尺寸只能由图片管线解析。
+
+按 ADR-0004，解码仍由自有解码器负责（区域/分块），Coil 只承担网络获取与缓存；决策前先更新 ADR-0004，
+并按 ARCHITECTURE §3 把 `:feature:reader` 的 `PageImageDecoder` / `PageTiling` 迁到 `:core:image`。
+
 ## 紧随其后的任务
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S1-04 | 漫画详情与章节（替换 `:app` 里的 `ComicDetailsPlaceholder`） | S1-03（已完成） |
-| 2 | S1-05 | Coil 漫画图片管线 | S0-06、S1-01 |
+| 1 | S1-06 | Room 历史与阅读进度 | S1-01、S0-05（已完成） |
+| 2 | S1-07 | 核心闭环集成 | S1-02 至 S1-06 |
 
-S1-08 剩余部分（不阻塞 S1-03，见已知风险）：设备侧 ABI 与 APK 体积实测、二进制请求体通道、
+S1-08 剩余部分（不阻塞 S1-05，见已知风险）：设备侧 ABI 与 APK 体积实测、二进制请求体通道、
 许可证登记、WebView 实现的最终处置。
 
 ## 已知风险与待确认
@@ -673,12 +760,15 @@ S1-08 剩余部分（不阻塞 S1-03，见已知风险）：设备侧 ABI 与 AP
 | `:feature:sources` 直接依赖 `:data:source` | 有意的边界取舍，已记录在 ARCHITECTURE §3 | 出现第二个数据实现或引入 DI 时把契约拆出去 |
 | `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
-| 导航契约模块已删除 | `:core:navigation` 零引用，S0-07 删除以符合模块创建准则 | S1-03 首次需要类型安全 Route 时重建 |
+| 导航契约模块 | S1-03 已按计划重建 `:core:navigation`（`AppRoute` + 字符串编解码），零引用问题不复存在 | — |
+| `:feature:details` 的封面是占位块 | `coverUrl` 已在 UI 状态里，但没有图片管线就无法解码 | S1-05 引入 `:core:image` + Coil |
+| 阅读器仍无 source-backed `PageProvider` | `ComicPage` 要求 `widthPx`/`heightPx` > 0，源只给 URL（`SourcePage.imageRef`），尺寸只能由图片管线解析 | S1-05 接通图片管线后实现 |
+| 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指定 JDK 17；本机可用的是 `C:\Users\11196859\.jdks\jbr-17.0.14` | 用户修复环境变量，或继续按命令临时指定 |
 | 大图策略的设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突） | 规则已由 JVM 预算测试保证，设备数据缺失，未验证 | Stage 0 退出门禁；需要时按 S0-06 记录的命令采集 |
 | 解码代码暂驻 `:feature:reader` | 已知技术债，已在 ADR-0004 记录 | S1-05 建立 `:core:image` 时迁移 |
 | Coil 仍未引入 | 有意推迟，见 ADR-0004 | S1-05 决策，且决策前先更新 ADR-0004 |
 | 中等缩放区间允许最多约 1.41 倍 GPU 放大 | 内存上界的代价，观感未验证 | 设备验证时确认是否可接受 |
-| 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指向 temurin17 | 用户修复环境变量，或继续按命令临时指定 |
+| 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指向 JDK 17（本机可用的是 `C:\Users\11196859\.jdks\jbr-17.0.14`） | 用户修复环境变量，或继续按命令临时指定 |
 | QuickJS fallback 是否必要 | S0-02 暂不引入 | 与 MessagePort 缺失问题一并决策 |
 | GPL-3.0 衍生边界和最终许可证 | 待确认 | 复用上游实现前完成许可证 ADR |
 | 最终 applicationId | 待用户确认 | 发布配置开始前确认 |

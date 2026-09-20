@@ -40,9 +40,10 @@ immutable UiState
 | `:data:source` | 来源包的安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
 | `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |
-| `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）与来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
+| `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与阅读器的入口 | Design System、领域契约 |
+| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:data:comic`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
 | `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架，以及 S0-06 的解码策略原型（`PageImageDecoder`、有界缓存、缩放与分块） | Design System、`:core:model` |
@@ -52,7 +53,7 @@ immutable UiState
 | `:source:engine` | AndroidX JavaScriptEngine 与 MessagePort 适配 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
 
-当前实现仍是 Stage 0 骨架；表中“职责”是边界，不表示功能已经完成。
+表中“职责”是边界，不表示功能已经完成；当前处于 Stage 1，已落地范围见 `docs/STATUS.md`。
 
 S0-07 按本文件第 5 节的模块创建准则删除了两个零引用模块：`:core:common`（`AppResult`/`AppError`
 没有任何生产或测试引用）与 `:core:navigation`（`AppRoute` 唯一声明，`Navigation 3` 只被它使用，

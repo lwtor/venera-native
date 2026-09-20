@@ -28,7 +28,7 @@
 | 阶段 | 目标 | 退出条件 | 状态 |
 | --- | --- | --- | --- |
 | Stage 0 | 验证 JS 漫画源和阅读器两项最高风险技术 | JavaScriptEngine 与大图方案形成有证据的 ADR | DONE（2026-09-20 退出） |
-| Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | IN_PROGRESS（S1-01、S1-02 已完成，S1-03 进行中） |
+| Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | IN_PROGRESS（S1-01 至 S1-04 已完成，S1-05 进行中） |
 | Stage 2 | 完成书架、下载和本地阅读 | 离线可浏览书架并阅读下载或本地漫画 | TODO |
 | Stage 3 | 补齐来源扩展能力 | Core/Extended 协议测试通过，Advanced 有支持矩阵 | TODO |
 | Stage 4 | 同步、自适应、性能与发布 | RC 通过迁移、压力、无障碍与发布检查 | TODO |
@@ -293,7 +293,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
   “Comic sources are unavailable on this device.” 失败（`:app` 传入的 `UnavailableMetadataReader`）。
 - 未做：从远端 URL 抓取来源包（与来源仓库客户端一起做）。
 
-### S1-08 自有引擎（QuickJS）落地 — IN_PROGRESS
+### S1-08 自有引擎（QuickJS）落地 — IN_PROGRESS（代码部分已完成，剩余 4 项不阻塞后续切片）
 
 依赖：S1-02。**阻塞 S1-03**。
 
@@ -338,18 +338,38 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 已知缺口：详情屏本身（S1-04，当前为标注清楚的占位）、筛选器的 UI（编码链路已完成）、
 探索页筛选（`ExplorePage` 尚无该字段）。详见 `docs/STATUS.md`。
 
-### S1-04 漫画详情与章节 — TODO
+### S1-04 漫画详情与章节 — DONE
 
-依赖：S1-03。
+依赖：S1-03（已完成）。
 
-计划模块：`:feature:details`、`:data:comic`。
+新增模块：`:feature:details`（改动模块：`:data:comic`、`:app`、`settings.gradle.kts`）。
 
 交付物：
 
-- 基础元数据、封面、简介和章节列表。
+- 基础元数据、封面槽位、简介和章节列表。
 - 分组、排序与刷新。
 - 章节选择生成统一 PageProvider。
 - 加载、空、部分失败和来源失效状态。
+
+实际执行（2026-09-20）：
+
+- **详情与章节一次取回**：上游把元数据与章节放在同一个 `loadInfo` 响应里，因此 `ComicCatalog` 只新增
+  `detail(comicKey)`（不重复暴露 `chapters`），刷新详情即刷新章节。另有 `enabledSource(sourceId)`
+  用于在请求之前区分"源已不在"与"源答不出来"。
+- **章节列表按源声明的样子渲染**：支持单列与带组名分区两种形状；显示顺序提供「源顺序 / 倒序」，
+  但**不按标题或序号重排**（`Chapter.index` 是源顺序里的位置，部分源按新→旧发布）。
+- **四种状态**：Loading / Ready / Failed（可重试）/ SourceUnavailable（只能返回）；源返回空章节是
+  部分结果而非失败。失败文案在 feature 内穷举映射 `SourceRuntimeError` 全部分支，兜底为通用文案，
+  不泄漏下层诊断文本。
+- **边界**：详情屏只把选中的 `ChapterKey` 交给装配层，不依赖 `:feature:reader`；`:app` 接到 Reader 路由，
+  并删除了原 `ComicDetailsPlaceholder`。
+- 测试：新增 13 项（`DetailsViewModelTest` 8 + `DetailsChaptersTest` 5），`ComicCatalogTest` 新增 4 项；
+  全量单测 208 项 0 失败。
+
+范围调整（交付物第 3 项）：**"章节选择生成统一 PageProvider" 只完成了契约侧那一半**。`ComicPage` 要求
+真实的 `widthPx`/`heightPx`，而源只给 URL（`SourcePage` 只有 `imageRef`），source-backed `PageProvider`
+必须等图片管线解析尺寸，因此该项随 S1-05 完成；`:app` 目前仍用 fixture/占位 Provider。封面同理：
+槽位已按最终尺寸就位，像素渲染等 S1-05。两项缺口已记入 `docs/STATUS.md`。
 
 ### S1-05 Coil 漫画图片管线 — TODO
 

@@ -3,6 +3,8 @@ package dev.veneranative.feature.search
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import dev.veneranative.core.model.Comic
+import dev.veneranative.core.model.ComicDetail
+import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.FilterOption
 import dev.veneranative.core.model.InstalledSource
@@ -181,6 +183,11 @@ class SearchViewModelTest {
         override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
             capabilityResponses[sourceId]
                 ?: SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(sourceId))
+
+        override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
+            error("not used by the search screen")
+
+        override suspend fun enabledSource(sourceId: SourceId): InstalledSource? = null
 
         override fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem> =
             error("not used by the search screen")

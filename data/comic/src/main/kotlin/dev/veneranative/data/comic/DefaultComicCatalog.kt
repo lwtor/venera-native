@@ -2,6 +2,8 @@ package dev.veneranative.data.comic
 
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.Comic
+import dev.veneranative.core.model.ComicDetail
+import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceCapabilities
@@ -32,6 +34,17 @@ class DefaultComicCatalog(
 
     override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
         core.capabilities(sourceId)
+
+    override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> = core.detail(comicKey)
+
+    /**
+     * Resolved from the installed list rather than from the runtime: a source that was uninstalled or
+     * switched off is not in the list, and asking the runtime would report it as "not loaded" — which
+     * is an engine detail, not the reason the user sees.
+     */
+    override suspend fun enabledSource(sourceId: SourceId): InstalledSource? =
+        runCatching { sources.installed() }.getOrDefault(emptyList())
+            .firstOrNull { it.sourceId == sourceId && it.enabled }
 
     override fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem> =
         ExplorePagingSource(core, request)

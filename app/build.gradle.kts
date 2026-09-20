@@ -24,6 +24,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":data:comic"))
     implementation(project(":data:source"))
+    implementation(project(":feature:details"))
     implementation(project(":feature:explore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:reader"))

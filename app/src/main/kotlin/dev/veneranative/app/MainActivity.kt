@@ -4,27 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
@@ -38,6 +24,7 @@ import dev.veneranative.data.comic.DefaultComicCatalog
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.LocalFileScriptFetcher
 import dev.veneranative.data.source.SourcePackageStore
+import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
 import dev.veneranative.feature.home.HomeRoute
 import dev.veneranative.feature.reader.AssetFixturePageProvider
@@ -138,8 +125,10 @@ class MainActivity : ComponentActivity() {
                         onBack = { route = AppRoute.Home },
                     )
 
-                    is AppRoute.ComicDetails -> ComicDetailsPlaceholder(
+                    is AppRoute.ComicDetails -> DetailsRoute(
+                        catalog = catalog,
                         comicKey = current.comicKey,
+                        onOpenChapter = { route = AppRoute.Reader(it) },
                         onBack = { route = AppRoute.Home },
                     )
 
@@ -164,45 +153,6 @@ private val AppRouteSaver: Saver<AppRoute, String> = Saver(
     save = { it.encode() },
     restore = { decodeAppRoute(it) ?: AppRoute.Home },
 )
-
-/**
- * Stand-in for the details screen.
- *
- * The route is typed and wired all the way here already — a search or explore result hands over a
- * `ComicKey`, not a string — and S1-04 replaces this with the real screen. Until then it names the
- * comic it would show instead of pretending to be finished.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ComicDetailsPlaceholder(
-    comicKey: ComicKey,
-    onBack: () -> Unit,
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Comic") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
-            )
-        },
-    ) { contentPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding)
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(text = comicKey.remoteId.value, style = MaterialTheme.typography.titleMedium)
-            Text(text = "from ${comicKey.sourceId.value}", style = MaterialTheme.typography.bodySmall)
-            Text(
-                text = "Comic details arrive with S1-04.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-    }
-}
 
 private fun decoderFor(strategy: DecodeStrategy, cache: PageImageCache): PageImageDecoder {
     val decoder: PageImageDecoder = when (strategy) {

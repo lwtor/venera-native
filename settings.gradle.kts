@@ -25,6 +25,7 @@ include(
     ":core:network",
     ":data:comic",
     ":data:source",
+    ":feature:details",
     ":feature:explore",
     ":feature:home",
     ":feature:reader",
