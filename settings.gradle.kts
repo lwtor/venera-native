@@ -22,6 +22,7 @@ include(
     ":core:designsystem",
     ":core:model",
     ":core:network",
+    ":data:source",
     ":feature:home",
     ":feature:reader",
     ":source:api",

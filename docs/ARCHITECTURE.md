@@ -37,6 +37,7 @@ immutable UiState
 | --- | --- | --- |
 | `:app` | MainActivity、应用 Theme、根装配 | Feature、Core、实现模块 |
 | `:core:model` | 稳定领域 ID 与跨层模型 | 尽量只依赖 Kotlin |
+| `:data:source` | 来源包的安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI | Design System、领域契约 |
