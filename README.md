@@ -46,6 +46,7 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 :data:source
 :feature:home
 :feature:reader
+:feature:sources
 :source:api
 :source:engine
 :source:network

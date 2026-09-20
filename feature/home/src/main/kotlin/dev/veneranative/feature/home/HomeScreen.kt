@@ -17,15 +17,25 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 
+/**
+ * Home screen.
+ *
+ * It exposes navigation as callbacks instead of depending on the target features: the assembly layer
+ * decides where "sources" and "reader" actually are.
+ */
 @Composable
-fun HomeRoute(onOpenReader: () -> Unit) {
-    HomeScreen(onOpenReader = onOpenReader)
+fun HomeRoute(
+    onOpenReader: () -> Unit,
+    onOpenSources: () -> Unit,
+) {
+    HomeScreen(onOpenReader = onOpenReader, onOpenSources = onOpenSources)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeScreen(
     onOpenReader: () -> Unit,
+    onOpenSources: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -45,9 +55,12 @@ internal fun HomeScreen(
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                text = "Reader prototype uses an in-memory page provider.",
+                text = "Install a comic source, or open the reader prototype with built-in pages.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Button(onClick = onOpenSources) {
+                Text("Sources")
+            }
             Button(onClick = onOpenReader) {
                 Text("Open reader prototype")
             }
@@ -59,6 +72,6 @@ internal fun HomeScreen(
 @Composable
 private fun HomeScreenPreview() {
     VeneraNativeTheme {
-        HomeScreen(onOpenReader = {})
+        HomeScreen(onOpenReader = {}, onOpenSources = {})
     }
 }

@@ -42,6 +42,7 @@ immutable UiState
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI | Design System、领域契约 |
 | `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架，以及 S0-06 的解码策略原型（`PageImageDecoder`、有界缓存、缩放与分块） | Design System、`:core:model` |
+| `:feature:sources` | 来源列表：安装、启停、卸载，以及加载 / 空 / 失败 / 成功四种页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:engine` | AndroidX JavaScriptEngine 与 MessagePort 适配 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
@@ -57,6 +58,10 @@ app 声明的依赖也没有被代码使用）。它们不属于废弃设计，�
 S0-06 的解码代码位于 `:feature:reader` 的 `image` 包，是**已知的临时位置**：它需要在 S1-05
 建立 `:core:image` 时迁移过去，迁移前 UI 契约（`PageImageDecoder`、`PageTile`）保持不变，
 理由与迁移条件记录在 ADR-0004。
+
+`:feature:sources` 直接依赖 `:data:source` 的仓库契约（`SourceRepository`）。这是本阶段有意的取舍：
+在只有一个实现、且没有依赖注入框架的情况下，再把契约拆成一个只有接口的模块只是形式主义。
+出现第二个数据实现或引入 DI 时，把契约拆出去并让 Feature 只依赖契约。
 
 ## 4. 目标依赖方向
 

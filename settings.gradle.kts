@@ -25,6 +25,7 @@ include(
     ":data:source",
     ":feature:home",
     ":feature:reader",
+    ":feature:sources",
     ":source:api",
     ":source:engine",
     ":source:network",

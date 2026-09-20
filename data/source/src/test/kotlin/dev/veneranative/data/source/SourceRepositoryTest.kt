@@ -79,7 +79,7 @@ class SourceRepositoryTest {
 
         val outcome = repository.install(LOCATION)
 
-        assertTrue(outcome is InstallOutcome.Failure)
+        assertEquals(SourceInstallError.Rejected, (outcome as InstallOutcome.Failure).error)
         assertEquals("1.0.0", store.read(sourceId)?.installed?.version)
         assertEquals("class A {}", store.read(sourceId)?.script)
         assertEquals("1.0.0", repository.installed().single().version)
@@ -92,9 +92,26 @@ class SourceRepositoryTest {
 
         val outcome = repository.install(LOCATION)
 
-        assertEquals(InstallOutcome.Failure("missing key"), outcome)
+        val failure = outcome as InstallOutcome.Failure
+        assertEquals(SourceInstallError.InvalidMetadata, failure.error)
+        // The lower layer's wording is kept for diagnostics but is not what the UI renders.
+        assertEquals("missing key", failure.detail)
         assertTrue(repository.installed().isEmpty())
         assertTrue(runtime.installedPackages.isEmpty())
+    }
+
+    @Test
+    fun `a device without a source engine is reported as unavailable`() = runTest {
+        givenScript(version = "1.0.0", script = "class A {}")
+        metadataReader.result = SourceMetadataResult.EngineUnavailable("no engine on this device")
+
+        val outcome = repository.install(LOCATION)
+
+        assertEquals(
+            SourceInstallError.EngineUnavailable,
+            (outcome as InstallOutcome.Failure).error,
+        )
+        assertTrue(repository.installed().isEmpty())
     }
 
     @Test
@@ -103,7 +120,10 @@ class SourceRepositoryTest {
 
         val outcome = repository.install(LOCATION)
 
-        assertEquals(InstallOutcome.Failure("No source script at this location."), outcome)
+        assertEquals(
+            SourceInstallError.LocationUnreadable,
+            (outcome as InstallOutcome.Failure).error,
+        )
         assertTrue(repository.installed().isEmpty())
     }
 
@@ -157,8 +177,8 @@ class SourceRepositoryTest {
         val outcome = brokenRepository.install(LOCATION)
 
         assertEquals(
-            InstallOutcome.Failure("The source could not be stored on this device."),
-            outcome,
+            SourceInstallError.StorageFailed,
+            (outcome as InstallOutcome.Failure).error,
         )
         assertEquals(listOf(sourceId), runtime.unloadedSourceIds)
     }

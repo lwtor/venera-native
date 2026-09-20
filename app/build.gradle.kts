@@ -21,8 +21,14 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:model"))
+    implementation(project(":data:source"))
     implementation(project(":feature:home"))
     implementation(project(":feature:reader"))
+    implementation(project(":feature:sources"))
+    // The assembly layer names engine contracts directly, so it declares them instead of relying on
+    // transitive exposure from the implementation modules.
+    implementation(project(":source:api"))
+    implementation(project(":source:engine"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.activity.compose)

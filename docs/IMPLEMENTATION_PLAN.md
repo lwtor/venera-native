@@ -262,7 +262,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
   游标、`{images}` 与三种探索页形态；全量单测 91 项通过。
 - 转入后续：`SourceCore` 引擎实现依赖 S1-08；`ComicKey` 的 Feature/Data 端到端使用随 S1-02/S1-03 落地。
 
-### S1-02 来源包安装与管理 — IN_PROGRESS
+### S1-02 来源包安装与管理 — DONE
 
 依赖：S1-01。
 
@@ -284,8 +284,14 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
   安装顺序为“运行时先接受、存储后写入”，写入失败则回滚运行时，运行时拒绝则存储不动。
 - `SourceMetadataReader` 契约放在 `:source:api`，接收脚本文本而非已安装包（避开包需要 id/版本、
   而 id/版本来自元数据的循环）；引擎实现随 S1-08。
-- 测试 16 项（存储 7 + 仓库 9）；全量单测 107 项通过。
-- 仍待完成：`:feature:sources` 列表 UI 与加载 / 空 / 错误 / 成功状态；远端 URL 抓取。
+- 安装失败改为领域错误 `SourceInstallError`（位置不可读 / 元数据非法 / 引擎不可用 / 被拒绝 / 存储失败），
+  UI 文案由 Feature 映射，下层的诊断字符串不再直接展示。
+- `:feature:sources` 落地：`SourcesScreen` / `SourcesViewModel` / `SourcesRoute`，四种状态齐备，
+  含卸载确认对话框；`:app` 用 `AppScreen` 枚举装配三个目的地，Home 通过回调暴露入口（Feature 之间不互相依赖）。
+- 测试 25 项（存储 7 + 仓库 10 + ViewModel 9）与 5 项 Compose 测试（仅编译）；全量单测 116 项通过。
+- 已知限制：真实脚本的元数据读取依赖 S1-08 的引擎实现，因此当前安装真实源会以
+  “Comic sources are unavailable on this device.” 失败（`:app` 传入的 `UnavailableMetadataReader`）。
+- 未做：从远端 URL 抓取来源包（与来源仓库客户端一起做）。
 
 ### S1-08 自有引擎（QuickJS）落地 — TODO
 

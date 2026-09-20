@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
-| 当前任务 | S1-02：来源包安装与管理 |
-| 当前任务状态 | IN_PROGRESS（数据层已完成，来源列表 UI 待做） |
+| 当前任务 | S1-08：自有引擎（QuickJS）落地 |
+| 当前任务状态 | TODO（S1-02 已完成；S1-08 阻塞 S1-03） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -394,17 +394,37 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - 正式 Reader UI 和下载功能。
 - 在结论得出前实现完整 QuickJS fallback。
 
-## 当前唯一执行任务
+## 当前唯一下一任务
 
-### S1-02：来源包安装与管理 — IN_PROGRESS
+### S1-08：自有引擎（QuickJS）落地 — TODO
 
-依赖：S1-01（已完成）。
+依赖：S1-02（已完成）。**阻塞 S1-03**。
 
-交付物（摘自 `docs/IMPLEMENTATION_PLAN.md`）：本地 URL/文件安装测试源；元数据验证、SHA-256、版本、
-启停、卸载；安装失败不污染已有可运行版本；来源列表的加载、空、错误与成功状态。
-计划模块：`:data:source`、`:feature:sources`。
+这是当前唯一阻塞端到端链路的任务。ADR-0008 已定案：WebView 系引擎在没有 MessagePort 的设备上
+无法提供异步 Host API，参考设备正是这种情况；协议与 UI 都已在它之上就绪，缺的是引擎。
 
-已完成（2026-09-20，数据层）：
+必须交付：
+
+- `:source:api` 契约的自有引擎实现（装配层选择实现，现有 WebView 实现保留到本任务通过为止）。
+- Host API 的**两套入口**：全局 `fetch`（`ok`/`json()`/`text()`）与 `Network.*`；这是真实源的实际用法
+  （ADR-0007 §4.3）。
+- `SourceMetadataReader` 的真实实现：执行脚本读取 `key`/`name`/`version`/`minAppVersion`，
+  替换 `:app` 里临时的 `UnavailableMetadataReader`。
+- 按 ADR-0008 第 3 节判据产出的数据：调用取消、调用超时、二进制通道、ABI 与体积、许可证登记。
+
+编译检查：
+
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
+
+## 最近完成
+
+### S1-02 来源包安装与管理 — DONE
+
+依赖：S1-01。
+
+已完成（2026-09-20）：
 
 - 新增 `:data:source` 模块：`SourceRepository`（安装 / 启停 / 卸载 / 列表）与 `DefaultSourceRepository`。
 - `SourcePackageStore`：每来源一个目录存脚本，外加 JSON 索引供列表页读取——**列表页不需要重新读取
@@ -414,24 +434,31 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - 新增 `SourceMetadataReader` 契约（`:source:api`）：接收**脚本文本**而不是已安装包，因为包需要 id
   与版本，而这两个正是元数据要提供的；引擎实现在 S1-08 落地，本阶段用测试替身。
 - `LocalFileScriptFetcher`：支持本地路径与 `file://`，满足“本地 URL/文件安装测试源”。
-- 测试：`SourcePackageStoreTest`（7）+ `SourceRepositoryTest`（9），覆盖升级替换、运行时拒绝后旧版
-  仍可用、元数据不可读不落盘、启停的加载与卸载、卸载清理、索引损坏不隐藏其它条目、恶意 id 不越界。
+- 安装失败改为领域错误 `SourceInstallError`（位置不可读 / 元数据非法 / 引擎不可用 / 被拒绝 / 存储失败），
+  UI 文案由 Feature 映射；下层的诊断字符串只用于日志，不再直接展示（有测试断言）。
+- `:feature:sources` 落地：`SourcesScreen` / `SourcesViewModel` / `SourcesRoute`，加载 / 空 / 失败 / 成功
+  四种状态齐备，卸载带确认对话框；`:app` 用 `AppScreen` 枚举装配三个目的地，Home 通过回调暴露入口，
+  Feature 之间不互相依赖。
+- 测试：`SourcePackageStoreTest`（7）+ `SourceRepositoryTest`（10）+ `SourcesViewModelTest`（9），
+  覆盖升级替换、运行时拒绝后旧版可用、元数据不可读不落盘、启停的加载与卸载、卸载清理、
+  索引损坏不隐藏其它条目、恶意 id 不越界、失败保留用户输入、列表失败可重试；另有 5 项 Compose 测试（仅编译）。
 
-仍待完成：
+已知限制（不是缺陷遗漏，是依赖顺序）：
 
-- `:feature:sources` 与来源列表的加载 / 空 / 错误 / 成功状态（下一轮）。
-- 从远端 URL 抓取来源包（需要复用应用 HTTP 客户端，与来源仓库客户端一起做）。
-- 真实元数据读取依赖 S1-08 的引擎实现。
+- 真实脚本的元数据读取依赖 S1-08 的引擎实现，因此当前安装真实源会以
+  “Comic sources are unavailable on this device.” 失败；`:app` 传入的 `UnavailableMetadataReader`
+  会在 S1-08 被真实实现替换。
+- 从远端 URL 抓取来源包未做，需要复用应用 HTTP 客户端。
 
 验证记录：
 
 ```text
 2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
-.\gradlew.bat --no-daemon --max-workers=2 :data:source:testDebugUnitTest :app:assembleDebug
+.\gradlew.bat --no-daemon --max-workers=2 :feature:sources:testDebugUnitTest :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug
 结果：BUILD SUCCESSFUL
-全量单元测试 107 项，failures=0 errors=0 skipped=0
-  core:model 24 / data:source 16 / source:api 29 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
+全量单元测试 116 项，failures=0 errors=0 skipped=0
+  core:model 24 / data:source 16 / source:api 29 / feature:reader 26 / feature:sources 9 / source:network 6 / source:engine 5 / core:network 1
 ```
 
 编译检查：
@@ -506,9 +533,8 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S1-02 | 来源包安装与管理 | S1-01（已完成） |
-| 2 | S1-08 | 自有引擎（QuickJS）落地，阻塞 S1-03 | S1-02 |
-| 3 | S1-03 | 探索与搜索纵向切片 | S1-01、S1-02、S1-08 |
+| 1 | S1-08 | 自有引擎（QuickJS）落地，阻塞 S1-03 | S1-02（已完成） |
+| 2 | S1-03 | 探索与搜索纵向切片 | S1-01、S1-02、S1-08 |
 
 ## 已知风险与待确认
 
@@ -520,6 +546,8 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 | WebView 引擎在参考设备上无法提供异步 Host API | ADR-0008 已定案转向自有引擎（QuickJS），spike 尚未执行 | spike 必须通过 ADR-0008 第 3 节全部判据；未通过前 S1-03 不得叠加临时方案 |
 | 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | ADR-0007 §4.3 已确认：只做 `Network.get/post` 无法运行真实源 | S1-08 引擎落地必须提供 `fetch` 兼容层，已列入 ADR-0008 spike 判据 |
 | 来源 id 冲突（上游存在两个源共用 `copy_manga`） | 已决策：`sourceId` 取脚本自报的 `key`，同 id 的第二次安装**替换**第一次，不共存 | 若产品上需要共存，必须先改 `SourceId` 语义并同步 `ComicKey` |
+| 安装真实源脚本在 S1-08 之前必然失败 | 元数据读取需要执行脚本，`:app` 暂时传入 `UnavailableMetadataReader` | S1-08 提供真实 `SourceMetadataReader` 后移除该占位实现 |
+| `:feature:sources` 直接依赖 `:data:source` | 有意的边界取舍，已记录在 ARCHITECTURE §3 | 出现第二个数据实现或引入 DI 时把契约拆出去 |
 | `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
 | 导航契约模块已删除 | `:core:navigation` 零引用，S0-07 删除以符合模块创建准则 | S1-03 首次需要类型安全 Route 时重建 |

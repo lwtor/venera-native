@@ -31,7 +31,32 @@ interface SourceRepository {
 sealed interface InstallOutcome {
     data class Success(val installed: InstalledSource) : InstallOutcome
 
-    data class Failure(val reason: String) : InstallOutcome
+    /**
+     * [detail] is for logs and diagnostics only. Callers must render [error], never this string:
+     * a lower layer's wording is not product copy.
+     */
+    data class Failure(
+        val error: SourceInstallError,
+        val detail: String? = null,
+    ) : InstallOutcome
+}
+
+/** Why an install did not happen. Each case has a different thing the user can do about it. */
+sealed interface SourceInstallError {
+    /** The script could not be read from where the user pointed. */
+    data object LocationUnreadable : SourceInstallError
+
+    /** The script ran but did not declare usable metadata (missing key, name or version). */
+    data object InvalidMetadata : SourceInstallError
+
+    /** This device's JavaScript engine cannot run sources at all. */
+    data object EngineUnavailable : SourceInstallError
+
+    /** The runtime accepted the text but refused the package, for example on a broken script. */
+    data object Rejected : SourceInstallError
+
+    /** The package was accepted but could not be written to storage. */
+    data object StorageFailed : SourceInstallError
 }
 
 class DefaultSourceRepository(
@@ -45,13 +70,19 @@ class DefaultSourceRepository(
 
     override suspend fun install(location: String): InstallOutcome {
         val script = when (val fetched = fetcher.fetch(location)) {
-            is FetchedScript.Failure -> return InstallOutcome.Failure(fetched.reason)
+            is FetchedScript.Failure ->
+                return InstallOutcome.Failure(SourceInstallError.LocationUnreadable, fetched.reason)
+
             is FetchedScript.Success -> fetched.script
         }
 
         val metadata = when (val read = metadataReader.read(script)) {
-            is SourceMetadataResult.Invalid -> return InstallOutcome.Failure(read.reason)
-            is SourceMetadataResult.EngineUnavailable -> return InstallOutcome.Failure(read.reason)
+            is SourceMetadataResult.Invalid ->
+                return InstallOutcome.Failure(SourceInstallError.InvalidMetadata, read.reason)
+
+            is SourceMetadataResult.EngineUnavailable ->
+                return InstallOutcome.Failure(SourceInstallError.EngineUnavailable, read.reason)
+
             is SourceMetadataResult.Success -> read.metadata
         }
 
@@ -68,7 +99,7 @@ class DefaultSourceRepository(
         return when (val installed = runtime.install(packageToInstall)) {
             is SourceInstallResult.Failed ->
                 // Storage is untouched, so the previous version keeps working.
-                InstallOutcome.Failure(installed.error.message)
+                InstallOutcome.Failure(SourceInstallError.Rejected, installed.error.message)
 
             is SourceInstallResult.Installed -> {
                 val entry = StoredSource(
@@ -87,7 +118,7 @@ class DefaultSourceRepository(
                     InstallOutcome.Success(entry.installed)
                 } else {
                     restore(previous, metadata.sourceId)
-                    InstallOutcome.Failure("The source could not be stored on this device.")
+                    InstallOutcome.Failure(SourceInstallError.StorageFailed)
                 }
             }
         }
