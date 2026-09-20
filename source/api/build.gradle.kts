@@ -9,6 +9,8 @@ android {
 dependencies {
     api(project(":core:model"))
 
+    implementation(libs.kotlinx.serialization.json)
+
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
 }

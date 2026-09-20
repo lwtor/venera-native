@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
-| 当前任务 | S1-01：稳定领域模型与 Source Core 协议 |
-| 当前任务状态 | IN_PROGRESS（领域模型与协议基础已完成，Source Core 契约待做） |
+| 当前任务 | S1-02：来源包安装与管理 |
+| 当前任务状态 | TODO（S1-01 已完成） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -394,11 +394,34 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - 正式 Reader UI 和下载功能。
 - 在结论得出前实现完整 QuickJS fallback。
 
-## 当前唯一执行任务
+## 当前唯一下一任务
 
-### S1-01：稳定领域模型与 Source Core 协议 — IN_PROGRESS
+### S1-02：来源包安装与管理 — TODO
 
-依赖：S0-07（已完成）。
+依赖：S1-01（已完成）。
+
+交付物（摘自 `docs/IMPLEMENTATION_PLAN.md`）：本地 URL/文件安装测试源；元数据验证、SHA-256、版本、
+启停、卸载；安装失败不污染已有可运行版本；来源列表的加载、空、错误与成功状态。
+计划模块：`:data:source`、`:feature:sources`。
+
+开始前要先处理的两点：
+
+- 安装流程必须落在 `:source:engine` 已有的 `SourceScriptRuntime.install` 上（版本、脚本与 SHA-256
+  校验已经在那里），不要把校验复制到新模块。
+- 来源元数据（`name`/`key`/`version`/`minAppVersion`）的读取依赖引擎；S1-08 之前无法在真实源上验证，
+  S1-02 先用测试源覆盖管理逻辑。
+
+编译检查：
+
+```powershell
+.\gradlew.bat :app:assembleDebug
+```
+
+## 最近完成
+
+### S1-01 稳定领域模型与 Source Core 协议 — DONE
+
+依赖：S0-07。
 
 已完成（2026-09-20）：
 
@@ -429,6 +452,15 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
   对齐的数组**、**网络主入口是全局 `fetch` 而不是 `Network.get/post`**。
 - `:core:model` 增加 `groupedChaptersOf()`（分组章节，保留组名与两层顺序）与
   `encodeFilterSelection()`（按声明顺序生成筛选数组）；新增 `ChaptersOfTest`（4）与筛选顺序测试（2）。
+- `:source:api` 新增 `protocol` 包：`SourceProtocol` 把契约编码成上游调用
+  （`loadInfo` / `loadEp` / `search.load` / `search.loadNext` / `explore.load`），
+  `SourceProtocolParser` 把响应解析回领域模型。**探索页的页码基准由页面类型决定**
+  （`multiPageComicList` 1-based、`mixed` 0-based、`multiPartPage` 传 null），选错会静默错一页。
+- 新增 `SourcePage`（只有 `imageRef` 与序号）：真实源的页面只有 URL、没有尺寸，尺寸由图片管线解析；
+  `ComicPage` 继续表示"尺寸已知"的阅读器契约，两者分工写在 KDoc 里。
+- 协议兼容测试：`SourceProtocolTest`（8）覆盖调用形态，`SourceProtocolParserTest`（12）用真实源的响应
+  形状覆盖分组章节与 marker 忽略、扁平章节、缺字段条目被丢弃、`{comics, maxPage}` 游标、`{images}`、
+  三种探索页形态。
 
 验证记录：
 
@@ -437,33 +469,23 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 .\gradlew.bat --no-daemon --max-workers=2 :core:model:testDebugUnitTest :source:api:testDebugUnitTest :app:assembleDebug
 结果：BUILD SUCCESSFUL
-全量单元测试 71 项，failures=0 errors=0 skipped=0
-  core:model 24 / source:api 9 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
+全量单元测试 91 项，failures=0 errors=0 skipped=0
+  core:model 24 / source:api 29 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
 ```
 
-仍待完成：
+转入后续任务（不属于 S1-01）：
 
-- 协议 DTO 与 JSON 兼容测试：把 `SourceCore` 契约映射到 `loadInfo` / `loadEp` / `search` / `explore`
-  等上游调用。签名已用真实源核对完毕（ADR-0007 §4.3），前置解除，可直接实现。
-- `SourceCore` 的引擎实现（依赖 S1-08 引擎落地），落地后复用 `SourceCoreTest` 的断言。
-- `ComicKey` 全链路使用在 Feature / Data 层的落实，随 S1-03 建立 `:data:comic` 完成。
-
-下一轮从协议 DTO 的前置核对开始：拉取 `venera-configs` 中的真实源实现，确认 `loadInfo` / `loadEp` 签名。
-
-编译检查：
-
-```powershell
-.\gradlew.bat :app:assembleDebug
-```
+- `SourceCore` 的引擎实现依赖 S1-08 引擎落地，落地后复用 `SourceCoreTest` 与协议测试的断言。
+- `ComicKey` 在 Feature / Data 层的端到端使用，随 S1-02 建立 `:data:source`、S1-03 建立 `:data:comic` 落地。
+- `loadThumbnails` 签名核对（S1-05 多页缩略图需要）。
 
 ## 紧随其后的任务
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S1-01 | 稳定领域模型与 Source Core 协议（进行中：Source Core 契约待做） | S0-07（已完成） |
-| 2 | S1-02 | 来源包安装与管理 | S1-01 |
-| 3 | S1-08 | 自有引擎（QuickJS）落地，阻塞 S1-03 | S1-02 |
-| 4 | S1-03 | 探索与搜索纵向切片 | S1-01、S1-02、S1-08 |
+| 1 | S1-02 | 来源包安装与管理 | S1-01（已完成） |
+| 2 | S1-08 | 自有引擎（QuickJS）落地，阻塞 S1-03 | S1-02 |
+| 3 | S1-03 | 探索与搜索纵向切片 | S1-01、S1-02、S1-08 |
 
 ## 已知风险与待确认
 

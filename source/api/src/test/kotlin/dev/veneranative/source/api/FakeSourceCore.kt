@@ -5,7 +5,6 @@ import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
-import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.PageCursor
 import dev.veneranative.core.model.PagedResult
@@ -13,6 +12,7 @@ import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.SourcePage
 import dev.veneranative.core.model.chaptersOf
 import kotlin.math.ceil
 
@@ -111,16 +111,11 @@ class FakeSourceCore(
         }
     }
 
-    override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<ComicPage>> =
+    override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
         if (declaredCapabilities.supports(SourceCapability.PAGES)) {
             SourceOutcome.Success(
                 List(FIXTURE_PAGE_COUNT) { index ->
-                    ComicPage(
-                        index = index,
-                        imageRef = "fake://${chapterKey.remoteId.value}/$index",
-                        widthPx = 1080,
-                        heightPx = 1440,
-                    )
+                    SourcePage(index = index, imageRef = "fake://${chapterKey.remoteId.value}/$index")
                 },
             )
         } else {

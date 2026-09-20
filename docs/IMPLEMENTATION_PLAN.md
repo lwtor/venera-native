@@ -234,7 +234,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 5. **不再安排引擎边界收敛任务**：Stage 0 已把引擎能力、二进制通道、终止恢复与吞吐量级写成结论；
    Stage 1 只在出现设备相关症状时按 `docs/STATUS.md` 的命令补测。
 
-### S1-01 稳定领域模型与 Source Core 协议 — IN_PROGRESS
+### S1-01 稳定领域模型与 Source Core 协议 — DONE
 
 依赖：S0-07。
 
@@ -255,8 +255,12 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - `:source:api` 落地 `SourceCore` 五个能力契约与 `SourceOutcome`，并新增 `FakeSourceCore` +
   `SourceCoreTest` 把契约语义（缺失能力可降级、失败以值返回、分页终止、章节顺序）变成可执行断言。
 - 测试：模型协议语义 18 项 + 契约 9 项，全量单测 65 项通过。
-- 仍待完成：协议 DTO 与 JSON 兼容测试（前置为 ADR-0007 第 4.3 节的 `loadInfo`/`loadEp` 签名核对）；
-  `SourceCore` 的引擎实现依赖 S1-08；`ComicKey` 在 Feature/Data 的全链路使用随 S1-03 落地。
+- 协议编解码：`SourceProtocol`（契约 → `loadInfo`/`loadEp`/`search.load`/`explore.load`）与
+  `SourceProtocolParser`（响应 → 领域模型），探索页页码基准由页面类型决定；新增 `SourcePage`
+  区分"源给的是 URL"与"阅读器需要尺寸"。
+- 协议兼容测试：编码 8 项 + 解析 12 项，覆盖分组章节与 marker 忽略、缺字段条目、`{comics, maxPage}`
+  游标、`{images}` 与三种探索页形态；全量单测 91 项通过。
+- 转入后续：`SourceCore` 引擎实现依赖 S1-08；`ComicKey` 的 Feature/Data 端到端使用随 S1-02/S1-03 落地。
 
 ### S1-02 来源包安装与管理 — TODO
 
