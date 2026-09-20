@@ -34,3 +34,7 @@ Thumbs.db
 *.log
 *.tmp
 *.bak
+
+# S0-06 large-image fixtures: generated locally, never committed
+tools/test-images/out/
+feature/reader/src/main/assets/fixtures/
