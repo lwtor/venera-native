@@ -130,7 +130,7 @@ class AndroidJavaScriptRuntime(
 
                 val invocationScript =
                     SourceInvocationScript.build(
-                        functionName = typedCall.functionName,
+                        member = typedCall.functionName,
                         argumentsJson = typedCall.argumentsJson,
                         invocationId = typedCall.callId,
                     )
@@ -294,8 +294,8 @@ class AndroidJavaScriptRuntime(
         if (call.callId.isBlank()) {
             return SourceRuntimeError.InvalidCall("Call ID must not be blank.")
         }
-        if (!SourceInvocationScript.validateFunctionName(call.functionName)) {
-            return SourceRuntimeError.InvalidCall("Function name is not a valid identifier.")
+        if (!SourceInvocationScript.validateMember(call.functionName)) {
+            return SourceRuntimeError.InvalidCall("Function name is not a valid member path.")
         }
         if (call.timeoutMillis !in 1..MAX_CALL_TIMEOUT_MILLIS) {
             return SourceRuntimeError.InvalidCall(

@@ -29,6 +29,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONException
+import org.json.JSONTokener
 
 /**
  * Owned-engine implementation of [SourceScriptRuntime] (ADR-0008).
@@ -144,9 +145,10 @@ class QuickJsRuntime(
 
                 val invocationScript =
                     SourceInvocationScript.buildAwaitable(
-                        functionName = typedCall.functionName,
+                        member = typedCall.functionName,
                         argumentsJson = typedCall.argumentsJson,
                         invocationId = typedCall.callId,
+                        root = SourceClassConvention.INSTANCE,
                     )
 
                 val evaluation = session.evaluate(engine, invocationScript)
@@ -259,8 +261,8 @@ class QuickJsRuntime(
         if (call.callId.isBlank()) {
             return SourceRuntimeError.InvalidCall("Call ID must not be blank.")
         }
-        if (!SourceInvocationScript.validateFunctionName(call.functionName)) {
-            return SourceRuntimeError.InvalidCall("Function name is not a valid identifier.")
+        if (!SourceInvocationScript.validateMember(call.functionName)) {
+            return SourceRuntimeError.InvalidCall("Function name is not a valid member path.")
         }
         if (call.timeoutMillis !in 1..MAX_CALL_TIMEOUT_MILLIS) {
             return SourceRuntimeError.InvalidCall(
@@ -314,16 +316,7 @@ class QuickJsRuntime(
                     )
                 bridge.install(engine)
                 bridge.loadBootstrap(engine)
-
-                val sentinel =
-                    engine.evaluate<String>(source.script + "\n;\"" + SOURCE_LOADED_SENTINEL + "\"\n")
-                if (sentinel != SOURCE_LOADED_SENTINEL) {
-                    throw RuntimeFailure(
-                        SourceRuntimeError.InvalidPackage(
-                            "Source script did not complete initialization.",
-                        ),
-                    )
-                }
+                instantiate(engine)
 
                 engineRef.set(engine)
                 return engine
@@ -332,6 +325,65 @@ class QuickJsRuntime(
                 throw failure
             }
         }
+
+        /**
+         * Runs the script the way upstream does and leaves the instance registered.
+         *
+         * The key in the script and the id the package was installed under must agree: the registry
+         * is keyed by it, and a mismatch would mean calls reach a different source than the one the
+         * user installed.
+         */
+        private suspend fun instantiate(engine: QuickJs) {
+            val className =
+                SourceClassConvention.classNameOf(source.script)
+                    ?: throw RuntimeFailure(
+                        SourceRuntimeError.InvalidPackage(
+                            "Source script must declare 'class <Name> extends ComicSource' at the " +
+                                "start of a line.",
+                        ),
+                    )
+
+            val instantiated =
+                engine.evaluate<String>(
+                    SourceClassConvention.instantiationScript(source.script, className),
+                )
+            if (instantiated != SourceClassConvention.INSTANTIATED_SENTINEL) {
+                throw RuntimeFailure(
+                    SourceRuntimeError.InvalidPackage("Source script did not instantiate its class."),
+                )
+            }
+
+            val declaredKey = readField(engine, KEY_FIELD)
+            if (declaredKey == null || !SourceClassConvention.isUsableKey(declaredKey)) {
+                throw RuntimeFailure(
+                    SourceRuntimeError.InvalidPackage(
+                        "Source 'key' must contain only letters, digits and underscores.",
+                    ),
+                )
+            }
+            if (declaredKey != source.sourceId.value) {
+                throw RuntimeFailure(
+                    SourceRuntimeError.InvalidPackage(
+                        "Source script declares key '$declaredKey' but the package is " +
+                            "identified as '${source.sourceId.value}'.",
+                    ),
+                )
+            }
+
+            val registered = engine.evaluate<String>(SourceClassConvention.registrationScript(declaredKey))
+            if (registered != SourceClassConvention.REGISTERED_SENTINEL) {
+                throw RuntimeFailure(
+                    SourceRuntimeError.InvalidPackage("Source script did not register itself."),
+                )
+            }
+
+            engine.evaluate<Any?>(SourceClassConvention.INIT_SCRIPT)
+        }
+
+        /** Reads one string field off the instance; the script JSON-encodes it so null is explicit. */
+        private suspend fun readField(engine: QuickJs, field: String): String? =
+            JSONTokener(engine.evaluate<String>(SourceClassConvention.fieldScript(field)))
+                .nextValue() as? String
 
         /**
          * The engine to evaluate on, rebuilding it after a dirty shutdown.
@@ -402,7 +454,7 @@ class QuickJsRuntime(
         const val DEFAULT_MAX_RESULT_BYTES = 1_048_576
         const val MAX_CALL_TIMEOUT_MILLIS = 120_000L
         const val MAX_ERROR_DETAIL_LENGTH = 512
-        const val SOURCE_LOADED_SENTINEL = "__VENERA_SOURCE_LOADED__"
+        const val KEY_FIELD = "key"
         const val DEFAULT_APP_LOCALE = "en"
         const val DEFAULT_APP_VERSION = "0"
     }

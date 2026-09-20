@@ -370,32 +370,9 @@ internal object QuickJsHostScript {
           });
 
           globalThis.APP = Object.freeze({
-            locale: ${quote(appLocale)},
-            version: ${quote(appVersion)}
+            locale: ${jsQuote(appLocale)},
+            version: ${jsQuote(appVersion)}
           });
         })();
-    """.trimIndent()
-
-    /** JavaScript string literal escaping: the values come from the host, not from the script. */
-    private fun quote(value: String): String = buildString(value.length + 2) {
-        append('"')
-        value.forEach { character ->
-            when (character) {
-                '"' -> append("\\\"")
-                '\\' -> append("\\\\")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> {
-                    if (character.code < 0x20) {
-                        append("\\u")
-                        append(character.code.toString(16).padStart(4, '0'))
-                    } else {
-                        append(character)
-                    }
-                }
-            }
-        }
-        append('"')
-    }
+    """.trimIndent() + "\n\n" + SourceBaseScript.script
 }

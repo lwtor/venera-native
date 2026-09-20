@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
-| 当前任务 | S1-08：自有引擎（QuickJS）落地 |
-| 当前任务状态 | IN_PROGRESS（绑定选型与桥接 spike 已完成，引擎实现待做） |
+| 当前任务 | S1-03：探索与搜索纵向切片 |
+| 当前任务状态 | IN_PROGRESS（引擎约定与地基已完成；SourceCore 实现与三个 Feature 模块待做） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -396,12 +396,49 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 
 ## 当前唯一执行任务
 
-### S1-08：自有引擎（QuickJS）落地 — IN_PROGRESS
+### S1-03：探索与搜索纵向切片 — IN_PROGRESS
 
-依赖：S1-02（已完成）。**阻塞 S1-03**。
+依赖：S1-01、S1-02、S1-08。
 
-这是当前唯一阻塞端到端链路的任务。ADR-0008 已定案：WebView 系引擎在没有 MessagePort 的设备上
-无法提供异步 Host API，参考设备正是这种情况；协议与 UI 都已在它之上就绪，缺的是引擎。
+已完成（2026-09-20，地基部分）：
+
+- **纠正了源的加载与调用约定**。此前运行时把源当成"一堆全局函数"，而**真实源不是这样**：
+  核对上游 `parser.dart` 与 `assets/init.js` 后确认的约定是"找第一行 `class X extends ComicSource` →
+  整脚本包进 IIFE 实例化 → 写进 `ComicSource.sources[key]` → 成员按**路径**调用"。按此实现：
+  `SourceClassConvention`（约定与生成代码）、`SourceBaseScript`（JS 侧基类，含 `sources` 注册表）、
+  加载时校验"脚本声明的 key 与安装的 id 一致"，成员调用解析路径并把 `this` 绑到声明它的对象。
+  这条纠正之前，任何真实源都无法安装（ADR-0007 §4.4）。
+- `QuickJsMetadataReader` 改为同一约定：实例化后读实例字段，而不是读全局变量。
+- 新增 `SourceClassConventionTest`（3）、`SourceInvocationScriptTest`（3，改为路径语义），
+  `QuickJsRuntimeTest` 扩到 20 项（注册表、`this` 绑定、`init` 执行、`loadSetting` 默认值、
+  路径成员、未知成员、key 不一致被拒、缩进声明被拒等）。
+
+仍待完成（S1-03 的主体）：
+
+- `SourceCore` 的引擎实现：把 Explore / Search / Detail / Chapters / Pages 映射成协议调用并解析响应
+  （S1-01 已备好 `SourceProtocol` 与 `SourceProtocolParser`，约定已可用）。
+- `:data:comic`、`:feature:explore`、`:feature:search` 与 Paging 3 适配、类型安全路由。
+
+验证记录：
+
+```text
+2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+.\gradlew.bat --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL
+全量单元测试 151 项，failures=0 errors=0
+  source:engine 39（QuickJsRuntimeTest 20、QuickJsMetadataReaderTest 7、QuickJsBridgeSpikeTest 3、
+  SourceClassConventionTest 3、SourceInvocationScriptTest 3、SourcePackageValidatorTest 3）
+```
+
+## 上一任务：S1-08 自有引擎（QuickJS）落地 — 代码部分完成
+
+### S1-08：自有引擎（QuickJS）落地 — 代码部分完成
+
+依赖：S1-02（已完成）。
+
+ADR-0008 已定案：WebView 系引擎在没有 MessagePort 的设备上无法提供异步 Host API，参考设备正是
+这种情况；协议与 UI 都已在它之上就绪，缺的是引擎。
 
 已完成（2026-09-20，选型 + 桥接 spike）：
 
@@ -577,8 +614,11 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S1-08 | 自有引擎（QuickJS）落地，阻塞 S1-03 | S1-02（已完成） |
-| 2 | S1-03 | 探索与搜索纵向切片 | S1-01、S1-02、S1-08 |
+| 1 | S1-03 | 探索与搜索纵向切片（进行中：约定与地基已完成） | S1-01、S1-02、S1-08 |
+| 2 | S1-04 | 漫画详情与章节 | S1-03 |
+
+S1-08 剩余部分（不阻塞 S1-03，见已知风险）：设备侧 ABI 与 APK 体积实测、二进制请求体通道、
+许可证登记、WebView 实现的最终处置。
 
 ## 已知风险与待确认
 

@@ -142,7 +142,37 @@ Stage 3/4 的内容提前拖进 Stage 1。
 | **网络主入口是全局 `fetch`**（`res.ok` / `res.json()` / `res.text()`），`Network.*` 只用于 cookie 等少量场景；POST 表单体用 `Convert.encodeUtf8()` | Host API 必须提供 `fetch` 兼容层；只做 `Network.get/post` 不足以运行真实源。**直接约束 S1-08 的引擎与桥设计** |
 | 该源没有 `loadThumbnails`，也没有 `next` 字段，分页全部依赖 `maxPage` | 页码式是主路径，游标式仍需保留但属少数 |
 
-### 4.4 仍待确认
+### 4.4 源对象的注册与调用约定（2026-09-20，核对上游 `parser.dart` 与 `assets/init.js`）
+
+上游宿主加载一个源脚本的完整约定，**逐条照抄而不是自创**，因为它决定了既有源能否不改一行就跑：
+
+| 步骤 | 上游做法 |
+| --- | --- |
+| 找类 | 取**第一行** `trim()` 后以 `class ` 开头、原始行也以 `class ` 开头（**缩进声明直接判为 Invalid Content**）、且包含 `extends ComicSource` 的行；类名取 `class` 与 `extends ComicSource` 之间的文本 |
+| 实例化 | 把**整段脚本文本**包进 IIFE：`(() => { <脚本> ; this['temp'] = new <ClassName>() }).call()` |
+| 读元数据 | 从实例读 `name` / `key` / `version`（三者必填）/ `minAppVersion` / `url`；`key` 只允许 `[A-Za-z0-9_]+` |
+| 注册 | `ComicSource.sources[key] = 实例`，此后一律通过该注册表调用成员 |
+| 成员调用 | **路径**形式：`ComicSource.sources[key].comic.loadInfo(id)`、`.search.load(kw, options, page)`、`.explore[i].load(page)` —— 因此成员的 `this` 是**声明它的那个对象**，不是全局对象 |
+| `init()` | 只有存在时才调用；上游在解析完成后异步延迟 50ms 触发 |
+
+基类 `ComicSource` 由宿主在 JS 侧提供（上游在 `assets/init.js`），成员包括身份字段、
+`loadData` / `saveData` / `deleteData` / `loadSetting` / `isLogged` / `translate` 与静态 `sources` 注册表。
+
+两条对本项目的直接结论：
+
+- **成员是路径不是标识符**，引擎的调用包装必须按路径解析，且不能把 `this` 绑成全局对象——
+  `SourceInvocationScript` 与它的测试按此实现。
+- **缩进的类声明会被拒绝**，这是上游既有行为（他们的解析器同样拒绝）。本项目的错误信息显式说明
+  “必须在行首声明”，避免使用者以为是我们的 bug。
+
+与上游的一处有意差异：`init()` 在本项目里是**在安装内被等待**的，而不是延迟 50ms 异步触发。
+理由是可重复性：安装完成即代表源可用，`init` 抛错会变成安装失败，而不是稍后变成难以定位的运行时错误。
+
+`ComicSource` 基类的 Stage 1 实现有两处已知简化（写在 `SourceBaseScript` 的文档注释里）：
+`saveData` 只活到引擎实例销毁，`loadSetting` 返回源自己声明的默认值而不是用户选择值——
+源的持久化数据与设置属于 Stage 2/3（见 §2.1）。
+
+### 4.5 仍待确认
 
 - `loadThumbnails` 的真实签名：该源未实现，需要再找使用它的源核对（影响 S1-05 多页缩略图）。
 - `Comment` 与 `ImageLoadingConfig` 的字段（分别影响 Stage 3 评论与 S1-05 图片管线）。

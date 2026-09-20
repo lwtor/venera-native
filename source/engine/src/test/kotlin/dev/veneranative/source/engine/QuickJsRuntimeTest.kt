@@ -26,6 +26,9 @@ import org.junit.Test
 /**
  * The owned runtime, exercised on the JVM (no device).
  *
+ * Fixtures follow the upstream source convention — `class X extends ComicSource` with members
+ * reached by path — so these tests fail if the runtime drifts away from what real sources expect.
+ *
  * `runBlocking` rather than `runTest` on purpose: timeout and cancellation must be measured against
  * real engine work, and the test scheduler's virtual clock would fire timeouts before the engine has
  * done anything.
@@ -33,12 +36,88 @@ import org.junit.Test
 class QuickJsRuntimeTest {
 
     @Test
-    fun `an installed source exposes its globals`() = runBlocking {
+    fun `a source instance is created, registered and callable`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
-            val sourceId = runtime.installSource(ECHO_SCRIPT)
-            val result = runtime.invokeSuccess(sourceId, "add", "[2,3]")
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    registryCheck() {
+                      return { registered: ComicSource.sources[this.key] === this };
+                    }
+                    """.trimIndent(),
+                ),
+            )
 
-            assertEquals(5, JSONObject(result).getInt("sum"))
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "registryCheck", "[]"))
+
+            assertTrue("the instance should be the registry entry", result.getBoolean("registered"))
+        }
+    }
+
+    @Test
+    fun `a member is called on the object that declares it`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    counter = {
+                      value: 0,
+                      bump: function () {
+                        this.value += 1;
+                        return this.value;
+                      }
+                    };
+                    """.trimIndent(),
+                ),
+            )
+
+            // The counter lives on the declaring object, so the second call must see the first
+            // call's effect. A runtime that called the member with `this = globalThis` would reset
+            // it and return 1 twice.
+            assertEquals("1", runtime.invokeSuccess(sourceId, "counter.bump"))
+            assertEquals("2", runtime.invokeSuccess(sourceId, "counter.bump"))
+        }
+    }
+
+    @Test
+    fun `init runs while the source is installed`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    init() {
+                      this.initialised = true;
+                    }
+                    wasInitialised() {
+                      return { value: this.initialised === true };
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "wasInitialised", "[]"))
+
+            assertTrue(result.getBoolean("value"))
+        }
+    }
+
+    @Test
+    fun `the declared settings default answers loadSetting`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    settings = { quality: { default: "high" } };
+                    quality() {
+                      return { value: this.loadSetting("quality") };
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "quality", "[]"))
+
+            assertEquals("high", result.getString("value"))
         }
     }
 
@@ -48,23 +127,27 @@ class QuickJsRuntimeTest {
         val host = RecordingHostApi { request ->
             val payload = JSONObject(request.payloadJson)
             recordedUrls += payload.getString("url")
-            SourceHostResult.Success(
-                requestId = request.requestId,
-                resultJson =
-                    JSONObject()
-                        .put("statusCode", 200)
-                        .put(
-                            "headers",
-                            JSONObject().put("Content-Type", JSONArray().put("application/json")),
-                        )
-                        .put("body", """{"items":[7,8]}""")
-                        .toString(),
-            )
+            respondWithBody(request.requestId, 200, """{"items":[7,8]}""")
         }
 
         withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
-            val sourceId = runtime.installSource(FETCH_SCRIPT)
-            val result = runtime.invokeSuccess(sourceId, "search", """["cats and dogs"]""")
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    search = {
+                      load: async function (keyword) {
+                        const response = await fetch(
+                          "https://example.com/search?q=" + encodeURIComponent(keyword)
+                        );
+                        const data = await response.json();
+                        return { ok: response.ok, status: response.status, count: data.items.length };
+                      }
+                    };
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = runtime.invokeSuccess(sourceId, "search.load", """["cats and dogs"]""")
             val decoded = JSONObject(result)
 
             assertTrue("expected ok, got $result", decoded.getBoolean("ok"))
@@ -84,24 +167,30 @@ class QuickJsRuntimeTest {
         val host = RecordingHostApi { request ->
             val payload = JSONObject(request.payloadJson)
             sentBodies += payload.get("body").toString()
-            SourceHostResult.Success(
-                requestId = request.requestId,
-                resultJson =
-                    JSONObject()
-                        .put("statusCode", 201)
-                        .put("headers", JSONObject())
-                        .put("body", "created")
-                        .toString(),
-            )
+            respondWithBody(request.requestId, 201, "created")
         }
 
         withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
-            val sourceId = runtime.installSource(FORM_SCRIPT)
-            val result = runtime.invokeSuccess(sourceId, "submit", """["标题=中文 ✓"]""")
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    comic = {
+                      loadEp: async function (id, ep) {
+                        const response = await fetch("https://example.com/comment", {
+                          method: "POST",
+                          headers: { "Content-Type": "text/plain; charset=utf-8" },
+                          body: Convert.encodeUtf8(id + "=" + ep)
+                        });
+                        return { status: response.status };
+                      }
+                    };
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = runtime.invokeSuccess(sourceId, "comic.loadEp", """["标题","中文 ✓"]""")
 
             assertEquals(201, JSONObject(result).getInt("status"))
-            // Convert.encodeUtf8 produces bytes; the transport carries text, so the body must come
-            // back as exactly the string that was encoded.
             assertEquals(listOf("标题=中文 ✓"), sentBodies)
         }
     }
@@ -113,12 +202,14 @@ class QuickJsRuntimeTest {
 
         withRuntime(runtime) { active ->
             val sourceId = active.installSource(
-                """
-                function shout() {
-                  console.warn("careful", { depth: 2 });
-                  return "done";
-                }
-                """.trimIndent(),
+                fixtureSource(
+                    """
+                    shout() {
+                      console.warn("careful", { depth: 2 });
+                      return "done";
+                    }
+                    """.trimIndent(),
+                ),
             )
             active.invokeSuccess(sourceId, "shout", "[]")
         }
@@ -131,16 +222,33 @@ class QuickJsRuntimeTest {
     @Test
     fun `the app locale is exposed to sources`() = runBlocking {
         withRuntime(QuickJsRuntime(appLocale = "zh_CN")) { runtime ->
-            val sourceId = runtime.installSource("""function locale() { return APP.locale; }""")
+            val sourceId = runtime.installSource(
+                fixtureSource("""locale() { return APP.locale; }"""),
+            )
 
             assertEquals("\"zh_CN\"", runtime.invokeSuccess(sourceId, "locale", "[]"))
         }
     }
 
     @Test
+    fun `an unknown member fails without killing the source`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(fixtureSource("""known() { return 1; }"""))
+
+            val result = runtime.invoke(SourceCall.InvokeFunction("unknown-1", sourceId, "search.load"))
+
+            val error = (result as SourceResult.Failure).error
+            assertTrue("expected ScriptExecution, got $error", error is SourceRuntimeError.ScriptExecution)
+            assertTrue(error.message.contains("Unknown source member"))
+        }
+    }
+
+    @Test
     fun `a source failure becomes a script execution error`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
-            val sourceId = runtime.installSource("""function fail() { throw new Error("boom"); }""")
+            val sourceId = runtime.installSource(
+                fixtureSource("""fail() { throw new Error("boom"); }"""),
+            )
             val result = runtime.invoke(SourceCall.InvokeFunction("fail-1", sourceId, "fail"))
 
             val error = (result as SourceResult.Failure).error
@@ -151,13 +259,13 @@ class QuickJsRuntimeTest {
 
     @Test
     fun `a host method outside the allow list is rejected`() = runBlocking {
-        val host = RecordingHostApi { request ->
-            SourceHostResult.Success(request.requestId, "{}")
-        }
+        val host = RecordingHostApi { request -> respondWithBody(request.requestId, 200, "{}") }
 
         withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
             val sourceId = runtime.installSource(
-                """async function read() { return veneraHost.call("files.read", { path: "/etc" }); }""",
+                fixtureSource(
+                    """read() { return veneraHost.call("files.read", { path: "/etc" }); }""",
+                ),
             )
             val result = runtime.invoke(SourceCall.InvokeFunction("read-1", sourceId, "read"))
 
@@ -172,10 +280,12 @@ class QuickJsRuntimeTest {
     fun `a non-terminating call times out`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
-                """
-                function spin() { while (true) { } }
-                function add(left, right) { return { sum: left + right }; }
-                """.trimIndent(),
+                fixtureSource(
+                    """
+                    spin() { while (true) { } }
+                    add(left, right) { return { sum: left + right }; }
+                    """.trimIndent(),
+                ),
             )
 
             val result =
@@ -208,14 +318,14 @@ class QuickJsRuntimeTest {
         }
 
         withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
-            val sourceId = runtime.installSource(FETCH_SCRIPT)
+            val sourceId = runtime.installSource(fetchSource())
             val pending =
                 async {
                     runtime.invoke(
                         SourceCall.InvokeFunction(
                             callId = "slow-1",
                             sourceId = sourceId,
-                            functionName = "search",
+                            functionName = "search.load",
                             argumentsJson = """["slow"]""",
                             timeoutMillis = 30_000,
                         ),
@@ -236,27 +346,13 @@ class QuickJsRuntimeTest {
         }
     }
 
-    /**
-     * The pinned binding cannot interrupt a script that is spinning inside the engine, so a timeout
-     * leaves that engine unusable. The runtime must therefore rebuild it: this asserts the source
-     * still answers after a timeout, which is the behaviour the runtime promises instead of
-     * pretending the interrupted script is fine.
-     */
-    private suspend fun assertSourceUsableAfterInterrupt(runtime: QuickJsRuntime, sourceId: SourceId) {
-        val followUp =
-            withTimeoutOrNull(FOLLOW_UP_WAIT_MILLIS) {
-                runCatching { runtime.invokeSuccess(sourceId, "add", "[1,2]") }
-            }
-        assertTrue("the source should answer again after a timeout", followUp?.isSuccess == true)
-    }
-
     @Test
     fun `an unloaded source is no longer callable`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
-            val sourceId = runtime.installSource(ECHO_SCRIPT)
+            val sourceId = runtime.installSource(fixtureSource("""known() { return 1; }"""))
             runtime.unload(sourceId)
 
-            val result = runtime.invoke(SourceCall.InvokeFunction("after-1", sourceId, "add", "[1,2]"))
+            val result = runtime.invoke(SourceCall.InvokeFunction("after-1", sourceId, "known"))
 
             val error = (result as SourceResult.Failure).error
             assertTrue("expected SourceNotLoaded, got $error", error is SourceRuntimeError.SourceNotLoaded)
@@ -266,11 +362,11 @@ class QuickJsRuntimeTest {
     @Test
     fun `a package whose hash does not match is rejected`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
-            val script = ECHO_SCRIPT
+            val script = fixtureSource("""known() { return 1; }""")
             val result =
                 runtime.install(
                     SourcePackage(
-                        sourceId = SourceId("mismatch"),
+                        sourceId = SourceId("fixture"),
                         version = "1",
                         script = script,
                         sha256 = sha256("$script "),
@@ -283,9 +379,67 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `a script that declares another key is rejected`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val script = fixtureSource("""known() { return 1; }""", key = "something_else")
+            val result =
+                runtime.install(
+                    SourcePackage(
+                        sourceId = SourceId("fixture"),
+                        version = "1",
+                        script = script,
+                        sha256 = sha256(script),
+                    ),
+                )
+
+            val failure = result as SourceInstallResult.Failed
+            assertTrue("expected InvalidPackage, got ${failure.error}", failure.error is SourceRuntimeError.InvalidPackage)
+            assertTrue(failure.error.message.contains("something_else"))
+        }
+    }
+
+    @Test
+    fun `a script that does not follow the class convention is rejected`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val result = runtime.installSourceResult("""function add(left, right) { return left + right; }""")
+
+            val failure = result as SourceInstallResult.Failed
+            assertTrue(
+                "expected a package error, got ${failure.error}",
+                failure.error is SourceRuntimeError.InvalidPackage,
+            )
+        }
+    }
+
+    @Test
+    fun `an unusable key is rejected`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val result =
+                runtime.installSourceResult(
+                    fixtureSource("""known() { return 1; }""", key = "not-a-key"),
+                )
+
+            val failure = result as SourceInstallResult.Failed
+            assertTrue("expected a package error, got ${failure.error}", failure.error is SourceRuntimeError.InvalidPackage)
+        }
+    }
+
+    @Test
     fun `a script that throws while loading is rejected`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
-            val result = runtime.installSourceResult("""throw new Error("no init");""")
+            val script =
+                """
+                class BrokenSource extends ComicSource {
+                  constructor() {
+                    super();
+                    this.key = "fixture";
+                    this.name = "Broken";
+                    this.version = "1";
+                    throw new Error("no init");
+                  }
+                }
+                """.trimIndent()
+            val result = runtime.installSourceResult(script)
 
             val failure = result as SourceInstallResult.Failed
             assertTrue(
@@ -298,7 +452,16 @@ class QuickJsRuntimeTest {
     @Test
     fun `a script with a syntax error is reported as such`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
-            val result = runtime.installSourceResult("""function broken( { """)
+            val result =
+                runtime.installSourceResult(
+                    """
+                    class BrokenSource extends ComicSource {
+                      constructor() {
+                        super();
+                        this.key = "fixture";
+                    }
+                    """.trimIndent(),
+                )
 
             val failure = result as SourceInstallResult.Failed
             assertTrue(
@@ -316,15 +479,18 @@ class QuickJsRuntimeTest {
         }
     }
 
-    private suspend fun SourceScriptRuntime.installSource(script: String): SourceId =
-        (installSourceResult(script) as SourceInstallResult.Installed).sourceId
+    private suspend fun SourceScriptRuntime.installSource(script: String): SourceId {
+        val result = installSourceResult(script)
+        assertTrue("expected install, got $result", result is SourceInstallResult.Installed)
+        return (result as SourceInstallResult.Installed).sourceId
+    }
 
     private suspend fun SourceScriptRuntime.installSourceResult(
         script: String,
     ): SourceInstallResult =
         install(
             SourcePackage(
-                sourceId = SourceId("fixture"),
+                sourceId = SourceId(FIXTURE_KEY),
                 version = "1",
                 script = script,
                 sha256 = sha256(script),
@@ -333,12 +499,29 @@ class QuickJsRuntimeTest {
 
     private suspend fun SourceScriptRuntime.invokeSuccess(
         sourceId: SourceId,
-        functionName: String,
-        argumentsJson: String,
+        member: String,
+        argumentsJson: String = "[]",
     ): String {
-        val result = invoke(SourceCall.InvokeFunction(functionName + "-1", sourceId, functionName, argumentsJson))
+        val result =
+            invoke(SourceCall.InvokeFunction(member + "-call", sourceId, member, argumentsJson))
         assertTrue("expected success, got $result", result is SourceResult.Success)
         return (result as SourceResult.Success).json
+    }
+
+    /**
+     * The pinned binding cannot interrupt a script that is spinning inside the engine, so a timeout
+     * leaves that engine unusable. The runtime must therefore rebuild it: this asserts the source
+     * still answers after a timeout, which is the behaviour the runtime promises instead of
+     * pretending the interrupted script is fine.
+     */
+    private suspend fun assertSourceUsableAfterInterrupt(runtime: QuickJsRuntime, sourceId: SourceId) {
+        val followUp =
+            withTimeoutOrNull(FOLLOW_UP_WAIT_MILLIS) {
+                runCatching {
+                    runtime.invokeSuccess(sourceId, "add", "[1,2]")
+                }
+            }
+        assertTrue("the source should answer again after a timeout", followUp?.isSuccess == true)
     }
 
     private class RecordingHostApi(
@@ -358,31 +541,53 @@ class QuickJsRuntimeTest {
         const val ENGINE_TEST_TIMEOUT_MILLIS = 120_000L
         const val FOLLOW_UP_WAIT_MILLIS = 15_000L
         const val HOST_CANCELLATION_WAIT_MILLIS = 10_000L
+        const val FIXTURE_KEY = "fixture"
 
-        val ECHO_SCRIPT = """function add(left, right) { return { sum: left + right }; }"""
-
-        val FETCH_SCRIPT =
-            """
-            async function search(keyword) {
-              const response = await fetch(
-                "https://example.com/search?q=" + encodeURIComponent(keyword)
-              );
-              const data = await response.json();
-              return { ok: response.ok, status: response.status, count: data.items.length };
+        /**
+         * A source script shaped the way upstream sources are, with [body] as extra members.
+         *
+         * Built line by line rather than interpolated into one indented raw string: the body brings
+         * its own indentation, which would make `trimIndent` a no-op and leave the class declaration
+         * indented — and an indented declaration is rejected by the upstream convention.
+         */
+        fun fixtureSource(body: String, key: String = FIXTURE_KEY): String =
+            buildString {
+                appendLine("class FixtureSource extends ComicSource {")
+                appendLine("  constructor() {")
+                appendLine("    super();")
+                appendLine("    this.name = \"Fixture\";")
+                appendLine("    this.key = \"$key\";")
+                appendLine("    this.version = \"1\";")
+                appendLine("  }")
+                appendLine()
+                appendLine(body)
+                appendLine("}")
             }
-            """.trimIndent()
 
-        val FORM_SCRIPT =
+        fun fetchSource(): String = fixtureSource(
             """
-            async function submit(text) {
-              const response = await fetch("https://example.com/post", {
-                method: "POST",
-                headers: { "Content-Type": "text/plain; charset=utf-8" },
-                body: Convert.encodeUtf8(text)
-              });
-              return { status: response.status };
-            }
-            """.trimIndent()
+            search = {
+              load: async function (keyword) {
+                const response = await fetch("https://example.com/search?q=" + keyword);
+                return { status: response.status };
+              }
+            };
+            """.trimIndent(),
+        )
+
+        fun respondWithBody(requestId: String, statusCode: Int, body: String): SourceHostResult =
+            SourceHostResult.Success(
+                requestId = requestId,
+                resultJson =
+                    JSONObject()
+                        .put("statusCode", statusCode)
+                        .put(
+                            "headers",
+                            JSONObject().put("Content-Type", JSONArray().put("application/json")),
+                        )
+                        .put("body", body)
+                        .toString(),
+            )
 
         fun sha256(value: String): String =
             MessageDigest.getInstance("SHA-256")

@@ -8,8 +8,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Metadata is read by running the script, so these tests pin what a script must declare and what
- * happens when it declares nothing usable.
+ * Metadata is read by instantiating the source class, so these tests pin what a script must declare
+ * and what happens when it declares nothing usable.
  */
 class QuickJsMetadataReaderTest {
 
@@ -20,10 +20,15 @@ class QuickJsMetadataReaderTest {
         val result =
             reader.read(
                 """
-                const key = "manga_dex";
-                const name = "MangaDex";
-                const version = "1.2.0";
-                const minAppVersion = "1.6.0";
+                class MangaDex extends ComicSource {
+                  constructor() {
+                    super();
+                    this.name = "MangaDex";
+                    this.key = "manga_dex";
+                    this.version = "1.2.0";
+                    this.minAppVersion = "1.6.0";
+                  }
+                }
                 """.trimIndent(),
             )
 
@@ -39,9 +44,14 @@ class QuickJsMetadataReaderTest {
         val result =
             reader.read(
                 """
-                const key = "local";
-                const name = "Local";
-                const version = "0.1";
+                class Local extends ComicSource {
+                  constructor() {
+                    super();
+                    this.name = "Local";
+                    this.key = "local";
+                    this.version = "0.1";
+                  }
+                }
                 """.trimIndent(),
             )
 
@@ -50,16 +60,33 @@ class QuickJsMetadataReaderTest {
     }
 
     @Test
-    fun `a script without a key is invalid rather than engine-unavailable`() = runBlocking {
-        val result = reader.read("""const name = "Nameless"; const version = "1";""")
+    fun `a script without the class convention is invalid`() = runBlocking {
+        val result = reader.read("""const key = "local"; const name = "Local"; const version = "1";""")
 
         val invalid = result as SourceMetadataResult.Invalid
-        assertTrue(invalid.reason.contains("key"))
+        assertTrue(invalid.reason.contains("ComicSource"))
+    }
+
+    @Test
+    fun `a script that throws while constructing is invalid`() = runBlocking {
+        val result =
+            reader.read(
+                """
+                class Broken extends ComicSource {
+                  constructor() {
+                    super();
+                    throw new Error("nope");
+                  }
+                }
+                """.trimIndent(),
+            )
+
+        assertTrue(result is SourceMetadataResult.Invalid)
     }
 
     @Test
     fun `a script that does not parse is invalid`() = runBlocking {
-        val result = reader.read("function broken( {")
+        val result = reader.read("class Broken extends ComicSource {")
 
         assertTrue(result is SourceMetadataResult.Invalid)
     }
@@ -72,8 +99,20 @@ class QuickJsMetadataReaderTest {
     }
 
     @Test
-    fun `a script that declares a non-string key is invalid`() = runBlocking {
-        val result = reader.read("""const key = 7; const name = "N"; const version = "1";""")
+    fun `a key outside the upstream alphabet is invalid`() = runBlocking {
+        val result =
+            reader.read(
+                """
+                class Odd extends ComicSource {
+                  constructor() {
+                    super();
+                    this.name = "Odd";
+                    this.key = "not-a-key";
+                    this.version = "1";
+                  }
+                }
+                """.trimIndent(),
+            )
 
         val invalid = result as SourceMetadataResult.Invalid
         assertTrue(invalid.reason.contains("key"))

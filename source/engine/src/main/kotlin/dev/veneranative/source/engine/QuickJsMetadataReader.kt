@@ -15,12 +15,13 @@ import org.json.JSONObject
 /**
  * Reads a source's declared metadata by running it in a throwaway engine.
  *
- * `key`, `name` and `version` only exist once the script has executed, so this cannot be a text
- * scan (ADR-0007 §2.1). The engine is created for this one read and closed immediately: an install
- * that fails validation must not leave a loaded source behind.
+ * `name`, `key` and `version` are instance fields, not literals, so the script has to run: the
+ * documented convention is a class extending `ComicSource`, instantiated after evaluation
+ * ([SourceClassConvention]). Reading them by text search would accept scripts that only look right.
  *
- * The script under inspection may not be safe to run twice, which is why it gets its own engine
- * rather than sharing an installed source's.
+ * The engine is created for this one read and closed immediately: an install that fails validation
+ * must not leave a loaded source behind, and the script under inspection is not trusted to be
+ * re-runnable.
  */
 class QuickJsMetadataReader(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -31,6 +32,13 @@ class QuickJsMetadataReader(
         if (script.isBlank()) {
             return SourceMetadataResult.Invalid("Source script must not be blank.")
         }
+
+        val className =
+            SourceClassConvention.classNameOf(script)
+                ?: return SourceMetadataResult.Invalid(
+                    "Source script must declare 'class <Name> extends ComicSource' at the start " +
+                        "of a line.",
+                )
 
         val engine =
             try {
@@ -46,7 +54,13 @@ class QuickJsMetadataReader(
             val encoded =
                 try {
                     withTimeout(timeoutMillis) {
-                        engine.evaluate<String>(script + "\n" + METADATA_PROBE)
+                        // The base class has to exist before the script's class can extend it.
+                        engine.evaluate<Any?>(SourceBaseScript.script)
+                        engine.evaluate<String>(
+                            SourceClassConvention.instantiationScript(script, className) +
+                                "\n" +
+                                METADATA_PROBE,
+                        )
                     }
                 } catch (_: TimeoutCancellationException) {
                     return@use SourceMetadataResult.Invalid(
@@ -66,7 +80,7 @@ class QuickJsMetadataReader(
         val declared =
             try {
                 JSONObject(encoded)
-            } catch (failure: JSONException) {
+            } catch (_: JSONException) {
                 return SourceMetadataResult.Invalid("Source metadata could not be decoded.")
             }
 
@@ -76,6 +90,11 @@ class QuickJsMetadataReader(
             ?: return SourceMetadataResult.Invalid("Source must declare a 'name'.")
         val version = declared.stringOrNull(VERSION_FIELD)
             ?: return SourceMetadataResult.Invalid("Source must declare a 'version'.")
+        if (!SourceClassConvention.isUsableKey(key)) {
+            return SourceMetadataResult.Invalid(
+                "Source 'key' must contain only letters, digits and underscores.",
+            )
+        }
 
         return try {
             SourceMetadataResult.Success(
@@ -91,8 +110,10 @@ class QuickJsMetadataReader(
         }
     }
 
-    private fun JSONObject.stringOrNull(field: String): String? =
-        if (isNull(field)) null else getString(field).trim().takeIf(String::isNotEmpty)
+    private fun JSONObject.stringOrNull(field: String): String? {
+        if (isNull(field)) return null
+        return getString(field).trim().takeIf(String::isNotEmpty)
+    }
 
     private companion object {
         const val DEFAULT_TIMEOUT_MILLIS = 5_000L
@@ -103,17 +124,16 @@ class QuickJsMetadataReader(
         const val MIN_APP_VERSION_FIELD = "minAppVersion"
 
         /**
-         * Runs after the script, in the same engine, so it sees whatever the script declared.
-         * `typeof` is used deliberately: an undeclared name must be reported as missing rather than
-         * throwing a ReferenceError that would look like a broken script.
+         * Runs after the instance exists, in the same engine. `typeof` keeps an undeclared or
+         * non-string field from turning into a ReferenceError that would look like a broken script.
          */
-        val METADATA_PROBE =
+        val METADATA_PROBE: String =
             """
             ;JSON.stringify({
-              key: typeof key === "string" ? key : null,
-              name: typeof name === "string" ? name : null,
-              version: typeof version === "string" ? version : null,
-              minAppVersion: typeof minAppVersion === "string" ? minAppVersion : null
+              key: typeof ${SourceClassConvention.INSTANCE}.key === "string" ? ${SourceClassConvention.INSTANCE}.key : null,
+              name: typeof ${SourceClassConvention.INSTANCE}.name === "string" ? ${SourceClassConvention.INSTANCE}.name : null,
+              version: typeof ${SourceClassConvention.INSTANCE}.version === "string" ? ${SourceClassConvention.INSTANCE}.version : null,
+              minAppVersion: typeof ${SourceClassConvention.INSTANCE}.minAppVersion === "string" ? ${SourceClassConvention.INSTANCE}.minAppVersion : null
             });
             """.trimIndent()
     }

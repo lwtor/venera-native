@@ -1,26 +1,47 @@
 package dev.veneranative.source.engine
 
+/**
+ * Builds the JavaScript that invokes one member of a source.
+ *
+ * A member is a **path** (`search.load`, `comic.loadEp`), not a global function name, because that
+ * is how upstream reaches them; the call goes through the loaded source's registry entry so `this`
+ * inside the member is the object that declares it, exactly as upstream calls it
+ * (see [SourceClassConvention]).
+ *
+ * The legacy WebView runtime keeps [DEFAULT_ROOT]: its fixture declares flat globals, and a
+ * single-segment path on the global object is the same thing.
+ */
 internal object SourceInvocationScript {
-    private val functionNamePattern = Regex("^[A-Za-z_$][A-Za-z0-9_$]*$")
+    private val segmentPattern = Regex("^[A-Za-z_$][A-Za-z0-9_$]*$")
 
-    fun validateFunctionName(functionName: String): Boolean =
-        functionNamePattern.matches(functionName)
+    /** `root` is a JavaScript expression the member path is resolved against. */
+    const val DEFAULT_ROOT = "globalThis"
+
+    fun validateMember(member: String): Boolean =
+        member.isNotEmpty() && member.split('.').all(segmentPattern::matches)
 
     fun build(
-        functionName: String,
+        member: String,
         argumentsJson: String,
         invocationId: String,
+        root: String = DEFAULT_ROOT,
     ): String {
-        require(validateFunctionName(functionName)) { "Invalid JavaScript function name." }
+        require(validateMember(member)) { "Invalid source member path." }
 
-        val quotedFunctionName = quote(functionName)
-        val quotedArguments = quote(argumentsJson)
-        val quotedInvocationId = quote(invocationId)
+        val quotedMember = jsQuote(member)
+        val quotedArguments = jsQuote(argumentsJson)
+        val quotedInvocationId = jsQuote(invocationId)
+        val segments = member.split('.').joinToString(separator = ", ") { jsQuote(it) }
         return """
             (function() {
-              const fn = globalThis[$quotedFunctionName];
+              const path = [$segments];
+              let target = $root;
+              for (let index = 0; index < path.length - 1 && target != null; index += 1) {
+                target = target[path[index]];
+              }
+              const fn = target == null ? undefined : target[path[path.length - 1]];
               if (typeof fn !== "function") {
-                throw new Error("Unknown source function: " + $quotedFunctionName);
+                throw new Error("Unknown source member: " + $quotedMember);
               }
               const args = JSON.parse($quotedArguments);
               if (!Array.isArray(args)) {
@@ -28,7 +49,7 @@ internal object SourceInvocationScript {
               }
               const previousInvocationId = globalThis.__veneraInvocationId;
               globalThis.__veneraInvocationId = $quotedInvocationId;
-              return Promise.resolve(fn.apply(undefined, args))
+              return Promise.resolve(fn.apply(target, args))
                 .then(function(value) {
                   return JSON.stringify({ value: value === undefined ? null : value });
                 })
@@ -50,32 +71,9 @@ internal object SourceInvocationScript {
      * created; awaiting it in the same script yields the envelope itself (ADR-0008 §8).
      */
     fun buildAwaitable(
-        functionName: String,
+        member: String,
         argumentsJson: String,
         invocationId: String,
-    ): String = "await " + build(functionName, argumentsJson, invocationId)
-
-    private fun quote(value: String): String = buildString(value.length + 2) {
-        append('"')
-        value.forEach { character ->
-            when (character) {
-                '"' -> append("\\\"")
-                '\\' -> append("\\\\")
-                '\b' -> append("\\b")
-                '\u000C' -> append("\\f")
-                '\n' -> append("\\n")
-                '\r' -> append("\\r")
-                '\t' -> append("\\t")
-                else -> {
-                    if (character.code < 0x20) {
-                        append("\\u")
-                        append(character.code.toString(16).padStart(4, '0'))
-                    } else {
-                        append(character)
-                    }
-                }
-            }
-        }
-        append('"')
-    }
+        root: String = DEFAULT_ROOT,
+    ): String = "await " + build(member, argumentsJson, invocationId, root)
 }
