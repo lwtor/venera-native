@@ -73,6 +73,7 @@ AndroidX JavaScriptEngine 1.1.0 的 API 方向是单向的：
 | 判据 | 通过条件 |
 | --- | --- |
 | 能力覆盖 | 仓库内测试源（含 `async`/`await` 网络调用）跑通 Explore、Search、Detail、Chapters、Pages 五个能力 |
+| 真实源兼容 | Host API 提供全局 `fetch`（`ok`/`json()`/`text()`）与 `Network.*` 两套入口，`venera-configs` 中的真实源可在不改写的前提下运行（依据见 ADR-0007 §4.3） |
 | 取消 | 取消进行中的调用能中断实际网络请求，且取消后 isolate 仍可继续调用 |
 | 超时 | 调用级超时生效，超时后可恢复（不要求重建整个 runtime） |
 | 二进制 | `ArrayBuffer` 等价通道可用，图片数据无需 Base64 |

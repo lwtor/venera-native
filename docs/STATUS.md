@@ -424,23 +424,27 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
   **源失败以值返回而不是异常**。
 - `:source:api` 新增 `FakeSourceCore` 与 `SourceCoreTest`（9 项）作为契约语义的可执行定义；
   真机引擎实现落地后应复用同一组断言，而不是另写一套。
+- 用 `venera-configs` 的 `manga_dex.js` 核对真实实现（ADR-0007 §4.3），修正了三处从文档看不出来的假设：
+  **`chapters` 是分组嵌套结构且顶层混有非章节键**、**`search` 的 `options` 是与 `optionList` 下标
+  对齐的数组**、**网络主入口是全局 `fetch` 而不是 `Network.get/post`**。
+- `:core:model` 增加 `groupedChaptersOf()`（分组章节，保留组名与两层顺序）与
+  `encodeFilterSelection()`（按声明顺序生成筛选数组）；新增 `ChaptersOfTest`（4）与筛选顺序测试（2）。
 
 验证记录：
 
 ```text
 2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
-.\gradlew.bat --no-daemon --max-workers=2 :core:model:testDebugUnitTest :source:api:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug
+.\gradlew.bat --no-daemon --max-workers=2 :core:model:testDebugUnitTest :source:api:testDebugUnitTest :app:assembleDebug
 结果：BUILD SUCCESSFUL
-全量单元测试 65 项，failures=0 errors=0 skipped=0
-  core:model 18 / source:api 9 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
+全量单元测试 71 项，failures=0 errors=0 skipped=0
+  core:model 24 / source:api 9 / feature:reader 26 / source:network 6 / source:engine 5 / core:network 1
 ```
 
 仍待完成：
 
-- 协议 DTO 与 JSON 兼容测试：把 `SourceCore` 契约映射到 `sendMessage` / `loadInfo` / `loadEp` 等上游调用。
-  前置是 ADR-0007 第 4.3 节：`loadInfo` 与 `loadEp` 的完整签名必须用 `venera-configs` 中的真实源
-  实现核对，不能从两份文档的用法片段推断。
+- 协议 DTO 与 JSON 兼容测试：把 `SourceCore` 契约映射到 `loadInfo` / `loadEp` / `search` / `explore`
+  等上游调用。签名已用真实源核对完毕（ADR-0007 §4.3），前置解除，可直接实现。
 - `SourceCore` 的引擎实现（依赖 S1-08 引擎落地），落地后复用 `SourceCoreTest` 的断言。
 - `ComicKey` 全链路使用在 Feature / Data 层的落实，随 S1-03 建立 `:data:comic` 完成。
 
@@ -469,7 +473,8 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 | 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
 | WebView 引擎在参考设备上无法提供异步 Host API | ADR-0008 已定案转向自有引擎（QuickJS），spike 尚未执行 | spike 必须通过 ADR-0008 第 3 节全部判据；未通过前 S1-03 不得叠加临时方案 |
-| `loadInfo` / `loadEp` 的完整签名未确认 | 两份上游文档只给了用法片段，不足以定义协议 DTO | 写 Detail / Pages 的协议 DTO 之前，以 `venera-configs` 真实源实现核对 |
+| 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | ADR-0007 §4.3 已确认：只做 `Network.get/post` 无法运行真实源 | S1-08 引擎落地必须提供 `fetch` 兼容层，已列入 ADR-0008 spike 判据 |
+| `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
 | 导航契约模块已删除 | `:core:navigation` 零引用，S0-07 删除以符合模块创建准则 | S1-03 首次需要类型安全 Route 时重建 |
 | 大图策略的设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突） | 规则已由 JVM 预算测试保证，设备数据缺失，未验证 | Stage 0 退出门禁；需要时按 S0-06 记录的命令采集 |

@@ -80,6 +80,36 @@ class SourceFilterTest {
     }
 
     @Test
+    fun `the payload follows the declared filter order, not the selection order`() {
+        val selection = FilterSelection(
+            linkedMapOf(
+                "status" to listOf("done"),
+                "sort" to listOf("1"),
+                "genre" to listOf("comedy", "action"),
+            ),
+        )
+
+        val payload = encodeFilterSelection(listOf(sort, genres, status), selection)
+
+        assertEquals(
+            listOf(
+                FilterValue.Single("1"),
+                FilterValue.Multiple(listOf("comedy", "action")),
+                FilterValue.Single("done"),
+            ),
+            payload,
+        )
+    }
+
+    @Test
+    fun `a filter that is not sent occupies its slot as null`() {
+        val payload = encodeFilterSelection(listOf(sort, status), FilterSelection.Empty)
+
+        // The dropdown explicitly reports "unselected" instead of being cancelled out.
+        assertEquals(listOf(FilterValue.Single("0"), FilterValue.Unselected), payload)
+    }
+
+    @Test
     fun `a value chosen outside the declared options is still forwarded`() {
         // Sources accept arbitrary values for some filters, so the model must not silently drop them.
         val value = genres.selectionValue(FilterSelection(mapOf("genre" to listOf("isekai"))))

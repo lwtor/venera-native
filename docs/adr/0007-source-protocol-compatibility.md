@@ -1,6 +1,6 @@
 # ADR-0007：Venera 漫画源协议兼容范围
 
-- 状态：Accepted（字段级已核对 `js_api.md`；剩余待确认项见第 4.3 节）
+- 状态：Accepted（已核对 `js_api.md` 与真实源实现；剩余待确认项见第 4.4 节）
 - 日期：2026-09-20
 - 决策者：项目维护者
 - 关联任务：S1-01、S1-02、S1-03、S1-04
@@ -128,14 +128,26 @@ Stage 3/4 的内容提前拖进 Stage 1。
   Base64 通道不可用。
 - 源与宿主的通用通信入口是 `sendMessage({method: ...})`，与 ADR-0003 的允许列表模型一致。
 
-### 4.3 仍待确认
+### 4.3 实现核对（2026-09-20，`venera-configs` 的 `manga_dex.js`）
 
-- `loadInfo`、`loadEp`、`loadThumbnails` 的**完整签名**：`comic_source.md` 与 `js_api.md` 都只给出
-  了 `loadEp(comicId, epId?) → {images: string[]}` 这一类用法，没有参数与返回的权威定义。
-  **必须在写 Pages 能力的协议 DTO 之前，以 `venera-configs` 中的真实源实现为准核对。**
+以真实源为准核对后，得到若干与文档简化描述不同的事实。**这些才是协议 DTO 与 Host 桥的实现依据**：
+
+| 事实 | 影响 |
+| --- | --- |
+| `loadInfo(id)` 单参数，返回 `ComicDetails` | 与文档一致 |
+| `loadEp(comicId, epId)` 返回 `{images: string[]}`；`epId` 实际必填（空值抛错），`comicId` 在该源中未被使用 | Pages 按两参数调用；缺 `epId` 返回无效请求，而不是空列表 |
+| **`chapters` 是嵌套结构**：顶层键是分组（如 `"Volume 1 - EN"`），值是章节 map；顶层还混有非章节的附加键（`latestChapterMarker`） | 解析必须只把对象值当分组、跳过标量附加键、保留两层顺序。模型侧由 `chaptersOf`（扁平）与 `groupedChaptersOf`（分组）分别覆盖 |
+| **`search.load(keyword, options, page)` 的 `options` 是与 `optionList` 下标对齐的字符串数组**，`"any"` 表示不过滤 | 筛选值必须按声明顺序编码成数组，不能只发一个 map |
+| `explore` 的 `viewMore` 是跳转指令对象（`{page, attributes}`），不是字符串 | Stage 1 视为不透明值，不解释、不跟随 |
+| **网络主入口是全局 `fetch`**（`res.ok` / `res.json()` / `res.text()`），`Network.*` 只用于 cookie 等少量场景；POST 表单体用 `Convert.encodeUtf8()` | Host API 必须提供 `fetch` 兼容层；只做 `Network.get/post` 不足以运行真实源。**直接约束 S1-08 的引擎与桥设计** |
+| 该源没有 `loadThumbnails`，也没有 `next` 字段，分页全部依赖 `maxPage` | 页码式是主路径，游标式仍需保留但属少数 |
+
+### 4.4 仍待确认
+
+- `loadThumbnails` 的真实签名：该源未实现，需要再找使用它的源核对（影响 S1-05 多页缩略图）。
 - `Comment` 与 `ImageLoadingConfig` 的字段（分别影响 Stage 3 评论与 S1-05 图片管线）。
-- 错误约定：文档没有专门章节，只在 `favorites` 系列出现“抛出字符串 `Login expired` 触发重登”
-  这一处约定；Stage 1 范围不涉及，记录备查。
+- 错误约定：文档无专门章节，只在 `favorites` 系列出现“抛出字符串 `Login expired` 触发重登”；
+  Stage 1 范围不涉及，记录备查。
 
 ## 5. 替代方案
 

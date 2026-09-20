@@ -75,6 +75,18 @@ data class FilterSelection(val values: Map<String, List<String>> = emptyMap()) {
 }
 
 /**
+ * Encodes a selection into the upstream `options` payload.
+ *
+ * Upstream passes search options as an array aligned with the source's `optionList`, so the order
+ * comes from the declared filters — never from the selection map, which has no order. A null entry
+ * means "do not send this filter".
+ */
+fun encodeFilterSelection(
+    filters: List<SourceFilter>,
+    selection: FilterSelection,
+): List<FilterValue?> = filters.map { filter -> filter.selectionValue(selection) }
+
+/**
  * The protocol shape of a filter value.
  *
  * Upstream encodes these three cases differently, and the difference is observable from the source
