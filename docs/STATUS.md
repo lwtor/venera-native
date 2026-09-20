@@ -9,7 +9,7 @@
 | 最后更新 | 2026-09-20 |
 | 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
 | 当前任务 | S1-08：自有引擎（QuickJS）落地 |
-| 当前任务状态 | TODO（S1-02 已完成；S1-08 阻塞 S1-03） |
+| 当前任务状态 | IN_PROGRESS（绑定选型与桥接 spike 已完成，引擎实现待做） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -394,23 +394,48 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 - 正式 Reader UI 和下载功能。
 - 在结论得出前实现完整 QuickJS fallback。
 
-## 当前唯一下一任务
+## 当前唯一执行任务
 
-### S1-08：自有引擎（QuickJS）落地 — TODO
+### S1-08：自有引擎（QuickJS）落地 — IN_PROGRESS
 
 依赖：S1-02（已完成）。**阻塞 S1-03**。
 
 这是当前唯一阻塞端到端链路的任务。ADR-0008 已定案：WebView 系引擎在没有 MessagePort 的设备上
 无法提供异步 Host API，参考设备正是这种情况；协议与 UI 都已在它之上就绪，缺的是引擎。
 
-必须交付：
+已完成（2026-09-20，选型 + 桥接 spike）：
+
+- **绑定选型定案**（ADR-0008 §7）：`io.github.dokar3:quickjs-kt:1.0.5`（Apache-2.0）。
+  选它而不是最新版是因为 1.0.6+ 用 Kotlin 2.4 编译、元数据版本超出本工具链可读范围
+  （AGP 内置 Kotlin 2.2 只能读到 2.3），1.0.5 是 2.4 之前的最后一版。
+- 已核实 `v1.0.5` 标签的 CMake 配置：Android + shared 时带 `-Wl,-z,max-page-size=16384`
+  （Google Play 强制要求）并开启 `CONFIG_BIGNUM`。
+- **JS → Kotlin 异步打通**：`QuickJsBridgeSpikeTest`（3 项，已在 JVM 执行通过）证明脚本可以
+  `await` 宿主 suspend 调用并取回值、宿主异常变成脚本侧 rejected await、`Promise.all` 并发可用。
+  这正是 WebView 引擎在参考设备上做不到的事。
+- **实测出调用约束并写进 ADR**：必须按脚本求值 + 顶层 `await`；async IIFE 会返回未解的 Promise 对象，
+  module 模式没有完成值。适配层不能自己包 async 函数。
+- 引擎模块已能在 JVM 上被回归：`testImplementation(quickjs-kt-jvm)` + 在单元测试类路径上排除
+  Android 产物（否则同一批类出现两次）。
+
+仍待完成：
 
 - `:source:api` 契约的自有引擎实现（装配层选择实现，现有 WebView 实现保留到本任务通过为止）。
-- Host API 的**两套入口**：全局 `fetch`（`ok`/`json()`/`text()`）与 `Network.*`；这是真实源的实际用法
-  （ADR-0007 §4.3）。
-- `SourceMetadataReader` 的真实实现：执行脚本读取 `key`/`name`/`version`/`minAppVersion`，
-  替换 `:app` 里临时的 `UnavailableMetadataReader`。
-- 按 ADR-0008 第 3 节判据产出的数据：调用取消、调用超时、二进制通道、ABI 与体积、许可证登记。
+- Host API 的**两套入口**：全局 `fetch`（`ok`/`json()`/`text()`）与 `Network.*`；真实源的写法见 ADR-0007 §4.3。
+- `SourceMetadataReader` 的真实实现，替换 `:app` 里临时的 `UnavailableMetadataReader`。
+- 取消与超时接入契约；二进制通道在 Host API 上的验证；ABI 与 APK 体积实测；许可证登记。
+- 通过后按 ADR-0008 §2.4 处置 WebView 实现，并更新 ADR-0002 的引擎状态。
+
+验证记录：
+
+```text
+2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+.\gradlew.bat --no-daemon --max-workers=2 :source:engine:testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL
+全量单元测试 119 项，failures=0 errors=0 skipped=0
+  source:engine 8（含 QuickJsBridgeSpikeTest 3）
+```
 
 编译检查：
 
@@ -543,7 +568,8 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 | 异步 Host API 在真机缺少 MessagePort | V2337A 上 `messagePorts=false`，S0-03 的桥按能力跳过 | Stage 1 决定异步桥实现方式时处理 |
 | 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
-| WebView 引擎在参考设备上无法提供异步 Host API | ADR-0008 已定案转向自有引擎（QuickJS），spike 尚未执行 | spike 必须通过 ADR-0008 第 3 节全部判据；未通过前 S1-03 不得叠加临时方案 |
+| WebView 引擎在参考设备上无法提供异步 Host API | 已定案转向自有引擎；JVM spike 已证明 JS→宿主异步可用（ADR-0008 §8） | 剩余判据（取消/超时映射、二进制、ABI 与体积）在引擎实现阶段完成 |
+| 引擎绑定为社区项目（Apache-2.0） | 版本已锁定 1.0.5；升级受 Kotlin 元数据兼容约束 | 升级前必须跑契约测试；若方案失效则自行交叉编译 QuickJS，契约不变 |
 | 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | ADR-0007 §4.3 已确认：只做 `Network.get/post` 无法运行真实源 | S1-08 引擎落地必须提供 `fetch` 兼容层，已列入 ADR-0008 spike 判据 |
 | 来源 id 冲突（上游存在两个源共用 `copy_manga`） | 已决策：`sourceId` 取脚本自报的 `key`，同 id 的第二次安装**替换**第一次，不共存 | 若产品上需要共存，必须先改 `SourceId` 语义并同步 `ComicKey` |
 | 安装真实源脚本在 S1-08 之前必然失败 | 元数据读取需要执行脚本，`:app` 暂时传入 `UnavailableMetadataReader` | S1-08 提供真实 `SourceMetadataReader` 后移除该占位实现 |

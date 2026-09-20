@@ -293,12 +293,22 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
   “Comic sources are unavailable on this device.” 失败（`:app` 传入的 `UnavailableMetadataReader`）。
 - 未做：从远端 URL 抓取来源包（与来源仓库客户端一起做）。
 
-### S1-08 自有引擎（QuickJS）落地 — TODO
+### S1-08 自有引擎（QuickJS）落地 — IN_PROGRESS
 
 依赖：S1-02。**阻塞 S1-03**。
 
 背景：ADR-0008 已确认 WebView 系引擎在没有 MessagePort 的设备上无法提供异步 Host API，
 而参考设备正是这种情况。
+
+实际执行（2026-09-20，选型与 spike 完成）：
+
+- 绑定选型定案为 `io.github.dokar3:quickjs-kt:1.0.5`（Apache-2.0），锁定原因与 16KB 页对齐
+  证据见 ADR-0008 §7。
+- `QuickJsBridgeSpikeTest` 在 JVM 上验证了脚本 `await` 宿主 suspend 调用、宿主异常传递与
+  `Promise.all` 并发；实测出"必须脚本模式 + 顶层 await"的调用约束并写进 ADR-0008 §8。
+- 引擎模块现在可以在 JVM 上回归（`testImplementation(quickjs-kt-jvm)`）。
+- 仍待完成：契约实现、`fetch`/`Network.*` 两套入口、`SourceMetadataReader`、取消与超时接入、
+  二进制与 ABI/体积实测。
 
 交付物：
 

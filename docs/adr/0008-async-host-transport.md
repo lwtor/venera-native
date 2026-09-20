@@ -112,6 +112,68 @@ spike 结果（ABI、体积、实测数据）必须回填本节。
 - spike 通过后：更新 ADR-0002 的引擎选择状态，并按 2.4 删除 WebView 实现。
 - 若 spike 失败：回到本 ADR 重新评估，不得直接在 S1-03 上叠加临时方案。
 
+## 7. 引擎绑定选型（2026-09-20 补充）
+
+### 决策
+
+使用 **`io.github.dokar3:quickjs-kt:1.0.5`**（Apache-2.0）作为自有引擎的原生绑定，
+而不是自己写 JNI 或使用 `app.cash.quickjs`（0.9.2 / 2021-08，已停更 4 年以上）。
+
+**为什么不是最新版**：1.0.6 及之后（含 1.0.15）用 Kotlin 2.4.x 编译，其元数据版本 2.4.0 超出本项目
+工具链可读范围（AGP 内置 Kotlin 2.2，可读到 2.3.0），直接引用会在编译期失败。1.0.5 用 Kotlin 2.3.20
+编译，是 2.4 之前的最后一版，因此锁定 1.0.5。什么时候可以升：等工具链的 Kotlin 提到 2.4 之后，
+升级必须伴随契约测试通过。
+
+### 依据
+
+| 判据 | 事实 |
+| --- | --- |
+| 许可证 | Apache-2.0（绑定层）；QuickJS 本体为 MIT。两者都需在 `:app` 的许可页登记 |
+| 维护状态 | 1.0.15 发布于 2026-09-03，2026 年内持续发布（1.0.1 → 1.0.15），非停更项目 |
+| **JS → Kotlin 异步** | `asyncFunction` 注册的宿主函数内部可直接 `suspend`，JS 侧用 top-level `await` / `Promise.all` 等待 —— **这正是 ADR-0008 §1 里 MessagePort 缺失导致无法实现的能力** |
+| 取消与超时 | 取消调用协程可中断正在执行的 JS；`evaluationTimeoutMillis` 与 `interruptEvaluation()` 提供实例级超时 |
+| 二进制 | 类型映射含 `Int8Array ↔ ByteArray`，无需 Base64 |
+| **16KB 页对齐** | 已核对 `v1.0.5` 标签的 `quickjs/native/CMakeLists.txt`：Android 且 `LIBRARY_TYPE=shared` 时显式添加 `-Wl,-z,max-page-size=16384`，并同时开启 `CONFIG_BIGNUM`（源脚本用得到大整数哈希）。这是 Google Play 自 2025-11-01 起的强制要求，必须核实而不是假设 |
+| 无设备验证 | 同时发布 `quickjs-kt-jvm`，因此引擎与契约测试可以在 JVM 上跑，不必依赖真机（符合项目“非必要不做实机测试”的约束） |
+| 构建成本 | 消费者只依赖预编译 AAR；NDK/CMake/Zig 只是上游构建自身的需要 |
+
+### 后果与限制
+
+- **引擎实现可以在 JVM 上被回归**：契约测试用 JVM 版本，真机只用于确认平台差异。
+- 绑定是社区项目，不是 Google 或商业支持：升级前必须跑契约测试，`1.0.x` 内保持版本锁定。
+- 引擎实现仍必须自己完成：Host API 允许列表、`fetch`/`Network.*` 两套入口、调用取消映射、
+  结果大小自行计数（ADR-0002 已确认引擎的大小上限不可依赖）。
+- 若绑定方案出现问题，替代路径是自行交叉编译 QuickJS 并复用同一 `:source:api` 契约；
+  协议、数据与 UI 层都不受影响。
+
+## 8. Spike 结果（2026-09-20，JVM）
+
+绑定选定后先做了最小桥接 spike，用 JVM 版产物运行（无需设备）：
+
+| 验证项 | 结果 |
+| --- | --- |
+| 脚本 `await` 宿主调用并取回值 | **通过**：宿主 `asyncFunction` 内 `suspend`，脚本侧 `await` 得到返回值 |
+| 宿主异常变成脚本侧 rejected await | **通过**：`try/catch` 捕获到宿主抛出的文本，引擎不崩 |
+| 并发宿主调用 | **通过**：`Promise.all` 三个调用全部完成且顺序符合预期 |
+| 原生库加载 | **通过**：JVM 产物自带桌面原生库，测试无需设备 |
+| 引擎资源限制接口 | 存在 `setMemoryLimit` / `setMaxStackSize` / `getMemoryUsage` / `gc`，可用于后续限额 |
+
+**实测到的调用约束（文档没写，必须写进实现）**：
+
+- 代码必须按**脚本**求值并使用**顶层 `await`**，例如
+  `const r = await source.search(...); r;`。这是唯一能直接拿到值的形态。
+- 用 async IIFE 包裹（`(async () => { ... })()`）会返回 **Promise 对象本身**，宿主拿到的是未解的值。
+- 用 module 模式（`asModule = true`）求值**没有完成值**，返回 null；`export` 的值也读不到。
+
+因此引擎适配层必须生成"顶层 await + 最后一条表达式"的包装代码，不能自行包一层 async 函数。
+这条约束已写成 `QuickJsBridgeSpikeTest` 的断言。
+
+仍未验证（需要在实现与设备阶段完成）：
+
+- 调用级取消与超时映射（绑定提供协程取消与 `evaluationTimeoutMillis`，但尚未接入我们的契约）。
+- 二进制通道（`Int8Array ↔ ByteArray` 已在绑定中，尚未在我们的 Host API 上验证）。
+- ABI 覆盖与 APK 体积（需实际打包后测量）。
+
 ## 官方依据
 
 - https://developer.android.com/develop/ui/views/layout/webapps/jsengine

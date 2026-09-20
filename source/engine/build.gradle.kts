@@ -13,10 +13,15 @@ android {
 dependencies {
     implementation(project(":source:api"))
     implementation(libs.androidx.javascriptengine)
+    implementation(libs.quickjs.kt)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
+    // The engine is tested on the JVM: the binding ships a desktop artifact, so contract behaviour
+    // (host callbacks, await, timeout, binary) does not need a device to be regression-checked.
+    testImplementation(libs.quickjs.kt.jvm)
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
@@ -25,3 +30,10 @@ dependencies {
     androidTestImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(project(":source:network"))
 }
+
+// Local unit tests must load the desktop native library, not the Android one. Leaving both on the
+// test classpath would put the same classes there twice and fail on the first engine call.
+configurations.matching { it.name.contains("UnitTest") && it.name.endsWith("RuntimeClasspath") }
+    .configureEach {
+        exclude(group = "io.github.dokar3", module = "quickjs-kt-android")
+    }

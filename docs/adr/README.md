@@ -11,7 +11,7 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | ADR-0005 | 跨 Android 版本的下载执行策略 | Stage 2 前待创建 |
 | ADR-0006 | 许可证、上游复用与品牌声明 | 复用上游实现前待创建 |
 | [ADR-0007](0007-source-protocol-compatibility.md) | Venera 漫画源协议兼容范围 | Accepted（字段级已核对，剩余待确认见 4.3） |
-| [ADR-0008](0008-async-host-transport.md) | 异步 Host API 传输与引擎选择 | Accepted（引擎 spike 验证中） |
+| [ADR-0008](0008-async-host-transport.md) | 异步 Host API 传输与引擎选择 | Accepted（选型与 JVM 桥接 spike 已完成，实现进行中） |
 
 ## 编写规则
 
