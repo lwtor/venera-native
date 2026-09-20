@@ -25,7 +25,7 @@ Stage 0 和 Stage 1 默认采用 AndroidX JavaScriptEngine 1.1.0：
 - 单次调用有调用 ID、超时和显式取消。
 - 超时或取消会关闭当前 isolate；下次调用从已保存的来源包重新创建并加载 isolate。
 - Runtime 要求引擎支持 `JS_FEATURE_PROMISE_RETURN` 和 `JS_FEATURE_ISOLATE_TERMINATION`。缺少任一能力时返回 `EngineUnavailable`，不降级为不可靠语义。
-- 支持非 Binder 传输时，单次结果当前上限配置为 1 MiB；否则受 Binder transaction limit 约束。S0-04 再用实测决定最终限制。
+- 单次参数与结果的默认上限为 1 MiB。`JavaScriptIsolate` 配置的大小上限在真机上不生效，因此 Runtime 必须自行计数并在超限时截断，不能把引擎或 Binder 限制当作内存保护。
 
 ## 验证结果
 
@@ -64,15 +64,32 @@ Stage 0 和 Stage 1 默认采用 AndroidX JavaScriptEngine 1.1.0：
 - 当前字符串通道不适合原始二进制；命名数据和二进制策略留到 S0-04。
 - 能力依赖设备 WebView/JavaScript Sandbox 实现，必须保留运行时检测。
 
+## S0-04 实测修订（2026-09-19，vivo V2337A / SDK 36）
+
+实测能力：`isolateTermination=true`、`promiseReturn=true`、`evaluateWithoutTransactionLimit=true`、
+`provideConsumeArrayBuffer=true`、**`messagePorts=false`**；脚本侧没有 `btoa`/`atob`/`TextEncoder`/`setTimeout`。
+
+据此修正三条结论：
+
+1. **二进制只能走 ArrayBuffer。** MessagePort 不可用，Base64 字符串通道也不可用，
+   图片等二进制数据必须使用 `provideConsumeArrayBuffer`。
+2. **超时可靠，内存上限不可依赖。** 配置的返回大小上限在真机上没有生效，
+   1 MiB 上限必须由 Runtime 自行计数与截断。
+3. **沙箱异常终止后必须重建整个 runtime。** 复用 runtime 与只重装来源都无法恢复；
+   恢复成本是一次 sandbox 重建（实测 1287 ms 触发终止）。
+
 ## Fallback 条件
 
-在 S0-04 完成前不实现 QuickJS fallback。出现以下任一情况时重新评估：
+QuickJS fallback 仍然不引入：参考设备具备 Promise 返回与 isolate termination，引擎选型不因此改变。
+下列条件出现时重新评估，其中第 2 条已经部分命中：
 
 1. 目标设备覆盖中有不可接受比例缺少 Promise 或可靠 isolate termination。
-2. Host API 消息桥无法稳定支持取消和并发。
-3. 大 JSON 或二进制传输不能满足漫画源需求。
-4. Sandbox 崩溃恢复无法达到可用性要求。
-5. 实测内存、启动或吞吐明显不满足来源调用。
+2. Host API 消息桥无法稳定支持取消和并发。**已部分命中**：参考设备 `messagePorts=false`，
+   所以 MessagePort 不能作为 Host API 的硬性前提，异步桥必须支持替代传输（见 ADR-0003）。
+3. 大 JSON 或二进制传输不能满足漫画源需求。**已缓解**：二进制改走 ArrayBuffer。
+4. Sandbox 崩溃恢复无法达到可用性要求。**已量化**：必须重建 runtime，恢复路径明确。
+5. 实测内存、启动或吞吐明显不满足来源调用。**未命中**：32 次同源并发 153 ms，
+   100 次顺序调用 375 ms，200 次排队 1045 ms。
 
 若需要 fallback，`:source:api` 契约保持不变，新增引擎实现由装配层选择。
 

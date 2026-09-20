@@ -1,9 +1,9 @@
 # ADR-0003：MessagePort Host API 与来源网络桥
 
-- 状态：Accepted
+- 状态：Accepted（能力要求在 2026-09-20 按 S0-04 实测结论修订）
 - 日期：2026-09-19
 - 决策者：项目维护者
-- 关联任务：S0-03、S0-04
+- 关联任务：S0-03、S0-04、S0-07
 
 ## 上下文
 
@@ -38,13 +38,23 @@ Source Invocation
 
 ## 能力要求
 
-启用 Host API 时设备必须同时支持：
+启用 Host API 时设备必须支持：
 
 - `JS_FEATURE_PROMISE_RETURN`
 - `JS_FEATURE_ISOLATE_TERMINATION`
-- `JS_FEATURE_MESSAGE_PORTS`
 
-缺少 Message Ports 时安装带 Host API 的 Runtime 返回 `EngineUnavailable`。不回退到 WebView JavaScript interface。
+**MessagePort 不是硬性前提。** S0-04 在参考设备（vivo V2337A）实测 `messagePorts=false`，
+把 `JS_FEATURE_MESSAGE_PORTS` 作为必需能力会让 Host API 在唯一的目标设备上不可用。
+修订后的要求：
+
+- 传输层按能力探测：设备支持 Message Ports 时优先使用，作为低延迟通道。
+- 缺少 Message Ports 时 Host API 必须仍然可用，且保持同一调用语义（调用 ID、超时、取消、
+  并发上限、错误分类）。替代传输的具体形式（脚本侧拉取式轮询，或把 Host 调用改为同步
+  请求-响应）由 Stage 1 的独立 ADR 决定，本 ADR 不预先选定。
+- 二进制传输统一使用 `provideConsumeArrayBuffer`，与 Message Ports 是否可用无关。
+
+修订理由与实测数据见 ADR-0002 的“S0-04 实测修订”。在替代传输 ADR 落地前，带 Host API 的
+集成测试在参考设备上按能力探测跳过，不得写成“已验证”。
 
 ## 后果
 
@@ -60,7 +70,8 @@ Source Invocation
 - S0-03 只处理 JSON 字符串和 UTF-8 文本，不传输原始二进制。
 - Cookie 当前只在进程内保存，持久化和 WebView 同步属于后续任务。
 - Host Promise 的迟到消息依赖端口关闭丢弃，脚本侧没有单独的请求取消方法。
-- 每来源 4 并发是 PoC 默认值，还没有设备压力数据。
+- 每来源 4 并发仍是 PoC 默认值；S0-04 实测 32 次同源并发全部成功（153 ms，串行执行），
+  并发上限的具体取值需要按来源协议在 Stage 1 复核。
 
 ## S0-04 待验证
 

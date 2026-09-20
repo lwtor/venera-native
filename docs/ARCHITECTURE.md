@@ -36,18 +36,26 @@ immutable UiState
 | 模块 | 当前职责 | 可依赖 |
 | --- | --- | --- |
 | `:app` | MainActivity、应用 Theme、根装配 | Feature、Core、实现模块 |
-| `:core:common` | 通用 Result 与非业务工具 | Kotlin/Coroutines 基础 |
 | `:core:model` | 稳定领域 ID 与跨层模型 | 尽量只依赖 Kotlin |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
-| `:core:navigation` | 类型安全 Route | Navigation 3、`:core:model` |
-| `:feature:home` | 首页占位 UI | Design System、Navigation、领域契约 |
-| `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码与预取骨架 | Design System、`:core:model` |
-| `:source:api` | Runtime、包、调用和结果契约 | `:core:model`、`:core:common` |
+| `:feature:home` | 首页占位 UI | Design System、领域契约 |
+| `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架，以及 S0-06 的解码策略原型（`PageImageDecoder`、有界缓存、缩放与分块） | Design System、`:core:model` |
+| `:source:api` | Runtime、包、调用和结果契约 | `:core:model` |
 | `:source:engine` | AndroidX JavaScriptEngine 与 MessagePort 适配 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
 
 当前实现仍是 Stage 0 骨架；表中“职责”是边界，不表示功能已经完成。
+
+S0-07 按本文件第 5 节的模块创建准则删除了两个零引用模块：`:core:common`（`AppResult`/`AppError`
+没有任何生产或测试引用）与 `:core:navigation`（`AppRoute` 唯一声明，`Navigation 3` 只被它使用，
+app 声明的依赖也没有被代码使用）。它们不属于废弃设计，而是“先建壳后接业务”的产物：
+`:core:common` 会在出现第一个真实的 Result/错误聚合需求时重建，`:core:navigation`
+会在 S1-03 首次需要类型安全 Route 时重建。
+
+S0-06 的解码代码位于 `:feature:reader` 的 `image` 包，是**已知的临时位置**：它需要在 S1-05
+建立 `:core:image` 时迁移过去，迁移前 UI 契约（`PageImageDecoder`、`PageTile`）保持不变，
+理由与迁移条件记录在 ADR-0004。
 
 ## 4. 目标依赖方向
 
@@ -81,7 +89,8 @@ immutable UiState
 :source:*     -X-> :app
 ```
 
-Feature 间跳转通过 `:core:navigation` 中的 Route 或 Feature Entry 契约完成，不通过直接依赖。
+Feature 间跳转通过类型安全 Route 或 Feature Entry 契约完成，不通过直接依赖。承载 Route 的模块
+（目标名 `:core:navigation`）在 S1-03 首次需要导航时创建，目前不存在。
 
 ## 5. 模块创建准则
 
@@ -196,6 +205,10 @@ Runtime 最终需要明确以下层级：
 `ComicImageRequest` 必须包含影响响应内容的来源、Method、Header、Body 和 transform 标识；Cache Key 必须覆盖这些鉴权差异。
 
 Retrofit 可以用于固定的应用服务，但不得成为动态漫画源请求的核心抽象。
+
+命名对应关系：上表是目标形态，当前实现为 `SourceNetworkExecutor`（每来源客户端、Cookie、并发上限、
+响应大小限制）与 `SourceNetworkHostApi`（Host API 允许列表与错误映射）；`ImageHttpClient`
+随 `:core:image` 与 Coil 在 S1-05 引入，`AppHttpClient` 随 `:core:network` 在需要固定服务时扩展。
 
 ## 10. 存储边界
 

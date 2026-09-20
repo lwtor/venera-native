@@ -168,9 +168,18 @@
 - 下载、本地压缩包、真实漫画源和持久化进度。
 - 完整手势设置和正式视觉设计。
 
-### S0-06 超长图、缩放和内存验证 — TODO
+### S0-06 超长图、缩放和内存验证 — DONE
 
 依赖：S0-05。
+
+实际执行：把“大图能否用”从观感问题转成可验证的算术问题。交付 ADR-0004（Accepted，默认区域/
+分块解码，设备实测补齐前不引入 Coil）、确定性 fixture 生成器、`PageImageDecoder` 的 `Sampled`
+与 `Region` 两种实现、有界位图缓存、阅读器缩放与分块渲染，以及 JVM 侧的几何与内存预算测试
+（26 项全部通过）。
+
+设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突）按用户决定“非必要不做实机测试”推迟，
+改列为 Stage 0 退出门禁与已知风险，探针 `LargeImageProbeTest` 保留在仓库等待需要时执行。
+详见 `docs/STATUS.md`。
 
 必须验证：
 
@@ -186,28 +195,44 @@
 - 测试设备/模拟器配置、内存数据和复现步骤。
 - `docs/adr/0004-large-image-strategy.md`。
 
-### S0-07 Stage 0 决策收敛 — TODO
+### S0-07 Stage 0 决策收敛 — DONE
 
-依赖：S0-04、S0-06。
+依赖：S0-04、S0-06（均已完成）。
 
-必须完成：
+实际执行（2026-09-20）：
 
-- ADR-0002 JavaScript Runtime 最终选择。
-- ADR-0004 大图策略最终选择。
-- 更新实际模块图、依赖版本和已知限制。
-- 把 Stage 1 范围按 PoC 结果重新估算。
-- 删除不再使用的实验代码；保留可回归验证的测试。
-- 全量 Lint、测试、Debug 构建通过。
+- ADR-0002 增补 S0-04 实测修订，QuickJS fallback 条件逐条对照实测结果。
+- ADR-0003 把 MessagePort 从硬性能力要求降级为可选通道，替代传输留给 Stage 1 的独立 ADR。
+- ADR-0004 复核通过（Accepted），解析结论未被后续证据推翻。
+- 删除零引用模块与代码：`:core:common`、`:core:navigation`、`JavaScriptEngineSupport`、
+  `ReaderZoomState.reset()`，并移除 app 未使用的 `:core:navigation` 依赖。
+- 新增 5 项 JVM 测试覆盖每来源 Cookie 隔离与清理。
+- 文档与代码对齐：模块表、命名漂移、已删除测试类的残留命令。
+- 完整验证：`lintDebug testDebugUnitTest :app:assembleDebug` BUILD SUCCESSFUL，
+  全量单元测试 39 项、0 失败。
 
-Stage 0 退出标准：
+Stage 0 退出标准对照：
 
-- JS Engine 可用性、限制、fallback 条件清晰。
-- Reader 图片方案有实测证据。
-- Stage 1 不再依赖未回答的关键技术假设。
+- JS Engine 可用性、限制、fallback 条件清晰：**满足**（ADR-0002 / ADR-0003）。
+- Reader 图片方案有实测证据：**部分满足**。解析证据由 `PageDecodeBudgetTest` 保证；
+  设备侧 PSS、耗时与掉帧按项目决定推迟，未验证，记录在 `docs/STATUS.md` 已知风险。
+- Stage 1 不再依赖未回答的关键技术假设：**基本满足**。唯一保留项是异步 Host 桥的替代传输，
+  必须在 S1-01 实现 Core 协议前用独立 ADR 定案。
 
 ## 5. Stage 1：核心阅读闭环
 
 Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点稳定性作为验收条件。
+
+### Stage 0 结论对 Stage 1 的修改
+
+1. **S1-01 之前增加一项 ADR**：异步 Host API 的传输方式（MessagePort 可选 + 替代通道）。
+   它决定 Core 协议里超时、取消与并发如何表达，必须在实现 Pages/Explore 前定案。
+2. **图片管线归属确定**：S1-05 建立 `:core:image` 时迁移 `:feature:reader` 的 `PageImageDecoder`
+   与 `PageTiling`；Coil 只承担网络获取与缓存，超长图解码仍由自有解码器负责。
+3. **导航契约后移**：`:core:navigation` 已在 S0-07 删除，在 S1-03 首次需要类型安全 Route 时重建。
+4. **`:core:common` 暂不存在**：只有出现统一的 Result/错误聚合需求时才按模块准则创建。
+5. **不再安排引擎边界收敛任务**：Stage 0 已把引擎能力、二进制通道、终止恢复与吞吐量级写成结论；
+   Stage 1 只在出现设备相关症状时按 `docs/STATUS.md` 的命令补测。
 
 ### S1-01 稳定领域模型与 Source Core 协议 — TODO
 

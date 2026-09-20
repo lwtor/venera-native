@@ -6,7 +6,15 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-项目处于阶段 0（技术验证）。阅读器原型已经可以运行（纵向连续阅读、横向 LTR/RTL 翻页、页码与邻近预取），当前唯一下一任务是 **S0-06：超长图、缩放和内存验证**。
+**Stage 0（技术验证）已完成**，下一任务是 **S1-01：稳定领域模型与 Source Core 协议**。
+
+阅读器原型可以直接运行（纵向连续阅读、横向 LTR/RTL 翻页、页码、邻近预取、双指缩放），
+并且在生成测试图后会走真实解码管线。大图问题已收敛为可验证的算术结论：确定性测试图生成器
+（`tools/test-images`）、`Sampled` 与 `Region` 两种解码策略、有界位图缓存，以及把单次解码
+上界写成断言的 JVM 预算测试。默认策略与依据见 `docs/adr/0004-large-image-strategy.md`。
+
+Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解码耗时、PSS、掉帧、手势冲突）
+按项目决定推迟，需要时用 `LargeImageProbeTest` 采集。
 
 开发接管入口：
 
@@ -27,10 +35,8 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ```text
 :app
-:core:common
 :core:designsystem
 :core:model
-:core:navigation
 :core:network
 :feature:home
 :feature:reader
@@ -38,6 +44,9 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 :source:engine
 :source:network
 ```
+
+`:core:common` 与 `:core:navigation` 在 S0-07 因零引用被删除，会分别在出现真实聚合需求与
+S1-03 需要类型安全导航契约时重建，见 `docs/ARCHITECTURE.md` 第 3 节。
 
 ## 技术基线
 
@@ -60,6 +69,16 @@ Windows：
 ```powershell
 .\gradlew.bat assembleDebug
 ```
+
+## 大图验证测试图
+
+S0-06 使用本地生成的图片，不提交任何真实漫画页：
+
+```powershell
+java -Xmx2g tools/test-images/GenerateTestImages.java feature/reader/src/main/assets/fixtures
+```
+
+生成后阅读器会改用真实解码管线；未生成时自动退回占位渲染。输出目录已被 `.gitignore` 排除。
 
 ## 许可与来源说明
 

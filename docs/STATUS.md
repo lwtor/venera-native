@@ -6,10 +6,10 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-09-19 |
-| 当前阶段 | Stage 0：技术验证 |
-| 当前任务 | S0-06：超长图、缩放和内存验证 |
-| 当前任务状态 | TODO（S0-05 已交付并通过编译验证） |
+| 最后更新 | 2026-09-20 |
+| 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
+| 当前任务 | S1-01：稳定领域模型与 Source Core 协议 |
+| 当前任务状态 | TODO（Stage 0 已完成；设备侧验证推迟，见已知风险） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -47,7 +47,7 @@
 - `:app` 单入口和最小首页。
 - `ComicKey`、`SourceId`、`RemoteComicId` 基础值对象。
 - `SourceScriptRuntime` 初始契约。
-- AndroidX JavaScriptEngine 支持检测包装。
+- AndroidX JavaScriptEngine 支持检测包装。（S0-07 已删除：零引用，Runtime 直接使用 `JavaScriptSandbox.isSupported`。）
 - 首个领域模型单元测试。
 - Windows 与类 Unix Gradle Wrapper。
 - Git 文本换行规则。
@@ -157,12 +157,123 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 构建期间 Gradle daemon 因原生内存耗尽崩溃（`hs_err` 报告 malloc 失败）并损坏 file-access
 缓存，已清理缓存并用 `--no-daemon --max-workers=2` 完成验证。本机资源紧张时建议沿用该参数。
 
+### S0-06 超长图、缩放和内存验证 — DONE
+
+已完成（2026-09-20）：
+
+- `docs/adr/0004-large-image-strategy.md` 状态改为 Accepted：默认策略是区域/分块解码，
+  整页 fit 采样降级为对照基线与短页快路径；在设备实测补齐前**不引入 Coil**。
+- 新增 `PageTiling` 纯函数：尺度、瓦片、窗口，以及**解码字节记账**；`PageTilingTest`（9 项）覆盖几何。
+- 新增 `PageDecodeBudgetTest`（9 项）：把 24 MiB 单次解码预算、整页采样阈值、
+  “解码成本与页面长度无关”变成可执行断言，而不是依赖设备观察。
+- `:feature:reader` 新增 `image` 包：`PageImageDecoder`、`SampledPageImageDecoder`、
+  `RegionPageImageDecoder`、有界 `PageImageCache`、`CachingPageImageDecoder`。
+- 阅读器接入真实解码：纵向连续阅读按瓦片渲染，横向翻页按可见窗口渲染；`ReaderZoomState`
+  支持双指缩放与平移，缩放激活时关闭列表滚动；底部栏可运行时切换策略做 A/B。
+- 新增 `AssetFixturePageProvider`：`assets/fixtures` 存在时用生成图，否则退回占位实现。
+- 新增 `tools/test-images`（生成器 + README）：确定性生成 6 个 fixture，禁止提交版权内容。
+- 新增 `LargeImageProbeTest`：设备侧的耗时 / PSS / 预取窗口测量入口（只编译，未执行）。
+
+结论（解析内存模型，1080×2000 视口、24 MiB 预算）：
+
+| 页面 | 整页解码 | 整页 fit 采样 | 实际解码 |
+| --- | --- | --- | --- |
+| 1080×1440 常见页 | 5.9 MiB | 5.9 MiB | 5.9 MiB，整页不切分 |
+| 1080×6000 长条 | 24.7 MiB | 24.7 MiB（超预算） | 12.4 MiB × 2 瓦片 |
+| 1080×16000 超长条 | 65.9 MiB | 65.9 MiB（超预算 2.7 倍） | 12.4 MiB × 6 瓦片 |
+| 3000×4000 高清 | 45.8 MiB | 11.4 MiB | 11.4 MiB，整页不切分 |
+
+- 整页解码成本随页面长度线性增长，区域解码与页面长度无关，因此 `Region` 是默认策略。
+- 中等缩放区间必须让采样服从内存预算（代价是最多约 1.41 倍 GPU 放大），
+  否则 2 的幂采样在 `scale ∈ (0.5, 1)` 无法收敛。
+
+验证记录：
+
+```text
+2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+.\gradlew.bat --no-daemon --max-workers=2 :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug
+结果：BUILD SUCCESSFUL
+单元测试：PageDecodeBudgetTest 9 / PageTilingTest 9 / ReaderViewModelTest 8，failures=0 errors=0 skipped=0
+
+2026-09-20（生成器实跑）
+java -Xmx2g tools/test-images/GenerateTestImages.java tools/test-images/out
+结果：6 个 fixture 全部生成，输出已删除（仅验证，未保留）
+```
+
+按用户决定推迟的设备验证（**不得写成已验证**）：
+
+用户决定（2026-09-20）：**非必要不做实机测试**。以下项目改为 Stage 0 退出门禁与已知风险：
+
+- fixture × 策略 × 模式（连续 / 翻页 × zoom 1 与 3）的解码耗时、位图字节数与 PSS 增量。
+- 预取窗口 1/2/3 的峰值内存与掉帧。
+- 快速滚动、连续翻页、旋转、后台恢复的人工验证。
+- 双指缩放与滚动手势冲突的人工验证（规则已定，行为待确认）。
+
+需要时按下面的命令采集：
+
+```powershell
+java -Xmx2g tools/test-images/GenerateTestImages.java feature/reader/src/main/assets/fixtures
+.\gradlew.bat :feature:reader:assembleDebugAndroidTest
+adb install -r -t feature\reader\build\outputs\apk\androidTest\debug\reader-debug-androidTest.apk
+adb logcat -c
+adb shell am instrument -w dev.veneranative.feature.reader.test/androidx.test.runner.AndroidJUnitRunner
+adb logcat -d -s VeneraImage:I
+```
+
+### S0-07 Stage 0 决策收敛与 ADR — DONE
+
+已完成（2026-09-20）：
+
+- ADR-0002 增补“S0-04 实测修订”：引擎选择维持 AndroidX JavaScriptEngine 1.1.0；二进制只能走
+  ArrayBuffer，超时可靠但结果大小上限不可依赖，沙箱终止后必须重建整个 runtime。
+  QuickJS fallback 条件逐条对照实测结果，其中“消息桥无法稳定支持取消与并发”部分命中。
+- ADR-0003 修订能力要求：**MessagePort 不再是 Host API 的硬性前提**（参考设备 `messagePorts=false`），
+  传输层改为能力探测，替代传输的具体形式留待 Stage 1 的独立 ADR；二进制统一走
+  `provideConsumeArrayBuffer`。
+- 删除零引用代码：`:core:common`（`AppResult`/`AppError`）、`:core:navigation`（`AppRoute`）、
+  `JavaScriptEngineSupport` 与 `ReaderZoomState.reset()`，并移除 app 未使用的 `:core:navigation` 依赖。
+  判定依据与重建条件见 `docs/ARCHITECTURE.md` 第 3 节。
+- 新增 `PerSourceCookieJarRegistryTest`（5 项 JVM 测试）：每来源 Cookie 隔离、清理与过期规则
+  现在可在 JVM 回归，不再只依赖无法在参考设备上完整执行的 instrumentation 测试。
+- 文档与代码对齐：修正 `SourceHttpClient` 命名漂移、S0-04 已删除测试类的残留命令、模块表与依赖。
+
+Stage 0 退出标准对照：
+
+| 退出标准 | 结论 | 依据 |
+| --- | --- | --- |
+| JS Engine 可用性、限制、fallback 条件清晰 | 满足 | ADR-0002 实测修订 + ADR-0003 能力探测修订 |
+| Reader 图片方案有实测证据 | 部分满足：解析证据充分，设备证据推迟 | ADR-0004 + `PageDecodeBudgetTest`；PSS/耗时/掉帧未测，见已知风险 |
+| Stage 1 不再依赖未回答的关键技术假设 | 基本满足，保留一项待决策 | 异步 Host 桥的替代传输必须在 S1-01 实现协议前用新 ADR 定案 |
+
+验证记录（关键节点完整验证）：
+
+```text
+2026-09-20
+JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
+.\gradlew.bat --no-daemon --max-workers=2 lintDebug testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL（1m 26s）
+
+全量单元测试 39 项，failures=0 errors=0 skipped=0：
+  core:model 1 / core:network 1 / feature:reader 26 / source:engine 5 / source:network 6
+  feature:reader = PageDecodeBudgetTest 9 + PageTilingTest 9 + ReaderViewModelTest 8
+  source:network = PerSourceCookieJarRegistryTest 5 + SensitiveDataRedactorTest 1
+
+Lint：lintDebug 在各模块执行，无阻断问题，未使用 lint baseline。
+instrumentation 与实机验证本轮未执行（按用户决定不做实机测试）。
+```
+
 ## 当前代码事实
 
 - `:app` 目前用本地状态在 `HomeRoute` 与 `ReaderRoute` 之间切换，尚未建立完整根导航。
 - `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
-- `:feature:reader` 已能渲染页面描述符、切换阅读方向并调度邻近预取，但页面是尺寸占位块，
-  没有任何真实图片解码。
+- `:feature:reader` 已能渲染页面描述符、切换阅读方向并调度邻近预取；当 `assets/fixtures`
+  存在时会改用 `AssetFixturePageProvider` 与真实解码管线，否则退回尺寸占位块。
+- `:feature:reader` 的解码实现处于原型阶段：`PageImageDecoder` 有 `Sampled`（整页降采样，
+  等价于通用图片库 fit 采样）与 `Region`（`BitmapRegionDecoder` 区域/分块）两种策略，
+  可在阅读器底部栏运行时切换；解码结果只存在于有界 `PageImageCache`，不进入 `ReaderUiState`。
+- 图片解码代码目前位于 `:feature:reader`，与“图片管线属于 core”的目标边界不一致；
+  S1-05 建立 `:core:image` 时必须迁移，已在 ADR-0004 记为技术债。
 - `:source:api` 已有最小 Runtime 契约，但还不是完整 Venera 漫画源协议。
 - `:source:engine` 已能执行隔离 fixture、结构化调用、超时、取消和生命周期恢复。
 - Runtime 当前为每来源串行调用；支持非 Binder 传输时结果上限配置为 1 MiB。
@@ -264,9 +375,13 @@ adb shell am instrument -w dev.veneranative.source.engine.test/androidx.test.run
 
 ```powershell
 adb logcat -c
-adb shell am instrument -w -e class dev.veneranative.source.engine.SourceRuntimeLimitsTest dev.veneranative.source.engine.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w dev.veneranative.source.engine.test/androidx.test.runner.AndroidJUnitRunner
 adb logcat -d -s VeneraStress:I
 ```
+
+S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`、`stress_fixture.js`
+已按上文删除，所以上面的命令只运行当前保留的引擎测试类；重建压力数据需要先重建 harness。
+`VeneraStress` tag 只对存活下来的测试有效。
 
 不在 S0-04 范围：
 
@@ -278,29 +393,26 @@ adb logcat -d -s VeneraStress:I
 
 ## 当前唯一下一任务
 
-### S0-06：超长图、缩放和内存验证 — TODO
+### S1-01：稳定领域模型与 Source Core 协议 — TODO
 
-目标：确定大图与超长图在 Compose 中是否可用，决定是否引入子采样或分块解码。
+依赖：S0-07（已完成）。
 
-必须验证：
+交付物（摘自 `docs/IMPLEMENTATION_PLAN.md`）：
 
-- 常见图片、超长条图、超高分辨率图。
-- 快速滚动、连续翻页、旋转、后台恢复。
-- 双指缩放与滚动手势冲突。
-- 不同预取窗口的峰值内存与卡顿。
-- Coil 常规解码是否足够；何时切换子采样或分块方案。
+- Comic、Chapter、Page、分页结果、筛选项和来源能力模型。
+- Explore、Search、Detail、Chapters、Pages 五个 Core 能力。
+- 序列化与协议兼容测试。
+- `ComicKey = SourceId + RemoteComicId` 全链路使用。
 
-产出：
+开始前必须先处理的两项遗留（来自 Stage 0）：
 
-- 固定生成的测试图片或生成脚本，禁止提交版权内容。
-- 测试设备/配置、内存数据和复现步骤。
-- `docs/adr/0004-large-image-strategy.md`。
+1. **异步 Host API 传输方式定案。** 参考设备 `messagePorts=false`，ADR-0003 已把 MessagePort
+   降级为可选通道，替代传输需要一个独立 ADR（脚本侧拉取式轮询，或把 Host 调用改为同步
+   请求-响应）。这决定 Core 协议里超时、取消与并发的表达方式，必须在实现 Pages/Explore 之前定案。
+2. **`:core:common` 是否重建。** 如果 S1-01 确实需要统一的 Result/错误聚合类型，按
+   `docs/ARCHITECTURE.md` 第 5 节的准则创建，不要照搬 Stage 0 的空壳。
 
-执行前须知：
-
-- 本任务本身是专项验证，允许实机测量，但**开始实机前必须先与用户确认范围**，
-  避免再次长时间占用设备而不产出可交付结论（S0-04 的教训）。
-- 引入 Coil 属于“新的图片主框架”，需要先补 ADR，不允许悄悄加依赖。
+编译检查：
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
@@ -310,8 +422,8 @@ adb logcat -d -s VeneraStress:I
 
 | 顺序 | ID | 名称 | 前置 |
 | --- | --- | --- | --- |
-| 1 | S0-06 | 超长图、缩放和内存验证 | S0-05 |
-| 2 | S0-07 | Stage 0 决策收敛与 ADR | S0-04、S0-06 |
+| 1 | S1-01 | 稳定领域模型与 Source Core 协议 | S0-07（已完成） |
+| 2 | S1-02 | 来源包安装与管理 | S1-01 |
 
 ## 已知风险与待确认
 
@@ -320,8 +432,14 @@ adb logcat -d -s VeneraStress:I
 | 异步 Host API 在真机缺少 MessagePort | V2337A 上 `messagePorts=false`，S0-03 的桥按能力跳过 | Stage 1 决定异步桥实现方式时处理 |
 | 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
-| ADR-0002 未按实测结论更新 | 待办 | 下次触及 Runtime 决策时更新 |
-| 超长图是否需要专用子采样组件 | 未验证 | 完成 S0-05 至 S0-06 |
+| 异步 Host 桥的替代传输未定案 | ADR-0003 已把 MessagePort 降级为可选通道，替代形式未选 | Stage 1 需要独立 ADR，且必须在实现 Pages/Explore 之前定案 |
+| `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
+| 导航契约模块已删除 | `:core:navigation` 零引用，S0-07 删除以符合模块创建准则 | S1-03 首次需要类型安全 Route 时重建 |
+| 大图策略的设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突） | 规则已由 JVM 预算测试保证，设备数据缺失，未验证 | Stage 0 退出门禁；需要时按 S0-06 记录的命令采集 |
+| 解码代码暂驻 `:feature:reader` | 已知技术债，已在 ADR-0004 记录 | S1-05 建立 `:core:image` 时迁移 |
+| Coil 仍未引入 | 有意推迟，见 ADR-0004 | S1-05 决策，且决策前先更新 ADR-0004 |
+| 中等缩放区间允许最多约 1.41 倍 GPU 放大 | 内存上界的代价，观感未验证 | 设备验证时确认是否可接受 |
+| 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指向 temurin17 | 用户修复环境变量，或继续按命令临时指定 |
 | QuickJS fallback 是否必要 | S0-02 暂不引入 | 与 MessagePort 缺失问题一并决策 |
 | GPL-3.0 衍生边界和最终许可证 | 待确认 | 复用上游实现前完成许可证 ADR |
 | 最终 applicationId | 待用户确认 | 发布配置开始前确认 |
