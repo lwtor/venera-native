@@ -19,6 +19,9 @@ dependencies {
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
+    // android.jar only carries org.json stubs, so the runtime's JSON boundaries are exercised
+    // against a real implementation instead of the platform's "not mocked" placeholder.
+    testImplementation(libs.json)
     // The engine is tested on the JVM: the binding ships a desktop artifact, so contract behaviour
     // (host callbacks, await, timeout, binary) does not need a device to be regression-checked.
     testImplementation(libs.quickjs.kt.jvm)

@@ -174,6 +174,51 @@ spike 结果（ABI、体积、实测数据）必须回填本节。
 - 二进制通道（`Int8Array ↔ ByteArray` 已在绑定中，尚未在我们的 Host API 上验证）。
 - ABI 覆盖与 APK 体积（需实际打包后测量）。
 
+## 9. 兼容层范围（2026-09-20，按真实源实测）
+
+引擎只提供 ECMAScript 内建对象：实测 `Object.getOwnPropertyNames(globalThis)` 里没有 `fetch`、
+`console`、`URL`、`TextEncoder`、`atob`、`setTimeout`、`crypto`、`Intl`。兼容层由
+`QuickJsHostScript` 注入，范围按**真实源的调用点**确定，而不是按"Web 平台一般应该有什么"推测：
+
+| 能力 | 决定 | 依据 |
+| --- | --- | --- |
+| `fetch(url, options)` + `ok` / `status` / `headers` / `text()` / `json()` / `arrayBuffer()` | 提供 | 真实源 12 处调用，网络主力入口 |
+| `Convert.encodeUtf8` / `decodeUtf8` | 提供 | 真实源用它编码 POST 表单体 |
+| `Network.get/post/put/patch/delete/fetchBytes` | 提供 | 协议要求；当前 Host API 只放行 `http.request` 的 GET/POST，其余方法会收到 `INVALID_REQUEST` |
+| `veneraHost.call(method, payload)` | 提供 | 与 WebView 实现和既有 fixture 保持一致，允许列表仍在 Kotlin 侧执行 |
+| `console.*` | 提供，转发到宿主日志 | 诊断必需（源本身不用） |
+| `APP.locale` / `APP.version` | 提供 | 真实源读取 `APP.locale` |
+| `URL` / `URLSearchParams` | **不提供** | 真实源 0 次使用；自写 URL 解析器会带来静默误解析风险 |
+| `TextEncoder` / `TextDecoder`、`atob` / `btoa` | **不提供** | 真实源 0 次使用（编码统一走 `Convert`） |
+| `setTimeout` / `setInterval`、`crypto`、`structuredClone`、`Intl` | **不提供** | 真实源 0 次使用 |
+
+规则：**新增一个全局必须同时给出用到它的源和一条测试**。未提供的项记在 `docs/STATUS.md`。
+
+已知传输限制：Host API 的请求体是文本（`http.request` 的 `body` 为字符串），因此
+`Convert.encodeUtf8` 编码后的表单体在桥内被解码回字符串再发送——UTF-8 文本语义等价，
+但真正的二进制体需要字节通道，属于 §8 列的未验证项。
+
+## 10. 实测：脚本中断能力（2026-09-20）
+
+ADR-0008 §3 把"调用取消与超时"列为 spike 判据。实测结果分两半，必须分开记录：
+
+| 场景 | 结果 |
+| --- | --- |
+| 脚本**挂起在宿主调用上**时取消 | **通过**：取消传导到宿主 `suspend` 函数（测试断言宿主请求也被取消），调用方收到 `Cancelled` |
+| 脚本**在引擎内死循环**（`while(true){}`）时超时 | **不能中断**：`QuickJs` 1.0.5 的公开接口只有 `memoryLimit` / `maxStackSize` / `evaluate` / `gc` / `close`，没有求值超时或中断入口（README 描述的 `evaluationTimeoutMillis` / `interruptEvaluation` 属于更新的版本） |
+
+由此产生两条实现约束，已写进 `QuickJsRuntime` 与测试：
+
+1. **求值不能作为调用方的子协程**。作为子协程时 `coroutineScope` 会等待无法中断的脚本，把"超时"变成"卡死"
+   （实测：测试挂到 JUnit 120s 超时）；`async` 子任务的失败还会绕过错误映射直接抛给调用方。
+   现在求值运行在会话自己的 `SupervisorJob` 作用域里。
+2. **超时或取消后引擎视为脏**：下次调用重建引擎并重新执行脚本（与 WebView 运行时丢弃被终止 isolate 的做法一致）。
+   丢弃时的 `close()` 在独立守护线程执行，因为对一个仍在跑脚本的引擎调用 `close()` 可能阻塞。
+
+**已知限制**：死循环脚本会占用一个 CPU 核，直到引擎被丢弃且其线程自然结束——宿主无法强制终止它。
+这是选择 1.0.5 的直接代价（§7 记录了为什么不能升到新版本）。升级路径：工具链 Kotlin 提到 2.4 后升级绑定
+（新版本提供中断），或自行交叉编译 QuickJS 并复用同一契约。**在升级前，不得把"超时"描述为"脚本已停止"。**
+
 ## 官方依据
 
 - https://developer.android.com/develop/ui/views/layout/webapps/jsengine

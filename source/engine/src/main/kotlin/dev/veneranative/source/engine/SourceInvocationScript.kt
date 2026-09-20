@@ -43,6 +43,18 @@ internal object SourceInvocationScript {
         """.trimIndent()
     }
 
+    /**
+     * The same wrapper, as an expression an engine with a completion value must await.
+     *
+     * An engine that hands back the value of the last expression returns the *Promise* [build]
+     * created; awaiting it in the same script yields the envelope itself (ADR-0008 §8).
+     */
+    fun buildAwaitable(
+        functionName: String,
+        argumentsJson: String,
+        invocationId: String,
+    ): String = "await " + build(functionName, argumentsJson, invocationId)
+
     private fun quote(value: String): String = buildString(value.length + 2) {
         append('"')
         value.forEach { character ->

@@ -417,13 +417,22 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
   module 模式没有完成值。适配层不能自己包 async 函数。
 - 引擎模块已能在 JVM 上被回归：`testImplementation(quickjs-kt-jvm)` + 在单元测试类路径上排除
   Android 产物（否则同一批类出现两次）。
+- **契约实现已落地**：`QuickJsRuntime`（每源一个引擎实例、调用串行、取消与超时都通过取消求值协程
+  映射、结果大小自行计数）、`QuickJsHostBridge`（允许列表 + 大小上限 + 响应信封）与
+  `QuickJsHostScript`（兼容层）。`AndroidJavaScriptRuntime` 的结果信封解析已提取为
+  `SourceResultEnvelope`，两个引擎共用同一套语义。
+- **Host API 两套入口已提供**：全局 `fetch`（`ok`/`status`/`headers`/`text()`/`json()`/`arrayBuffer()`）、
+  `Network.*`、`Convert.encodeUtf8`/`decodeUtf8`、`console.*`、`APP.locale`/`version`、`veneraHost.call`。
+  兼容层范围按真实源的调用点确定（ADR-0008 §9），未提供的全局逐条记录，不凭想象补齐。
+- **`QuickJsMetadataReader` 已替换 `:app` 的 `UnavailableMetadataReader`**：脚本在一次性引擎里执行后
+  读取 `key`/`name`/`version`/`minAppVersion`。
+- **装配层已切换到自有引擎**：`:app` 用 `QuickJsRuntime(hostApi = SourceNetworkHostApi(SourceNetworkExecutor()))`
+  + `QuickJsMetadataReader`；WebView 实现保留在 `:source:engine` 及其 androidTest 中，按 ADR-0008 §2.4
+  等待自有引擎通过全部判据后再处置。
 
 仍待完成：
 
-- `:source:api` 契约的自有引擎实现（装配层选择实现，现有 WebView 实现保留到本任务通过为止）。
-- Host API 的**两套入口**：全局 `fetch`（`ok`/`json()`/`text()`）与 `Network.*`；真实源的写法见 ADR-0007 §4.3。
-- `SourceMetadataReader` 的真实实现，替换 `:app` 里临时的 `UnavailableMetadataReader`。
-- 取消与超时接入契约；二进制通道在 Host API 上的验证；ABI 与 APK 体积实测；许可证登记。
+- 二进制通道在 Host API 上的验证；ABI 与 APK 体积实测；许可证登记。
 - 通过后按 ADR-0008 §2.4 处置 WebView 实现，并更新 ADR-0002 的引擎状态。
 
 验证记录：
@@ -431,10 +440,20 @@ S0-04 的 `SourceRuntimeLimitsTest`、`SourceRuntimeStressTest`、`StressProbe`�
 ```text
 2026-09-20（编译级 + JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
 JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
-.\gradlew.bat --no-daemon --max-workers=2 :source:engine:testDebugUnitTest :app:assembleDebug
-结果：BUILD SUCCESSFUL
-全量单元测试 119 项，failures=0 errors=0 skipped=0
-  source:engine 8（含 QuickJsBridgeSpikeTest 3）
+
+第一轮：发现三个真实缺陷（三个测试失败）
+- 超时测试挂死至 JUnit 120s 超时：coroutineScope 会等待无法中断的子协程
+- 另两项把 QuickJsException 直接抛出，绕过错误映射：async 子任务失败会传给父作用域
+- 根因是同一个：求值不能作为调用方的子协程；该绑定无法中断引擎内的死循环（ADR-0008 §10）
+
+第二轮（修正后）：
+.\gradlew.bat --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug
+结果：BUILD SUCCESSFUL in 35s
+全量单元测试 139 项，failures=0 errors=0
+  source:engine 27（QuickJsRuntimeTest 13、QuickJsMetadataReaderTest 6、QuickJsBridgeSpikeTest 3、
+  SourceInvocationScriptTest 2、SourcePackageValidatorTest 3）
+  其中 QuickJsRuntimeTest 的"超时后源仍可用"用 2.0s 完成（重建引擎生效），
+  "取消传导到宿主请求"断言通过
 ```
 
 编译检查：
@@ -570,9 +589,12 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
 | WebView 引擎在参考设备上无法提供异步 Host API | 已定案转向自有引擎；JVM spike 已证明 JS→宿主异步可用（ADR-0008 §8） | 剩余判据（取消/超时映射、二进制、ABI 与体积）在引擎实现阶段完成 |
 | 引擎绑定为社区项目（Apache-2.0） | 版本已锁定 1.0.5；升级受 Kotlin 元数据兼容约束 | 升级前必须跑契约测试；若方案失效则自行交叉编译 QuickJS，契约不变 |
-| 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | ADR-0007 §4.3 已确认：只做 `Network.get/post` 无法运行真实源 | S1-08 引擎落地必须提供 `fetch` 兼容层，已列入 ADR-0008 spike 判据 |
+| 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | 已解决：兼容层提供 `fetch`（含 `ok`/`status`/`json()`/`text()`）与 `Network.*` | 若在真实源上发现 `fetch` 语义缺口，按 ADR-0008 §9 的规则补实现并加测试 |
 | 来源 id 冲突（上游存在两个源共用 `copy_manga`） | 已决策：`sourceId` 取脚本自报的 `key`，同 id 的第二次安装**替换**第一次，不共存 | 若产品上需要共存，必须先改 `SourceId` 语义并同步 `ComicKey` |
-| 安装真实源脚本在 S1-08 之前必然失败 | 元数据读取需要执行脚本，`:app` 暂时传入 `UnavailableMetadataReader` | S1-08 提供真实 `SourceMetadataReader` 后移除该占位实现 |
+| **绑定无法中断引擎内的死循环脚本** | 已实测（ADR-0008 §10）：挂起型取消可用，计算型不可中断；超时后靠丢弃并重建引擎保证源仍可用 | 死循环脚本会占一个 CPU 核直到引擎被丢弃；升级绑定（需工具链 Kotlin 2.4）或自行编译 QuickJS 才能根治；在此之前不得把"超时"当作"脚本已停止" |
+| 兼容层有意不提供的全局（`URL`、`URLSearchParams`、`TextEncoder`/`TextDecoder`、`atob`/`btoa`、`setTimeout`、`crypto`、`structuredClone`、`Intl`） | 按真实源实测（0 次使用）决定，避免自写实现静默误解析 | 遇到需要它们的源时补实现 + 测试，并更新 ADR-0008 §9 |
+| `Network.*` 的非 GET/POST 方法、二进制请求体 | Host API 目前只放行 `http.request` 的 GET/POST，且请求体是文本 | 需要时扩展 `http.request`；二进制需增加字节通道 |
+| `APP.version` 仍是占位值 `"0"` | `APP.locale` 已按设备区域传入，`version` 未接 | 与 `minAppVersion` 校验一起在协议适配层接入 |
 | `:feature:sources` 直接依赖 `:data:source` | 有意的边界取舍，已记录在 ARCHITECTURE §3 | 出现第二个数据实现或引入 DI 时把契约拆出去 |
 | `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |

@@ -29,6 +29,9 @@ dependencies {
     // transitive exposure from the implementation modules.
     implementation(project(":source:api"))
     implementation(project(":source:engine"))
+    // The Host API implementation lives with the network stack (ADR-0001); the assembly layer is
+    // what pairs it with an engine.
+    implementation(project(":source:network"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.androidx.activity.compose)

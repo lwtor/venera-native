@@ -31,10 +31,12 @@ import dev.veneranative.feature.reader.image.PageImageDecoder
 import dev.veneranative.feature.reader.image.RegionPageImageDecoder
 import dev.veneranative.feature.reader.image.SampledPageImageDecoder
 import dev.veneranative.feature.sources.SourcesRoute
-import dev.veneranative.source.api.SourceMetadataReader
-import dev.veneranative.source.api.SourceMetadataResult
-import dev.veneranative.source.engine.AndroidJavaScriptRuntime
+import dev.veneranative.source.engine.QuickJsMetadataReader
+import dev.veneranative.source.engine.QuickJsRuntime
+import dev.veneranative.source.network.SourceNetworkExecutor
+import dev.veneranative.source.network.SourceNetworkHostApi
 import java.io.File
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,8 +64,11 @@ class MainActivity : ComponentActivity() {
                 val sourceRepository = remember(context) {
                     DefaultSourceRepository(
                         store = SourcePackageStore(File(context.filesDir, "sources")),
-                        runtime = AndroidJavaScriptRuntime(context = context),
-                        metadataReader = UnavailableMetadataReader,
+                        runtime = QuickJsRuntime(
+                            hostApi = SourceNetworkHostApi(SourceNetworkExecutor()),
+                            appLocale = Locale.getDefault().toString(),
+                        ),
+                        metadataReader = QuickJsMetadataReader(),
                         fetcher = LocalFileScriptFetcher(),
                     )
                 }
@@ -112,16 +117,4 @@ private fun decoderFor(strategy: DecodeStrategy, cache: PageImageCache): PageIma
         DecodeStrategy.Region -> RegionPageImageDecoder()
     }
     return CachingPageImageDecoder(delegate = decoder, cache = cache)
-}
-
-/**
- * Placeholder until the engine work can read a script's declared metadata.
- *
- * `key`, `name` and `version` only exist after the script has been executed, so this reports the
- * honest answer — sources are unavailable — instead of guessing them from the script text. It is an
- * assembly-layer decision and is replaced by the engine-backed reader in S1-08.
- */
-private object UnavailableMetadataReader : SourceMetadataReader {
-    override suspend fun read(script: String): SourceMetadataResult =
-        SourceMetadataResult.EngineUnavailable("Source metadata reading is not implemented yet.")
 }

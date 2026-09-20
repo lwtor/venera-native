@@ -161,7 +161,7 @@ class AndroidJavaScriptRuntime(
                         return@withLock typedCall.failure(mapInvocationFailure(failure))
                     }
 
-                SourceResult.Success(typedCall.callId, extractResultJson(envelope))
+                SourceResult.Success(typedCall.callId, SourceResultEnvelope.extract(envelope))
             } catch (failure: RuntimeFailure) {
                 typedCall.failure(failure.error)
             } catch (failure: JSONException) {
@@ -310,19 +310,6 @@ class AndroidJavaScriptRuntime(
         return null
     }
 
-    private fun extractResultJson(envelope: String): String {
-        val result = JSONObject(envelope)
-        if (!result.has(RESULT_VALUE_KEY)) {
-            throw JSONException("Missing result value.")
-        }
-        return when (val value = result.get(RESULT_VALUE_KEY)) {
-            JSONObject.NULL -> "null"
-            is String -> JSONObject.quote(value)
-            is Number, is Boolean, is JSONObject, is JSONArray -> value.toString()
-            else -> throw JSONException("Unsupported result value.")
-        }
-    }
-
     private fun mapInvocationFailure(failure: Throwable): SourceRuntimeError =
         when (failure) {
             is EvaluationFailedException ->
@@ -404,6 +391,5 @@ class AndroidJavaScriptRuntime(
         const val MAX_CALL_TIMEOUT_MILLIS = 120_000L
         const val MAX_ERROR_DETAIL_LENGTH = 512
         const val SOURCE_LOADED_SENTINEL = "__VENERA_SOURCE_LOADED__"
-        const val RESULT_VALUE_KEY = "value"
     }
 }

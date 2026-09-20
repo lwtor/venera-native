@@ -9,6 +9,9 @@ javascriptEngine = "1.1.0"
 junit4 = "4.13.2"
 kotlinxSerialization = "1.11.0"
 quickjs = "1.0.5"
+# Test-only: android.jar ships org.json stubs, so unit tests that touch the runtime's JSON
+# boundaries need a real implementation on the classpath.
+json = "20231013"
 lifecycle = "2.11.0"
 navigation3 = "1.1.7"
 okhttp = "5.5.0"
@@ -38,6 +41,7 @@ kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serializa
 # without a device; the version is pinned deliberately and is upgraded only with contract tests.
 quickjs-kt = { module = "io.github.dokar3:quickjs-kt", version.ref = "quickjs" }
 quickjs-kt-jvm = { module = "io.github.dokar3:quickjs-kt-jvm", version.ref = "quickjs" }
+json = { module = "org.json:json", version.ref = "json" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }

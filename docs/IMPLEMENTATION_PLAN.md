@@ -307,8 +307,10 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - `QuickJsBridgeSpikeTest` 在 JVM 上验证了脚本 `await` 宿主 suspend 调用、宿主异常传递与
   `Promise.all` 并发；实测出"必须脚本模式 + 顶层 await"的调用约束并写进 ADR-0008 §8。
 - 引擎模块现在可以在 JVM 上回归（`testImplementation(quickjs-kt-jvm)`）。
-- 仍待完成：契约实现、`fetch`/`Network.*` 两套入口、`SourceMetadataReader`、取消与超时接入、
-  二进制与 ABI/体积实测。
+- 契约实现已落地：`QuickJsRuntime`（每源一个引擎实例、取消与超时映射、自行计数结果大小）与
+  `QuickJsMetadataReader`（一次性引擎读取 key/name/version，替换装配层的占位实现）。
+- 兼容层范围按真实源调用点确定（ADR-0008 §9），未提供的全局逐条记录而不是猜测补齐。
+- 仍待完成：设备/ABI 与体积实测、二进制通道、取消与超时在真机上的表现确认。
 
 交付物：
 
