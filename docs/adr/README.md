@@ -10,8 +10,8 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | [ADR-0004](0004-large-image-strategy.md) | 超长图与子采样策略、Coil 引入条件 | Accepted（设备侧验证推迟，未验证项见 `docs/STATUS.md`） |
 | ADR-0005 | 跨 Android 版本的下载执行策略 | Stage 2 前待创建 |
 | ADR-0006 | 许可证、上游复用与品牌声明 | 复用上游实现前待创建 |
-| ADR-0007 | Venera 漫画源兼容范围 | Stage 1 前待创建 |
-| ADR-0008 | 异步 Host API 传输方式（无 MessagePort 时的替代通道） | S1-01 实现 Core 协议前待创建 |
+| [ADR-0007](0007-source-protocol-compatibility.md) | Venera 漫画源协议兼容范围 | Accepted（字段级细节待补，见第 4 节） |
+| [ADR-0008](0008-async-host-transport.md) | 异步 Host API 传输与引擎选择 | Accepted（引擎 spike 验证中） |
 
 ## 编写规则
 
