@@ -76,111 +76,39 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
-    /**
-     * Outlives any single screen: a progress write must survive leaving the reader, so its scope and
-     * handle live with the activity rather than with the composition that happened to start it.
-     */
-    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val progressTracker = AtomicReference<ReadingProgressTracker?>(null)
+    private val graph by lazy {
+        androidx.lifecycle.ViewModelProvider(this)[AppGraph::class.java]
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             VeneraNativeTheme {
-                App(this@MainActivity, appScope, progressTracker)
+                App(this@MainActivity, graph)
             }
         }
     }
 
     override fun onStop() {
-        // What makes throttling safe: the newest page is still in memory, and this is the last
-        // moment the process is guaranteed alive. `NonCancellable` because a flush must not be
-        // dropped by lifecycle teardown.
-        progressTracker.get()?.let { tracker ->
-            appScope.launch(NonCancellable) { tracker.flush() }
-        }
+        graph.flushProgress()
         super.onStop()
-    }
-
-    override fun onDestroy() {
-        appScope.cancel()
-        super.onDestroy()
     }
 }
 
 @Composable
 private fun App(
     activity: MainActivity,
-    appScope: CoroutineScope,
-    progressTracker: AtomicReference<ReadingProgressTracker?>,
+    graph: AppGraph,
 ) {
-    // Assembly layer: features receive their dependencies from here, so no feature has to know
-    // about storage, the engine or another feature.
-    val context = LocalContext.current.applicationContext
-    val imageCache = remember { PageImageCache(DEFAULT_IMAGE_CACHE_BYTES) }
-
-    // One OkHttp dispatcher and one cookie registry for both the source calls and the images:
-    // sharing them is what lets a chapter's cookies unlock that chapter's pages.
-    val httpClient = remember { AppHttpClientFactory.create(AppHttpClientFactory.createDispatcher()) }
-    val cookieJars = remember { PerSourceCookieJarRegistry() }
-    val authProvider: ComicImageAuthProvider = remember(cookieJars) {
-        SourceCookieImageAuth(cookieJars)
-    }
-    val diskCache = remember(context) { comicImageDiskCache(context) }
-    val imagePipeline = remember(httpClient, context) { CoilComicImagePipeline(httpClient, diskCache, authProvider) }
-    val imageLoader = remember(context, authProvider, imagePipeline) {
-        comicImageLoader(context, authProvider, imagePipeline, diskCache)
-    }
-
-    // One runtime serves the whole app: sources are loaded into it, and both the repository and the
-    // catalog above it talk to the same loaded instances.
-    val runtime = remember(cookieJars, httpClient) {
-        QuickJsRuntime(
-            hostApi = SourceNetworkHostApi(SourceNetworkExecutor(baseClient = httpClient, cookieJars = cookieJars)),
-            appLocale = Locale.getDefault().toString(),
-        )
-    }
-    val sourceRepository = remember(context, runtime) {
-        DefaultSourceRepository(
-            store = SourcePackageStore(File(context.filesDir, "sources")),
-            runtime = runtime,
-            metadataReader = QuickJsMetadataReader(),
-            fetcher = LocalFileScriptFetcher(),
-        )
-    }
-    val catalog = remember(sourceRepository, runtime) {
-        DefaultComicCatalog(sources = sourceRepository, core = EngineSourceCore(runtime))
-    }
-
-    // Real pages: the sizes `ComicPage` needs come from the image pipeline, which is what makes a
-    // source-backed chapter renderable at all.
-    val provider: PageProvider = remember(catalog, imagePipeline) {
-        SourcePageProvider(catalog = catalog, sizer = CoilPageImageSizer(imagePipeline))
-    }
-    val decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = remember(imageCache, imagePipeline) {
-        { strategy -> dev.veneranative.core.image.decode.PipelinePageImageDecoder(imagePipeline, decoderFor(strategy, imageCache)) }
-    }
-
-    // Room is opened asynchronously, so reading stays available before it: history precision is not
-    // worth blocking the first frame on disk I/O.
-    val database by produceState<VeneraDatabase?>(initialValue = null, context) {
-        value = VeneraDatabaseFactory.get(context)
-    }
-    val historyRepository: HistoryRepository? = remember(database) {
-        database?.let { DefaultHistoryRepository(it.readingHistoryDao(), it.readingProgressDao()) }
-    }
-    LaunchedEffect(historyRepository, appScope) {
-        historyRepository?.let { repository ->
-            progressTracker.set(
-                ReadingProgressTracker(
-                    repository = repository,
-                    scope = appScope,
-                    clock = { System.currentTimeMillis() },
-                ),
-            )
-        }
-    }
+    val historyRepository by graph.history.collectAsStateWithLifecycle()
+    val appScope = graph.scope
+    val progressTracker = graph.progressTracker
+    val catalog = graph.catalog
+    val sourceRepository = graph.sourceRepository
+    val provider = graph.provider
+    val decoderFactory = graph.decoderFactory
+    val imageLoader = graph.imageLoader
 
     var route by rememberSaveable(stateSaver = AppRouteSaver) {
         mutableStateOf<AppRoute>(AppRoute.Home)

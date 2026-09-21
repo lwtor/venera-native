@@ -233,6 +233,18 @@ class EngineSourceCoreTest {
         }
     }
 
+    @Test
+    fun `reinstall refreshes capabilities on the same core`() = runBlocking {
+        val runtime = QuickJsRuntime()
+        try {
+            runtime.install(SourcePackage(sourceId, "1", FULL_SOURCE, sha256(FULL_SOURCE)))
+            val core = EngineSourceCore(runtime)
+            assertTrue(core.capabilitiesSuccess().supports(SourceCapability.EXPLORE))
+            runtime.install(SourcePackage(sourceId, "2", SEARCH_ONLY_SOURCE, sha256(SEARCH_ONLY_SOURCE)))
+            assertTrue(!core.capabilitiesSuccess().supports(SourceCapability.EXPLORE))
+        } finally { runtime.close() }
+    }
+
     private suspend fun withCore(script: String, block: suspend (EngineSourceCore) -> Unit) {
         val runtime = QuickJsRuntime()
         try {

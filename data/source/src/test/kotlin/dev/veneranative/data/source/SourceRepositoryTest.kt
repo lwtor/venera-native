@@ -200,6 +200,21 @@ class SourceRepositoryTest {
         assertEquals(sourceId, runtime.unloadedSourceIds.last())
     }
 
+    @Test
+    fun `new repository restores enabled packages once and excludes disabled packages`() = runTest {
+        givenScript("1", "old")
+        repository.install(LOCATION)
+        val restartedRuntime = FakeSourceScriptRuntime()
+        val restarted = DefaultSourceRepository(store, restartedRuntime, metadataReader, fetcher)
+        restarted.installed()
+        restarted.installed()
+        assertEquals(1, restartedRuntime.installedPackages.size)
+        restarted.setEnabled(sourceId, false)
+        val disabledRuntime = FakeSourceScriptRuntime()
+        DefaultSourceRepository(store, disabledRuntime, metadataReader, fetcher).installed()
+        assertTrue(disabledRuntime.installedPackages.isEmpty())
+    }
+
     private fun givenScript(version: String, script: String) {
         fetcher.scripts[LOCATION] = script
         metadataReader.result = SourceMetadataResult.Success(

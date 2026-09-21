@@ -106,3 +106,5 @@ java -Xmx2g tools/test-images/GenerateTestImages.java feature/reader/src/main/as
 ## 许可与来源说明
 
 Venera 原项目采用 GPL-3.0。本项目在进入功能实现阶段前，将根据实际复用的源码、资源和漫画源兼容层完成许可证确认，并持续在应用“关于”页面和项目文档中保留上游致谢与链接。
+
+质量门禁与逐任务提交见 `AGENTS.md`；当前整改状态见 `docs/reviews/stage-01-remediation.md`。根依赖由保留的 `AppGraph` 装配，启用来源支持冷启动恢复。

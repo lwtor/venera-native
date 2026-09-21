@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-22 |
 | 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q05（详见质量整改台账） |
-| 当前任务状态 | Q04 DONE；Q05 IN_PROGRESS；Stage 2 暂停 |
+| 当前任务 | Q06（详见质量整改台账） |
+| 当前任务状态 | Q05 DONE；Q06 IN_PROGRESS；Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -28,6 +28,8 @@
 - Q03：保留稳定页索引，按邻近页面解析尺寸并支持失败重试；解码器通过带租约的认证缓存文件读取正文 验证：`:core:image:testDebugUnitTest :data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 - Q04：以不可变脚本和原子索引替换保证来源升级一致性，失败保留旧包，回滚保留禁用状态 验证：`:data:source:testDebugUnitTest :app:assembleDebug` — PASS。
+
+- Q05：保留根依赖跨配置变化，销毁时关闭资源；冷启动串行恢复启用来源，禁用卸载清理会话，升级能力不再使用陈旧缓存 验证：`:data:source:testDebugUnitTest :source:core:testDebugUnitTest :data:comic:testDebugUnitTest :app:assembleDebug` — PASS。
 
 ## 已经完成
 

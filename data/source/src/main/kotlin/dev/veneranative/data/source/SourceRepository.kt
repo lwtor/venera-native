@@ -8,6 +8,8 @@ import dev.veneranative.source.api.SourceMetadataResult
 import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceScriptRuntime
 import java.security.MessageDigest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -66,11 +68,32 @@ class DefaultSourceRepository(
     private val runtime: SourceScriptRuntime,
     private val metadataReader: SourceMetadataReader,
     private val fetcher: SourceScriptFetcher,
+    private val onSourceChanged: (SourceId) -> Unit = {},
 ) : SourceRepository {
 
-    override suspend fun installed(): List<InstalledSource> = store.list()
+    private val mutex = Mutex()
+    private val loaded = mutableSetOf<SourceId>()
 
-    override suspend fun install(location: String): InstallOutcome {
+    override suspend fun installed(): List<InstalledSource> = mutex.withLock {
+        store.list().also { entries ->
+            for (entry in entries) {
+                if (entry.enabled && entry.sourceId !in loaded) {
+                    val stored = store.read(entry.sourceId) ?: continue
+                    if (runtime.install(stored.toPackage()) is SourceInstallResult.Installed) {
+                        loaded += entry.sourceId
+                    }
+                }
+            }
+        }
+    }
+
+    override suspend fun install(location: String): InstallOutcome = mutex.withLock { installLocked(location) }
+    override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean =
+        mutex.withLock { setEnabledLocked(sourceId, enabled) }
+    override suspend fun uninstall(sourceId: SourceId): Boolean = mutex.withLock { uninstallLocked(sourceId) }
+
+
+    private suspend fun installLocked(location: String): InstallOutcome {
         val script = when (val fetched = fetcher.fetch(location)) {
             is FetchedScript.Failure ->
                 return InstallOutcome.Failure(SourceInstallError.LocationUnreadable, fetched.reason)
@@ -117,6 +140,7 @@ class DefaultSourceRepository(
                 )
                 val stored = runCatching { store.write(entry) }.isSuccess
                 if (stored) {
+                    loaded += metadata.sourceId
                     InstallOutcome.Success(entry.installed)
                 } else {
                     withContext(NonCancellable) { restore(previous, metadata.sourceId) }
@@ -126,7 +150,7 @@ class DefaultSourceRepository(
         }
     }
 
-    override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean {
+    private suspend fun setEnabledLocked(sourceId: SourceId, enabled: Boolean): Boolean {
         val stored = store.read(sourceId) ?: return false
         if (stored.installed.enabled == enabled) return true
 
@@ -137,18 +161,23 @@ class DefaultSourceRepository(
             runtime.unload(sourceId)
         }
         return try {
-            store.setEnabled(sourceId, enabled)
+            store.setEnabled(sourceId, enabled).also {
+                if (enabled) loaded += sourceId else loaded -= sourceId
+                if (!enabled) onSourceChanged(sourceId)
+            }
         } catch (failure: Exception) {
             withContext(NonCancellable) { restore(stored, sourceId) }
             throw failure
         }
     }
 
-    override suspend fun uninstall(sourceId: SourceId): Boolean {
+    private suspend fun uninstallLocked(sourceId: SourceId): Boolean {
         val removed = store.remove(sourceId)
         // Unload unconditionally: an unloaded source is not an error, and a stale isolate must not
         // survive an uninstall.
         runtime.unload(sourceId)
+        loaded -= sourceId
+        onSourceChanged(sourceId)
         return removed
     }
 

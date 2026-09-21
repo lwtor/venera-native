@@ -37,8 +37,7 @@ import kotlinx.serialization.json.JsonPrimitive
 /**
  * [SourceCore] over a [SourceScriptRuntime]: typed operations in, upstream calls out.
  *
- * What a source declares is read once per source through the engine's structure probe and cached,
- * because declarations only change when the source is reloaded. The declarations decide the call
+ * What a source declares is read through the current engine instance's structure probe. The declarations decide the call
  * shape, the way upstream does:
  *
  * - `load` wins over `loadNext` (ADR-0007 §2.2), so a cursor is only used when the source declares
@@ -54,7 +53,7 @@ class EngineSourceCore(
 ) : SourceCore {
 
     private val sequence = AtomicLong(0)
-    private val descriptions = ConcurrentHashMap<SourceId, SourceDescription>()
+
 
     override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
         when (val described = describe(sourceId)) {
@@ -192,7 +191,7 @@ class EngineSourceCore(
     }
 
     private suspend fun describe(sourceId: SourceId): SourceOutcome<SourceDescription> {
-        descriptions[sourceId]?.let { return SourceOutcome.Success(it) }
+        // Probe the current runtime instance; reinstall and in-flight probes cannot cache stale shapes.
 
         val probed = mutableMapOf<String, SourceShape?>()
         for (path in PROBE_PATHS) {
@@ -242,7 +241,6 @@ class EngineSourceCore(
                 explorePages = declaredPages,
                 searchUsesLoad = searchUsesLoad,
             )
-        descriptions[sourceId] = description
         return SourceOutcome.Success(description)
     }
 
@@ -271,7 +269,6 @@ class EngineSourceCore(
 
             is SourceResult.Failure -> {
                 // A source that is not loaded may have been reinstalled since it was described.
-                if (result.error is SourceRuntimeError.SourceNotLoaded) descriptions.remove(sourceId)
                 SourceOutcome.Failure(result.error)
             }
         }

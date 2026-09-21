@@ -37,10 +37,15 @@ class DefaultComicCatalog(
     override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
         core.capabilities(sourceId)
 
-    override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> = core.detail(comicKey)
+    override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
+        sources.installed()
+        return core.detail(comicKey)
+    }
 
-    override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
-        core.pages(chapterKey)
+    override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> {
+        sources.installed()
+        return core.pages(chapterKey)
+    }
 
     /**
      * Resolved from the installed list rather than from the runtime: a source that was uninstalled or
