@@ -8,8 +8,8 @@
 | Q01 | HTTP 正文读取 | DONE | R01；短响应/超限/异常/取消 |
 | Q02 | 图片缓存与网络 | DONE | R02/R13；租约、取消、大小、表单、共享缓存 |
 | Q03 | 正文按需图片链路 | DONE | R03/R11/R12；稳定页号、按需加载与预取 |
-| Q04 | 来源原子存储 | IN_PROGRESS | R08；失败回滚与重启一致 |
-| Q05 | 来源恢复与生命周期 | TODO | R04/R14；恢复、版本失效、Cookie 清理 |
+| Q04 | 来源原子存储 | DONE | R08；失败回滚与重启一致 |
+| Q05 | 来源恢复与生命周期 | IN_PROGRESS | R04/R14；恢复、版本失效、Cookie 清理 |
 | Q06 | 探索分页 | TODO | R09；mixed 完整分页 |
 | Q07 | 进度持久化 | TODO | R06；串行、失败保留、事务 |
 | Q08 | 恢复与退出集成 | TODO | R05/R06；异步恢复、选章、退出强刷 |
@@ -28,3 +28,5 @@ Q01：修复正文有界读取与回调异常映射；新增短/空/边界、chu
 Q02：修复缓存提交后的文件租约、网络取消与实际字节上限、表单编码、鉴权快照及共享 DiskCache；新增首次下载和缓存命中/请求语义回归。 验证：`:core:image:testDebugUnitTest :app:assembleDebug` — PASS；`git diff --check`。
 
 Q03：保留稳定页索引，按邻近页面解析尺寸并支持失败重试；解码器通过带租约的认证缓存文件读取正文 验证：`:core:image:testDebugUnitTest :data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check`。
+
+Q04：以不可变脚本和原子索引替换保证来源升级一致性，失败保留旧包，回滚保留禁用状态 验证：`:data:source:testDebugUnitTest :app:assembleDebug` — PASS；`git diff --check`。

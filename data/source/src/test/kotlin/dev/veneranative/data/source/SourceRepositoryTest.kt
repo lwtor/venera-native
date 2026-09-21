@@ -183,6 +183,23 @@ class SourceRepositoryTest {
         assertEquals(listOf(sourceId), runtime.unloadedSourceIds)
     }
 
+    @Test
+    fun `failed upgrade does not reactivate a disabled source`() = runTest {
+        givenScript("1", "old")
+        repository.install(LOCATION)
+        repository.setEnabled(sourceId, false)
+        val failing = DefaultSourceRepository(
+            SourcePackageStore(File(temporaryFolder.root, "sources"), beforeIndexCommit = {
+                throw java.io.IOException("disk full")
+            }), runtime, metadataReader, fetcher,
+        )
+        givenScript("2", "new")
+        assertTrue(failing.install(LOCATION) is InstallOutcome.Failure)
+        assertFalse(store.read(sourceId)!!.installed.enabled)
+        assertEquals("old", store.read(sourceId)!!.script)
+        assertEquals(sourceId, runtime.unloadedSourceIds.last())
+    }
+
     private fun givenScript(version: String, script: String) {
         fetcher.scripts[LOCATION] = script
         metadataReader.result = SourceMetadataResult.Success(

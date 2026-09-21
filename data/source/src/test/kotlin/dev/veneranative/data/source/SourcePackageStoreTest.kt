@@ -103,6 +103,18 @@ class SourcePackageStoreTest {
         assertFalse(File(temporaryFolder.root.parentFile, "escaped").exists())
     }
 
+    @Test
+    fun `failed index commit preserves the previous script after restart`() {
+        val root = File(temporaryFolder.root, "sources")
+        store.write(source("source-a", "1", "old"))
+        val failing = SourcePackageStore(root, beforeIndexCommit = { throw java.io.IOException("disk full") })
+        assertTrue(runCatching { failing.write(source("source-a", "2", "new")) }.isFailure)
+        val restored = SourcePackageStore(root).read(SourceId("source-a"))!!
+        assertEquals("1", restored.installed.version)
+        assertEquals("old", restored.script)
+        assertEquals(HASH, restored.sha256)
+    }
+
     private fun source(id: String, version: String, script: String) = StoredSource(
         installed = InstalledSource(
             sourceId = SourceId(id),

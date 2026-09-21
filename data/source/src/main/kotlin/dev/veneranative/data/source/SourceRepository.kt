@@ -8,6 +8,8 @@ import dev.veneranative.source.api.SourceMetadataResult
 import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceScriptRuntime
 import java.security.MessageDigest
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 /**
  * Install, enable, disable and remove comic sources.
@@ -117,7 +119,7 @@ class DefaultSourceRepository(
                 if (stored) {
                     InstallOutcome.Success(entry.installed)
                 } else {
-                    restore(previous, metadata.sourceId)
+                    withContext(NonCancellable) { restore(previous, metadata.sourceId) }
                     InstallOutcome.Failure(SourceInstallError.StorageFailed)
                 }
             }
@@ -134,7 +136,12 @@ class DefaultSourceRepository(
         } else {
             runtime.unload(sourceId)
         }
-        return store.setEnabled(sourceId, enabled)
+        return try {
+            store.setEnabled(sourceId, enabled)
+        } catch (failure: Exception) {
+            withContext(NonCancellable) { restore(stored, sourceId) }
+            throw failure
+        }
     }
 
     override suspend fun uninstall(sourceId: SourceId): Boolean {
@@ -147,7 +154,7 @@ class DefaultSourceRepository(
 
     /** Puts the runtime back to the state storage still describes after a failed write. */
     private suspend fun restore(previous: StoredSource?, sourceId: SourceId) {
-        if (previous == null) {
+        if (previous == null || !previous.installed.enabled) {
             runtime.unload(sourceId)
         } else {
             runtime.install(previous.toPackage())
