@@ -41,6 +41,8 @@ S0-06 在 `:feature:reader` 内引入 `PageImageDecoder` 抽象，实现两种�
 
 Coil 若按 S1-05 引入，其职责限定为：网络获取、内存/磁盘缓存、跨页面占位与变换；超长图的区域解码仍由自有解码器接管，Coil 不作为超长图的解码路径。此约束在 S1-05 生效时同步更新本 ADR。
 
+> **S1-05 已生效（2026-09-21）：Coil 3.4.0 已按上述职责引入，解码代码已迁往 `:core:image`。** 详见第 7 节。
+
 ### 2.2 位图不进入 UI 状态
 
 - `ReaderUiState`、SavedStateHandle、数据库均不持有 `Bitmap`。
@@ -116,10 +118,10 @@ decodedBytes = width * height * 4           （ARGB_8888）
 
 负面与代价：
 
-- 原型阶段解码代码位于 `:feature:reader`，与 ADR-0001 的“图片管线属于 core”不一致；S1-05 建立 `:core:image` 时必须迁移，本 ADR 记录该债务。
+- 原型阶段解码代码位于 `:feature:reader`，与 ADR-0001 的“图片管线属于 core”不一致；S1-05 建立 `:core:image` 时必须迁移，本 ADR 记录该债务。**该债务已在 S1-05 解除（第 7 节）。**
 - 中等缩放区间会放弃部分清晰度（最多约 1.41 倍放大），这是内存上界的代价；若设备实测显示该区间观感不可接受，需要在本 ADR 中改规则而不是改实现。
 - 翻页缩放时窗口随平移变化，首次实现没有瓦片缓存与超扫描复用，可能出现重复解码；解码耗时数据仍待设备验证。
-- 不引入 Coil 意味着原型阶段没有磁盘缓存，重复打开同一页会重复解码文件。
+- 不引入 Coil 意味着原型阶段没有磁盘缓存，重复打开同一页会重复解码文件。**已在 S1-05 解除。**
 - 解析记账用的是 ARGB_8888 上界；若后续启用硬件位图或 RGB_565，实际占用更低，但本 ADR 的阈值不做下调。
 
 ## 5. 替代方案
@@ -145,3 +147,45 @@ decodedBytes = width * height * 4           （ARGB_8888）
 
 采集入口已就绪：`LargeImageProbeTest` + `tools/test-images`，命令见 `docs/STATUS.md`。
 若实测与第 2.3 / 2.4 节冲突，先更新本 ADR 再改代码。
+
+## 7. S1-05 修订：引入 Coil 3.4.0，建立 `:core:image`
+
+- 状态：Accepted（2026-09-21）
+- 范围：本节只收紧第 2.1 节的“暂不引入 Coil”，其余阈值（24 MiB 预算、整页 `inSampleSize ≤ 2`、瓦片高度 ≤ 1.5 屏）与第 2.2 节的“位图不进入 UI 状态”**全部不变**。
+
+### 7.1 决策
+
+1. **引入 Coil 3.4.0**，只引入 `coil-core`、`coil-compose`、`coil-test` 三个产物。
+2. **Coil 的职责严格限定为网络获取、磁盘缓存与常规图（封面、缩略图）解码。** 漫画页的区域/分块解码仍由第 2.1 节的自有 `RegionPageImageDecoder` 承担，Coil 不作为超长图的解码路径。第 5 节“直接用 Coil `AsyncImage` 处理一切”的否决结论不变。
+3. **不引入 `coil-network-okhttp`。** 网络走 `:core:image` 自建的 `ComicImageFetcher` + `:core:network` 的共享 OkHttp，这样连接池、Dispatcher 与超时策略与全应用一致，也不必把 Header / Referer / Cookie / POST 语义塞进 Coil 的网络层。
+4. **解码代码从 `:feature:reader` 迁到 `:core:image`**，包名 `dev.veneranative.feature.reader.image` → `dev.veneranative.core.image`，类型名与公开签名不变，因此阅读器 UI 契约不受影响。第 4 节记录的架构债务就此解除。
+
+### 7.2 版本证据（不凭记忆）
+
+| 依赖 | 选择 | 依据 |
+| --- | --- | --- |
+| Coil | **3.4.0**，不是最新的 3.6.3 | Maven Central 上 `coil-compose` 的最新 release 是 3.6.3，但自 3.5.0 起 Coil 改用 **Kotlin 2.4.x** 编译（`coil-compose-3.5.0.pom` → `kotlin-stdlib 2.4.0`，3.6.3 → 2.4.10）。本项目 AGP 9.2.1 内置 Kotlin / KGP 为 **2.2.10**，读不了 2.4 的元数据。3.4.0 → `kotlin-stdlib 2.3.10`，落在已验证可读区间内（同一结论已在仓库内被 `quickjs-kt` 1.0.5 可用 / 1.0.6 不可用所印证）。 |
+| KSP | **2.3.10**，只在 `build-logic` 声明 | KSP 必须与 KGP 对齐，本项目 KGP 为 AGP 9.2.1 内置的 2.2.10。最初按该对齐关系选的 `2.2.10-2.0.2` 在本仓库**实测失败**：它通过 `kotlin.sourceSets` 注册生成目录，而 AGP 9 内置 Kotlin 只接受 `android.sourceSets`（google/ksp#2729）。2.3.10 在支持的 KGP 范围内（2.2.10–2.3.x）且已含该修复，冒烟编译通过；**KGP 不动，也未加任何 gradle.properties 开关**。 |
+
+若将来要把 KGP 提到 2.4 以换用 Coil 3.6.3，必须单独决策并连带评估 `quickjs-kt` 的锁定策略。
+
+### 7.3 缓存键与鉴权隔离
+
+自建 `ComicImageKeyer`：缓存键 = URL + Method + Body 摘要 + **响应相关 Header 的规范化集合** + 来源分区。`User-Agent`、`Accept-Language` 这类不影响响应的头不进键，否则缓存碎片化。Cookie **不存进请求模型**，而由 `ComicImageAuthProvider` 在“算键”与“取图”两个时刻同源解析，从根上杜绝跨鉴权复用缓存条目。
+
+已知限制：本设计只覆盖请求侧的允许列表，**不解析响应的 `Vary`**。真实源若大量依赖 `Vary`，可能出现缓存复用错误。该限制登记在 `docs/STATUS.md`；若后续命中，回来改 `ComicImageCacheKey` 而不是改调用方。
+
+### 7.4 后果
+
+正面：
+
+- 重复打开同一页不再重复下载，原型阶段“没有磁盘缓存”的代价解除。
+- 封面等常规图有了一条统一的、带缓存的渲染路径，feature 层不需要 import Coil。
+- 图片管线回到 `:core:*`，与 ADR-0001 一致。
+
+代价与新增风险：
+
+- 多一个第三方依赖，版本被工具链锁在 3.4.0（第 7.2 节）。
+- Coil 不承担超长图解码，因此 `PageImageDecoder` 家族仍需自行维护，两条路径并存。
+- 不解析 `Vary` 是明确接受的已知限制。
+- 页面尺寸解析依赖图片头部：JPEG / PNG / WebP / GIF 走纯 Kotlin 解析（JVM 可测），未知格式退回 `BitmapFactory.inJustDecodeBounds`。单页解析失败时**跳过该页**而不是让整章失败。

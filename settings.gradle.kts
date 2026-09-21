@@ -19,11 +19,14 @@ rootProject.name = "VeneraNative"
 
 include(
     ":app",
+    ":core:database",
     ":core:designsystem",
+    ":core:image",
     ":core:model",
     ":core:navigation",
     ":core:network",
     ":data:comic",
+    ":data:history",
     ":data:source",
     ":feature:details",
     ":feature:explore",

@@ -20,9 +20,15 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:image"))
+    implementation(project(":core:database"))
     implementation(project(":core:model"))
+    // Named directly because the assembly layer builds the shared OkHttp client that both the
+    // source calls and the comic image pipeline use.
+    implementation(project(":core:network"))
     implementation(project(":core:navigation"))
     implementation(project(":data:comic"))
+    implementation(project(":data:history"))
     implementation(project(":data:source"))
     implementation(project(":feature:details"))
     implementation(project(":feature:explore"))
@@ -45,5 +51,8 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
+    // The assembly layer builds the ImageLoader that `ComicImage` consumes through composition local,
+    // so it names Coil's Compose artifact even though it draws no images itself.
+    implementation(libs.coil.compose)
     debugImplementation(libs.compose.ui.tooling)
 }
