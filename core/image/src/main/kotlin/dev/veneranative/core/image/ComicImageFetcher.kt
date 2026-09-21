@@ -25,7 +25,7 @@ class ComicImageFetcher(
     override suspend fun fetch(): FetchResult? {
         val file = pipeline.cachedFileOf(request) ?: return null
         return SourceFetchResult(
-            source = ImageSource(file = file.file.toOkioPath(), fileSystem = options.fileSystem),
+            source = ImageSource(file = file.file.toOkioPath(), fileSystem = options.fileSystem, closeable = file),
             mimeType = file.mimeType,
             dataSource = DataSource.NETWORK,
         )

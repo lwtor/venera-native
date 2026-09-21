@@ -512,3 +512,5 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 当前执行表与验收：`docs/reviews/stage-01-remediation.md`。Q00 DONE；Q01 IN_PROGRESS；Q02–Q13 TODO。Stage 1 复验退出前不启动 S2-01。
 
 - Q01 DONE：修复正文有界读取与回调异常映射；新增短/空/边界、chunked 超限和读取异常回归。；验证见 STATUS 与整改台账。下一项 Q02 IN_PROGRESS。
+
+- Q02 DONE：修复缓存提交后的文件租约、网络取消与实际字节上限、表单编码、鉴权快照及共享 DiskCache；新增首次下载和缓存命中/请求语义回归。；验证见 STATUS 与整改台账。下一项 Q03 IN_PROGRESS。

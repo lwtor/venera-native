@@ -4,10 +4,14 @@ import dev.veneranative.core.model.ImageSize
 import java.io.File
 
 /** Image bytes that are on disk, ready to be decoded or header-parsed. */
-data class ComicImageFile(
+class ComicImageFile(
     val file: File,
     val mimeType: String?,
-)
+    private val release: () -> Unit = {},
+) : java.io.Closeable {
+    private val closed = java.util.concurrent.atomic.AtomicBoolean()
+    override fun close() { if (closed.compareAndSet(false, true)) release() }
+}
 
 /**
  * The comic image pipeline: everything a caller needs from an image before it is drawn.

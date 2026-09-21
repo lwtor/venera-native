@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
+import kotlinx.coroutines.sync.withLock
 
 /**
  * [ComicImagePipeline] over the app's shared OkHttp client and a Coil [DiskCache].
@@ -31,53 +32,71 @@ class CoilComicImagePipeline(
     private val headerBytes: Int = DEFAULT_HEADER_BYTES,
 ) : ComicImagePipeline {
 
-    override suspend fun cachedFileOf(request: ComicImageRequest): ComicImageFile? = withContext(Dispatchers.IO) {
-        val key = keyOf(request)
-        readSnapshot(key)?.let { return@withContext it }
-        download(request, key)
-    }
+    private val locks = Array(32) { kotlinx.coroutines.sync.Mutex() }
 
-    override suspend fun sizeOf(request: ComicImageRequest): ImageSize? = withContext(Dispatchers.IO) {
-        val file = cachedFileOf(request) ?: return@withContext null
-        headerParserSizeOf(file) ?: boundsSizeOf(file.file)
-    }
-
-    private fun keyOf(request: ComicImageRequest): String =
-        ComicImageCacheKey.of(request, auth.headersFor(request.sourceId, request.url))
-
-    private fun readSnapshot(key: String): ComicImageFile? {
-        val snapshot = diskCache.openSnapshot(key) ?: return null
-        return try {
-            ComicImageFile(file = File(snapshot.data.toString()), mimeType = null)
-        } finally {
-            snapshot.close()
-        }
-    }
-
-    private fun download(request: ComicImageRequest, key: String): ComicImageFile? {
-        val call = client.newCall(httpRequest(request) ?: return null)
-        val response = try {
-            call.execute()
-        } catch (_: IOException) {
-            return null
-        }
-        return response.use { executed ->
-            if (!executed.isSuccessful) return null
-            val body = executed.body ?: return null
-            val length = body.contentLength()
-            if (length > maxBytes) return null
-            val editor = diskCache.openEditor(key) ?: return null
-            val mimeType = executed.header("Content-Type")
-            try {
-                diskCache.fileSystem.sink(editor.data).buffer().use { sink ->
-                    body.source().use { source -> sink.writeAll(source) }
+    override suspend fun cachedFileOf(request: ComicImageRequest): ComicImageFile? {
+        // Freeze authentication once: key and HTTP must describe the exact same identity.
+        val headers = auth.headersFor(request.sourceId, request.url).toMap()
+        val key = ComicImageCacheKey.of(request, headers)
+        var acquired: ComicImageFile? = null
+        try {
+            return withContext(Dispatchers.IO) {
+                locks[(key.hashCode() and Int.MAX_VALUE) % locks.size].withLock {
+                    (readSnapshot(key) ?: download(request, headers, key)).also { acquired = it }
                 }
-                editor.commit()
-            } catch (failure: IOException) {
-                editor.abort()
-                return null
             }
-            ComicImageFile(file = File(editor.data.toString()), mimeType = mimeType)
+        } catch (failure: kotlinx.coroutines.CancellationException) {
+            acquired?.close()
+            throw failure
+        } catch (_: IOException) { return null }
+    }
+
+    override suspend fun sizeOf(request: ComicImageRequest): ImageSize? =
+        cachedFileOf(request)?.use { file ->
+            withContext(Dispatchers.IO) { headerParserSizeOf(file) ?: boundsSizeOf(file.file) }
+        }
+
+    private fun readSnapshot(key: String): ComicImageFile? = diskCache.openSnapshot(key)?.asFile()
+
+    private fun DiskCache.Snapshot.asFile(mimeType: String? = null): ComicImageFile =
+        ComicImageFile(File(data.toString()), mimeType) { close() }
+
+    private suspend fun download(request: ComicImageRequest, headers: Map<String, String>, key: String): ComicImageFile? {
+        val http = httpRequest(request, headers) ?: return null
+        return kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+            val call = client.newCall(http)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: IOException) {
+                    if (continuation.isActive) continuation.resumeWith(Result.success(null))
+                }
+                override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
+                    val file = try { response.use { executed ->
+                        if (!executed.isSuccessful || executed.body.contentLength() > maxBytes) return@use null
+                        val editor = diskCache.openEditor(key) ?: return@use null
+                        var committed = false
+                        try {
+                            diskCache.fileSystem.sink(editor.data).buffer().use { sink ->
+                                val source = executed.body.source()
+                                val buffer = okio.Buffer()
+                                var total = 0L
+                                while (true) {
+                                    val count = source.read(buffer, minOf(8192L, maxBytes - total + 1))
+                                    if (count == -1L) break
+                                    total += count
+                                    if (total > maxBytes) throw IOException("Image exceeds byte limit")
+                                    sink.write(buffer, count)
+                                }
+                            }
+                            if (call.isCanceled()) throw IOException("Cancelled")
+                            val snapshot = editor.commitAndOpenSnapshot()
+                            committed = true
+                            snapshot?.asFile(executed.header("Content-Type"))
+                        } finally { if (!committed) editor.abort() }
+                    } } catch (_: IOException) { null }
+                    continuation.resume(file) { _, value, _ -> value?.close() }
+                }
+            })
         }
     }
 
@@ -110,10 +129,10 @@ class CoilComicImagePipeline(
      * broken strings). That is a bad page, not a broken chapter, so it is reported as unresolvable
      * instead of thrown.
      */
-    private fun httpRequest(request: ComicImageRequest): Request? {
+    private fun httpRequest(request: ComicImageRequest, authHeaders: Map<String, String>): Request? {
         val url = request.url.toHttpUrlOrNull() ?: return null
         val headers = request.headers +
-            auth.headersFor(request.sourceId, request.url) +
+            authHeaders +
             (request.referer?.let { referer -> mapOf("Referer" to referer) } ?: emptyMap())
         val builder = Request.Builder().url(url)
         headers.forEach { (name, value) -> builder.header(name, value) }
@@ -127,10 +146,9 @@ class CoilComicImagePipeline(
     private fun ComicImageBody?.toRequestBody(): RequestBody = when (this) {
         null -> EMPTY_BODY
         is ComicImageBody.Bytes -> content.toRequestBody(contentType?.toMediaTypeOrNull())
-        is ComicImageBody.Form -> fields.entries
-            .sortedBy { (name, _) -> name }
-            .joinToString(separator = "&") { (name, value) -> "$name=$value" }
-            .toRequestBody(FORM_CONTENT_TYPE.toMediaTypeOrNull())
+        is ComicImageBody.Form -> okhttp3.FormBody.Builder().apply {
+            fields.toSortedMap().forEach { (name, value) -> add(name, value) }
+        }.build()
     }
 
     private companion object {

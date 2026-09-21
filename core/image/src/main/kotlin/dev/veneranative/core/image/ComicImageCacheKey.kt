@@ -63,10 +63,11 @@ internal object ComicImageCacheKey {
         is ComicImageBody.Bytes ->
             ("bytes|${body.contentType.orEmpty()}|").toByteArray(Charsets.UTF_8) + body.content
 
-        is ComicImageBody.Form -> body.fields.entries
-            .sortedBy { (name, _) -> name }
-            .joinToString(separator = "&", prefix = "form|") { (name, value) -> "$name=$value" }
-            .toByteArray(Charsets.UTF_8)
+        is ComicImageBody.Form -> okio.Buffer().also { buffer ->
+            okhttp3.FormBody.Builder().apply {
+                body.fields.toSortedMap().forEach { (name, value) -> add(name, value) }
+            }.build().writeTo(buffer)
+        }.readByteArray()
     }
 
     private fun sha256Hex(bytes: ByteArray): String {

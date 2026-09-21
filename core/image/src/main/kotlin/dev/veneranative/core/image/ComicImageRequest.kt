@@ -20,7 +20,7 @@ sealed interface ComicImageBody {
  *
  * Everything that can change the response is part of the value: method, body, headers, referer and
  * the source partition. Cookies are **not** stored here: they are resolved through
- * [ComicImageAuthProvider] at both cache-key time and fetch time, so the two can never disagree and
+ * [ComicImageAuthProvider] once per pipeline operation, so its disk key and HTTP request agree and
  * one identity can never be served another identity's cached image.
  */
 data class ComicImageRequest(

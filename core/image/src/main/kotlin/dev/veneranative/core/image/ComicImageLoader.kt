@@ -23,6 +23,9 @@ fun comicImageLoader(
         add(ComicImageKeyer(auth))
         add(ComicImageFetcher.Factory(pipeline))
     }
+    // Authentication may change between a Coil key lookup and fetch. Keep bytes in the
+    // authenticated disk pipeline until immutable request identities support memory caching.
+    .memoryCache(null)
     .diskCache(diskCache)
     .build()
 

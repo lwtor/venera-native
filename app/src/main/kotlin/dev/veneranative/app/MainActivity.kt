@@ -127,9 +127,10 @@ private fun App(
     val authProvider: ComicImageAuthProvider = remember(cookieJars) {
         SourceCookieImageAuth(cookieJars)
     }
-    val imagePipeline = remember(httpClient, context) { CoilComicImagePipeline(httpClient, comicImageDiskCache(context), authProvider) }
+    val diskCache = remember(context) { comicImageDiskCache(context) }
+    val imagePipeline = remember(httpClient, context) { CoilComicImagePipeline(httpClient, diskCache, authProvider) }
     val imageLoader = remember(context, authProvider, imagePipeline) {
-        comicImageLoader(context, authProvider, imagePipeline)
+        comicImageLoader(context, authProvider, imagePipeline, diskCache)
     }
 
     // One runtime serves the whole app: sources are loaded into it, and both the repository and the

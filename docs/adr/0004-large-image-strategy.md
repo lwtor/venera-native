@@ -189,3 +189,7 @@ decodedBytes = width * height * 4           （ARGB_8888）
 - Coil 不承担超长图解码，因此 `PageImageDecoder` 家族仍需自行维护，两条路径并存。
 - 不解析 `Vary` 是明确接受的已知限制。
 - 页面尺寸解析依赖图片头部：JPEG / PNG / WebP / GIF 走纯 Kotlin 解析（JVM 可测），未知格式退回 `BitmapFactory.inJustDecodeBounds`。单页解析失败时**跳过该页**而不是让整章失败。
+
+## 8. 质量整改：图片文件所有权（2026-09-22）
+
+网络缓存返回 Closeable 文件租约，尺寸探测与正文解码在租约内完成，Coil Fetcher 将租约交给 ImageSource。下载使用同一份鉴权快照生成缓存键和请求，网络取消下传 Call.cancel，未知长度也按实际字节限制，POST 表单用 FormBody 编码。App 的 pipeline 与 ImageLoader 共享同一个 DiskCache。当前关闭 Coil 解码内存缓存，避免可变鉴权在 Keyer 与 Fetcher 之间变动造成错配；鉴权隔离磁盘缓存继续生效。恢复内存缓存须先建立不可变鉴权请求身份并补回归。
