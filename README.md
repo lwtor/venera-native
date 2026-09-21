@@ -6,9 +6,13 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-**Stage 0（技术验证）已完成，正在执行 Stage 1（核心阅读闭环）**。已完成的切片：S1-01 稳定领域模型与
-Source Core 协议、S1-02 来源包安装与管理、S1-03 探索与搜索、S1-04 漫画详情与章节。当前任务以
-[`docs/STATUS.md`](docs/STATUS.md) 的“当前唯一执行任务”为准，本文件不再重复任务编号。
+**Stage 0（技术验证）已完成，Stage 1（核心阅读闭环）已完成**。Stage 1 全部切片均已交付：S1-01 稳定领域模型
+与 Source Core 协议、S1-02 来源包安装与管理、S1-03 探索与搜索、S1-04 漫画详情与章节、S1-05 Coil 漫画图片
+管线、S1-06 Room 历史与阅读进度、S1-07 核心闭环集成。
+
+端到端可完成的动作：安装仓库内测试源 → 探索或搜索 → 打开详情选章 → 经真实图片管线进入阅读器 →
+退出后重新进入恢复阅读进度 → 来源错误有可恢复 UI。人工验证脚本与其未执行的说明记录在
+[`docs/STATUS.md`](docs/STATUS.md)。
 
 Stage 1 的两项前置决策已经落地：[ADR-0007](docs/adr/0007-source-protocol-compatibility.md) 划定
 承诺兼容的源协议子集，[ADR-0008](docs/adr/0008-async-host-transport.md) 决定用自有引擎替代
@@ -41,11 +45,14 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 
 ```text
 :app
+:core:database
 :core:designsystem
+:core:image
 :core:model
 :core:navigation
 :core:network
 :data:comic
+:data:history
 :data:source
 :feature:details
 :feature:explore
@@ -65,11 +72,13 @@ S1-03 需要类型安全导航契约时重建，见 `docs/ARCHITECTURE.md` 第 3
 ## 技术基线
 
 - Android Gradle Plugin 9.2.1 + Gradle 9.4.1
-- AGP 内置 Kotlin + JDK 17
+- AGP 内置 Kotlin（KGP 2.2.10）+ JDK 17
+- KSP 2.3.10（不得降级到 2.2.10：会与 AGP 内置 Kotlin 冲突，见 `docs/STATUS.md`）
 - compileSdk / targetSdk 37，minSdk 26
 - Jetpack Compose + Material 3
 - Navigation 3
-- AndroidX JavaScriptEngine
+- Coil 3.4.0（不引 `coil-network-okhttp`，网络走共享 OkHttp）
+- Room 2.8.5
 - Gradle Kotlin DSL + Version Catalog + Convention Plugins
 
 ## 构建

@@ -120,7 +120,9 @@ git diff --check
 
 即使处于关键节点，也只执行计划明确要求的验证，不擅自增加重复验证。耗时验证开始前应确认它对当前交付确有必要。无法执行的关键验证在 `docs/STATUS.md` 记录原因和风险，不得写成“已验证”。
 
-## 8. 完成任务后的文档协议
+## 8. 完成任务后的文档与提交协议
+
+### 8.1 文档协议
 
 每个任务完成后必须：
 
@@ -133,6 +135,37 @@ git diff --check
 3. 架构决策发生变化时新增或更新 `docs/adr/`，不得只留在聊天或提交信息里。
 4. 模块、构建方式或入口改变时更新 `README.md` 和 `docs/ARCHITECTURE.md`。
 5. 确保工作区只包含本任务相关修改。
+
+### 8.2 提交协议（每个小任务都必须 commit）
+
+**一个任务做完就 commit，不允许攒到多个任务或整个 Stage 结束再统一提交。**
+
+攒到最后再交的代价已经在实践中付过：几十个文件混在一起，其中还夹带了协作过程中不经意的
+`git add`、工具自动生成的文件和临时探测改动的残留，事后要重新分辨哪些该进哪些不该进，
+既慢又容易漏掉本该剔除的东西。
+
+提交时必须：
+
+1. **粒度是任务，不是 Stage。** 一个 commit 对应一个可独立理解的任务：
+   `feat(history): persist reading progress with throttled writes` 是对的，
+   `feat: finish Stage 1` 不是。
+2. **文档同步属于该任务的一部分**，和代码进同一个 commit，不要单独留到最后补。
+3. **提交前逐个确认 changes**，重点剔除：
+   - 本机绝对路径；
+   - IDE 与工具自动生成的文件（典型的如 `gradle/gradle-daemon-jvm.properties`、
+     `gradle.properties` 里的本机 SDK 路径、`local.properties`）；
+   - 仅为排查问题而加的临时改动与调试代码；
+   - 与当前任务无关的其他变更（它们要么先单独 commit，要么先 stash）。
+4. 提交前最低检查：
+
+   ```powershell
+   .\gradlew.bat :app:assembleDebug
+   git diff --check
+   ```
+
+5. **commit message 用 Conventional Commits**，说明是什么改动以及为什么，不要只重复文件名。
+
+推送到远程前再次确认 working tree 干净，并且没有把凭据或真实用户数据带进去。
 
 状态标记固定使用：
 

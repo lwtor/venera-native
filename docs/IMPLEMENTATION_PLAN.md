@@ -28,7 +28,7 @@
 | 阶段 | 目标 | 退出条件 | 状态 |
 | --- | --- | --- | --- |
 | Stage 0 | 验证 JS 漫画源和阅读器两项最高风险技术 | JavaScriptEngine 与大图方案形成有证据的 ADR | DONE（2026-09-20 退出） |
-| Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | IN_PROGRESS（S1-01 至 S1-04 已完成，S1-05 进行中） |
+| Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | DONE（S1-01 至 S1-07 全部完成；详见 docs/STATUS.md） |
 | Stage 2 | 完成书架、下载和本地阅读 | 离线可浏览书架并阅读下载或本地漫画 | TODO |
 | Stage 3 | 补齐来源扩展能力 | Core/Extended 协议测试通过，Advanced 有支持矩阵 | TODO |
 | Stage 4 | 同步、自适应、性能与发布 | RC 通过迁移、压力、无障碍与发布检查 | TODO |
@@ -371,11 +371,11 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 必须等图片管线解析尺寸，因此该项随 S1-05 完成；`:app` 目前仍用 fixture/占位 Provider。封面同理：
 槽位已按最终尺寸就位，像素渲染等 S1-05。两项缺口已记入 `docs/STATUS.md`。
 
-### S1-05 Coil 漫画图片管线 — TODO
+### S1-05 Coil 漫画图片管线 — DONE
 
 依赖：S0-06、S1-01。
 
-计划模块：`:core:image` 或在实际复用边界明确后命名。
+新增模块：`:core:image`（改动模块：`:core:model`、`:data:comic`、`:feature:details`、`:feature:reader`、`:app`、构建配置）。
 
 交付物：
 
@@ -384,7 +384,36 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - Header、Referer、Cookie、POST 图片的测试。
 - 鉴权不同的请求不会错误复用缓存。
 
-### S1-06 Room 历史与阅读进度 — TODO
+实际执行（2026-09-21）：
+
+- **Coil 锁 3.4.0**，只引 `coil-core` / `coil-compose` / `coil-test`，**不引 `coil-network-okhttp`**：
+  网络由 `:core:image` 自建 Fetcher 走 `:core:network` 的共享 OkHttp，连接池、Dispatcher 与超时
+  策略和全应用一致。3.5.0+ 用 Kotlin 2.4 编译，本项目 KGP 2.2.10 读不了（ADR-0004 §7.2）。
+- **`:core:image` 建立 + 解码代码迁移**：`PageTiling` / `PageImageDecoder` 家族与两个 JVM 测试
+  用 `git mv` 从 `:feature:reader` 迁入（包名改为 `dev.veneranative.core.image` 的 `tiling` /
+  `decode` 子包，类型名与签名不变），ADR-0004 记录的架构债务解除。
+- **缓存键**：URL + Method + Body 摘要 + 响应相关 Header 规范化集合 + 来源分区；Cookie 由
+  `ComicImageAuthProvider` 在算键与取图时同源解析，不存进请求模型。已登记已知限制：不解析响应
+  的 `Vary`。
+- **尺寸解析**：JPEG / PNG / WebP / GIF 走纯 Kotlin 头部解析（JVM 可测），未知格式退回
+  `BitmapFactory.inJustDecodeBounds`；单页解析失败**跳过该页**而不是让整章失败。
+- **契约下沉**：`PageProvider` / `ChapterContent` / `ImageSize` / `PageImageSizer` 进 `:core:model`
+  （`:core:model` 仍不碰 Android / Compose / 网络 / 数据库），`SourcePageProvider` 落在 `:data:comic`；
+  详情页封面换成 `ComicImage`。
+- **构建基础**：新增 `venera.android.room.library` 约定插件；KSP 升到 2.3.10 才与 AGP 9 内置
+  Kotlin 共存（KGP 保持 2.2.10，未加任何 flag），`AndroidRoomLibraryConventionPlugin` 已冒烟验证。
+- 测试：`ComicImageCacheKeyTest` 10 项、`ImageSizeHeaderParserTest` 9 项、
+  `SourcePageProviderTest` 5 项；迁移过来的 `PageTilingTest` 与 `PageDecodeBudgetTest` 各 9 项不变。
+  验证：`:app:assembleDebug` + 相关模块 `testDebugUnitTest` 全绿。
+
+未完成（留给 S1-07 集成，不提前实现）：
+
+- `:app` 装配 `ImageLoader` / `ComicImageAuthProvider`（Cookie 适配器）与 `SourcePageProvider`，
+  在此之前封面与阅读器仍走占位路径。
+- Header / Referer / Cookie / POST 的**端到端**验证（需设备或 MockWebServer），当前只有 JVM 侧的
+  键与请求构造覆盖。
+
+### S1-06 Room 历史与阅读进度 — DONE
 
 依赖：S1-01、S0-05。
 
@@ -400,7 +429,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - 进度节流保存，退出或进入后台强制落盘。
 - 恢复章节和页码。
 
-### S1-07 核心闭环集成 — TODO
+### S1-07 核心闭环集成 — DONE
 
 依赖：S1-02 至 S1-06。
 

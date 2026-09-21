@@ -39,14 +39,17 @@ immutable UiState
 | `:core:model` | 稳定领域 ID 与跨层模型 | 尽量只依赖 Kotlin |
 | `:data:source` | 来源包的安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
+| `:core:image` | 漫画图片管线：`ComicImageRequest` 与稳定缓存键、自建 Fetcher（走 `:core:network` 的共享 OkHttp）、Coil 磁盘缓存、图片头部尺寸解析、封面渲染的 `ComicImage`，以及从 `:feature:reader` 迁来的页面解码与分块 | `:core:model`、`:core:network`、Coil 3.4.0、Compose |
 | `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |
 | `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
+| `:core:database` | Room 持久化：`VeneraDatabase`、`ReadingHistoryEntity` / `ReadingProgressEntity` 与两个 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列，值对象在 `:data:history` 转换 | Room 2.8.5 |
+| `:data:history` | 阅读历史与恢复：`HistoryRepository` 契约、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与阅读器的入口 | Design System、领域契约 |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:data:comic`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
-| `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架，以及 S0-06 的解码策略原型（`PageImageDecoder`、有界缓存、缩放与分块） | Design System、`:core:model` |
+| `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架 | Design System、`:core:model`、`:core:image` |
 | `:feature:sources` | 来源列表：安装、启停、卸载，以及加载 / 空 / 失败 / 成功四种页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |
@@ -61,13 +64,19 @@ app 声明的依赖也没有被代码使用）。它们不属于废弃设计，�
 `:core:common` 会在出现第一个真实的 Result/错误聚合需求时重建，`:core:navigation`
 会在 S1-03 首次需要类型安全 Route 时重建。
 
-S0-06 的解码代码位于 `:feature:reader` 的 `image` 包，是**已知的临时位置**：它需要在 S1-05
-建立 `:core:image` 时迁移过去，迁移前 UI 契约（`PageImageDecoder`、`PageTile`）保持不变，
-理由与迁移条件记录在 ADR-0004。
+S1-05 已建立 `:core:image`，S0-06 的解码代码随之从 `:feature:reader` 的 `image` 包迁入
+（`dev.veneranative.feature.reader.image` → `dev.veneranative.core.image` 的 `tiling` / `decode`
+子包），**类型名与公开签名不变**，因此阅读器 UI 契约不受影响。ADR-0004 记录的这项架构债务已解除。
 
-`:feature:sources` 直接依赖 `:data:source` 的仓库契约（`SourceRepository`）。这是本阶段有意的取舍：
-在只有一个实现、且没有依赖注入框架的情况下，再把契约拆成一个只有接口的模块只是形式主义。
-出现第二个数据实现或引入 DI 时，把契约拆出去并让 Feature 只依赖契约。
+`:feature:sources` 直接依赖 `:data:source` 的仓库契约（`SourceRepository`），`:feature:reader` 直接依赖
+`:data:history` 的 `HistoryRepository`。这是本阶段有意的取舍：在只有一个实现、且没有依赖注入框架的情况下，
+再把契约拆成一个只有接口的模块只是形式主义。出现第二个数据实现或引入 DI 时，把契约拆出去并让 Feature
+只依赖契约。
+
+`:core:database` 刻意不依赖 `:core:model`：Room 实体若反向依赖领域模型，换一层值对象就要改数据库。
+代价是 `:data:history` 承担了全部实体↔领域转换，收益是持久化层保持纯 Schema。
+同理，`:core:image` 不依赖 `:source:network`，因此 per-source Cookie 由 `:app` 的 `SourceCookieImageAuth`
+适配成 `ComicImageAuthProvider` —— `:app` 是唯一允许同时看到两边的地方。
 
 ## 4. 目标依赖方向
 

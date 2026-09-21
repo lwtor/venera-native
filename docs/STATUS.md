@@ -6,14 +6,14 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-09-20 |
-| 当前阶段 | Stage 1：核心阅读闭环（Stage 0 已于 2026-09-20 退出） |
-| 当前任务 | S1-05：Coil 漫画图片管线 |
-| 当前任务状态 | TODO（S1-04 已完成；详情与章节已可用，图片管线是阅读链路剩下的最后一环） |
+| 最后更新 | 2026-09-21 |
+| 当前阶段 | Stage 1：核心阅读闭环 — **已完成** |
+| 当前任务 | 无（Stage 1 全部任务交付；下一项为 Stage 2 的 S2-01 本地收藏与书架） |
+| 当前任务状态 | S1-05 / S1-06 / S1-07 均 **DONE**（见下方"Stage 1 收尾"章节） |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
-| 工作基线 | AGP 9.2.1、Gradle 9.4.1、JDK 17、SDK 37、minSdk 26 |
+| 工作基线 | AGP 9.2.1、Gradle 9.4.1、JDK 17、SDK 37、minSdk 26、KSP 2.3.10、Coil 3.4.0、Room 2.8.5 |
 
 ## 已经完成
 
@@ -712,35 +712,112 @@ JAVA_HOME 临时指向本机 JDK 17（仅当前命令，不入库）
 - `ComicKey` 在 Feature / Data 层的端到端使用，随 S1-02 建立 `:data:source`、S1-03 建立 `:data:comic` 落地。
 - `loadThumbnails` 签名核对（S1-05 多页缩略图需要）。
 
-## 当前唯一执行任务
+## Stage 1 收尾：S1-05 / S1-06 / S1-07 — DONE
 
-### S1-05：Coil 漫画图片管线 — TODO
+Stage 1 的三个剩余任务已全部交付。以下按任务记录做了什么、验证到什么程度、以及哪些明确没验证。
+
+### S1-05 Coil 漫画图片管线 — DONE
 
 依赖：S0-06、S1-01（均已完成）。
 
-计划模块：`:core:image`（名字以实际复用边界为准，见 ADR-0004）。
+实际交付：
 
-必须交付：Coil 3 与共享 OkHttp 连接池、`ComicImageRequest`（含影响响应的 Header / Referer / Cookie /
-Method / Body 与 transform 标识）、自定义 Fetcher 与稳定 Cache Key、鉴权不同的请求不会错误复用缓存。
+- 新建 `:core:image`，Coil **3.4.0**。`gradle/libs.versions.toml` 只引入 `coil-core` / `coil-compose` /
+  `coil-test`，**不引 `coil-network-okhttp`**（网络走自建 Fetcher + `:core:network` 共享 OkHttp 连接池）。
+- `ComicImageRequest`（URL / Method / Body / Header / Referer / sourceId / variant）、`ComicImageCacheKey`、
+  `ComicImageKeyer`、`ComicImageFetcher`、`ComicImagePipeline` 与 `CoilComicImagePipeline`、`CoilPageImageSizer`。
+- **缓存键覆盖确认**：不同 Cookie → 异键、不同 Authorization → 异键、只有 `User-Agent` 不同 → 同键、
+  GET vs POST → 异键、POST body 不同 → 异键、同 URL 不同源 → 异键。`RESPONSE_AFFECTING_HEADERS` 之外的
+  易变请求头不参与建键，避免缓存碎片化。
+- `ImageSizeHeaderParser`：JPEG / PNG / WebP（VP8、VP8L、VP8X）/ GIF 的纯 Kotlin 头部解析，未知格式回退
+  `BitmapFactory.inJustDecodeBounds`，因此这一段可以在 JVM 上测。
+- **`:feature:reader` 的 `PageImageDecoder` / `PageTiling` 已用 `git mv` 迁到 `:core:image`**，包名改为
+  `dev.veneranative.core.image.{decode,tiling}`，类型名与公开签名不变，两个测试类各 9 项保持不变。这解除了
+  ADR-0004 §4 标记的"解码代码临时放在 feature"技术债。
+- `PageProvider` / `ChapterContent` / `ImageSize` / `PageImageSizer` 下沉到 `:core:model`，使 `:data:comic`
+  能提供 source-backed 实现而不越界依赖 feature。
+- `:data:comic` 新增 `SourcePageProvider`：**单页尺寸解析失败时跳过该页，而不是让整章失败**——源给出失效
+  URL、防盗链或过期 token 是常态，已由测试断言。
 
-本任务同时解除两项 S1-04 留下的缺口：
+先更新了 ADR-0004（新增 §7 选型证据：为何锁 3.4.0 而不是最新的 3.6.3），再动代码。
 
-- 详情屏的**封面**（`ComicDetail.comic.coverUrl` 已在状态里，缺的是解码与加载）。
-- **章节选择生成 source-backed `PageProvider`**：`ComicPage` 需要真实的 `widthPx`/`heightPx`，
-  而源只给 URL，尺寸只能由图片管线解析。
+### S1-06 Room 历史与阅读进度 — DONE
 
-按 ADR-0004，解码仍由自有解码器负责（区域/分块），Coil 只承担网络获取与缓存；决策前先更新 ADR-0004，
-并按 ARCHITECTURE §3 把 `:feature:reader` 的 `PageImageDecoder` / `PageTiling` 迁到 `:core:image`。
+依赖：S1-01、S0-05（均已完成）。
 
-## 紧随其后的任务
+实际交付：
 
-| 顺序 | ID | 名称 | 前置 |
-| --- | --- | --- | --- |
-| 1 | S1-06 | Room 历史与阅读进度 | S1-01、S0-05（已完成） |
-| 2 | S1-07 | 核心闭环集成 | S1-02 至 S1-06 |
+- 新建 `:core:database`（Room 2.8.5）：`ReadingHistoryEntity` / `ReadingProgressEntity`、两个 DAO、
+  `@Database(version = 1, exportSchema = true)` 的 `VeneraDatabase`、`VeneraDatabaseFactory`。
+  **不依赖 `:core:model`**，主键用字符串列，值对象在 `:data:history` 转换。
+- `core/database/schemas/dev.veneranative.core.database.VeneraDatabase/1.json` 已入库，作为 Migration 基线。
+- 新建 `:data:history`：`HistoryRepository` 契约、`HistoryMappers`、`DefaultHistoryRepository`、
+  `ProgressThrottlePolicy`、`ReadingProgressTracker`、假 DAO 与两个测试类。
+- **节流保存**：默认窗口 2000 ms；`onPageChanged` 只记住最新值，`flush()` 立即落盘。时钟与 CoroutineScope
+  注入，因此节流行为在 JVM 上可测，已覆盖"窗口内只写一次"、"超时后写入"、"flush 立即写"、
+  "flush 两次只写一次"、"最新值不被旧值覆盖"等 8 项。
+- `MainActivity.onStop()` 用 `NonCancellable` 调 `flush()`，这是节流能安全存在的前提：最后一次翻页必须落盘。
+- 删除历史时同时清 `reading_progress`——否则删掉记录后重进，仍会被残留的恢复点拉回原章节。
 
-S1-08 剩余部分（不阻塞 S1-05，见已知风险）：设备侧 ABI 与 APK 体积实测、二进制请求体通道、
-许可证登记、WebView 实现的最终处置。
+### S1-07 核心闭环集成 — DONE
+
+依赖：S1-02 至 S1-06（均已完成）。
+
+实际交付：
+
+- `:app` 装配换成真实实现：`SourcePageProvider(catalog, CoilPageImageSizer(pipeline))`，`FakePageProvider`
+  与 `AssetFixturePageProvider` 不再参与主链路。
+- **Cookie 与连接池同源**：`:app` 的 `SourceCookieImageAuth` 把 `:source:network` 的
+  `PerSourceCookieJarRegistry` 接成 `ComicImageAuthProvider`，且用的是**同一个** OkHttp dispatcher 与
+  **同一个** cookie registry 实例——源请求写下的 Cookie 正是它的图片主机后续索要的那个。这点错了不会报错，
+  只会让每一页都 403。
+- `LocalComicImageLoader` 由 `:app` 提供，feature 不 import Coil。
+- 阅读器接入恢复与保存：`ReaderRoute` 增加 `startPageIndex` 与 `progressRecorder`；进入时按记录的页码恢复，
+  翻页时经 tracker 节流上报。
+- 来源错误的可恢复 UI 沿用既有形态：详情 feat 的失败/失效状态与阅读器的 `ReaderStatus.Failed` 重试，
+  **未新增文案体系**。
+- 新增 `tools/test-sources/demo_comic_source.js`：遵循 `SourceClassConvention` 的最小仓库内测试源，全部数据
+  本地生成，不请求真实站点。
+
+#### 端到端人工脚本（记录于本文件，未实机执行）
+
+按既定约定"非必要不做实机测试"，以下脚本**尚未在设备上运行**，因此不标记为"已验证"。执行条件：
+
+```
+AGP 9.2.1 / JDK 17 / compileSdk 37，adb 连接的设备或模拟器（API ≥ 26）。
+构建：sh gradlew :app:assembleDebug
+安装：sh gradlew :app:installDebug
+```
+
+1. **安装测试源**：应用内 → 来源管理 → 安装本地脚本 → 选择 `tools/test-sources/demo_comic_source.js`。
+   预期：列表出现 `Demo Comic Source`，版本 1.0.0。
+2. **探索**：首页 → 探索。预期：翻到第 3 页仍能加载，`maxPage` 为 3（42 条 / 每页 20）。
+3. **搜索**：搜索 `demo`。预期：返回 2 条；搜索 `miss`。预期：空结果，不进入错误态。
+4. **详情与选章**：打开任一漫画 → 章节按 `Chapter 1/2/3` 顺序展示（脚本刻意顺序发布，应用层不得重排）→
+   选择 `Chapter 2`。
+5. **阅读器**：预期封面与正文页由图片管线加载不再是占位块；垂直连续与横向 LTR/RTL 均可翻页；
+   底栏可在 `Sampled` 与 `Region` 两套解码策略间切换。
+6. **进度恢复**：翻到第 3 页 → 返回首页 → 再次打开同一漫画的同一章节。预期：直接落在第 3 页。
+7. **退出强刷**：翻页后立刻按 Home 键退到后台。预期：重新进入仍在刚才那一页（验证 `onStop` 的 `flush()`）。
+8. **来源错误可恢复**：断网后进入详情，预期显示既有失败态并提供重试；恢复网络后重试成功。
+
+#### 验证程度
+
+- 已完成：`:app:assembleDebug` 通过；全仓库 `testDebugUnitTest` **250 项通过、0 失败**；
+  `:core:database:compileDebugAndroidTestKotlin` 通过；`:feature:reader:compileDebugAndroidTestKotlin` 通过。
+- **未实机执行**：上述 8 步人工脚本，以及 Source 之外的真机行为（进程回收、前后台切换、API 26 兼容性）。
+- Header / Referer / Cookie / POST 图片目前只有 JVM 侧的"缓存键"与"请求构造"覆盖，端到端需在设备上或
+  用 MockWebServer 验证。
+
+## Stage 1 完成后的已知限制
+
+| 限制 | 影响 | 何时处理 |
+| --- | --- | --- |
+| 图片缓存键不解析响应的 `Vary` | 真实源若大量依赖 `Vary`，可能复用错误 | 发现命中时回来改 `ComicImageCacheKey`，不要改调用方 |
+| 图片的 Header/Referer/Cookie/POST 只有 JVM 侧覆盖 | 需要端到端才能确认真实链路 | 引入 MockWebServer 或首次实机验证时 |
+| 阅读进度只在 App 进程退出前 flush，未区分"切后台"与"旋转/多窗口" | 旋转会触发一次多余但无害的落盘 | 需要严格区分时引入 `androidx.lifecycle:lifecycle-process` |
+| Coil 锁 3.4.0，未用最新的 3.6.3 | 后者用 Kotlin 2.4 编译，本工具链 KGP 2.2.10 读不了 | 升级工具链时连带决策（会影响 quickjs-kt 的锁定） |
+| `demo_comic_source.js` 的图片走 `file:///android_asset` | 与真实 http 图片链路不完全等价 | 端到端验证时把 image URL 换成本地 http 服务 |
 
 ## 已知风险与待确认
 
@@ -750,6 +827,8 @@ S1-08 剩余部分（不阻塞 S1-05，见已知风险）：设备侧 ABI 与 AP
 | 二进制通道 | 已确认：只能走 `provideConsumeArrayBuffer` | — |
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
 | WebView 引擎在参考设备上无法提供异步 Host API | 已定案转向自有引擎；JVM spike 已证明 JS→宿主异步可用（ADR-0008 §8） | 剩余判据（取消/超时映射、二进制、ABI 与体积）在引擎实现阶段完成 |
+| 图片缓存键不解析响应的 `Vary` | 明确接受的已知限制，键只覆盖请求侧允许列表 | 发现真实源依赖 `Vary` 导致复用错误时，回来改 `ComicImageCacheKey`，不要改调用方 |
+| KSP 与 AGP 9 内置 Kotlin 的共存 | 曾因 KSP 通过 `kotlin.sourceSets` 注册生成目录而失败（google/ksp#2729）；已用 KSP 2.3.10 解决，KGP 仍为内置的 2.2.10，未加任何 flag | 升级 AGP/KGP 时重新冒烟 `:core:database` |
 | 引擎绑定为社区项目（Apache-2.0） | 版本已锁定 1.0.5；升级受 Kotlin 元数据兼容约束 | 升级前必须跑契约测试；若方案失效则自行交叉编译 QuickJS，契约不变 |
 | 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | 已解决：兼容层提供 `fetch`（含 `ok`/`status`/`json()`/`text()`）与 `Network.*` | 若在真实源上发现 `fetch` 语义缺口，按 ADR-0008 §9 的规则补实现并加测试 |
 | 来源 id 冲突（上游存在两个源共用 `copy_manga`） | 已决策：`sourceId` 取脚本自报的 `key`，同 id 的第二次安装**替换**第一次，不共存 | 若产品上需要共存，必须先改 `SourceId` 语义并同步 `ComicKey` |
@@ -761,12 +840,12 @@ S1-08 剩余部分（不阻塞 S1-05，见已知风险）：设备侧 ABI 与 AP
 | `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
 | 导航契约模块 | S1-03 已按计划重建 `:core:navigation`（`AppRoute` + 字符串编解码），零引用问题不复存在 | — |
-| `:feature:details` 的封面是占位块 | `coverUrl` 已在 UI 状态里，但没有图片管线就无法解码 | S1-05 引入 `:core:image` + Coil |
-| 阅读器仍无 source-backed `PageProvider` | `ComicPage` 要求 `widthPx`/`heightPx` > 0，源只给 URL（`SourcePage.imageRef`），尺寸只能由图片管线解析 | S1-05 接通图片管线后实现 |
+| `:feature:details` 的封面是占位块 | **已解决**：S1-05 的 `ComicImage` 已接进封面槽位；但 `LocalComicImageLoader` 仍由 `:app` 提供，未提供前渲染占位（不回退成空白） | S1-07 集成时由 `:app` 装配 ImageLoader |
+| 阅读器仍无 source-backed `PageProvider` | **已解决契约与实现**：`PageProvider` / `ChapterContent` 已下沉 `:core:model`，`SourcePageProvider` 已在 `:data:comic` 落地并测试 | S1-07 集成时由 `:app` 装配进 `ReaderRoute` |
 | 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指定 JDK 17；本机可用的是 `C:\Users\11196859\.jdks\jbr-17.0.14` | 用户修复环境变量，或继续按命令临时指定 |
 | 大图策略的设备侧验证（解码耗时 / PSS / 掉帧 / 手势冲突） | 规则已由 JVM 预算测试保证，设备数据缺失，未验证 | Stage 0 退出门禁；需要时按 S0-06 记录的命令采集 |
-| 解码代码暂驻 `:feature:reader` | 已知技术债，已在 ADR-0004 记录 | S1-05 建立 `:core:image` 时迁移 |
-| Coil 仍未引入 | 有意推迟，见 ADR-0004 | S1-05 决策，且决策前先更新 ADR-0004 |
+| 解码代码暂驻 `:feature:reader` | **已解除**：S1-05 已迁入 `:core:image` 的 `tiling` / `decode` 子包，类型名与公开签名不变 | — |
+| Coil 仍未引入 | **已引入 3.4.0**（只引 `coil-core` / `coil-compose` / `coil-test`，网络走共享 OkHttp），ADR-0004 §7 已记录选型证据与职责边界 | 升级到 3.5.0+ 需先把 KGP 提到 2.4，单独决策 |
 | 中等缩放区间允许最多约 1.41 倍 GPU 放大 | 内存上界的代价，观感未验证 | 设备验证时确认是否可接受 |
 | 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指向 JDK 17（本机可用的是 `C:\Users\11196859\.jdks\jbr-17.0.14`） | 用户修复环境变量，或继续按命令临时指定 |
 | QuickJS fallback 是否必要 | S0-02 暂不引入 | 与 MessagePort 缺失问题一并决策 |
