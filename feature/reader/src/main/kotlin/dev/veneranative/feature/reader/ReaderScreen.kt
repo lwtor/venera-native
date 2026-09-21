@@ -48,16 +48,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
+import dev.veneranative.core.image.decode.PageImageDecoder
+import dev.veneranative.core.image.tiling.DecodeStrategy
+import dev.veneranative.core.image.tiling.DecodedPageImage
+import dev.veneranative.core.image.tiling.PageDecodeRequest
+import dev.veneranative.core.image.tiling.PageRegion
+import dev.veneranative.core.image.tiling.PageTile
+import dev.veneranative.core.image.tiling.PageTiling
+import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
-import dev.veneranative.feature.reader.image.DecodeStrategy
-import dev.veneranative.feature.reader.image.DecodedPageImage
-import dev.veneranative.feature.reader.image.PageDecodeRequest
-import dev.veneranative.feature.reader.image.PageImageDecoder
-import dev.veneranative.feature.reader.image.PageRegion
-import dev.veneranative.feature.reader.image.PageTile
-import dev.veneranative.feature.reader.image.PageTiling
-import dev.veneranative.feature.reader.image.PageViewport
 import kotlin.math.roundToInt
+
 
 /** How far panning may travel in continuous mode, expressed in screens of content. */
 private const val PAN_HEIGHT_SCREENS = 4f

@@ -1,7 +1,9 @@
 package dev.veneranative.feature.reader
 
+import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId

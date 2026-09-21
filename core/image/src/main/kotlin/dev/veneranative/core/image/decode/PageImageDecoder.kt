@@ -1,5 +1,10 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.decode
 
+import dev.veneranative.core.image.tiling.DecodeStrategy
+import dev.veneranative.core.image.tiling.DecodedPageImage
+import dev.veneranative.core.image.tiling.PageDecodeRequest
+import dev.veneranative.core.image.tiling.PageTile
+import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
 import java.io.Closeable
 

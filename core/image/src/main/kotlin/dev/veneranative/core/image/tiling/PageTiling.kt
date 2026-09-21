@@ -1,4 +1,4 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.tiling
 
 import kotlin.math.ceil
 import kotlin.math.roundToInt

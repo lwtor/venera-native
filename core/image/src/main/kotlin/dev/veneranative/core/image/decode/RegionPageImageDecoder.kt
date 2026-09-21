@@ -1,9 +1,15 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.decode
 
 import android.graphics.BitmapFactory
 import android.graphics.BitmapRegionDecoder
 import android.graphics.Rect
 import android.os.SystemClock
+import dev.veneranative.core.image.tiling.DecodeStrategy
+import dev.veneranative.core.image.tiling.DecodedPageImage
+import dev.veneranative.core.image.tiling.PageDecodeRequest
+import dev.veneranative.core.image.tiling.PageTile
+import dev.veneranative.core.image.tiling.PageTiling
+import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

@@ -1,4 +1,4 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.tiling
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

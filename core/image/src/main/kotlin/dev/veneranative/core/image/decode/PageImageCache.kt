@@ -1,4 +1,4 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.decode
 
 import android.graphics.Bitmap
 

@@ -7,7 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import dev.veneranative.feature.reader.image.PageViewport
+import dev.veneranative.core.image.tiling.PageViewport
+
 
 /**
  * Pan and zoom state of the reader viewport.

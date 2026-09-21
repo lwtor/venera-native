@@ -1,4 +1,7 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.decode
+
+import dev.veneranative.core.image.tiling.DecodedPageImage
+import dev.veneranative.core.image.tiling.PageDecodeRequest
 
 /**
  * Caches decode results so scrolling back and forth does not re-decode, and so the S0-06 probe can

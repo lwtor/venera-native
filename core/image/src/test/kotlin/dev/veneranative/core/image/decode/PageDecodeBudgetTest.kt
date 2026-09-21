@@ -1,5 +1,7 @@
-package dev.veneranative.feature.reader.image
+package dev.veneranative.core.image.decode
 
+import dev.veneranative.core.image.tiling.PageTiling
+import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

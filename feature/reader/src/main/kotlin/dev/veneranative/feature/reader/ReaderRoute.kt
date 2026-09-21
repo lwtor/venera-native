@@ -5,9 +5,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.veneranative.core.image.decode.PageImageDecoder
+import dev.veneranative.core.image.tiling.DecodeStrategy
 import dev.veneranative.core.model.ChapterKey
-import dev.veneranative.feature.reader.image.DecodeStrategy
-import dev.veneranative.feature.reader.image.PageImageDecoder
+import dev.veneranative.core.model.PageProvider
+
 
 /**
  * Entry point of the reader: owns the ViewModel, collects state and connects navigation back.
@@ -23,11 +25,20 @@ fun ReaderRoute(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
+    /** Where to open a resumed chapter; ignored when it falls outside the loaded pages. */
+    startPageIndex: Int = 0,
+    /** Throttled persistence seam; null keeps the reader read-only, which is what previews want. */
+    progressRecorder: ReaderViewModel.ChapterPageRecorder? = null,
 ) {
     val viewModelKey =
         "${chapter.comicKey.sourceId.value}:${chapter.comicKey.remoteId.value}:${chapter.remoteId.value}"
     val viewModel: ReaderViewModel = viewModel(key = viewModelKey) {
-        ReaderViewModel(chapter = chapter, provider = provider)
+        ReaderViewModel(
+            chapter = chapter,
+            provider = provider,
+            startPageIndex = startPageIndex,
+            recorder = progressRecorder,
+        )
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     ReaderScreen(

@@ -9,6 +9,8 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
+    // The reader renders pages with the decoders that now live in `:core:image`.
+    implementation(project(":core:image"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)

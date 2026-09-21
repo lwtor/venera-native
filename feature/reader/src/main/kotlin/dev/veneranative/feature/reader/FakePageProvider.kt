@@ -1,8 +1,11 @@
 package dev.veneranative.feature.reader
 
+import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.model.PageProvider
 import kotlinx.coroutines.delay
+
 
 /**
  * Deterministic in-memory provider used by previews, the demo entry point and tests.
