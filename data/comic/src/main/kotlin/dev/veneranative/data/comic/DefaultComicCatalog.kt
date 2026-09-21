@@ -1,6 +1,7 @@
 package dev.veneranative.data.comic
 
 import androidx.paging.PagingSource
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -9,6 +10,7 @@ import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.SourcePage
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.source.api.SearchRequest
@@ -36,6 +38,9 @@ class DefaultComicCatalog(
         core.capabilities(sourceId)
 
     override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> = core.detail(comicKey)
+
+    override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
+        core.pages(chapterKey)
 
     /**
      * Resolved from the installed list rather than from the runtime: a source that was uninstalled or

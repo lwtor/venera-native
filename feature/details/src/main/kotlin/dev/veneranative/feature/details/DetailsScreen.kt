@@ -27,12 +27,17 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.veneranative.core.image.ComicImageRequest
+import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.SourceId
+
 
 /**
  * Stateless details screen: renders [state] and sends [onAction].
@@ -157,7 +162,7 @@ private fun Content(
 private fun Header(state: DetailsUiState) {
     val comic = state.detail?.comic ?: return
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Cover(title = comic.title)
+        Cover(title = comic.title, coverUrl = comic.coverUrl, sourceId = comic.key.sourceId)
 
         Column(
             modifier = Modifier.weight(1f),
@@ -202,30 +207,60 @@ private fun Header(state: DetailsUiState) {
 }
 
 /**
- * The cover slot at its final size.
+ * The cover slot at its final size, rendered by the image pipeline.
  *
- * A cover is a URL, and turning one into pixels is the image pipeline's job (`:core:image` with Coil,
- * S1-05). Until that exists the slot shows the title rather than pretending to load something.
+ * A cover is a URL that may need the source's headers, so it goes through `ComicImage` rather than
+ * through a plain image composable: the request carries the source id, which is what lets the auth
+ * provider attach that source's cookies. When the source gave no cover — or the assembly layer has
+ * not provided an image loader — the slot still shows the title instead of an empty box.
  */
 @Composable
-private fun Cover(title: String) {
+private fun Cover(
+    title: String,
+    coverUrl: String?,
+    sourceId: SourceId,
+) {
     Surface(
         modifier = Modifier.size(width = 96.dp, height = 144.dp),
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceVariant,
     ) {
-        Box(
-            modifier = Modifier.padding(8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall,
-                textAlign = TextAlign.Center,
-                maxLines = 4,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        CoverPlaceholder(title = title, coverUrl = coverUrl, sourceId = sourceId)
+    }
+}
+
+@Composable
+private fun CoverPlaceholder(
+    title: String,
+    coverUrl: String?,
+    sourceId: SourceId,
+) {
+    if (coverUrl == null) {
+        CoverTitle(title = title)
+        return
+    }
+    ComicImage(
+        request = ComicImageRequest(url = coverUrl, sourceId = sourceId, variant = COVER_VARIANT),
+        contentDescription = title,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.Crop,
+        placeholder = { CoverTitle(title = title) },
+    )
+}
+
+@Composable
+private fun CoverTitle(title: String) {
+    Box(
+        modifier = Modifier.padding(8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center,
+            maxLines = 4,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -322,3 +357,6 @@ private fun ChapterOrder.label(): String = when (this) {
 }
 
 internal const val DETAILS_LOADING_TAG = "details-loading"
+
+/** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
+private const val COVER_VARIANT = "cover"

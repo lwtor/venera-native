@@ -1,6 +1,7 @@
 package dev.veneranative.feature.details
 
 import androidx.paging.PagingSource
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -10,6 +11,7 @@ import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.SourcePage
 import dev.veneranative.core.model.chaptersOf
 import dev.veneranative.core.model.groupedChaptersOf
 import dev.veneranative.data.comic.ComicCatalog
@@ -220,6 +222,9 @@ class DetailsViewModelTest {
 
         override suspend fun enabledSource(sourceId: SourceId): InstalledSource? =
             source?.takeIf { it.sourceId == sourceId }
+
+        override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
+            error("not used by the details screen")
 
         override fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem> =
             error("not used by the details screen")

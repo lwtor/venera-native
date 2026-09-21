@@ -2,6 +2,8 @@ package dev.veneranative.feature.explore
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import dev.veneranative.core.model.SourcePage
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -175,6 +177,9 @@ class ExploreViewModelTest {
 
         override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
             error("not used by the explore screen")
+
+        override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
+            error("not used by this screen")
 
         override suspend fun enabledSource(sourceId: SourceId): InstalledSource? = null
 

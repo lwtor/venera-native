@@ -1,6 +1,7 @@
 package dev.veneranative.data.comic
 
 import androidx.paging.PagingSource
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -9,6 +10,7 @@ import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.PageCursor
 import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.SourcePage
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
@@ -40,6 +42,15 @@ interface ComicCatalog {
      * refreshes the chapter list too rather than asking the source twice for the same response.
      */
     suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail>
+
+    /**
+     * Page references of a chapter, in the order the source listed them.
+     *
+     * A reference is a URL, not a sized descriptor: sources do not report dimensions, so the caller
+     * resolves the real size through the image pipeline (`:core:image`) before it can build
+     * `ComicPage`s.
+     */
+    suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>>
 
     /**
      * The installed source behind [sourceId], or null when it is gone or switched off.

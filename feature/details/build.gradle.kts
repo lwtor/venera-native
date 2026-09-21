@@ -8,6 +8,7 @@ android {
 
 dependencies {
     implementation(project(":core:designsystem"))
+    implementation(project(":core:image"))
     implementation(project(":core:model"))
     implementation(project(":data:comic"))
     implementation(project(":source:api"))

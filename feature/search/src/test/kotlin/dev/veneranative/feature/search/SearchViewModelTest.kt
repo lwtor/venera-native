@@ -2,6 +2,8 @@ package dev.veneranative.feature.search
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import dev.veneranative.core.model.SourcePage
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -186,6 +188,9 @@ class SearchViewModelTest {
 
         override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
             error("not used by the search screen")
+
+        override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
+            error("not used by this screen")
 
         override suspend fun enabledSource(sourceId: SourceId): InstalledSource? = null
 
