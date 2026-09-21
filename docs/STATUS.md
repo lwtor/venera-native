@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-22 |
 | 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q01 HTTP 有界读取与异常收尾 |
-| 当前任务状态 | Q00 审查规则 DONE；Q01 IN_PROGRESS；S1-07 重新打开，Stage 2 暂停 |
+| 当前任务 | Q02（详见质量整改台账） |
+| 当前任务状态 | Q01 DONE；Q02 IN_PROGRESS；Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -20,6 +20,8 @@
 审查基线 `cbfb8ea`，发现及切片见 `docs/reviews/stage-01-remediation.md`。下方历史 DONE 是当时记录，不覆盖本次重新打开的验收。
 
 - Q00：新增 Stage 必须审查、修复、复验后退出的规则；完善逐任务提交、暂存检查与用户修改保护。验证：纯文档，`git diff --check`。
+
+- Q01：修复正文有界读取与回调异常映射；新增短/空/边界、chunked 超限和读取异常回归。 验证：`:source:network:testDebugUnitTest :app:assembleDebug` — PASS。
 
 ## 已经完成
 

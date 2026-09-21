@@ -16,6 +16,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okio.Buffer
 
 class SourceNetworkExecutor(
     private val baseClient: OkHttpClient = AppHttpClientFactory.create(),
@@ -90,7 +91,7 @@ class SourceNetworkExecutor(
                     }
 
                     override fun onResponse(call: Call, response: Response) {
-                        val result =
+                        val result = try {
                             response.use {
                                 val body = response.body
                                 if (body.contentLength() > maxResponseBytes) {
@@ -98,7 +99,13 @@ class SourceNetworkExecutor(
                                         SourceNetworkError.ResponseTooLarge(maxResponseBytes),
                                     )
                                 } else {
-                                    val bytes = body.source().readByteArray(maxResponseBytes + 1)
+                                    val buffer = Buffer()
+                                    val source = body.source()
+                                    while (buffer.size <= maxResponseBytes) {
+                                        val read = source.read(buffer, minOf(8192L, maxResponseBytes - buffer.size + 1))
+                                        if (read == -1L) break
+                                    }
+                                    val bytes = buffer.readByteArray()
                                     if (bytes.size > maxResponseBytes) {
                                         SourceHttpResult.Failure(
                                             SourceNetworkError.ResponseTooLarge(maxResponseBytes),
@@ -114,6 +121,10 @@ class SourceNetworkExecutor(
                                     }
                                 }
                             }
+                        } catch (failure: IOException) {
+                            onFailure(call, failure)
+                            return
+                        }
                         if (continuation.isActive) continuation.resume(result)
                     }
                 },
