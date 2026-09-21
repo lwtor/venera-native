@@ -6,14 +6,20 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-09-21 |
-| 当前阶段 | Stage 1：核心阅读闭环 — **已完成** |
-| 当前任务 | 无（Stage 1 全部任务交付；下一项为 Stage 2 的 S2-01 本地收藏与书架） |
-| 当前任务状态 | S1-05 / S1-06 / S1-07 均 **DONE**（见下方"Stage 1 收尾"章节） |
+| 最后更新 | 2026-09-22 |
+| 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
+| 当前任务 | Q01 HTTP 有界读取与异常收尾 |
+| 当前任务状态 | Q00 审查规则 DONE；Q01 IN_PROGRESS；S1-07 重新打开，Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
 | 工作基线 | AGP 9.2.1、Gradle 9.4.1、JDK 17、SDK 37、minSdk 26、KSP 2.3.10、Coil 3.4.0、Room 2.8.5 |
+
+## 质量整改（2026-09-22）
+
+审查基线 `cbfb8ea`，发现及切片见 `docs/reviews/stage-01-remediation.md`。下方历史 DONE 是当时记录，不覆盖本次重新打开的验收。
+
+- Q00：新增 Stage 必须审查、修复、复验后退出的规则；完善逐任务提交、暂存检查与用户修改保护。验证：纯文档，`git diff --check`。
 
 ## 已经完成
 

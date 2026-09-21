@@ -155,7 +155,7 @@ git diff --check
    - IDE 与工具自动生成的文件（典型的如 `gradle/gradle-daemon-jvm.properties`、
      `gradle.properties` 里的本机 SDK 路径、`local.properties`）；
    - 仅为排查问题而加的临时改动与调试代码；
-   - 与当前任务无关的其他变更（它们要么先单独 commit，要么先 stash）。
+   - 与当前任务无关的其他变更：保留用户已有修改，不得自行 commit、stash、删除或重置它们。
 4. 提交前最低检查：
 
    ```powershell
@@ -163,7 +163,9 @@ git diff --check
    git diff --check
    ```
 
-5. **commit message 用 Conventional Commits**，说明是什么改动以及为什么，不要只重复文件名。
+5. 暂存后检查 `git diff --cached` 与 `git diff --cached --check`；编译必须覆盖将提交的完整切片，不得依赖未提交文件。完成当前子任务的代码、测试、文档后立即提交，再开始下一子任务。完成报告包含 commit hash；commit 不代表自动 push。
+6. 小任务必须有稳定编号、明确验收项，依赖完整且可独立编译。只读审查不制造空提交；纯文档任务可记录“不涉及编译”，执行差异检查。Unix 编译命令为 `sh gradlew :app:assembleDebug`。
+7. **commit message 用 Conventional Commits**，说明是什么改动以及为什么，不要只重复文件名。
 
 推送到远程前再次确认 working tree 干净，并且没有把凭据或真实用户数据带进去。
 
@@ -175,6 +177,17 @@ git diff --check
 - `DONE`：交付物和验收项全部完成
 
 同一时刻原则上只有一个 `IN_PROGRESS` 任务。
+
+### 8.3 Stage 质量审查（必须执行）
+
+每个 Stage 实现完成后，由负责质量审查的 Agent（Codex）逐项对照实施计划、代码、测试及实际验证证据。阶段退出前必须：
+
+1. 在 `docs/reviews/` 保存带基线、验收矩阵、发现、验证命令及剩余风险的审查记录。
+2. 对发现的问题建立小任务，先补可复现测试，修复并复验，每项完成立即 commit。
+3. 验证跨模块用户闭环，不能把单元测试数量、编译成功或仅存在人工脚本当作闭环通过。
+4. 发现阻断当前验收的问题时保持 Stage `IN_PROGRESS`，不得推进下一 Stage；外部阻塞记录具体解除条件。
+5. 已接受的延期验证必须有明确归属、原因和风险，不能记为通过；范围变化同步 STATUS、计划及 ADR。
+6. 审查与修复后的结论一致、规定门禁满足后，才将 Stage 标为 `DONE`。后续阶段重复同一流程。
 
 ## 9. Definition of Done
 
