@@ -109,12 +109,12 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     init {
         scope.launch {
             val db = VeneraDatabaseFactory.get(context)
-            val repository = DefaultHistoryRepository(db.readingHistoryDao(), db.readingProgressDao())
+            val repository = DefaultHistoryRepository(db)
             progressTracker.set(ReadingProgressTracker(repository, scope, clock = { System.currentTimeMillis() }))
             _history.value = repository
         }
     }
-    fun flushProgress() { scope.launch { progressTracker.get()?.flush() } }
+    fun flushProgress() { scope.launch { runCatching { progressTracker.get()?.flush() } } }
     override fun onCleared() {
         scope.launch(NonCancellable) {
             try { progressTracker.get()?.flush() } finally {

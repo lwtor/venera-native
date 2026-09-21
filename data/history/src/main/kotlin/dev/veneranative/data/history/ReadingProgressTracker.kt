@@ -1,62 +1,69 @@
 package dev.veneranative.data.history
 
+import dev.veneranative.core.model.ComicKey
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
-/**
- * Keeps the database from being written on every page turn.
- *
- * Reading a comic means dozens of page events per minute, and none of them are worth a transaction
- * on their own: what matters is the last one, and even that can wait for the next window. So
- * [onPageChanged] only remembers the newest value and [flush] is what guarantees it survives — the
- * app calls it when the reader is left or the process goes to the background, and nothing can be
- * lost in between because the pending value stays in memory until something writes it.
- *
- * The clock and the scope are injected so the throttle is testable on the JVM.
- */
+/** Coalesces each comic independently; a failed write remains pending for the next flush. */
 class ReadingProgressTracker(
     private val repository: HistoryRepository,
     private val scope: CoroutineScope,
     private val clock: () -> Long,
     private val throttleMillis: Long = DEFAULT_THROTTLE_MILLIS,
 ) {
-
-    private val policy = ProgressThrottlePolicy(throttleMillis)
-    private val pending = AtomicReference<ReadingHistoryEntry?>()
-    private val lastWriteAt = AtomicReference<Long?>()
     private val lock = Any()
+    private val writer = Mutex()
+    private val pending = linkedMapOf<ComicKey, ReadingHistoryEntry>()
+    private var lastWriteAt: Long? = null
+    private var scheduled: Job? = null
+    private val _writeFailed = MutableStateFlow(false)
+    val writeFailed: StateFlow<Boolean> = _writeFailed
 
-    fun onPageChanged(entry: ReadingHistoryEntry) {
-        val writeNow = synchronized(lock) {
-            pending.set(entry)
-            val now = clock()
-            if (policy.shouldWrite(now, lastWriteAt.get())) {
-                lastWriteAt.set(now)
-                true
-            } else {
-                false
+    fun onPageChanged(entry: ReadingHistoryEntry) = synchronized(lock) {
+        pending[entry.comicKey] = entry
+        if (scheduled?.isActive != true) {
+            scheduled = scope.launch {
+                try {
+                    while (true) {
+                        val wait = synchronized(lock) {
+                            if (pending.isEmpty()) { scheduled = null; return@launch }
+                            lastWriteAt?.let { (throttleMillis - (clock() - it)).coerceAtLeast(0) } ?: 0
+                        }
+                        delay(wait)
+                        flush()
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) {
+                    synchronized(lock) { scheduled = null }
+                    _writeFailed.value = true
+                }
             }
         }
-        if (writeNow) scheduleWrite()
     }
 
-    /** Writes whatever is pending immediately. Used when the reader is being left. */
-    suspend fun flush() {
-        val snapshot = synchronized(lock) { pending.getAndSet(null) }
-        if (snapshot != null) {
-            lastWriteAt.set(clock())
-            repository.record(snapshot)
+    /** Serialized with scheduled writes; values are removed only after a successful transaction. */
+    suspend fun flush() = writer.withLock {
+        val snapshot = synchronized(lock) { pending.values.toList() }
+        for (entry in snapshot) {
+            try { repository.record(entry) }
+            catch (failure: Exception) {
+                _writeFailed.value = true
+                throw failure
+            }
+            synchronized(lock) {
+                if (pending[entry.comicKey] === entry) pending.remove(entry.comicKey)
+                lastWriteAt = clock()
+            }
         }
+        _writeFailed.value = false
     }
 
-    private fun scheduleWrite(): Job = scope.launch {
-        val snapshot = synchronized(lock) { pending.getAndSet(null) }
-        if (snapshot != null) repository.record(snapshot)
-    }
-
-    companion object {
-        const val DEFAULT_THROTTLE_MILLIS: Long = 2000L
-    }
+    companion object { const val DEFAULT_THROTTLE_MILLIS: Long = 2000L }
 }

@@ -1,5 +1,7 @@
 package dev.veneranative.data.history
 
+import androidx.room.withTransaction
+import dev.veneranative.core.database.VeneraDatabase
 import dev.veneranative.core.database.ReadingHistoryDao
 import dev.veneranative.core.database.ReadingProgressDao
 import dev.veneranative.core.model.ComicKey
@@ -17,10 +19,15 @@ import kotlinx.coroutines.flow.map
  * newer than that one" is something the caller knows and a second clock would only overwrite it —
  * including across processes, where a restored session's older timestamp must stay older.
  */
-class DefaultHistoryRepository(
+class DefaultHistoryRepository internal constructor(
     private val historyDao: ReadingHistoryDao,
     private val progressDao: ReadingProgressDao,
+    private val transaction: suspend (suspend () -> Unit) -> Unit = { it() },
 ) : HistoryRepository {
+    constructor(database: VeneraDatabase) : this(
+        database.readingHistoryDao(), database.readingProgressDao(),
+        { operation -> database.withTransaction { operation() } },
+    )
 
     /**
      * Newest positions first, mapped to domain values.
@@ -33,8 +40,10 @@ class DefaultHistoryRepository(
         historyDao.observeRecent(limit).map { rows -> rows.mapNotNull { it.toDomainOrNull() } }
 
     override suspend fun record(entry: ReadingHistoryEntry) {
-        historyDao.upsert(entry.toEntity())
-        progressDao.upsert(entry.toProgressEntity())
+        transaction {
+            historyDao.upsert(entry.toEntity())
+            progressDao.upsert(entry.toProgressEntity())
+        }
     }
 
     override suspend fun progress(comicKey: ComicKey): ReadingProgress? =
@@ -44,7 +53,9 @@ class DefaultHistoryRepository(
     override suspend fun remove(comicKey: ComicKey) {
         val sourceId = comicKey.sourceId.value
         val comicId = comicKey.remoteId.value
-        historyDao.delete(sourceId, comicId)
-        progressDao.delete(sourceId, comicId)
+        transaction {
+            historyDao.delete(sourceId, comicId)
+            progressDao.delete(sourceId, comicId)
+        }
     }
 }
