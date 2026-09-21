@@ -8,19 +8,7 @@ import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.SourcePage
 import dev.veneranative.source.api.SourceOutcome
 
-/**
- * Pages of a chapter as the source describes them.
- *
- * A source answers with image references and nothing else, while `ComicPage` needs a size, so every
- * reference is measured through the [PageImageSizer] before it becomes a descriptor. That seam is
- * also why this provider can live in the data layer: it depends on `:core:model` contracts, not on
- * the image implementation.
- *
- * **A page whose size cannot be resolved is skipped, not failed.** Sources hand out dead URLs, hotlink
- * protected hosts and expired tokens all the time, and one bad page must not make a whole chapter
- * unreadable. When a source itself cannot answer at all, the failure is thrown as
- * [SourceLoadException] so the reader keeps its retry path.
- */
+/** Loads chapter references immediately; dimensions and image bytes are resolved per visible page. */
 class SourcePageProvider(
     private val catalog: ComicCatalog,
     private val sizer: PageImageSizer,
@@ -33,17 +21,20 @@ class SourcePageProvider(
             is SourceOutcome.Success -> outcome.value
             is SourceOutcome.Failure -> throw SourceLoadException(outcome.error)
         }
-        val pages = references.mapNotNull { reference -> pageOf(reference, chapter) }
+        val pages = references.mapIndexed { index, reference ->
+            ComicPage(index, reference.imageRef, 1080, 1440, chapter.comicKey.sourceId,
+                dev.veneranative.core.model.PageSizeState.Pending)
+        }
         return ChapterContent(title = chapterTitle(chapter), pages = pages)
     }
 
-    private suspend fun pageOf(reference: SourcePage, chapter: ChapterKey): ComicPage? {
-        val size = sizer.sizeOf(reference.imageRef, chapter.comicKey.sourceId) ?: return null
-        return ComicPage(
-            index = reference.index,
-            imageRef = reference.imageRef,
-            widthPx = size.widthPx,
-            heightPx = size.heightPx,
-        )
+    override suspend fun resolve(page: ComicPage): ComicPage {
+        val sourceId = requireNotNull(page.sourceId)
+        val size = sizer.sizeOf(page.imageRef, sourceId)
+            ?: throw java.io.IOException("Page image unavailable")
+        return page.copy(widthPx = size.widthPx, heightPx = size.heightPx,
+            sizeState = dev.veneranative.core.model.PageSizeState.Ready)
     }
+
+    override suspend fun prefetch(page: ComicPage) { resolve(page) }
 }

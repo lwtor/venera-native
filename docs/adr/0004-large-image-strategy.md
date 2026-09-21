@@ -193,3 +193,7 @@ decodedBytes = width * height * 4           （ARGB_8888）
 ## 8. 质量整改：图片文件所有权（2026-09-22）
 
 网络缓存返回 Closeable 文件租约，尺寸探测与正文解码在租约内完成，Coil Fetcher 将租约交给 ImageSource。下载使用同一份鉴权快照生成缓存键和请求，网络取消下传 Call.cancel，未知长度也按实际字节限制，POST 表单用 FormBody 编码。App 的 pipeline 与 ImageLoader 共享同一个 DiskCache。当前关闭 Coil 解码内存缓存，避免可变鉴权在 Keyer 与 Fetcher 之间变动造成错配；鉴权隔离磁盘缓存继续生效。恢复内存缓存须先建立不可变鉴权请求身份并补回归。
+
+## 9. 按需页面解析（2026-09-22）
+
+章节先返回完整稳定页号与估计尺寸，PageProvider.resolve 只解析可见页邻域。失败页保留位置并显示独立重试，不再丢弃或伪装成空章节。ComicPage 携带 sourceId 与尺寸状态；图片层的 PipelinePageImageDecoder 将网络引用解析成租约内本地路径，再调用现有解码器，Feature 不实现网络。此节替代第 7.4 节“跳过坏页”的规则。

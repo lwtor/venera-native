@@ -11,6 +11,8 @@ data class ComicPage(
     val imageRef: String,
     val widthPx: Int,
     val heightPx: Int,
+    val sourceId: SourceId? = null,
+    val sizeState: PageSizeState = PageSizeState.Ready,
 ) {
     init {
         require(index >= 0) { "index must be >= 0" }
@@ -21,3 +23,6 @@ data class ComicPage(
     /** Width divided by height, used to reserve space before the image is decoded. */
     val aspectRatio: Float get() = widthPx.toFloat() / heightPx.toFloat()
 }
+
+/** Unknown sizes use a layout estimate until the visible neighbourhood is resolved. */
+enum class PageSizeState { Pending, Ready, Failed }

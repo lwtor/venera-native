@@ -54,6 +54,7 @@ data class PageTile(
 /** A single decode request. Every request carries a target size: no request may decode at full size. */
 data class PageDecodeRequest(
     val path: String,
+    val sourceId: dev.veneranative.core.model.SourceId? = null,
     val targetWidthPx: Int,
     val targetHeightPx: Int,
     /** Null means "the whole page", which only the sampled strategy uses. */

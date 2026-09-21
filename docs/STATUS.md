@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-22 |
 | 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q03（详见质量整改台账） |
-| 当前任务状态 | Q02 DONE；Q03 IN_PROGRESS；Stage 2 暂停 |
+| 当前任务 | Q04（详见质量整改台账） |
+| 当前任务状态 | Q03 DONE；Q04 IN_PROGRESS；Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -24,6 +24,8 @@
 - Q01：修复正文有界读取与回调异常映射；新增短/空/边界、chunked 超限和读取异常回归。 验证：`:source:network:testDebugUnitTest :app:assembleDebug` — PASS。
 
 - Q02：修复缓存提交后的文件租约、网络取消与实际字节上限、表单编码、鉴权快照及共享 DiskCache；新增首次下载和缓存命中/请求语义回归。 验证：`:core:image:testDebugUnitTest :app:assembleDebug` — PASS。
+
+- Q03：保留稳定页索引，按邻近页面解析尺寸并支持失败重试；解码器通过带租约的认证缓存文件读取正文 验证：`:core:image:testDebugUnitTest :data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 ## 已经完成
 

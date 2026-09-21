@@ -242,6 +242,7 @@ private fun ContinuousPages(
                 item = item,
                 decoder = decoder,
                 modifier = Modifier.padding(vertical = 4.dp),
+                onRetry = { onAction(ReaderAction.RetryPage(item.page.index)) },
             )
         }
     }
@@ -274,7 +275,8 @@ private fun SinglePagePager(
                 decoder = null,
             )
         } else {
-            ZoomablePage(page = state.pages[index], viewport = viewport, decoder = decoder)
+            ZoomablePage(page = state.pages[index], viewport = viewport, decoder = decoder,
+                onRetry = { onAction(ReaderAction.RetryPage(index)) })
         }
     }
 }
@@ -288,6 +290,7 @@ private fun ZoomablePage(
     page: ComicPage,
     viewport: PageViewport,
     decoder: PageImageDecoder,
+    onRetry: () -> Unit,
 ) {
     val zoomState = rememberReaderZoomState()
     val scale = PageTiling.containScale(page.widthPx, page.heightPx, viewport) * zoomState.scale
@@ -316,6 +319,7 @@ private fun ZoomablePage(
         PageTile(
             item = TileItem(page, 0, tile),
             decoder = decoder,
+            onRetry = onRetry,
             modifier = Modifier.offset {
                 IntOffset(
                     x = (baseXPx + tile.contentOffsetXPx).roundToInt(),
@@ -338,6 +342,7 @@ private fun PageTile(
     item: TileItem,
     decoder: PageImageDecoder?,
     modifier: Modifier = Modifier,
+    onRetry: () -> Unit = {},
 ) {
     val density = LocalDensity.current
     val tile = item.tile
@@ -359,11 +364,22 @@ private fun PageTile(
         return
     }
 
-    val imageState by produceState<PageImageState?>(initialValue = null, tile, decoder) {
+    if (item.page.sizeState != dev.veneranative.core.model.PageSizeState.Ready) {
+        Box(modifier = boxModifier, contentAlignment = Alignment.Center) {
+            if (item.page.sizeState == dev.veneranative.core.model.PageSizeState.Failed) {
+                Button(onClick = onRetry) { Text("Retry page ${item.page.index + 1}") }
+            } else CircularProgressIndicator()
+        }
+        return
+    }
+    var retryGeneration by remember(item.page.imageRef) { mutableStateOf(0) }
+    val imageState by produceState<PageImageState?>(initialValue = null, item.page, tile, decoder, retryGeneration) {
+        value = null
         value = try {
             val decoded = decoder.decode(
                 PageDecodeRequest(
                     path = item.page.imageRef,
+                    sourceId = item.page.sourceId,
                     targetWidthPx = tile.displayWidthPx,
                     targetHeightPx = tile.displayHeightPx,
                     region = tile.region,
@@ -371,6 +387,8 @@ private fun PageTile(
                 ),
             )
             PageImageState.Decoded(decoded)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (_: OutOfMemoryError) {
             PageImageState.OutOfMemory
         } catch (_: Exception) {
@@ -382,10 +400,7 @@ private fun PageTile(
         when (val current = imageState) {
             null -> CircularProgressIndicator()
 
-            PageImageState.Failed -> Text(
-                text = "Page image unavailable",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            PageImageState.Failed -> Button(onClick = { retryGeneration++ }) { Text("Retry page ${item.page.index + 1}") }
 
             PageImageState.OutOfMemory -> Text(
                 text = "Page image is too large to decode",

@@ -158,8 +158,8 @@ private fun App(
     val provider: PageProvider = remember(catalog, imagePipeline) {
         SourcePageProvider(catalog = catalog, sizer = CoilPageImageSizer(imagePipeline))
     }
-    val decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = remember(imageCache) {
-        { strategy -> decoderFor(strategy, imageCache) }
+    val decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = remember(imageCache, imagePipeline) {
+        { strategy -> dev.veneranative.core.image.decode.PipelinePageImageDecoder(imagePipeline, decoderFor(strategy, imageCache)) }
     }
 
     // Room is opened asynchronously, so reading stays available before it: history precision is not

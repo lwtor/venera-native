@@ -23,6 +23,9 @@ interface PageProvider {
 
     suspend fun loadChapter(chapter: ChapterKey): ChapterContent
 
+    /** Resolve one page on demand without changing its stable position in the chapter. */
+    suspend fun resolve(page: ComicPage): ComicPage = page
+
     /** Warm-up for a page that is about to become visible. Default is a no-op. */
     suspend fun prefetch(page: ComicPage) = Unit
 }

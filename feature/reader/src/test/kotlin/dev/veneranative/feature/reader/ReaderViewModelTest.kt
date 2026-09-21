@@ -127,6 +127,33 @@ class ReaderViewModelTest {
         assertEquals(ReadingDirection.RightToLeft, viewModel.state.value.direction)
     }
 
+    @Test
+    fun `only the neighbourhood resolves and a failed page keeps its index until retry`() = runTest(dispatcher) {
+        val resolved = mutableListOf<Int>()
+        var fail = true
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterKey) = ChapterContent("Chapter", List(20) {
+                dev.veneranative.core.model.ComicPage(it, "https://image/$it", 1080, 1440,
+                    sizeState = dev.veneranative.core.model.PageSizeState.Pending)
+            })
+            override suspend fun resolve(page: dev.veneranative.core.model.ComicPage): dev.veneranative.core.model.ComicPage {
+                resolved += page.index
+                if (page.index == 1 && fail) throw java.io.IOException("offline")
+                return page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Ready)
+            }
+        }
+        val vm = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+        assertEquals(listOf(0, 1), resolved)
+        assertEquals(20, vm.state.value.pageCount)
+        assertEquals(dev.veneranative.core.model.PageSizeState.Failed, vm.state.value.pages[1].sizeState)
+        fail = false
+        vm.onAction(ReaderAction.RetryPage(1))
+        advanceUntilIdle()
+        assertEquals(dev.veneranative.core.model.PageSizeState.Ready, vm.state.value.pages[1].sizeState)
+        assertEquals((0 until 20).toList(), vm.state.value.pages.map { it.index })
+    }
+
     private class FailingPageProvider : PageProvider {
         override suspend fun loadChapter(chapter: ChapterKey): ChapterContent =
             throw IllegalStateException("provider unavailable")

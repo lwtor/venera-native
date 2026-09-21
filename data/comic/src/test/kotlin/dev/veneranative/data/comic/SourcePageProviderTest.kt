@@ -28,7 +28,7 @@ import org.junit.Test
  *
  * The interesting part is the failure behaviour: a source answers with URLs, sizes come from the
  * image pipeline, and one unresolvable URL is the normal case rather than an exception. The
- * assertions below pin that a bad page is dropped while the rest of the chapter stays readable.
+ * assertions below pin that failed pages retain their positions and can be resolved independently.
  */
 class SourcePageProviderTest {
 
@@ -63,11 +63,12 @@ class SourcePageProviderTest {
             content.pages.map { it.imageRef },
         )
         assertEquals(listOf(0, 1, 2), content.pages.map { it.index })
-        assertEquals(1200, content.pages.first().heightPx)
+        assertEquals(dev.veneranative.core.model.PageSizeState.Pending, content.pages.first().sizeState)
+        assertEquals(1200, provider.resolve(content.pages.first()).heightPx)
     }
 
     @Test
-    fun `a page whose size cannot be resolved is skipped instead of failing the chapter`() = runTest {
+    fun `a broken page retains its stable position for retry`() = runTest {
         val provider = SourcePageProvider(
             catalog = FakeCatalog(
                 pages = listOf(
@@ -84,13 +85,13 @@ class SourcePageProviderTest {
 
         val content = provider.loadChapter(chapter)
 
-        assertEquals(listOf("https://img/0", "https://img/2"), content.pages.map { it.imageRef })
-        // A skipped page keeps its own index: indices stay the source's, not the compacted ones.
-        assertEquals(listOf(0, 2), content.pages.map { it.index })
+        assertEquals(listOf("https://img/0", "https://img/broken", "https://img/2"), content.pages.map { it.imageRef })
+        // Failed images retain their position.
+        assertEquals(listOf(0, 1, 2), content.pages.map { it.index })
     }
 
     @Test
-    fun `a chapter whose pages are all unresolvable is empty rather than failed`() = runTest {
+    fun `unresolvable images remain retryable instead of becoming an empty chapter`() = runTest {
         val provider = SourcePageProvider(
             catalog = FakeCatalog(pages = listOf(SourcePage(index = 0, imageRef = "https://img/broken"))),
             sizer = FixedSizer(),
@@ -98,7 +99,8 @@ class SourcePageProviderTest {
 
         val content = provider.loadChapter(chapter)
 
-        assertTrue(content.pages.isEmpty())
+        assertEquals(1, content.pages.size)
+        assertTrue(runCatching { provider.resolve(content.pages.single()) }.isFailure)
     }
 
     @Test

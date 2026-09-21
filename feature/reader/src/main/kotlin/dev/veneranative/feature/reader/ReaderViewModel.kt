@@ -37,6 +37,7 @@ class ReaderViewModel(
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
 
     private val prefetched = mutableSetOf<Int>()
+    private val pageJobs = mutableMapOf<Int, kotlinx.coroutines.Job>()
 
     init {
         load()
@@ -45,6 +46,10 @@ class ReaderViewModel(
     fun onAction(action: ReaderAction) {
         when (action) {
             ReaderAction.Retry -> load()
+            is ReaderAction.RetryPage -> {
+                prefetched.remove(action.index)
+                resolvePage(action.index)
+            }
             is ReaderAction.PageShown -> showPage(action.index)
             is ReaderAction.ChangeDirection -> _state.update { it.copy(direction = action.direction) }
         }
@@ -55,6 +60,8 @@ class ReaderViewModel(
         viewModelScope.launch {
             try {
                 val content = provider.loadChapter(chapter)
+                pageJobs.values.forEach { it.cancel() }
+                pageJobs.clear()
                 prefetched.clear()
                 val resumedIndex = startPageIndex.coerceIn(0, content.pages.lastIndex.coerceAtLeast(0))
                 _state.update { current ->
@@ -93,17 +100,35 @@ class ReaderViewModel(
         if (pages.isEmpty()) return
         val first = (center - prefetchRadius).coerceAtLeast(0)
         val last = (center + prefetchRadius).coerceAtMost(pages.lastIndex)
-        for (index in first..last) {
-            if (!prefetched.add(index)) continue
-            viewModelScope.launch {
-                try {
-                    provider.prefetch(pages[index])
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (_: Exception) {
-                    // A failed warm-up must not break reading; the page still loads on demand.
+        pageJobs.filterKeys { it !in first..last }.values.forEach { it.cancel() }
+        for (index in first..last) resolvePage(index)
+    }
+
+    private fun resolvePage(index: Int) {
+        val page = _state.value.pages.getOrNull(index) ?: return
+        if (index in prefetched || pageJobs[index]?.isActive == true) return
+        pageJobs[index] = viewModelScope.launch {
+            try {
+                if (page.sizeState == dev.veneranative.core.model.PageSizeState.Ready) {
+                    provider.prefetch(page)
+                } else {
+                    updatePage(index, page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Pending))
+                    updatePage(index, provider.resolve(page))
+                }
+                prefetched.add(index)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                if (page.sizeState != dev.veneranative.core.model.PageSizeState.Ready) {
+                    updatePage(index, page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Failed))
                 }
             }
+        }
+    }
+
+    private fun updatePage(index: Int, page: dev.veneranative.core.model.ComicPage) {
+        _state.update { current ->
+            current.copy(pages = current.pages.mapIndexed { position, old -> if (position == index) page else old })
         }
     }
 
