@@ -95,6 +95,13 @@ class EngineSourceCoreTest {
 
             // The fixture echoes the page argument into the comic id, so the base is observable.
             assertEquals(listOf("x0"), first.comicsOf())
+            assertEquals(PageCursor.Page(1), first.next)
+            val second = core.exploreSuccess(ExploreRequest(sourceId, "Frontpage", cursor = first.next))
+            assertEquals(listOf("x1"), second.comicsOf())
+            assertEquals(PageCursor.Page(2), second.next)
+            val last = core.exploreSuccess(ExploreRequest(sourceId, "Frontpage", cursor = second.next))
+            assertEquals(listOf("x2"), last.comicsOf())
+            assertNull(last.next)
         }
     }
 

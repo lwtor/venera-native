@@ -99,7 +99,8 @@ class EngineSourceCore(
                         sourceId = request.sourceId,
                         page = page,
                         payload = payload.value,
-                        pageNumber = (request.cursor as? PageCursor.Page)?.number ?: FIRST_PAGE,
+                        pageNumber = (request.cursor as? PageCursor.Page)?.number
+                            ?: if (page.kind == ExploreKind.MIXED) 0 else FIRST_PAGE,
                     )
                 },
             )
