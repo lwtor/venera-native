@@ -22,6 +22,9 @@ sealed interface AppRoute {
     /** Installed source management. */
     data object Sources : AppRoute
 
+    /** The shelf: favourite folders, downloads and imported comics. */
+    data object Library : AppRoute
+
     /** Browse a source's declared explore pages. */
     data class Explore(val sourceId: String?) : AppRoute
 

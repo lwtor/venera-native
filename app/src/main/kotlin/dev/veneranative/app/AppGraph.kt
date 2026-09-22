@@ -44,6 +44,9 @@ import dev.veneranative.core.navigation.encode
 import dev.veneranative.core.network.AppHttpClientFactory
 import dev.veneranative.data.comic.DefaultComicCatalog
 import dev.veneranative.data.comic.SourcePageProvider
+import dev.veneranative.data.collection.ComicCatalogChapterProbe
+import dev.veneranative.data.collection.CollectionRepository
+import dev.veneranative.data.collection.DefaultCollectionRepository
 import dev.veneranative.data.history.DefaultHistoryRepository
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.history.ReadingHistoryEntry
@@ -108,12 +111,17 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     }
     private val _history = kotlinx.coroutines.flow.MutableStateFlow<HistoryRepository?>(null)
     val history: kotlinx.coroutines.flow.StateFlow<HistoryRepository?> = _history
+    private val _collection = kotlinx.coroutines.flow.MutableStateFlow<CollectionRepository?>(null)
+    val collection: kotlinx.coroutines.flow.StateFlow<CollectionRepository?> = _collection
     init {
         scope.launch {
             val db = VeneraDatabaseFactory.get(getApplication())
             val repository = DefaultHistoryRepository(db)
             progressTracker.set(ReadingProgressTracker(repository, scope, clock = { System.currentTimeMillis() }))
             _history.value = repository
+            // The shelf asks installed sources for chapter snapshots; the assembly layer is the only
+            // place that can see both the repository and the catalog.
+            _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))
         }
     }
     fun flushProgress() { scope.launch { runCatching { progressTracker.get()?.flush() } } }

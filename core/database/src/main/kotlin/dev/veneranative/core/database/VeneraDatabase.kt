@@ -4,12 +4,22 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 /**
- * The single Room database. Version 1 is the migration baseline: every later schema change is a
- * migration from an exported `schemas/<version>.json`, which is why `exportSchema` stays true.
+ * The single Room database.
+ *
+ * Each version is a migration from an exported `schemas/<version>.json`, which is why
+ * `exportSchema` stays true: the exported files are the baseline `MigrationTestHelper` validates
+ * against, and a version bump without one is a database Room silently cannot open on upgrade.
+ *
+ * Version 2 adds the shelf (S2-01). Later stages add their own step rather than editing this one.
  */
 @Database(
-    entities = [ReadingHistoryEntity::class, ReadingProgressEntity::class],
-    version = 1,
+    entities = [
+        ReadingHistoryEntity::class,
+        ReadingProgressEntity::class,
+        FavoriteFolderEntity::class,
+        FavoriteEntryEntity::class,
+    ],
+    version = 2,
     exportSchema = true,
 )
 abstract class VeneraDatabase : RoomDatabase() {
@@ -17,4 +27,6 @@ abstract class VeneraDatabase : RoomDatabase() {
     abstract fun readingHistoryDao(): ReadingHistoryDao
 
     abstract fun readingProgressDao(): ReadingProgressDao
+
+    abstract fun favoriteDao(): FavoriteDao
 }

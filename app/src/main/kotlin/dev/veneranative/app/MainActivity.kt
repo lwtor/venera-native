@@ -42,6 +42,7 @@ import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.decodeAppRoute
 import dev.veneranative.core.navigation.encode
 import dev.veneranative.core.network.AppHttpClientFactory
+import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.comic.DefaultComicCatalog
 import dev.veneranative.data.comic.SourcePageProvider
 import dev.veneranative.data.history.DefaultHistoryRepository
@@ -54,6 +55,7 @@ import dev.veneranative.data.source.SourcePackageStore
 import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
 import dev.veneranative.feature.home.HomeRoute
+import dev.veneranative.feature.library.LibraryRoute
 import dev.veneranative.feature.reader.ReaderRoute
 import dev.veneranative.feature.reader.ReaderViewModel
 import dev.veneranative.feature.search.SearchRoute
@@ -102,6 +104,7 @@ private fun App(
     graph: AppGraph,
 ) {
     val historyRepository by graph.history.collectAsStateWithLifecycle()
+    val collectionRepository by graph.collection.collectAsStateWithLifecycle()
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -125,6 +128,7 @@ private fun App(
             appScope = appScope,
             activity = activity,
             historyRepository = historyRepository,
+            collectionRepository = collectionRepository,
             progressTracker = progressTracker,
         )
     }
@@ -141,6 +145,7 @@ private fun AppNavHost(
     appScope: CoroutineScope,
     activity: MainActivity,
     historyRepository: HistoryRepository?,
+    collectionRepository: CollectionRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -156,7 +161,21 @@ private fun AppNavHost(
             onOpenSources = { onRouteChange(AppRoute.Sources) },
             onOpenExplore = { onRouteChange(AppRoute.Explore(null)) },
             onOpenSearch = { onRouteChange(AppRoute.Search(null)) },
+            onOpenLibrary = { onRouteChange(AppRoute.Library) },
         )
+
+        AppRoute.Library -> {
+            val collection = collectionRepository
+            if (collection == null) {
+                androidx.compose.material3.CircularProgressIndicator()
+            } else {
+                LibraryRoute(
+                    collection = collection,
+                    onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
+                    onBack = { onRouteChange(AppRoute.Home) },
+                )
+            }
+        }
 
         AppRoute.Sources -> SourcesRoute(
             repository = sourceRepository,

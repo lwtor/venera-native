@@ -7,9 +7,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 最后更新 | 2026-09-22 |
-| 当前阶段 | Stage 1：核心阅读闭环 — **DONE** |
-| 当前任务 | S2-01 本地收藏与书架 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01 TODO |
+| 当前阶段 | Stage 2：增量能力 |
+| 当前任务 | S2-02（S2-01 已完成待验收） |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01 DONE；S2-02 TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -53,6 +53,72 @@
 数量等描述已过期。当前实现以本节、`docs/ARCHITECTURE.md` 和质量整改台账为准：Room、Coil、QuickJS、
 来源正文阅读与恢复均已接入；WebView Runtime 仅为待删除兼容实现。设备手势、进程回收/API 26、完整
 人工闭环没有在本轮执行，均不得记为通过。
+
+## 最近完成：S2-01 本地收藏与书架 — DONE
+
+依赖：Stage 1（S1-06 Room 已落地）。
+
+实际交付：
+
+- `:core:database` 升到 **version 2**（只做 v1→v2，不预埋 v3）：新增 `FavoriteFolderEntity`（`favorite_folder`）
+  与 `FavoriteEntryEntity`（`favorite_entry`，复合主键 `ref_source` + `ref_comic`）、`FavoriteDao`，
+  `Migrations.kt` 里只有一个 `MIGRATION_1_2`（建两张表 + 四个索引 + 播种默认分组）。
+  `core/database/schemas/.../2.json` 已入库。
+- **`:core:database` 仍然不依赖 `:core:model`**：收藏表只用字符串列（`ref_source` / `ref_comic` /
+  `folder_id` 等），排序与枚举都存名字，值对象转换全部放在 `:data:collection`。
+- 身份用 `ComicRef`（新增于 `:core:model`）：`Remote(ComicKey)` 与 `Local(LocalComicId)` 共用
+  `ref_source` / `ref_comic` 两列；本地取保留命名空间 `@local`，而来源安装拒绝以 `@` 开头的 key，
+  因此两条路径不会撞。
+- 新建 `:data:collection`：`CollectionRepository` 契约、`DefaultCollectionRepository`、
+  `UpdateMarker`、`RemoteChapterProbe` / `ComicCatalogChapterProbe`、`CollectionMappers`。
+  **排序是 DAO 查询而不是内存重排**：四种 `ShelfSort`（加入时间 / 标题 / 最近阅读 / 有更新）各对应一条
+  带 `ORDER BY` 的 SQL（标题 `COLLATE NOCASE`、最近阅读空值排最后），仓库只挑查询，不持有列表。
+- **有更新的判定不用时间戳**：把已存的 `(chapterCount, latestChapterId)` 快照与新探测到的
+  `ChapterSnapshot` 比较——首次探测只记基线不算更新，章节变少不算更新，章节数相同但最后一章被替换算更新；
+  源答不出来（离线 / 无此能力）保持原标记，不误标也不误清。
+- 新建 `:feature:library`：`LibraryUiState` / `LibraryAction` / `LibraryViewModel` / `LibraryRoute` /
+  `LibraryScreen` + `FolderChips` / `FavoriteGrid`。ViewModel 只有
+  `folderId + sort` 的选择 `StateFlow`，数据经 `flatMapLatest` 订阅仓库 Flow，**自身不留任何列表副本**。
+- 装配：`:core:navigation` 的 `AppRoute` 增加 `Library` 及其字符串编解码；`:feature:home` 增加
+  「书架」入口；`:app` 在 `AppGraph` 里用 `DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))`
+  装配，`MainActivity` 增加 `AppRoute.Library` 分支。
+
+验收对照：
+
+| 验收项 | 结论 | 依据 |
+| --- | --- | --- |
+| 分组可新建 / 重命名 / 删除 | 通过 | `DefaultCollectionRepositoryTest`（新建追加并 trim、重命名可见、删除把漫画移回默认分组、默认分组不可删） |
+| 条目排序且顺序持久化 | 通过 | 四种排序各自选出不同首项的断言 + `FavoriteDaoTest`（真 SQLite 上的 `ORDER BY`、`COLLATE NOCASE`、空值排最后） |
+| 条目可在分组间移动 | 通过 | `moveTo` 移动单条；删除分组时整组移回默认分组 |
+| 可标记 / 清除「有更新」 | 通过 | `refreshUpdates()` 与 `clearUpdate()` 的断言，含「清除后再次刷新不会重新标记」 |
+| Room 是唯一事实来源 | 通过 | 仓库只暴露 Flow；`LibraryViewModelTest` 断言切换分组与排序各只发一次查询，重复选中同一分组不再查询 |
+
+已知缺口（明确留给后续，不是遗漏）：
+
+- **还没有「加入书架」的入口**：仓库层的 add / remove / move / 标更新已可用并被测试覆盖，但从详情或
+  探索页把漫画加进书架的 UI 动作不在 S2-01 的验收项里，留给后续任务接（设计里也把它排在书架之后）。
+- `lastReadAt` 已落库但还没有写入方：阅读链路的进度上报目前只进 `:data:history`，把最近阅读时间同步到
+  收藏条目需要一条明确的写入点，未在本轮凭猜测接上。
+- instrumentation 测试（`VeneraDatabaseMigrationTest`、`FavoriteDaoTest`）与 Compose 测试只编译未执行，
+  按 `AGENTS.md` 第 7 节普通节点策略；迁移的数据保留断言要等真机轮次才真正跑起来。
+- 未跑 Lint、未装 APK、未做实机验证。
+
+验证记录：
+
+```text
+2026-09-22（编译级 + 相关模块 JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME=/Users/lwtor/Library/Java/JavaVirtualMachines/corretto-17.0.9/Contents/Home
+ANDROID_HOME=/Users/lwtor/Library/Android/sdk
+sh gradlew :app:assembleDebug :core:database:compileDebugAndroidTestKotlin
+           :data:collection:testDebugUnitTest :feature:library:testDebugUnitTest
+           :core:model:testDebugUnitTest :core:navigation:testDebugUnitTest
+结果：BUILD SUCCESSFUL
+
+新增 JVM 单测：data:collection 29（DefaultCollectionRepositoryTest 17 / UpdateMarkerTest 7 /
+  CollectionMappersTest 5）、feature:library 11（LibraryViewModelTest）、core:model 5（ComicRefTest）、
+  core:navigation 4（AppRouteEncodingTest，较原来 +1）
+failures=0 errors=0
+```
 
 ## 已经完成
 
@@ -307,8 +373,10 @@ instrumentation 与实机验证本轮未执行（按用户决定不做实机测�
 
 ## 当前代码事实
 
-- `:app` 用一个 `AppRoute` 状态切换六个目的地（Home / Sources / Explore / Search / ComicDetails /
-  Reader），路由经 `encode()` / `decodeAppRoute()` 存进 `rememberSaveable`；还没有返回栈。
+- `:app` 用一个 `AppRoute` 状态切换七个目的地（Home / Sources / Explore / Search / ComicDetails /
+  Reader / Library），路由经 `encode()` / `decodeAppRoute()` 存进 `rememberSaveable`；还没有返回栈。
+- 书架与收藏已落地：`:data:collection` + `:feature:library`，Room v2 的 `favorite_folder` /
+  `favorite_entry` 是唯一事实来源；从首页「书架」入口进入。**加入书架的 UI 入口尚未接通**（见 S2-01 已知缺口）。
 - `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
 - 来源链路已可用：安装 / 启停 / 卸载（`:feature:sources` + `:data:source`）、探索与搜索
   （`:feature:explore` / `:feature:search` + `:data:comic` + Paging 3，仅向前分页）、详情与章节
@@ -878,7 +946,9 @@ AGP 9.2.1 / JDK 17 / compileSdk 37，adb 连接的设备或模拟器（API ≥ 2
 | `:feature:sources` 直接依赖 `:data:source` | 有意的边界取舍，已记录在 ARCHITECTURE §3 | 出现第二个数据实现或引入 DI 时把契约拆出去 |
 | `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
-| 导航契约模块 | S1-03 已按计划重建 `:core:navigation`（`AppRoute` + 字符串编解码），零引用问题不复存在 | — |
+| 书架已有仓库层与界面，但没有「加入书架」入口 | S2-01 只要求分组/排序/移动/标记更新；add 的能力已在 `CollectionRepository` 提供并被测试覆盖 | 接详情或探索页的收藏动作时补，并同时接 `lastReadAt` 的写入点 |
+| `favorite_entry.lastReadAt` 无写入方 | 「最近阅读」排序恒为空值排最后 | 阅读进度上报时同步写收藏条目 |
+| `:feature:library` 的 instrumentation 与 Compose 测试只编译未执行 | 迁移的数据保留断言尚未在真机跑过 | 关键节点执行 `connectedDebugAndroidTest` |
 | `:feature:details` 的封面是占位块 | **已解决**：S1-05 的 `ComicImage` 已接进封面槽位；但 `LocalComicImageLoader` 仍由 `:app` 提供，未提供前渲染占位（不回退成空白） | S1-07 集成时由 `:app` 装配 ImageLoader |
 | 阅读器仍无 source-backed `PageProvider` | **已解决契约与实现**：`PageProvider` / `ChapterContent` 已下沉 `:core:model`，`SourcePageProvider` 已在 `:data:comic` 落地并测试 | S1-07 集成时由 `:app` 装配进 `ReaderRoute` |
 | 本机 `JAVA_HOME` 指向失效的 temurin21 路径 | 构建前需临时指定 JDK 17；本机可用的是 `C:\Users\11196859\.jdks\jbr-17.0.14` | 用户修复环境变量，或继续按命令临时指定 |

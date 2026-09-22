@@ -18,6 +18,7 @@ class AppRouteEncodingTest {
     private val routes = listOf(
         AppRoute.Home,
         AppRoute.Sources,
+        AppRoute.Library,
         AppRoute.Explore(null),
         AppRoute.Search(null),
         AppRoute.Explore("manga_dex"),
@@ -46,6 +47,12 @@ class AppRouteEncodingTest {
         assertNull(decodeAppRoute("reader:source:comic"))
         assertNull(decodeAppRoute("something-else"))
         assertNull(decodeAppRoute(""))
+    }
+
+    @Test
+    fun `the library route encodes to its own string`() {
+        assertEquals("library", AppRoute.Library.encode())
+        assertEquals(AppRoute.Library, decodeAppRoute("library"))
     }
 
     @Test

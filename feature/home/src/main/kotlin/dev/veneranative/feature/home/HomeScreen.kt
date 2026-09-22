@@ -29,12 +29,14 @@ fun HomeRoute(
     onOpenSources: () -> Unit,
     onOpenExplore: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenLibrary: () -> Unit,
 ) {
     HomeScreen(
         onOpenReader = onOpenReader,
         onOpenSources = onOpenSources,
         onOpenExplore = onOpenExplore,
         onOpenSearch = onOpenSearch,
+        onOpenLibrary = onOpenLibrary,
     )
 }
 
@@ -45,6 +47,7 @@ internal fun HomeScreen(
     onOpenSources: () -> Unit,
     onOpenExplore: () -> Unit,
     onOpenSearch: () -> Unit,
+    onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -67,6 +70,9 @@ internal fun HomeScreen(
                 text = "Install a comic source, then browse or search it.",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Button(onClick = onOpenLibrary) {
+                Text("Library")
+            }
             Button(onClick = onOpenSources) {
                 Text("Sources")
             }
@@ -87,6 +93,6 @@ internal fun HomeScreen(
 @Composable
 private fun HomeScreenPreview() {
     VeneraNativeTheme {
-        HomeScreen(onOpenReader = {}, onOpenSources = {}, onOpenExplore = {}, onOpenSearch = {})
+        HomeScreen(onOpenReader = {}, onOpenSources = {}, onOpenExplore = {}, onOpenSearch = {}, onOpenLibrary = {})
     }
 }
