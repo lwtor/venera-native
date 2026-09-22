@@ -102,6 +102,22 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `init host calls carry an installation invocation id`() = runBlocking {
+        val host = RecordingHostApi { request -> respondWithBody(request.requestId, 200, "{}") }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            runtime.installSource(
+                fixtureSource(
+                    """
+                    async init() { await fetch("https://example.com/init"); }
+                    known() { return true; }
+                    """.trimIndent(),
+                ),
+            )
+        }
+        assertEquals("source-install", host.requests.single().invocationId)
+    }
+
+    @Test
     fun `the declared settings default answers loadSetting`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
@@ -196,7 +212,7 @@ class QuickJsRuntimeTest {
     }
 
     @Test
-    fun `console output reaches the host log`() = runBlocking {
+    fun `console output is redacted before it reaches the host log`() = runBlocking {
         val logs = CopyOnWriteArrayList<Pair<String, String>>()
         val runtime = QuickJsRuntime(logSink = { level, message -> logs += level to message })
 
@@ -205,7 +221,7 @@ class QuickJsRuntimeTest {
                 fixtureSource(
                     """
                     shout() {
-                      console.warn("careful", { depth: 2 });
+                      console.warn("Authorization: secret-token", { password: "hidden" });
                       return "done";
                     }
                     """.trimIndent(),
@@ -216,7 +232,7 @@ class QuickJsRuntimeTest {
 
         assertEquals(1, logs.size)
         assertEquals("warn", logs.single().first)
-        assertEquals("""careful {"depth":2}""", logs.single().second)
+        assertEquals(QuickJsHostBridge.REDACTED_LOG_MESSAGE, logs.single().second)
     }
 
     @Test
@@ -343,6 +359,27 @@ class QuickJsRuntimeTest {
                 "the host request should be cancelled with the call",
                 withTimeoutOrNull(HOST_CANCELLATION_WAIT_MILLIS) { hostCancelled.await() } != null,
             )
+        }
+    }
+
+    @Test(timeout = ENGINE_TEST_TIMEOUT_MILLIS)
+    fun `a second call is rejected instead of waiting in an unbounded queue`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val host = RecordingHostApi { request ->
+            entered.complete(Unit)
+            awaitCancellation()
+        }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val sourceId = runtime.installSource(fetchSource())
+            val first = async {
+                runtime.invoke(SourceCall.InvokeFunction("first", sourceId, "search.load", "[\"slow\"]", 30_000))
+            }
+            entered.await()
+            val second = runtime.invoke(SourceCall.InvokeFunction("second", sourceId, "search.load", "[\"next\"]"))
+            val error = (second as SourceResult.Failure).error
+            assertTrue(error is SourceRuntimeError.Internal && error.retryable)
+            runtime.cancel("first")
+            first.await()
         }
     }
 

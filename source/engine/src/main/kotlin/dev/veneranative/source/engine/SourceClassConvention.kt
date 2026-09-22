@@ -96,8 +96,17 @@ internal object SourceClassConvention {
     /** Calls `init()` when the source declares one; sources without it must not fail. */
     val INIT_SCRIPT: String =
         """
-        if (typeof $INSTANCE.init === "function") {
-          await $INSTANCE.init();
+        {
+          const previousInvocationId = globalThis.__veneraInvocationId;
+          globalThis.__veneraInvocationId = "source-install";
+          try {
+            if (typeof $INSTANCE.init === "function") {
+              await $INSTANCE.init();
+            }
+          } finally {
+            if (previousInvocationId === undefined) delete globalThis.__veneraInvocationId;
+            else globalThis.__veneraInvocationId = previousInvocationId;
+          }
         }
         """.trimIndent()
 

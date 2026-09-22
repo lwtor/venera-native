@@ -186,7 +186,7 @@ spike 结果（ABI、体积、实测数据）必须回填本节。
 | `Convert.encodeUtf8` / `decodeUtf8` | 提供 | 真实源用它编码 POST 表单体 |
 | `Network.get/post/put/patch/delete/fetchBytes` | 提供 | 协议要求；当前 Host API 只放行 `http.request` 的 GET/POST，其余方法会收到 `INVALID_REQUEST` |
 | `veneraHost.call(method, payload)` | 提供 | 与 WebView 实现和既有 fixture 保持一致，允许列表仍在 Kotlin 侧执行 |
-| `console.*` | 提供，转发到宿主日志 | 诊断必需（源本身不用） |
+| `console.*` | 提供，但宿主只接收级别与固定脱敏标记 | 不可信日志可能含 Cookie、Token、密码或用户输入，原文不得进入 logcat |
 | `APP.locale` / `APP.version` | 提供 | 真实源读取 `APP.locale` |
 | `URL` / `URLSearchParams` | **不提供** | 真实源 0 次使用；自写 URL 解析器会带来静默误解析风险 |
 | `TextEncoder` / `TextDecoder`、`atob` / `btoa` | **不提供** | 真实源 0 次使用（编码统一走 `Convert`） |
@@ -218,6 +218,10 @@ ADR-0008 §3 把"调用取消与超时"列为 spike 判据。实测结果分两�
 **已知限制**：死循环脚本会占用一个 CPU 核，直到引擎被丢弃且其线程自然结束——宿主无法强制终止它。
 这是选择 1.0.5 的直接代价（§7 记录了为什么不能升到新版本）。升级路径：工具链 Kotlin 提到 2.4 后升级绑定
 （新版本提供中断），或自行交叉编译 QuickJS 并复用同一契约。**在升级前，不得把"超时"描述为"脚本已停止"。**
+
+质量整改补充：安装与元数据探测在独立会话作用域执行，调用方可在期限到达时返回；同一来源只允许一个
+进行中调用，忙时立即返回可重试错误，避免无法中断的脚本后方形成无界队列。`init()` 执行期间设置专用
+调用 ID，使初始化网络请求仍经过 Host API 的调用追踪。以上约束不改变 1.0.5 无法强停 CPU 死循环的事实。
 
 ## 官方依据
 

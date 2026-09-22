@@ -6,8 +6,12 @@ import dev.veneranative.core.model.SourceMetadata
 import dev.veneranative.source.api.SourceMetadataReader
 import dev.veneranative.source.api.SourceMetadataResult
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withTimeout
 import org.json.JSONException
 import org.json.JSONObject
@@ -50,10 +54,9 @@ class QuickJsMetadataReader(
                 )
             }
 
-        return engine.use {
-            val encoded =
-                try {
-                    withTimeout(timeoutMillis) {
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val evaluation = scope.async {
+            engine.use {
                         // The base class has to exist before the script's class can extend it.
                         engine.evaluate<Any?>(SourceBaseScript.script)
                         engine.evaluate<String>(
@@ -61,18 +64,25 @@ class QuickJsMetadataReader(
                                 "\n" +
                                 METADATA_PROBE,
                         )
-                    }
-                } catch (_: TimeoutCancellationException) {
-                    return@use SourceMetadataResult.Invalid(
+            }
+        }
+        return try {
+            parse(withTimeout(timeoutMillis) { evaluation.await() })
+        } catch (_: TimeoutCancellationException) {
+            Thread { runCatching { engine.close() } }.apply {
+                isDaemon = true
+                name = "quickjs-metadata-close"
+            }.start()
+            SourceMetadataResult.Invalid(
                         "Source script did not declare its metadata within ${timeoutMillis}ms.",
-                    )
-                } catch (failure: Throwable) {
-                    return@use SourceMetadataResult.Invalid(
+            )
+        } catch (failure: Throwable) {
+            SourceMetadataResult.Invalid(
                         failure.message?.take(MAX_REASON_LENGTH)
                             ?: "Source script could not be read.",
-                    )
-                }
-            parse(encoded)
+            )
+        } finally {
+            scope.cancel()
         }
     }
 

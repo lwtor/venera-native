@@ -2,6 +2,7 @@ package dev.veneranative.source.engine
 
 import dev.veneranative.source.api.SourceMetadataResult
 import kotlinx.coroutines.runBlocking
+import kotlin.system.measureTimeMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -96,6 +97,25 @@ class QuickJsMetadataReaderTest {
         val result = reader.read("   ")
 
         assertTrue(result is SourceMetadataResult.Invalid)
+    }
+
+    @Test(timeout = 5_000L)
+    fun `non terminating metadata returns at its configured deadline`() = runBlocking {
+        val reader = QuickJsMetadataReader(timeoutMillis = 100L)
+        val elapsed = measureTimeMillis {
+            val result = reader.read(
+                """
+                class Stuck extends ComicSource {
+                  constructor() {
+                    super();
+                    while (true) {}
+                  }
+                }
+                """.trimIndent(),
+            )
+            assertTrue(result is SourceMetadataResult.Invalid)
+        }
+        assertTrue("metadata timeout took ${elapsed}ms", elapsed < 2_000L)
     }
 
     @Test

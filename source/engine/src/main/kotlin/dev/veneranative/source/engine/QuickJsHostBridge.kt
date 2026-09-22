@@ -48,8 +48,9 @@ internal class QuickJsHostBridge(
         }
         engine.asyncFunction<Any?>("__veneraLog") { arguments ->
             val level = arguments.getOrNull(0) as? String ?: "log"
-            val message = arguments.getOrNull(1) as? String ?: ""
-            logSink(level, message)
+            // Script output is untrusted and may contain credentials or user input. The host keeps
+            // only severity and a fixed diagnostic marker; raw source text never reaches logcat.
+            logSink(level.takeIf { it in LOG_LEVELS } ?: "log", REDACTED_LOG_MESSAGE)
         }
     }
 
@@ -186,8 +187,8 @@ internal class QuickJsHostBridge(
          * abstraction belongs to a later stage; what matters here is that the engine never reaches
          * for a platform API that unit tests cannot load.
          */
-        val DEFAULT_LOG_SINK: (String, String) -> Unit = { level, message ->
-            println("VeneraSource[$level] $message")
-        }
+        const val REDACTED_LOG_MESSAGE = "[source log redacted]"
+        private val LOG_LEVELS = setOf("log", "info", "warn", "error", "debug")
+        val DEFAULT_LOG_SINK: (String, String) -> Unit = { _, _ -> }
     }
 }

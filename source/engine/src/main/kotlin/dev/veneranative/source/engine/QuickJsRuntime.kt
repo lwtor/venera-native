@@ -88,7 +88,7 @@ class QuickJsRuntime(
 
             val session = LoadedSource(source, dispatcher)
             try {
-                withTimeout(installTimeoutMillis) { session.load() }
+                withTimeout(installTimeoutMillis) { session.loadAsync().await() }
             } catch (_: TimeoutCancellationException) {
                 session.discard()
                 return@withLock SourceInstallResult.Failed(
@@ -118,17 +118,20 @@ class QuickJsRuntime(
             sessions[typedCall.sourceId]
                 ?: return typedCall.failure(SourceRuntimeError.SourceNotLoaded(typedCall.sourceId))
 
-        return session.invocationMutex.withLock {
-            if (closed.get()) return@withLock typedCall.failure(SourceRuntimeError.RuntimeClosed())
+        if (!session.invocationMutex.tryLock()) {
+            return typedCall.failure(SourceRuntimeError.Internal("Source is busy; retry the call."))
+        }
+        return try {
+            if (closed.get()) return typedCall.failure(SourceRuntimeError.RuntimeClosed())
             if (sessions[typedCall.sourceId] !== session) {
-                return@withLock typedCall.failure(
+                return typedCall.failure(
                     SourceRuntimeError.SourceNotLoaded(typedCall.sourceId),
                 )
             }
 
             val activeCall = ActiveCall()
             if (activeCalls.putIfAbsent(typedCall.callId, activeCall) != null) {
-                return@withLock typedCall.failure(
+                return typedCall.failure(
                     SourceRuntimeError.InvalidCall("Call ID is already active."),
                 )
             }
@@ -136,11 +139,14 @@ class QuickJsRuntime(
             try {
                 val engine =
                     try {
-                        session.engine()
+                        withTimeout(typedCall.timeoutMillis) { session.engineAsync().await() }
+                    } catch (_: TimeoutCancellationException) {
+                        session.discardEngine()
+                        return typedCall.failure(SourceRuntimeError.Timeout(typedCall.timeoutMillis))
                     } catch (failure: RuntimeFailure) {
-                        return@withLock typedCall.failure(failure.error)
+                        return typedCall.failure(failure.error)
                     } catch (failure: Throwable) {
-                        return@withLock typedCall.failure(mapLoadFailure(failure))
+                        return typedCall.failure(mapLoadFailure(failure))
                     }
 
                 val invocationScript =
@@ -159,25 +165,25 @@ class QuickJsRuntime(
                         withTimeout(typedCall.timeoutMillis) { evaluation.await() }
                     } catch (_: TimeoutCancellationException) {
                         session.discardEngine()
-                        return@withLock typedCall.failure(
+                        return typedCall.failure(
                             SourceRuntimeError.Timeout(typedCall.timeoutMillis),
                         )
                     } catch (cancellation: CancellationException) {
                         session.discardEngine()
                         if (activeCall.cancelled.get()) {
-                            return@withLock typedCall.failure(SourceRuntimeError.Cancelled())
+                            return typedCall.failure(SourceRuntimeError.Cancelled())
                         }
                         throw cancellation
                     } catch (failure: Throwable) {
-                        return@withLock typedCall.failure(mapInvocationFailure(failure))
+                        return typedCall.failure(mapInvocationFailure(failure))
                     }
 
                 if (activeCall.cancelled.get()) {
                     session.discardEngine()
-                    return@withLock typedCall.failure(SourceRuntimeError.Cancelled())
+                    return typedCall.failure(SourceRuntimeError.Cancelled())
                 }
                 if (envelope.toByteArray(UTF_8).size > maxResultBytes) {
-                    return@withLock typedCall.failure(
+                    return typedCall.failure(
                         SourceRuntimeError.ScriptExecution(
                             "Source result exceeded the allowed size.",
                         ),
@@ -196,6 +202,8 @@ class QuickJsRuntime(
             } finally {
                 activeCalls.remove(typedCall.callId, activeCall)
             }
+        } finally {
+            session.invocationMutex.unlock()
         }
     }
 
@@ -392,6 +400,10 @@ class QuickJsRuntime(
          * Callers already hold [invocationMutex], so this must not take it again.
          */
         suspend fun engine(): QuickJs = engineRef.get() ?: load()
+
+        fun loadAsync(): Deferred<QuickJs> = scope.async { load() }
+
+        fun engineAsync(): Deferred<QuickJs> = scope.async { engine() }
 
         fun evaluate(engine: QuickJs, script: String): Deferred<String> =
             scope.async { engine.evaluate<String>(script) }

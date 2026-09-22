@@ -14,8 +14,8 @@
 | Q07 | 进度持久化 | DONE | R06；串行、失败保留、事务 |
 | Q08 | 恢复与退出集成 | DONE | R05/R06；异步恢复、选章、退出强刷 |
 | Q09 | 阅读缩放与手势 | DONE | R10；平移、滚动、模式互斥 |
-| Q10 | Runtime 边界 | IN_PROGRESS | R15/R16/R17；日志、init、超时取消队列 |
-| Q11 | 测试源与闭环 | TODO | R07；同一协议 fixture、安装、网络图片 |
+| Q10 | Runtime 边界 | DONE | R15/R16/R17；日志、init、超时取消队列 |
+| Q11 | 测试源与闭环 | IN_PROGRESS | R07；同一协议 fixture、安装、网络图片 |
 | Q12 | 文档和引擎判据 | TODO | 旧状态、ADR、构建/ABI/许可及延期归属 |
 | Q13 | 阶段复验 | TODO | 明确测试门禁与最终质量结论 |
 
@@ -40,3 +40,5 @@ Q07：进度按漫画合并并串行写入，失败保留可重试，尾部定�
 Q08：等待异步恢复后创建阅读会话，只恢复匹配章节；首屏和翻页使用真实漫画、章节与封面元数据记录，离开阅读器立即强刷。验证：`:data:history:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check`。
 
 Q09：使用可与父级滚动协作的 transformable 手势；未缩放时保留单指滚动，缩放后启用有界平移，并把连续模式偏移应用到画面。验证：`:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check`。
+
+Q10：来源日志原文在进入宿主前脱敏；init Host 请求带安装调用 ID；安装、重建和元数据探测受超时保护；同一来源忙时立即返回可重试错误以阻止无界排队。验证：`:source:engine:testDebugUnitTest :app:assembleDebug` — PASS；`git diff --check`。

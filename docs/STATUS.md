@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-22 |
 | 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q10（详见质量整改台账） |
-| 当前任务状态 | Q09 DONE；Q10 IN_PROGRESS；Stage 2 暂停 |
+| 当前任务 | Q11（详见质量整改台账） |
+| 当前任务状态 | Q10 DONE；Q11 IN_PROGRESS；Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -38,6 +38,8 @@
 - Q08：等待异步恢复后创建阅读会话，只恢复匹配章节；首屏和翻页使用真实漫画、章节与封面元数据记录，离开阅读器立即强刷。验证：`:data:history:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 - Q09：未缩放时保留连续滚动与分页滑动，缩放后才接管平移；连续模式真实应用偏移并按内容尺寸限位。验证：`:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
+
+- Q10：日志原文脱敏，init 网络请求具备调用 ID，安装/重建/元数据探测受截止时间保护，同源忙时立即返回可重试错误。QuickJS 1.0.5 的 CPU 死循环仍只能让调用方超时并丢弃引擎，不能声称脚本线程已被终止。验证：`:source:engine:testDebugUnitTest :app:assembleDebug` — PASS。
 
 ## 已经完成
 
