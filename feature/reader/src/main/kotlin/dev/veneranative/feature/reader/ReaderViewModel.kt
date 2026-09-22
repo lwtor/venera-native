@@ -24,14 +24,12 @@ class ReaderViewModel(
     /** Page to open at; a resumed session starts where it was left. */
     private val startPageIndex: Int = 0,
     /** Reported whenever the visible page changes, for throttled persistence. Null disables saving. */
-    private val recorder: ChapterPageRecorder? = null,
+    private val progress: dev.veneranative.core.model.ReaderProgress? = null,
     private val prefetchRadius: Int = DEFAULT_PREFETCH_RADIUS,
 ) : ViewModel() {
 
-    /** Persists where a reader is, one call per page turn. */
-    fun interface ChapterPageRecorder {
-        suspend fun record(chapterTitle: String, pageIndex: Int, pageCount: Int)
-    }
+    private var content: dev.veneranative.core.model.ChapterContent? = null
+    private var loadJob: kotlinx.coroutines.Job? = null
 
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
@@ -57,13 +55,16 @@ class ReaderViewModel(
 
     private fun load() {
         _state.update { it.copy(status = ReaderStatus.Loading) }
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             try {
+                val resumePage = progress?.resumePage() ?: startPageIndex
                 val content = provider.loadChapter(chapter)
+                this@ReaderViewModel.content = content
                 pageJobs.values.forEach { it.cancel() }
                 pageJobs.clear()
                 prefetched.clear()
-                val resumedIndex = startPageIndex.coerceIn(0, content.pages.lastIndex.coerceAtLeast(0))
+                val resumedIndex = resumePage.coerceIn(0, content.pages.lastIndex.coerceAtLeast(0))
                 _state.update { current ->
                     current.copy(
                         chapterTitle = content.title,
@@ -72,6 +73,7 @@ class ReaderViewModel(
                         status = ReaderStatus.Ready,
                     )
                 }
+                progress?.record(content, resumedIndex)
                 prefetchAround(resumedIndex)
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -87,11 +89,7 @@ class ReaderViewModel(
         val target = index.coerceIn(0, pages.lastIndex)
         if (target == _state.value.currentPageIndex) return
         _state.update { it.copy(currentPageIndex = target) }
-        recorder?.let { sink ->
-            viewModelScope.launch {
-                runCatching { sink.record(_state.value.chapterTitle, target, pages.size) }
-            }
-        }
+        content?.let { progress?.record(it, target) }
         prefetchAround(target)
     }
 
@@ -100,7 +98,7 @@ class ReaderViewModel(
         if (pages.isEmpty()) return
         val first = (center - prefetchRadius).coerceAtLeast(0)
         val last = (center + prefetchRadius).coerceAtMost(pages.lastIndex)
-        pageJobs.filterKeys { it !in first..last }.values.forEach { it.cancel() }
+        pageJobs.keys.filter { it !in first..last }.forEach { pageJobs.remove(it)?.cancel() }
         for (index in first..last) resolvePage(index)
     }
 

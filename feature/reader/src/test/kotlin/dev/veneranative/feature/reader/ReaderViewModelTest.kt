@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -37,6 +38,23 @@ class ReaderViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `waits for async resume then records the initial visible page`() = runTest(dispatcher) {
+        val saved = kotlinx.coroutines.CompletableDeferred<Int>()
+        val recorded = mutableListOf<Int>()
+        val progress = object : dev.veneranative.core.model.ReaderProgress {
+            override suspend fun resumePage() = saved.await()
+            override fun record(content: ChapterContent, pageIndex: Int) { recorded += pageIndex }
+        }
+        val model = ReaderViewModel(chapterKey, FakePageProvider(8), progress = progress)
+        runCurrent()
+        assertEquals(ReaderStatus.Loading, model.state.value.status)
+        saved.complete(4)
+        advanceUntilIdle()
+        assertEquals(4, model.state.value.currentPageIndex)
+        assertEquals(listOf(4), recorded)
     }
 
     @Test

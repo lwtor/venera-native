@@ -33,6 +33,28 @@ class DefaultHistoryRepositoryTest {
         updatedAtEpochMillis = updatedAt,
     )
 
+    @Test fun `resume belongs only to the saved chapter and records display metadata`() = runTest {
+        repository.record(entry(chapterId = "chapter-1", pageIndex = 3))
+        val tracker = ReadingProgressTracker(repository, this, { 2_000L })
+        val matching = ReaderProgressSession(
+            dev.veneranative.core.model.ChapterKey(key, RemoteChapterId("chapter-1")), repository, tracker, { 2_000L },
+        )
+        val other = ReaderProgressSession(
+            dev.veneranative.core.model.ChapterKey(key, RemoteChapterId("chapter-2")), repository, tracker, { 2_000L },
+        )
+        assertEquals(3, matching.resumePage())
+        assertEquals(0, other.resumePage())
+        other.record(dev.veneranative.core.model.ChapterContent(
+            "Second chapter", listOf(dev.veneranative.core.model.ComicPage(0, "image", 10, 10)),
+            comicTitle = "Readable title", coverUrl = "cover",
+        ), 0)
+        tracker.flush()
+        val recent = repository.observeRecent(1).first().first()
+        assertEquals("Readable title", recent.comicTitle)
+        assertEquals("Second chapter", recent.chapterTitle)
+        assertEquals("cover", recent.coverUrl)
+    }
+
     @Test fun `recording writes to both history and progress`() = runTest {
         repository.record(entry())
 

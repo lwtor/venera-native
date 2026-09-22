@@ -12,8 +12,8 @@
 | Q05 | 来源恢复与生命周期 | DONE | R04/R14；恢复、版本失效、Cookie 清理 |
 | Q06 | 探索分页 | DONE | R09；mixed 完整分页 |
 | Q07 | 进度持久化 | DONE | R06；串行、失败保留、事务 |
-| Q08 | 恢复与退出集成 | IN_PROGRESS | R05/R06；异步恢复、选章、退出强刷 |
-| Q09 | 阅读缩放与手势 | TODO | R10；平移、滚动、模式互斥 |
+| Q08 | 恢复与退出集成 | DONE | R05/R06；异步恢复、选章、退出强刷 |
+| Q09 | 阅读缩放与手势 | IN_PROGRESS | R10；平移、滚动、模式互斥 |
 | Q10 | Runtime 边界 | TODO | R15/R16/R17；日志、init、超时取消队列 |
 | Q11 | 测试源与闭环 | TODO | R07；同一协议 fixture、安装、网络图片 |
 | Q12 | 文档和引擎判据 | TODO | 旧状态、ADR、构建/ABI/许可及延期归属 |
@@ -36,3 +36,5 @@ Q05：保留根依赖跨配置变化，销毁时关闭资源；冷启动串行�
 Q06：mixed 探索以零基游标解析连续分页，回归覆盖 0、1、2 与末页停止 验证：`:source:core:testDebugUnitTest :app:assembleDebug` — PASS；`git diff --check`。
 
 Q07：进度按漫画合并并串行写入，失败保留可重试，尾部定时落盘；生产历史仓库通过 Room 事务同步历史和恢复位置 验证：`:data:history:testDebugUnitTest :app:assembleDebug` — PASS；`git diff --check`。
+
+Q08：等待异步恢复后创建阅读会话，只恢复匹配章节；首屏和翻页使用真实漫画、章节与封面元数据记录，离开阅读器立即强刷。验证：`:data:history:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check`。

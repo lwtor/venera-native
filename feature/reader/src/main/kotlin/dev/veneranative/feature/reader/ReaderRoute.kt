@@ -28,17 +28,20 @@ fun ReaderRoute(
     /** Where to open a resumed chapter; ignored when it falls outside the loaded pages. */
     startPageIndex: Int = 0,
     /** Throttled persistence seam; null keeps the reader read-only, which is what previews want. */
-    progressRecorder: ReaderViewModel.ChapterPageRecorder? = null,
+    progress: dev.veneranative.core.model.ReaderProgress? = null,
+    onExit: () -> Unit = {},
 ) {
-    val viewModelKey =
-        "${chapter.comicKey.sourceId.value}:${chapter.comicKey.remoteId.value}:${chapter.remoteId.value}"
-    val viewModel: ReaderViewModel = viewModel(key = viewModelKey) {
-        ReaderViewModel(
-            chapter = chapter,
-            provider = provider,
-            startPageIndex = startPageIndex,
-            recorder = progressRecorder,
-        )
+    val owner = androidx.compose.runtime.remember(chapter) {
+        object : androidx.lifecycle.ViewModelStoreOwner {
+            override val viewModelStore = androidx.lifecycle.ViewModelStore()
+        }
+    }
+    val exit by androidx.compose.runtime.rememberUpdatedState(onExit)
+    androidx.compose.runtime.DisposableEffect(owner) {
+        onDispose { owner.viewModelStore.clear(); exit() }
+    }
+    val viewModel: ReaderViewModel = viewModel(viewModelStoreOwner = owner) {
+        ReaderViewModel(chapter, provider, startPageIndex = startPageIndex, progress = progress)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     ReaderScreen(

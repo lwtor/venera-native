@@ -4,6 +4,8 @@ package dev.veneranative.core.model
 data class ChapterContent(
     val title: String,
     val pages: List<ComicPage>,
+    val comicTitle: String? = null,
+    val coverUrl: String? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }
@@ -48,4 +50,10 @@ interface PageImageSizer {
 
     /** The size, or null when the reference could not be resolved and the caller should skip it. */
     suspend fun sizeOf(imageRef: String, sourceId: SourceId): ImageSize?
+}
+
+/** A chapter-bound persistence session. Recording only queues immutable data; it must not block UI. */
+interface ReaderProgress {
+    suspend fun resumePage(): Int
+    fun record(content: ChapterContent, pageIndex: Int)
 }

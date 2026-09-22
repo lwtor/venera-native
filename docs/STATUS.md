@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-22 |
 | 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q08（详见质量整改台账） |
-| 当前任务状态 | Q07 DONE；Q08 IN_PROGRESS；Stage 2 暂停 |
+| 当前任务 | Q09（详见质量整改台账） |
+| 当前任务状态 | Q08 DONE；Q09 IN_PROGRESS；Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -34,6 +34,8 @@
 - Q06：mixed 探索以零基游标解析连续分页，回归覆盖 0、1、2 与末页停止 验证：`:source:core:testDebugUnitTest :app:assembleDebug` — PASS。
 
 - Q07：进度按漫画合并并串行写入，失败保留可重试，尾部定时落盘；生产历史仓库通过 Room 事务同步历史和恢复位置 验证：`:data:history:testDebugUnitTest :app:assembleDebug` — PASS。
+
+- Q08：等待异步恢复后创建阅读会话，只恢复匹配章节；首屏和翻页使用真实漫画、章节与封面元数据记录，离开阅读器立即强刷。验证：`:data:history:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 ## 已经完成
 

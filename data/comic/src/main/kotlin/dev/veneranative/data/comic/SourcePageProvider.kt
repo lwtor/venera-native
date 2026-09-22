@@ -25,7 +25,11 @@ class SourcePageProvider(
             ComicPage(index, reference.imageRef, 1080, 1440, chapter.comicKey.sourceId,
                 dev.veneranative.core.model.PageSizeState.Pending)
         }
-        return ChapterContent(title = chapterTitle(chapter), pages = pages)
+        val detail = (catalog.detail(chapter.comicKey) as? SourceOutcome.Success)?.value
+        return ChapterContent(
+            title = detail?.chapters?.firstOrNull { it.key == chapter }?.title ?: chapterTitle(chapter),
+            pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
+        )
     }
 
     override suspend fun resolve(page: ComicPage): ComicPage {

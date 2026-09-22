@@ -176,57 +176,25 @@ private fun AppNavHost(
         )
 
         is AppRoute.Reader -> {
-            val startPage by resumePageOf(current.chapter, historyRepository)
-            ReaderRoute(
-                chapter = current.chapter,
-                provider = provider,
-                onBack = { onRouteChange(AppRoute.Home) },
-                decoderFactory = decoderFactory,
-                startPageIndex = startPage,
-                progressRecorder = historyRepository?.let { repository ->
-                    recorderFor(current.chapter, repository, progressTracker)
-                },
-            )
+            val tracker = progressTracker.get()
+            if (historyRepository == null || tracker == null) {
+                androidx.compose.material3.CircularProgressIndicator()
+            } else {
+                val session = remember(current.chapter, historyRepository, tracker) {
+                    dev.veneranative.data.history.ReaderProgressSession(
+                        current.chapter, historyRepository, tracker, { System.currentTimeMillis() },
+                    )
+                }
+                ReaderRoute(
+                    chapter = current.chapter, provider = provider,
+                    onBack = { onRouteChange(AppRoute.ComicDetails(current.chapter.comicKey)) },
+                    decoderFactory = decoderFactory, progress = session,
+                    onExit = { appScope.launch { runCatching { tracker.flush() } } },
+                )
+            }
         }
     }
 }
-
-/** Where a resumed chapter should open, or the first page when nothing was recorded. */
-@Composable
-private fun resumePageOf(
-    chapter: ChapterKey,
-    repository: HistoryRepository?,
-): State<Int> =
-    produceState(initialValue = 0, chapter, repository) {
-        value = repository?.progress(chapter.comicKey)?.pageIndex ?: 0
-    }
-
-/**
- * Turns page turns into throttled writes.
- *
- * The chapter's own title comes from the provider: it is display text, never a cache key, so nothing
- * breaks when a source returns something odd.
- */
-private fun recorderFor(
-    chapter: ChapterKey,
-    repository: HistoryRepository,
-    progressTracker: AtomicReference<ReadingProgressTracker?>,
-): ReaderViewModel.ChapterPageRecorder = ReaderViewModel.ChapterPageRecorder { chapterTitle, pageIndex, pageCount ->
-    progressTracker.get()?.onPageChanged(
-        ReadingHistoryEntry(
-            comicKey = chapter.comicKey,
-            comicTitle = chapter.remoteId.value,
-            chapterId = chapter.remoteId,
-            chapterTitle = chapterTitle,
-            coverUrl = null,
-            pageIndex = pageIndex,
-            pageCount = pageCount,
-            updatedAtEpochMillis = System.currentTimeMillis(),
-        ),
-    )
-}
-
-private const val DEFAULT_IMAGE_CACHE_BYTES = 64L * 1024 * 1024
 
 /** Keeps the current route across process death; the encoding itself lives in `:core:navigation`. */
 private val AppRouteSaver: Saver<AppRoute, String> = Saver(
