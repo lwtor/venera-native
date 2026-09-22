@@ -1,7 +1,17 @@
 package dev.veneranative.data.collection
 
+import dev.veneranative.core.database.DEFAULT_FOLDER_ID
 import dev.veneranative.core.model.ComicRef
 import kotlinx.coroutines.flow.Flow
+
+/**
+ * The folder a comic goes into when the caller has no folder to name.
+ *
+ * Every install has one — the migration and the first-open callback both seed it — so a screen that
+ * only offers "keep this comic" does not have to ask which folder. Choosing a folder is the shelf's
+ * job, not every screen's.
+ */
+const val DEFAULT_SHELF_FOLDER_ID: String = DEFAULT_FOLDER_ID
 
 /** A folder the user files favourites into. */
 data class FavoriteFolder(
@@ -63,6 +73,9 @@ interface CollectionRepository {
 
     /** Favourites of one folder, or of every folder when [folderId] is null, already sorted. */
     fun observeItems(folderId: String?, sort: ShelfSort): Flow<List<FavoriteItem>>
+
+    /** One comic's row, or null while it is not on the shelf: how a screen knows a comic is kept. */
+    fun observeItem(ref: ComicRef): Flow<FavoriteItem?>
 
     /** The new folder's id. */
     suspend fun createFolder(name: String): String

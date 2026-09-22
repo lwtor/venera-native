@@ -68,6 +68,15 @@ interface FavoriteDao {
     @Query("SELECT * FROM favorite_entry WHERE ref_source = :refSource AND ref_comic = :refComic")
     suspend fun entry(refSource: String, refComic: String): FavoriteEntryEntity?
 
+    /**
+     * One comic's shelf row, or null while it is not on the shelf.
+     *
+     * A screen that offers "keep this comic" asks the database rather than remembering what it last
+     * wrote: the answer then stays right when the comic is removed from the shelf somewhere else.
+     */
+    @Query("SELECT * FROM favorite_entry WHERE ref_source = :refSource AND ref_comic = :refComic")
+    fun observeEntry(refSource: String, refComic: String): Flow<FavoriteEntryEntity?>
+
     /** Every favourite, for an update sweep. */
     @Query("SELECT * FROM favorite_entry")
     suspend fun entries(): List<FavoriteEntryEntity>

@@ -48,6 +48,9 @@ internal class FakeCollectionRepository : CollectionRepository {
         emitAll(items.map { rows -> if (folderId == null) rows else rows.filter { it.folderId == folderId } })
     }
 
+    override fun observeItem(ref: ComicRef): Flow<FavoriteItem?> =
+        items.map { rows -> rows.firstOrNull { it.ref == ref } }
+
     override suspend fun createFolder(name: String): String {
         createdFolders += name
         val id = "folder-${createdFolders.size}"

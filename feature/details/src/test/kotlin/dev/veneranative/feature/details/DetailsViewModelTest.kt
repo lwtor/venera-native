@@ -5,6 +5,7 @@ import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.ComicRef
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.RemoteComicId
@@ -14,6 +15,8 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
 import dev.veneranative.core.model.chaptersOf
 import dev.veneranative.core.model.groupedChaptersOf
+import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
+import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
 import dev.veneranative.source.api.ExploreRequest
@@ -40,6 +43,7 @@ class DetailsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeCatalog()
+    private val collection = FakeCollectionRepository()
     private val comicKey = ComicKey(SourceId("s"), RemoteComicId("c1"))
 
     @Before
@@ -57,7 +61,7 @@ class DetailsViewModelTest {
         catalog.source = installed("s", name = "Source S")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
 
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
 
         assertEquals(DetailsStatus.Ready, viewModel.state.value.status)
@@ -72,7 +76,7 @@ class DetailsViewModelTest {
         // would only ever say "not loaded" — which is not the reason the reader needs to hear.
         catalog.source = null
 
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
 
         assertEquals(DetailsStatus.SourceUnavailable, viewModel.state.value.status)
@@ -87,7 +91,7 @@ class DetailsViewModelTest {
             SourceRuntimeError.ScriptExecution("TypeError: cannot read property 'x' of undefined"),
         )
 
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
 
         assertEquals(DetailsStatus.Failed, viewModel.state.value.status)
@@ -103,7 +107,7 @@ class DetailsViewModelTest {
             SourceRuntimeError.UnsupportedCapability(SourceCapability.DETAIL),
         )
 
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
 
         assertEquals(DetailsStatus.Failed, viewModel.state.value.status)
@@ -117,7 +121,7 @@ class DetailsViewModelTest {
             ComicDetail(comic = Comic(comicKey, title = "Frieren")),
         )
 
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
 
         assertEquals(DetailsStatus.Ready, viewModel.state.value.status)
@@ -129,7 +133,7 @@ class DetailsViewModelTest {
     fun `a failed load can be retried`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.Timeout(10_000))
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
         assertEquals(DetailsStatus.Failed, viewModel.state.value.status)
 
@@ -145,7 +149,7 @@ class DetailsViewModelTest {
     fun `a refresh keeps a group that still exists and drops one that does not`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren", grouped = true))
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
         assertEquals(listOf("EN", "JP"), viewModel.state.value.groups)
 
@@ -168,7 +172,7 @@ class DetailsViewModelTest {
     fun `changing the order is a display choice and can be reverted`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
-        val viewModel = DetailsViewModel(catalog, comicKey)
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
 
         viewModel.onAction(DetailsAction.OrderSelected(ChapterOrder.Reversed))
@@ -177,6 +181,116 @@ class DetailsViewModelTest {
         viewModel.onAction(DetailsAction.OrderSelected(ChapterOrder.SourceOrder))
         assertEquals(listOf("Chapter 1", "Chapter 2"), viewModel.state.value.visibleChapters.map { it.title })
         assertEquals(1, catalog.detailCalls)
+    }
+
+    @Test
+    fun `keeping a comic puts it on the shelf and the shelf says so`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+        assertFalse(viewModel.state.value.isFavorite)
+
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        advanceUntilIdle()
+
+        // What the screen shows and what the shelf holds are the same fact: the flag is read back
+        // from the shelf, not remembered from the tap.
+        assertTrue(viewModel.state.value.isFavorite)
+        assertTrue(collection.contains(ComicRef.Remote(comicKey)))
+        assertEquals(DEFAULT_SHELF_FOLDER_ID, collection.added.single().folderId)
+    }
+
+    @Test
+    fun `a comic already on the shelf shows as kept and can be removed`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        collection.seed(
+            FavoriteItem(
+                ref = ComicRef.Remote(comicKey),
+                title = "Frieren",
+                folderId = DEFAULT_SHELF_FOLDER_ID,
+                addedAtEpochMillis = 1_000L,
+            ),
+        )
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.isFavorite)
+
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.isFavorite)
+        assertFalse(collection.contains(ComicRef.Remote(comicKey)))
+        assertEquals(listOf(ComicRef.Remote(comicKey)), collection.removed)
+    }
+
+    @Test
+    fun `keeping a comic records the chapters the source listed`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        advanceUntilIdle()
+
+        // An update check can only compare against what the source said now, so this is the baseline
+        // it will compare against later.
+        val snapshot = collection.added.single().snapshot
+        assertEquals("Frieren", snapshot.title)
+        assertEquals(2, snapshot.chapterCount)
+        assertEquals("2", snapshot.latestChapterId)
+    }
+
+    @Test
+    fun `a comic whose source listed no chapters is kept with nothing to compare yet`() =
+        runTest(dispatcher) {
+            catalog.source = installed("s")
+            catalog.detailResponse = SourceOutcome.Success(
+                ComicDetail(comic = Comic(comicKey, title = "Frieren")),
+            )
+            val viewModel = DetailsViewModel(catalog, comicKey, collection)
+            advanceUntilIdle()
+
+            viewModel.onAction(DetailsAction.ToggleFavorite)
+            advanceUntilIdle()
+
+            // Zero would mean "empty", which the next real answer would read as an update.
+            assertNull(collection.added.single().snapshot.chapterCount)
+            assertTrue(viewModel.state.value.isFavorite)
+        }
+
+    @Test
+    fun `a shelf that refuses the write says so in product copy`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        collection.addError = RuntimeException("disk on fire")
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        advanceUntilIdle()
+
+        val message = viewModel.state.value.shelfMessage.orEmpty()
+        assertTrue(message.isNotEmpty())
+        assertFalse("storage diagnostics must not reach the screen", message.contains("disk on fire"))
+        assertFalse(viewModel.state.value.isFavorite)
+    }
+
+    @Test
+    fun `without a shelf there is nothing to keep a comic in`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val viewModel = DetailsViewModel(catalog, comicKey, null)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.hasShelf)
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        advanceUntilIdle()
+
+        assertFalse(viewModel.state.value.isFavorite)
+        assertTrue(collection.added.isEmpty())
     }
 
     private fun detail(title: String, grouped: Boolean = false) = ComicDetail(

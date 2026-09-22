@@ -48,7 +48,7 @@ immutable UiState
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与书架的入口 | Design System、领域契约 |
 | `:feature:library` | 书架页：收藏 tab 的文件夹筛选、四种排序、更新标记与条目操作（`LibraryUiState` + `LibraryAction` + `LibraryViewModel`） | Design System、`:core:model`、`:core:image`、`:data:collection` |
-| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:data:comic`、`:source:api` |
+| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏/取消收藏（写入默认分组），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
 | `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架 | Design System、`:core:model`、`:core:image` |

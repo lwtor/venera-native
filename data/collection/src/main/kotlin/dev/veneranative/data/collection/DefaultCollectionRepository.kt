@@ -54,6 +54,9 @@ class DefaultCollectionRepository internal constructor(
             ShelfSort.Updated -> dao.observeByUpdate(folderId)
         }.map { rows -> rows.mapNotNull { it.toDomainOrNull() } }
 
+    override fun observeItem(ref: ComicRef): Flow<FavoriteItem?> =
+        dao.observeEntry(ref.refSource(), ref.refComic()).map { row -> row?.toDomainOrNull() }
+
     override suspend fun createFolder(name: String): String {
         val trimmed = name.trim()
         require(trimmed.isNotEmpty()) { "folder name must not be blank" }

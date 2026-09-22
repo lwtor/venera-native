@@ -95,8 +95,10 @@
 
 已知缺口（明确留给后续，不是遗漏）：
 
-- **还没有「加入书架」的入口**：仓库层的 add / remove / move / 标更新已可用并被测试覆盖，但从详情或
-  探索页把漫画加进书架的 UI 动作不在 S2-01 的验收项里，留给后续任务接（设计里也把它排在书架之后）。
+- **「加入书架 / 移出书架」入口已补在 `:feature:details`**：详情页有一个收藏开关，未收藏时显示
+  「Add to shelf」，已收藏时显示「On the shelf」并可点掉；写进默认分组（`DEFAULT_SHELF_FOLDER_ID`），
+  文件夹选择仍然只在书架页。是否已收藏由 `CollectionRepository.observeItem()` 从 Room 读回，
+  不是屏幕记住自己点过什么。
 - `lastReadAt` 已落库但还没有写入方：阅读链路的进度上报目前只进 `:data:history`，把最近阅读时间同步到
   收藏条目需要一条明确的写入点，未在本轮凭猜测接上。
 - instrumentation 测试（`VeneraDatabaseMigrationTest`、`FavoriteDaoTest`）与 Compose 测试只编译未执行，
@@ -117,6 +119,13 @@ sh gradlew :app:assembleDebug :core:database:compileDebugAndroidTestKotlin
 新增 JVM 单测：data:collection 29（DefaultCollectionRepositoryTest 17 / UpdateMarkerTest 7 /
   CollectionMappersTest 5）、feature:library 11（LibraryViewModelTest）、core:model 5（ComicRefTest）、
   core:navigation 4（AppRouteEncodingTest，较原来 +1）
+failures=0 errors=0
+
+补上收藏入口后复跑：
+sh gradlew :app:assembleDebug :feature:details:testDebugUnitTest :data:collection:testDebugUnitTest
+           :feature:library:testDebugUnitTest
+结果：BUILD SUCCESSFUL
+feature:details 14（DetailsViewModelTest 8 + 收藏往返 6）/ data:collection 29 / feature:library 11
 failures=0 errors=0
 ```
 
@@ -376,7 +385,7 @@ instrumentation 与实机验证本轮未执行（按用户决定不做实机测�
 - `:app` 用一个 `AppRoute` 状态切换七个目的地（Home / Sources / Explore / Search / ComicDetails /
   Reader / Library），路由经 `encode()` / `decodeAppRoute()` 存进 `rememberSaveable`；还没有返回栈。
 - 书架与收藏已落地：`:data:collection` + `:feature:library`，Room v2 的 `favorite_folder` /
-  `favorite_entry` 是唯一事实来源；从首页「书架」入口进入。**加入书架的 UI 入口尚未接通**（见 S2-01 已知缺口）。
+  `favorite_entry` 是唯一事实来源；首页「书架」入口进书架，详情页的收藏开关负责加入与移出。
 - `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
 - 来源链路已可用：安装 / 启停 / 卸载（`:feature:sources` + `:data:source`）、探索与搜索
   （`:feature:explore` / `:feature:search` + `:data:comic` + Paging 3，仅向前分页）、详情与章节
@@ -946,7 +955,7 @@ AGP 9.2.1 / JDK 17 / compileSdk 37，adb 连接的设备或模拟器（API ≥ 2
 | `:feature:sources` 直接依赖 `:data:source` | 有意的边界取舍，已记录在 ARCHITECTURE §3 | 出现第二个数据实现或引入 DI 时把契约拆出去 |
 | `loadThumbnails` 签名仍未确认 | 核对过的源未实现该方法 | S1-05 多页缩略图开始前，再找使用它的源核对 |
 | `SensitiveDataRedactor` 无生产调用点 | 错误路径不拼接敏感值且有测试断言；脱敏工具本身有 JVM 测试 | 日志功能落地时必须接入，否则删除 |
-| 书架已有仓库层与界面，但没有「加入书架」入口 | S2-01 只要求分组/排序/移动/标记更新；add 的能力已在 `CollectionRepository` 提供并被测试覆盖 | 接详情或探索页的收藏动作时补，并同时接 `lastReadAt` 的写入点 |
+| 收藏开关只写默认分组，详情页不做文件夹选择 | 文件夹管理属于书架页；一个只看得到一本漫画的屏幕没有可选项 | 需要「加入时选分组」时再在详情页加一次选择 |
 | `favorite_entry.lastReadAt` 无写入方 | 「最近阅读」排序恒为空值排最后 | 阅读进度上报时同步写收藏条目 |
 | `:feature:library` 的 instrumentation 与 Compose 测试只编译未执行 | 迁移的数据保留断言尚未在真机跑过 | 关键节点执行 `connectedDebugAndroidTest` |
 | `:feature:details` 的封面是占位块 | **已解决**：S1-05 的 `ComicImage` 已接进封面槽位；但 `LocalComicImageLoader` 仍由 `:app` 提供，未提供前渲染占位（不回退成空白） | S1-07 集成时由 `:app` 装配 ImageLoader |

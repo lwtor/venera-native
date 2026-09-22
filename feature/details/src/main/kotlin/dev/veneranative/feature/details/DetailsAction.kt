@@ -13,4 +13,12 @@ sealed interface DetailsAction {
     data class GroupSelected(val group: String?) : DetailsAction
 
     data class OrderSelected(val order: ChapterOrder) : DetailsAction
+
+    /**
+     * Keep the comic, or stop keeping it.
+     *
+     * One action rather than a folder picker: which folder a comic lives in is the shelf's job, and a
+     * screen that only ever sees one comic has nothing to choose between.
+     */
+    data object ToggleFavorite : DetailsAction
 }

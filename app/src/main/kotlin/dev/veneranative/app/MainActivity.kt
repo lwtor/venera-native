@@ -201,6 +201,7 @@ private fun AppNavHost(
         is AppRoute.ComicDetails -> DetailsRoute(
             catalog = catalog,
             comicKey = current.comicKey,
+            collection = collectionRepository,
             onOpenChapter = { onRouteChange(AppRoute.Reader(it)) },
             onBack = { onRouteChange(AppRoute.Home) },
         )

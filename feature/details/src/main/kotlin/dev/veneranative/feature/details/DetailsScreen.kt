@@ -119,7 +119,7 @@ private fun Content(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { Header(state) }
+        item { Header(state = state, onAction = onAction) }
 
         state.detail?.description?.takeIf { it.isNotBlank() }?.let { description ->
             item {
@@ -159,7 +159,10 @@ private fun Content(
 }
 
 @Composable
-private fun Header(state: DetailsUiState) {
+private fun Header(
+    state: DetailsUiState,
+    onAction: (DetailsAction) -> Unit,
+) {
     val comic = state.detail?.comic ?: return
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Cover(title = comic.title, coverUrl = comic.coverUrl, sourceId = comic.key.sourceId)
@@ -202,6 +205,39 @@ private fun Header(state: DetailsUiState) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+
+            if (state.hasShelf) {
+                ShelfControl(state = state, onAction = onAction)
+            }
+        }
+    }
+}
+
+/**
+ * Keep or stop keeping this comic.
+ *
+ * It reads as one control because it is one question — is this comic on my shelf — and the shelf's
+ * answer is what the chip shows, not what this screen last wrote.
+ */
+@Composable
+private fun ShelfControl(
+    state: DetailsUiState,
+    onAction: (DetailsAction) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        FilterChip(
+            selected = state.isFavorite,
+            onClick = { onAction(DetailsAction.ToggleFavorite) },
+            label = { Text(if (state.isFavorite) "On the shelf" else "Add to shelf") },
+        )
+        val caption = state.shelfMessage
+            ?: if (state.isFavorite) "Tap to remove it from your shelf." else null
+        if (caption != null) {
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

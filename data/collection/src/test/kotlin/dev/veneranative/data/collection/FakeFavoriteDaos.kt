@@ -75,6 +75,9 @@ internal class FakeFavoriteDao : FavoriteDao {
     override suspend fun entry(refSource: String, refComic: String): FavoriteEntryEntity? =
         entries.value.firstOrNull { it.refSource == refSource && it.refComic == refComic }
 
+    override fun observeEntry(refSource: String, refComic: String): Flow<FavoriteEntryEntity?> =
+        entries.map { rows -> rows.firstOrNull { it.refSource == refSource && it.refComic == refComic } }
+
     override suspend fun entries(): List<FavoriteEntryEntity> = entries.value
 
     override suspend fun deleteEntry(refSource: String, refComic: String) {

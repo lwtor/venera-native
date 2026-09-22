@@ -17,6 +17,15 @@ data class DetailsUiState(
     /** The group the list is narrowed to; null shows every group. */
     val selectedGroup: String? = null,
     val order: ChapterOrder = ChapterOrder.SourceOrder,
+    /**
+     * Whether the comic is on the user's shelf. Read from the shelf rather than remembered from the
+     * last tap, so removing it there shows up here.
+     */
+    val isFavorite: Boolean = false,
+    /** False until the assembly layer hands the screen a shelf: until then there is none to use. */
+    val hasShelf: Boolean = false,
+    /** Product copy when keeping or removing the comic failed; never a lower layer's wording. */
+    val shelfMessage: String? = null,
     /** Product copy for the last failure; never a lower layer's wording. */
     val message: String? = null,
 ) {
