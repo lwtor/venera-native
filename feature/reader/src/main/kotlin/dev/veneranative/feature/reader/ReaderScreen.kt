@@ -2,7 +2,8 @@ package dev.veneranative.feature.reader
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -40,7 +41,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,9 +60,6 @@ import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
 import kotlin.math.roundToInt
 
-
-/** How far panning may travel in continuous mode, expressed in screens of content. */
-private const val PAN_HEIGHT_SCREENS = 4f
 
 /**
  * Stateless reader rendering. Every input comes from [state]; every intent leaves as [onAction].
@@ -217,24 +215,31 @@ private fun ContinuousPages(
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { index -> items.getOrNull(index)?.let { onAction(ReaderAction.PageShown(it.page.index)) } }
     }
+    val contentWidthPx = items.maxOfOrNull { it.tile.displayWidthPx }?.toFloat() ?: viewport.widthPx.toFloat()
+    val contentHeightPx = items.sumOf { it.tile.displayHeightPx }.toFloat()
+    val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
+        zoomState.applyGesture(
+            pan = pan,
+            zoomFactor = zoomFactor,
+            viewport = viewport,
+            contentWidthPx = contentWidthPx,
+            contentHeightPx = contentHeightPx,
+        )
+    }
     LazyColumn(
         state = listState,
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(viewport) {
-                // panZoomLock keeps single-finger scrolling with the list: a drag is only treated
-                // as a pan once a second pointer or a zoom is detected.
-                detectTransformGestures(panZoomLock = true) { _, pan, zoomFactor, _ ->
-                    zoomState.applyGesture(
-                        pan = pan,
-                        zoomFactor = zoomFactor,
-                        viewport = viewport,
-                        contentWidthPx = viewport.widthPx * zoomState.scale,
-                        contentHeightPx = viewport.heightPx * zoomState.scale * PAN_HEIGHT_SCREENS,
-                    )
-                }
-            },
-        userScrollEnabled = !zoomState.isZoomed,
+            .graphicsLayer {
+                translationX = zoomState.offsetX
+                translationY = zoomState.offsetY
+            }
+            .transformable(
+                state = transformState,
+                canPan = { zoomState.isZoomed },
+                lockRotationOnZoomPan = true,
+            ),
+        userScrollEnabled = true,
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         items(items, key = { "${it.page.index}:${it.tileIndex}" }) { item ->
@@ -299,20 +304,23 @@ private fun ZoomablePage(
     val tile = remember(page, viewport, zoomState.scale, zoomState.offsetX, zoomState.offsetY, decoder) {
         decoder.planWindow(page, viewport, zoomState.scale, zoomState.offsetX, zoomState.offsetY)
     }
+    val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
+        zoomState.applyGesture(
+            pan = pan,
+            zoomFactor = zoomFactor,
+            viewport = viewport,
+            contentWidthPx = contentWidthPx,
+            contentHeightPx = contentHeightPx,
+        )
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(viewport) {
-                detectTransformGestures(panZoomLock = true) { _, pan, zoomFactor, _ ->
-                    zoomState.applyGesture(
-                        pan = pan,
-                        zoomFactor = zoomFactor,
-                        viewport = viewport,
-                        contentWidthPx = contentWidthPx,
-                        contentHeightPx = contentHeightPx,
-                    )
-                }
-            },
+            .transformable(
+                state = transformState,
+                canPan = { zoomState.isZoomed },
+                lockRotationOnZoomPan = true,
+            ),
     ) {
         val baseXPx = (viewport.widthPx - contentWidthPx) / 2f + zoomState.offsetX
         val baseYPx = (viewport.heightPx - contentHeightPx) / 2f + zoomState.offsetY

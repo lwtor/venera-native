@@ -38,13 +38,17 @@ class ReaderZoomState {
         contentWidthPx: Float,
         contentHeightPx: Float,
     ) {
+        val previousScale = scale
         scale = (scale * zoomFactor).coerceIn(MIN_SCALE, MAX_SCALE)
         if (!isZoomed) {
             resetOffset()
             return
         }
-        val limitXPx = ((contentWidthPx - viewport.widthPx) / 2f).coerceAtLeast(0f)
-        val limitYPx = ((contentHeightPx - viewport.heightPx) / 2f).coerceAtLeast(0f)
+        val scaleChange = scale / previousScale
+        val nextWidthPx = contentWidthPx * scaleChange
+        val nextHeightPx = contentHeightPx * scaleChange
+        val limitXPx = ((nextWidthPx - viewport.widthPx) / 2f).coerceAtLeast(0f)
+        val limitYPx = ((nextHeightPx - viewport.heightPx) / 2f).coerceAtLeast(0f)
         offsetX = (offsetX + pan.x).coerceIn(-limitXPx, limitXPx)
         offsetY = (offsetY + pan.y).coerceIn(-limitYPx, limitYPx)
     }
