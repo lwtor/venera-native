@@ -293,7 +293,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
   “Comic sources are unavailable on this device.” 失败（`:app` 传入的 `UnavailableMetadataReader`）。
 - 未做：从远端 URL 抓取来源包（与来源仓库客户端一起做）。
 
-### S1-08 自有引擎（QuickJS）落地 — IN_PROGRESS（代码部分已完成，剩余 4 项不阻塞后续切片）
+### S1-08 自有引擎（QuickJS）落地 — DONE（Stage 1 文本 Host API 范围）
 
 依赖：S1-02。**阻塞 S1-03**。
 
@@ -310,14 +310,17 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - 契约实现已落地：`QuickJsRuntime`（每源一个引擎实例、取消与超时映射、自行计数结果大小）与
   `QuickJsMetadataReader`（一次性引擎读取 key/name/version，替换装配层的占位实现）。
 - 兼容层范围按真实源调用点确定（ADR-0008 §9），未提供的全局逐条记录而不是猜测补齐。
-- 仍待完成：设备/ABI 与体积实测、二进制通道、取消与超时在真机上的表现确认。
+- Release 构建已通过；Debug 19 MiB、未签名 Release 4.9 MiB，包含 arm64-v8a、armeabi-v7a、x86、
+  x86_64 四个 ABI。JVM 已覆盖取消、超时和超时后恢复。
+- 不宣称完成：真机取消/CPU 死循环终止、脚本二进制 Host 通道、设备手势与进程恢复。二进制协议归入
+  Stage 3；真机项保留为明确延期风险。WebView 兼容实现随二进制协议决策后删除。
 
 交付物：
 
 - `:source:engine` 的自有引擎实现，满足 `:source:api` 契约（引擎实现由装配层选择）。
 - 仓库内测试源（含 `async`/`await` 网络调用）跑通 Explore、Search、Detail、Chapters、Pages。
 - 按 ADR-0008 第 3 节判据产出的数据：调用取消、调用超时、二进制通道、ABI 与体积、许可证登记。
-- 通过后按 ADR-0008 §2.4 处置现有 WebView 实现，并更新 ADR-0002 的引擎状态。
+- `THIRD_PARTY_NOTICES.md` 已登记直接引擎许可证；完整依赖报告和项目许可证仍是发布门禁。
 
 ### S1-03 探索与搜索纵向切片 — DONE
 
@@ -532,3 +535,5 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - Q10 DONE：Runtime 日志、初始化调用 ID、安装/探测超时和同源队列边界完成整改；验证见 STATUS 与整改台账。下一项 Q11 IN_PROGRESS。
 
 - Q11 DONE：生产协议 demo、Source Core 自动回归、本地 HTTP 图片和 SAF 安装入口形成同一闭环；验证见 STATUS 与整改台账。下一项 Q12 IN_PROGRESS。
+
+- Q12 DONE：当前事实、QuickJS 验收范围、ABI/包体、许可状态与延期风险已对齐；验证见 STATUS 与整改台账。下一项 Q13 IN_PROGRESS。

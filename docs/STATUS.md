@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-22 |
 | 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q12（详见质量整改台账） |
-| 当前任务状态 | Q11 DONE；Q12 IN_PROGRESS；Stage 2 暂停 |
+| 当前任务 | Q13（详见质量整改台账） |
+| 当前任务状态 | Q12 DONE；Q13 IN_PROGRESS；Stage 2 暂停 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -42,6 +42,15 @@
 - Q10：日志原文脱敏，init 网络请求具备调用 ID，安装/重建/元数据探测受截止时间保护，同源忙时立即返回可重试错误。QuickJS 1.0.5 的 CPU 死循环仍只能让调用方超时并丢弃引擎，不能声称脚本线程已被终止。验证：`:source:engine:testDebugUnitTest :app:assembleDebug` — PASS。
 
 - Q11：同一份 demo fixture 通过 Source Core 完整能力回归并用于人工闭环；支持 SAF 文件选择安装，正文使用生成图片的受控本地 HTTP 服务。人工设备闭环仍按 Q13 明确记录是否实际执行。验证：`:source:core:testDebugUnitTest :data:source:testDebugUnitTest :feature:sources:testDebugUnitTest :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
+
+- Q12：Release 构建和 Lint Vital 通过；Debug APK 19 MiB，未签名 Release APK 4.9 MiB，QuickJS 覆盖 arm64-v8a、armeabi-v7a、x86、x86_64。新增第三方声明；完整依赖许可报告、项目许可证、签名发布仍属于 Stage 4 发布门禁。脚本二进制 Host 通道归 Stage 3；设备手势、进程恢复/API 26 与真机取消仍明确未验证。
+
+### 当前事实覆盖说明
+
+下方按任务时间记录的历史段落保留审计价值，但其中“尚未引入 Room/Coil”“fixture 阅读器”以及旧测试
+数量等描述已过期。当前实现以本节、`docs/ARCHITECTURE.md` 和质量整改台账为准：Room、Coil、QuickJS、
+来源正文阅读与恢复均已接入；WebView Runtime 仅为待删除兼容实现。设备手势、进程回收/API 26、完整
+人工闭环没有在本轮执行，均不得记为通过。
 
 ## 已经完成
 

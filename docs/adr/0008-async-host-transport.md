@@ -168,11 +168,10 @@ spike 结果（ABI、体积、实测数据）必须回填本节。
 因此引擎适配层必须生成"顶层 await + 最后一条表达式"的包装代码，不能自行包一层 async 函数。
 这条约束已写成 `QuickJsBridgeSpikeTest` 的断言。
 
-仍未验证（需要在实现与设备阶段完成）：
-
-- 调用级取消与超时映射（绑定提供协程取消与 `evaluationTimeoutMillis`，但尚未接入我们的契约）。
-- 二进制通道（`Int8Array ↔ ByteArray` 已在绑定中，尚未在我们的 Host API 上验证）。
-- ABI 覆盖与 APK 体积（需实际打包后测量）。
+当前判据状态：调用级取消、宿主网络取消、超时后重建、初始化 Host 调用和同源队列边界已有 JVM
+回归。正文图片通过共享 OkHttp/Coil 管线传输，Stage 1 的 Host API 只承诺文本响应；真正的二进制请求体
+与脚本字节返回不宣称通过，归入 Stage 3 扩展协议。ABI、Debug/Release 包体与许可证状态以
+`docs/STATUS.md` 的最新质量审查记录为准。
 
 ## 9. 兼容层范围（2026-09-20，按真实源实测）
 
