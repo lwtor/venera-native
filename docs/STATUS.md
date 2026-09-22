@@ -7,9 +7,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 最后更新 | 2026-09-22 |
-| 当前阶段 | Stage 1：质量整改 — **IN_PROGRESS** |
-| 当前任务 | Q13（详见质量整改台账） |
-| 当前任务状态 | Q12 DONE；Q13 IN_PROGRESS；Stage 2 暂停 |
+| 当前阶段 | Stage 1：核心阅读闭环 — **DONE** |
+| 当前任务 | S2-01 本地收藏与书架 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01 TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -44,6 +44,8 @@
 - Q11：同一份 demo fixture 通过 Source Core 完整能力回归并用于人工闭环；支持 SAF 文件选择安装，正文使用生成图片的受控本地 HTTP 服务。人工设备闭环仍按 Q13 明确记录是否实际执行。验证：`:source:core:testDebugUnitTest :data:source:testDebugUnitTest :feature:sources:testDebugUnitTest :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 - Q12：Release 构建和 Lint Vital 通过；Debug APK 19 MiB，未签名 Release APK 4.9 MiB，QuickJS 覆盖 arm64-v8a、armeabi-v7a、x86、x86_64。新增第三方声明；完整依赖许可报告、项目许可证、签名发布仍属于 Stage 4 发布门禁。脚本二进制 Host 通道归 Stage 3；设备手势、进程恢复/API 26 与真机取消仍明确未验证。
+
+- Q13：修复阶段门禁发现的 `AppGraph` Context 静态持有、Compose Modifier 参数顺序和预览硬编码存储路径；执行全量 Debug Lint、全部 JVM 单测及 Debug/Release 构建。274 项测试通过，零失败/错误/跳过；Stage 1 质量复验结论为通过。完整结论见 `docs/reviews/stage-01-final.md`。
 
 ### 当前事实覆盖说明
 

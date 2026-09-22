@@ -51,8 +51,8 @@ fun SourcesScreen(
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
     onBack: () -> Unit,
-    onChooseScript: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onChooseScript: () -> Unit = {},
 ) {
     var pendingUninstall by remember { mutableStateOf<InstalledSource?>(null) }
 
@@ -279,7 +279,7 @@ private fun SourcesScreenPreview() {
                         name = "Demo Source",
                         version = "1.0.0",
                         enabled = true,
-                        origin = "/sdcard/demo.js",
+                        origin = "content://demo/source.js",
                     ),
                 ),
             ),

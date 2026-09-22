@@ -16,8 +16,8 @@ import dev.veneranative.data.source.SourceRepository
 fun SourcesRoute(
     repository: SourceRepository,
     onBack: () -> Unit,
-    onRequestScript: (((String) -> Unit) -> Unit) = {},
     modifier: Modifier = Modifier,
+    onRequestScript: (((String) -> Unit) -> Unit) = {},
 ) {
     val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository) }
     val state by viewModel.state.collectAsStateWithLifecycle()

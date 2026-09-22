@@ -77,21 +77,23 @@ import kotlinx.coroutines.launch
 class AppGraph(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val progressTracker = AtomicReference<ReadingProgressTracker?>(null)
-    private val context = application.applicationContext
     private val imageCache = PageImageCache(64L * 1024 * 1024)
     private val httpClient = AppHttpClientFactory.create(AppHttpClientFactory.createDispatcher())
     private val cookieJars = PerSourceCookieJarRegistry()
     private val network = SourceNetworkExecutor(baseClient = httpClient, cookieJars = cookieJars)
     private val authProvider = SourceCookieImageAuth(cookieJars)
-    private val diskCache = comicImageDiskCache(context)
+    private val diskCache = comicImageDiskCache(getApplication())
     private val imagePipeline = CoilComicImagePipeline(httpClient, diskCache, authProvider)
-    val imageLoader = comicImageLoader(context, authProvider, imagePipeline, diskCache)
+    val imageLoader = comicImageLoader(getApplication(), authProvider, imagePipeline, diskCache)
     private val runtime = QuickJsRuntime(
         hostApi = SourceNetworkHostApi(network), appLocale = Locale.getDefault().toString(),
     )
     val sourceRepository = DefaultSourceRepository(
-        SourcePackageStore(File(context.filesDir, "sources")), runtime, QuickJsMetadataReader(),
-        AndroidSourceScriptFetcher(context), onSourceChanged = { network.clearSource(it) },
+        SourcePackageStore(File(getApplication<android.app.Application>().filesDir, "sources")),
+        runtime,
+        QuickJsMetadataReader(),
+        AndroidSourceScriptFetcher(getApplication()),
+        onSourceChanged = { network.clearSource(it) },
     )
     val catalog = DefaultComicCatalog(sourceRepository, EngineSourceCore(runtime))
     val provider: PageProvider = SourcePageProvider(catalog, CoilPageImageSizer(imagePipeline))
@@ -108,7 +110,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     val history: kotlinx.coroutines.flow.StateFlow<HistoryRepository?> = _history
     init {
         scope.launch {
-            val db = VeneraDatabaseFactory.get(context)
+            val db = VeneraDatabaseFactory.get(getApplication())
             val repository = DefaultHistoryRepository(db)
             progressTracker.set(ReadingProgressTracker(repository, scope, clock = { System.currentTimeMillis() }))
             _history.value = repository

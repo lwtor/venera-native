@@ -28,7 +28,7 @@
 | 阶段 | 目标 | 退出条件 | 状态 |
 | --- | --- | --- | --- |
 | Stage 0 | 验证 JS 漫画源和阅读器两项最高风险技术 | JavaScriptEngine 与大图方案形成有证据的 ADR | DONE（2026-09-20 退出） |
-| Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | IN_PROGRESS（质量审查发现闭环缺陷，按 Q00–Q13 整改） |
+| Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | DONE（Q00–Q13 整改及阶段复验通过） |
 | Stage 2 | 完成书架、下载和本地阅读 | 离线可浏览书架并阅读下载或本地漫画 | TODO |
 | Stage 3 | 补齐来源扩展能力 | Core/Extended 协议测试通过，Advanced 有支持矩阵 | TODO |
 | Stage 4 | 同步、自适应、性能与发布 | RC 通过迁移、压力、无障碍与发布检查 | TODO |
@@ -512,7 +512,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 
 ## 10. Stage 0/1 质量整改
 
-当前执行表与验收：`docs/reviews/stage-01-remediation.md`。Q00 DONE；Q01 IN_PROGRESS；Q02–Q13 TODO。Stage 1 复验退出前不启动 S2-01。
+执行表与验收：`docs/reviews/stage-01-remediation.md`。Q00–Q13 全部 DONE，Stage 1 已通过阶段复验；当前唯一下一任务为 S2-01。
 
 - Q01 DONE：修复正文有界读取与回调异常映射；新增短/空/边界、chunked 超限和读取异常回归。；验证见 STATUS 与整改台账。下一项 Q02 IN_PROGRESS。
 
@@ -536,4 +536,6 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 
 - Q11 DONE：生产协议 demo、Source Core 自动回归、本地 HTTP 图片和 SAF 安装入口形成同一闭环；验证见 STATUS 与整改台账。下一项 Q12 IN_PROGRESS。
 
-- Q12 DONE：当前事实、QuickJS 验收范围、ABI/包体、许可状态与延期风险已对齐；验证见 STATUS 与整改台账。下一项 Q13 IN_PROGRESS。
+- Q12 DONE：当前事实、QuickJS 验收范围、ABI/包体、许可状态与延期风险已对齐；验证见 STATUS 与整改台账。后续 Q13 已完成。
+
+- Q13 DONE：全量 Debug Lint、274 项 JVM 单测、Debug/Release 构建通过；修复门禁发现的 4 项 Lint 错误并形成最终审查记录。Stage 1 DONE；下一项 S2-01 TODO。

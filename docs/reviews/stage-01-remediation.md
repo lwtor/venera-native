@@ -17,7 +17,7 @@
 | Q10 | Runtime 边界 | DONE | R15/R16/R17；日志、init、超时取消队列 |
 | Q11 | 测试源与闭环 | DONE | R07；同一协议 fixture、安装、网络图片 |
 | Q12 | 文档和引擎判据 | DONE | 旧状态、ADR、构建/ABI/许可及延期归属 |
-| Q13 | 阶段复验 | IN_PROGRESS | 明确测试门禁与最终质量结论 |
+| Q13 | 阶段复验 | DONE | 明确测试门禁与最终质量结论 |
 
 ## 验证记录
 
@@ -46,3 +46,5 @@ Q10：来源日志原文在进入宿主前脱敏；init Host 请求带安装调�
 Q11：仓库 demo 改用生产协议并由 Source Core 测试直接加载；图片改为本地 HTTP 生成物；增加系统文件选择器和 content URI 读取，修正文档中的离线验收语义。验证：`:source:core:testDebugUnitTest :data:source:testDebugUnitTest :feature:sources:testDebugUnitTest :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check`。
 
 Q12：修正文档当前事实、QuickJS 判据与延期归属，登记第三方许可证；Release 构建通过，Debug 19 MiB、未签名 Release 4.9 MiB，四个 ABI 均含 libquickjs.so。验证：`:app:assembleRelease` — PASS；`git diff --check`。
+
+Q13：执行阶段完整质量门禁；修复 `AppGraph` 的 Context 静态持有、两个 Compose Modifier 参数顺序及预览硬编码 `/sdcard`。验证：`lintDebug testDebugUnitTest :app:assembleDebug :app:assembleRelease` — PASS（274 tests，0 failures/errors/skipped；1625 Gradle tasks）；`git diff --check`。最终结论见 `stage-01-final.md`。
