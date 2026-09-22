@@ -103,6 +103,9 @@ java -Xmx2g tools/test-images/GenerateTestImages.java feature/reader/src/main/as
 
 生成后阅读器会改用真实解码管线；未生成时自动退回占位渲染。输出目录已被 `.gitignore` 排除。
 
+Stage 1 的完整本地来源闭环使用 `tools/test-sources/demo_comic_source.js`。生成图片、启动本地 HTTP
+服务、通过系统文件选择器安装以及离线重试步骤见 `tools/test-sources/README.md`。
+
 ## 许可与来源说明
 
 Venera 原项目采用 GPL-3.0。本项目在进入功能实现阶段前，将根据实际复用的源码、资源和漫画源兼容层完成许可证确认，并持续在应用“关于”页面和项目文档中保留上游致谢与链接。

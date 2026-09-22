@@ -1,7 +1,11 @@
 package dev.veneranative.data.source
 
+import android.content.Context
+import android.net.Uri
 import java.io.File
 import java.net.URI
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Reads source script text from wherever the user pointed at.
@@ -41,5 +45,28 @@ class LocalFileScriptFetcher : SourceScriptFetcher {
                 }
             }
             .getOrElse { FetchedScript.Failure("The source script could not be read.") }
+    }
+}
+
+/** Reads Storage Access Framework documents and falls back to ordinary local paths. */
+class AndroidSourceScriptFetcher(
+    context: Context,
+    private val local: SourceScriptFetcher = LocalFileScriptFetcher(),
+) : SourceScriptFetcher {
+    private val resolver = context.applicationContext.contentResolver
+
+    override suspend fun fetch(location: String): FetchedScript {
+        if (!location.startsWith("content:", ignoreCase = true)) return local.fetch(location)
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                resolver.openInputStream(Uri.parse(location))?.bufferedReader()?.use { it.readText() }
+            }.fold(
+                onSuccess = { script ->
+                    if (script.isNullOrBlank()) FetchedScript.Failure("The source script is empty.")
+                    else FetchedScript.Success(script)
+                },
+                onFailure = { FetchedScript.Failure("The source script could not be read.") },
+            )
+        }
     }
 }

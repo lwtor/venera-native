@@ -143,6 +143,13 @@ private fun AppNavHost(
     historyRepository: HistoryRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
+    var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    val scriptPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        uri?.toString()?.let { scriptSelection?.invoke(it) }
+        scriptSelection = null
+    }
     when (val current = route) {
         AppRoute.Home -> HomeRoute(
             onOpenReader = { },
@@ -154,6 +161,10 @@ private fun AppNavHost(
         AppRoute.Sources -> SourcesRoute(
             repository = sourceRepository,
             onBack = { onRouteChange(AppRoute.Home) },
+            onRequestScript = { consume ->
+                scriptSelection = consume
+                scriptPicker.launch(arrayOf("application/javascript", "text/javascript", "text/plain"))
+            },
         )
 
         is AppRoute.Explore -> ExploreRoute(

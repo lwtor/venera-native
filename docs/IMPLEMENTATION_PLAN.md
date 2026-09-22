@@ -530,3 +530,5 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 - Q09 DONE：阅读缩放使用与父级滚动协作的手势，缩放后平移可见且有界；验证见 STATUS 与整改台账。下一项 Q10 IN_PROGRESS。
 
 - Q10 DONE：Runtime 日志、初始化调用 ID、安装/探测超时和同源队列边界完成整改；验证见 STATUS 与整改台账。下一项 Q11 IN_PROGRESS。
+
+- Q11 DONE：生产协议 demo、Source Core 自动回归、本地 HTTP 图片和 SAF 安装入口形成同一闭环；验证见 STATUS 与整改台账。下一项 Q12 IN_PROGRESS。

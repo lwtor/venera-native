@@ -35,6 +35,30 @@ import org.junit.Test
  */
 class EngineSourceCoreTest {
 
+    @Test
+    fun `repository demo source exposes the complete stage one protocol`() = runBlocking {
+        val scriptFile = generateSequence(java.io.File(System.getProperty("user.dir"))) { it.parentFile }
+            .map { java.io.File(it, "tools/test-sources/demo_comic_source.js") }
+            .first { it.isFile }
+        val script = scriptFile.readText()
+        val id = SourceId("demo_comic_source")
+        val runtime = QuickJsRuntime()
+        try {
+            assertTrue(runtime.install(SourcePackage(id, "2", script, sha256(script))) is SourceInstallResult.Installed)
+            val core = EngineSourceCore(runtime)
+            val capabilities = (core.capabilities(id) as SourceOutcome.Success).value
+            assertTrue(capabilities.supports(SourceCapability.EXPLORE))
+            assertTrue(capabilities.supports(SourceCapability.SEARCH))
+            assertTrue(capabilities.supports(SourceCapability.DETAIL))
+            assertTrue(capabilities.supports(SourceCapability.PAGES))
+            val comicKey = ComicKey(id, RemoteComicId("c1"))
+            assertTrue(core.detail(comicKey) is SourceOutcome.Success)
+            val pages = core.pages(ChapterKey(comicKey, RemoteChapterId("ch1"))) as SourceOutcome.Success
+            assertEquals(3, pages.value.size)
+            assertTrue(pages.value.all { it.imageRef.startsWith("http://127.0.0.1:8765/") })
+        } finally { runtime.close() }
+    }
+
     private val sourceId = SourceId(FIXTURE_KEY)
 
     @Test

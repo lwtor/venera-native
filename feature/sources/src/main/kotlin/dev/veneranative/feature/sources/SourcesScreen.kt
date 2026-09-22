@@ -51,6 +51,7 @@ fun SourcesScreen(
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
     onBack: () -> Unit,
+    onChooseScript: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var pendingUninstall by remember { mutableStateOf<InstalledSource?>(null) }
@@ -69,7 +70,7 @@ fun SourcesScreen(
                 .fillMaxSize()
                 .padding(contentPadding),
         ) {
-            InstallRow(state = state, onAction = onAction)
+            InstallRow(state = state, onAction = onAction, onChooseScript = onChooseScript)
             state.message?.let { message ->
                 MessageRow(message = message, onDismiss = { onAction(SourcesAction.DismissMessage) })
             }
@@ -162,6 +163,7 @@ fun SourcesScreen(
 private fun InstallRow(
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
+    onChooseScript: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -183,6 +185,9 @@ private fun InstallRow(
             enabled = state.canInstall,
         ) {
             Text(if (state.installing) "Installing…" else "Install")
+        }
+        TextButton(onClick = onChooseScript, enabled = !state.installing) {
+            Text("Choose JavaScript file")
         }
         if (state.installing) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())

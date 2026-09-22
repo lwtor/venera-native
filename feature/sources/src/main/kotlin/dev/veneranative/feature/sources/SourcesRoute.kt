@@ -16,6 +16,7 @@ import dev.veneranative.data.source.SourceRepository
 fun SourcesRoute(
     repository: SourceRepository,
     onBack: () -> Unit,
+    onRequestScript: (((String) -> Unit) -> Unit) = {},
     modifier: Modifier = Modifier,
 ) {
     val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository) }
@@ -24,6 +25,12 @@ fun SourcesRoute(
         state = state,
         onAction = viewModel::onAction,
         onBack = onBack,
+        onChooseScript = {
+            onRequestScript { location ->
+                viewModel.onAction(SourcesAction.InstallLocationChanged(location))
+                viewModel.onAction(SourcesAction.Install)
+            }
+        },
         modifier = modifier,
     )
 }
