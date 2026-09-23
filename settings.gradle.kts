@@ -27,6 +27,7 @@ include(
     ":core:network",
     ":data:comic",
     ":data:collection",
+    ":data:download",
     ":data:history",
     ":data:source",
     ":feature:details",

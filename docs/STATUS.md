@@ -6,10 +6,10 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-09-22 |
+| 最后更新 | 2026-09-23 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-02（S2-01 已完成待验收） |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01 DONE；S2-02 TODO |
+| 当前任务 | S2-03 Android 后台下载执行 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01 DONE；S2-02 DONE；S2-03 TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -53,6 +53,66 @@
 数量等描述已过期。当前实现以本节、`docs/ARCHITECTURE.md` 和质量整改台账为准：Room、Coil、QuickJS、
 来源正文阅读与恢复均已接入；WebView Runtime 仅为待删除兼容实现。设备手势、进程回收/API 26、完整
 人工闭环没有在本轮执行，均不得记为通过。
+
+## 最近完成：S2-02 下载领域与持久队列 — DONE
+
+依赖：S2-01（Room v2 与 `ComicRef` 已落地）。
+
+实际交付：
+
+- `:core:database` 升到 **version 3**，只加一个 `MIGRATION_2_3`：`download_task`（章节一行，含
+  `worker_id` / `heartbeat_at` 用于崩溃后认领）与 `download_page`（每页一行，外键级联删除）。
+  `core/database/schemas/.../3.json` 已入库，迁移测试断言 v2→v3 后收藏行仍在。
+- 新建 `:data:download`：`DownloadRepository` 契约 + `DefaultDownloadRepository`、`DownloadStateMachine`、
+  `DownloadQueue`、`PageDownloader`、`DownloadFileLayout`、`DownloadRecovery`、`ChapterManifest`、
+  `DownloadPlanner`、`DownloadMappers`、`DownloadEnvironment`。
+- **并发是真的被限制住，不是约定**：`DownloadQueue` 用两个信号量——全局 4、单源 2。单源限制存在的理由
+  是来源会限流甚至封禁，而一个章节属于一个来源；没有它，全局 4 会被最先入队的那个章节吃满。
+- **页写入是原子的**：`.part` 写 + `fsync` + `rename`，只有改名后调用方才看得到文件；崩溃留下的是
+  「没有这个页」而不是「半个页」。写完立刻用 `:core:image` 的 `ImageSizeHeaderParser` 校验头部——防盗链
+  会返回 200 加一段 HTML，不校验的话队列会塞满解码出空白的假页。校验失败删文件并计 `Failed`。
+- **章节状态由页状态派生**，不存在独立的「章节已完成」字段，因此两者不可能互相矛盾。派生顺序里
+  `Failed` 排在 `Queued` 之前：一页失败比「还有页在排队」更值得告诉用户。
+- 恢复扫描处理三种「谎」：心跳过期的 `Running` 页回到 `Queued`；`Succeeded` 但文件缺失/大小不符的页
+  回到 `Queued`；数据库行丢失但 `chapter.json` 还在时按清单重建（磁盘上已有文件的页直接记为完成，
+  不重复下载）。无主文件只报告不删除——它可能是用户还想要的章节。
+- `chapter.json` 在入队时原子写入，是数据库丢失后重建的唯一权威。
+
+验收对照：
+
+| 验收项 | 结论 | 依据 |
+| --- | --- | --- |
+| 页级任务与幂等入队 | 通过 | `DefaultDownloadRepositoryTest`：重复入队不产生重复页行，且已完成的进度不被重置 |
+| 状态机与终态 | 通过 | `DownloadStateMachineTest`：`Succeeded` 不可回退、`Canceled` 不可复活、非法迁移抛错而非静默应用 |
+| 暂停 / 继续 / 取消 | 通过 | `DefaultDownloadRepositoryTest`：暂停只影响未开始的页（在途页允许落地）、取消后行与文件都不剩 |
+| 全局 4 / 单源 2 | 通过 | `DownloadQueueTest`：实测峰值并发；慢来源不会把另一来源的页堵在后面 |
+| 原子写 + 完整性校验 | 通过 | `DownloadFileLayoutTest`（无 `.part` 残留、写失败不留文件）+ `PageDownloaderTest`（非图片字节判 `Corrupt` 且文件被删） |
+| 恢复扫描 | 通过 | `DownloadRecoveryTest`：僵尸页重置、文件缺失/截断重置、清单收养、孤儿只报告不删除 |
+| v3 迁移与基线 | 通过 | `3.json` 入库；`VeneraDatabaseMigrationTest` 新增 v2→v3、v1→v3 两个数据保留用例（编译级） |
+
+已知缺口（明确留给后续，不是遗漏）：
+
+- **还没有后台执行者**：`DownloadRepository` 已可用，但没人调用它。Worker、通知、约束是 S2-03。
+- **没有 UI**：没有下载列表页，也没有从详情页触发下载的入口，属 S2-03 之后的装配。
+- 心跳过期阈值定为 5 分钟（`HEARTBEAT_STALE_AFTER_MILLIS`），未经真机验证；Worker 多久打一次心跳
+  由 S2-03 决定，届时若心跳周期接近 5 分钟需要一起调整。
+- instrumentation 测试（迁移）只编译未执行；未跑 Lint、未装 APK。
+
+验证记录：
+
+```text
+2026-09-23（编译级 + 相关模块 JVM 单测，按 AGENTS.md 第 7 节普通节点策略）
+JAVA_HOME=/Users/lwtor/Library/Java/JavaVirtualMachines/corretto-17.0.9/Contents/Home
+ANDROID_HOME=/Users/lwtor/Library/Android/sdk
+sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
+           :core:database:compileDebugAndroidTestKotlin :app:assembleDebug
+结果：BUILD SUCCESSFUL
+
+新增 JVM 单测：data:download 69（DefaultDownloadRepositoryTest 15 / DownloadRecoveryTest 12 /
+  DownloadStateMachineTest 10 / DownloadFileLayoutTest 11 / DownloadMappersTest 8 /
+  PageDownloaderTest 7 / DownloadQueueTest 6）、core:model 5（ChapterRefTest）
+全量 testDebugUnitTest：BUILD SUCCESSFUL
+```
 
 ## 最近完成：S2-01 本地收藏与书架 — DONE
 

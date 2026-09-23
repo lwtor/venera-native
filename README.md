@@ -52,11 +52,14 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 :core:navigation
 :core:network
 :data:comic
+:data:collection
+:data:download
 :data:history
 :data:source
 :feature:details
 :feature:explore
 :feature:home
+:feature:library
 :feature:reader
 :feature:search
 :feature:sources

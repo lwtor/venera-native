@@ -100,6 +100,86 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun versionThreeCreatesTheQueueTables() {
+        val created = helper.createDatabase(TEST_DB, 3)
+
+        assertEquals(
+            listOf(
+                "download_page",
+                "download_task",
+                "favorite_entry",
+                "favorite_folder",
+                "reading_history",
+                "reading_progress",
+            ),
+            created.tableNames(),
+        )
+        created.close()
+    }
+
+    @Test fun migratingFromTwoToThreeValidatesAgainstTheExportedSchema() {
+        helper.createDatabase(TEST_DB, 2).close()
+
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_2_3).close()
+    }
+
+    @Test fun migratingFromTwoToThreeKeepsTheShelfRows() {
+        helper.createDatabase(TEST_DB, 2).apply {
+            execSQL("INSERT INTO favorite_folder VALUES('default','Default',0,0)")
+            execSQL(
+                "INSERT INTO favorite_entry VALUES(" +
+                    "'source-a','comic-1','default','Comic',NULL,NULL,1000,NULL,12,'chapter-12',0,NULL)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_2_3).use { db ->
+            assertEquals(
+                listOf("default" to "Default"),
+                db.query("SELECT folder_id, name FROM favorite_folder").use { cursor ->
+                    buildList {
+                        while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+                    }
+                },
+            )
+            assertEquals(
+                listOf("comic-1" to "chapter-12"),
+                db.query("SELECT ref_comic, latest_chapter_id FROM favorite_entry").use { cursor ->
+                    buildList {
+                        while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1))
+                    }
+                },
+            )
+        }
+    }
+
+    @Test fun migratingFromOneToThreeKeepsStageOneRowsThroughBothSteps() {
+        helper.createDatabase(TEST_DB, 1).apply {
+            execSQL(
+                "INSERT INTO reading_history VALUES(" +
+                    "'source-a','comic-1','chapter-3','Comic','Chapter 3','cover',3,12,1000)",
+            )
+            execSQL("INSERT INTO reading_progress VALUES('source-a','comic-1','chapter-3',3,1000)")
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 3, true, MIGRATION_1_2, MIGRATION_2_3).use { db ->
+            assertEquals(listOf("chapter-3" to 3), db.readPairs("reading_history"))
+            assertEquals(listOf("chapter-3" to 3), db.readPairs("reading_progress"))
+            assertEquals(
+                listOf(
+                    "download_page",
+                    "download_task",
+                    "favorite_entry",
+                    "favorite_folder",
+                    "reading_history",
+                    "reading_progress",
+                ),
+                db.tableNames(),
+            )
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

@@ -66,5 +66,53 @@ val MIGRATION_1_2: Migration = object : Migration(1, 2) {
     }
 }
 
+/** S2-02: the download queue — one row per chapter and one per page. */
+val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `download_task` (" +
+                "`task_id` TEXT NOT NULL, " +
+                "`ref_source` TEXT NOT NULL, " +
+                "`ref_comic` TEXT NOT NULL, " +
+                "`ref_chapter` TEXT NOT NULL, " +
+                "`title` TEXT NOT NULL, " +
+                "`comic_title` TEXT, " +
+                "`page_count` INTEGER NOT NULL, " +
+                "`completed_pages` INTEGER NOT NULL, " +
+                "`state` TEXT NOT NULL, " +
+                "`worker_id` TEXT, " +
+                "`heartbeat_at` INTEGER NOT NULL, " +
+                "`created_at` INTEGER NOT NULL, " +
+                "`updated_at` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`task_id`)" +
+                ")",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_download_task_updated_at` " +
+                "ON `download_task` (`updated_at`)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `download_page` (" +
+                "`task_id` TEXT NOT NULL, " +
+                "`page_index` INTEGER NOT NULL, " +
+                "`image_ref` TEXT NOT NULL, " +
+                "`state` TEXT NOT NULL, " +
+                "`relative_path` TEXT, " +
+                "`bytes` INTEGER NOT NULL, " +
+                "`attempts` INTEGER NOT NULL, " +
+                "`last_error` TEXT, " +
+                "PRIMARY KEY(`task_id`, `page_index`), " +
+                "FOREIGN KEY(`task_id`) REFERENCES `download_task`(`task_id`) " +
+                "ON UPDATE NO ACTION ON DELETE CASCADE" +
+                ")",
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_download_page_state` " +
+                "ON `download_page` (`state`)",
+        )
+    }
+}
+
 /** Every migration the database knows about, in order. */
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2)
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3)
