@@ -50,8 +50,8 @@ immutable UiState
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与书架的入口 | Design System、领域契约 |
-| `:feature:library` | 书架页：收藏与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记与条目操作，本地页接入 SAF 导入和移除 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:local` |
-| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏/取消收藏（写入默认分组），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:source:api` |
+| `:feature:library` | 书架页：收藏、下载队列与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local` |
+| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏与下载操作；打开章节通过远端 `ChapterRef` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度 | Design System、`:core:model`、`:core:image` |

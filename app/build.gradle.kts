@@ -31,6 +31,10 @@ dependencies {
     implementation(project(":data:collection"))
     // The assembly layer installs the download environment the worker reads (ADR-0005 §2.5).
     implementation(project(":data:download"))
+    // The app declares WorkManager's foreground service in its merged manifest, so keep the
+    // runtime dependency visible to app lint and manifest validation rather than relying on a
+    // transitive implementation detail of :data:download.
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(project(":data:history"))
     implementation(project(":data:local"))
     implementation(project(":data:source"))

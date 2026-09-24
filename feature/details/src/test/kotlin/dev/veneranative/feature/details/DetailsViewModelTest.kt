@@ -13,12 +13,18 @@ import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.chaptersOf
 import dev.veneranative.core.model.groupedChaptersOf
 import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
 import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
+import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.download.DownloadTask
+import dev.veneranative.data.download.DownloadPage
+import dev.veneranative.data.download.DownloadError
+import dev.veneranative.data.download.RecoveryReport
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
@@ -30,6 +36,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -68,6 +76,21 @@ class DetailsViewModelTest {
         assertEquals("Frieren", viewModel.state.value.title)
         assertEquals("Source S", viewModel.state.value.sourceName)
         assertEquals(listOf("Chapter 1", "Chapter 2"), viewModel.state.value.visibleChapters.map { it.title })
+    }
+
+    @Test fun `download chapter action resolves source pages and enqueues remote reference`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        catalog.pagesResponse = SourceOutcome.Success(listOf(SourcePage(0, "https://page/1"), SourcePage(1, "https://page/2")))
+        val downloads = RecordingDownloadRepository()
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        advanceUntilIdle()
+        val chapter = viewModel.state.value.detail!!.chapters.first()
+        viewModel.onAction(DetailsAction.DownloadChapter(chapter.key))
+        advanceUntilIdle()
+        assertEquals(ChapterRef.Remote(chapter.key), downloads.enqueuedChapter)
+        assertEquals(listOf("https://page/1", "https://page/2"), downloads.enqueuedPages.map { it.imageRef })
+        assertEquals(1, viewModel.state.value.downloadQueueVersion)
     }
 
     @Test
@@ -321,6 +344,7 @@ class DetailsViewModelTest {
         var detailResponse: SourceOutcome<ComicDetail> =
             SourceOutcome.Failure(SourceRuntimeError.Internal("no response configured"))
         var detailCalls: Int = 0
+        var pagesResponse: SourceOutcome<List<SourcePage>> = SourceOutcome.Success(emptyList())
 
         override suspend fun searchableSources(): List<InstalledSource> = emptyList()
 
@@ -338,12 +362,35 @@ class DetailsViewModelTest {
             source?.takeIf { it.sourceId == sourceId }
 
         override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
-            error("not used by the details screen")
+            pagesResponse
 
         override fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem> =
             error("not used by the details screen")
 
         override fun search(request: SearchRequest): PagingSource<PageKey, Comic> =
             error("not used by the details screen")
+    }
+
+    private class RecordingDownloadRepository : DownloadRepository {
+        var enqueuedChapter: ChapterRef? = null
+        var enqueuedPages: List<SourcePage> = emptyList()
+        override fun observeTasks(): Flow<List<DownloadTask>> = emptyFlow()
+        override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = emptyFlow()
+        override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) {
+            enqueuedChapter = chapter
+            enqueuedPages = pages
+        }
+        override suspend fun pause(chapter: ChapterRef) = Unit
+        override suspend fun resume(chapter: ChapterRef) = Unit
+        override suspend fun cancel(chapter: ChapterRef) = Unit
+        override suspend fun retryFailed(chapter: ChapterRef) = Unit
+        override suspend fun recover(workerId: String) = RecoveryReport(workerId, 0, 0, 0, 0, emptyList())
+        override suspend fun isCompleteOffline(chapter: ChapterRef) = false
+        override suspend fun pagesOf(chapter: ChapterRef) = emptyList<DownloadPage>()
+        override suspend fun queuedPages(limit: Int) = emptyList<DownloadPage>()
+        override suspend fun markRunning(chapter: ChapterRef, index: Int) = false
+        override suspend fun markPaused(chapter: ChapterRef, index: Int) = false
+        override suspend fun markSucceeded(chapter: ChapterRef, index: Int, relativePath: String, bytes: Long) = false
+        override suspend fun markFailed(chapter: ChapterRef, index: Int, error: DownloadError) = false
     }
 }

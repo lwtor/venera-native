@@ -13,6 +13,7 @@ dependencies {
     // Keeping a comic: the details screen writes to the shelf rather than growing its own storage.
     implementation(project(":data:collection"))
     implementation(project(":data:comic"))
+    implementation(project(":data:download"))
     implementation(project(":source:api"))
 
     implementation(platform(libs.compose.bom))

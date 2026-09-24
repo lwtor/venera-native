@@ -26,6 +26,8 @@ data class DetailsUiState(
     val hasShelf: Boolean = false,
     /** Product copy when keeping or removing the comic failed; never a lower layer's wording. */
     val shelfMessage: String? = null,
+    val downloadMessage: String? = null,
+    val downloadQueueVersion: Int = 0,
     /** Product copy for the last failure; never a lower layer's wording. */
     val message: String? = null,
 ) {

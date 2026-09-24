@@ -49,6 +49,10 @@ import dev.veneranative.data.history.DefaultHistoryRepository
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.history.ReadingHistoryEntry
 import dev.veneranative.data.history.ReadingProgressTracker
+import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.download.worker.DownloadWorkScheduler
+import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.data.local.localReaderKey
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.LocalFileScriptFetcher
 import dev.veneranative.data.source.SourcePackageStore
@@ -106,6 +110,7 @@ private fun App(
     val historyRepository by graph.history.collectAsStateWithLifecycle()
     val collectionRepository by graph.collection.collectAsStateWithLifecycle()
     val localRepository by graph.local.collectAsStateWithLifecycle()
+    val downloadRepository by graph.download.collectAsStateWithLifecycle()
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -131,6 +136,7 @@ private fun App(
             historyRepository = historyRepository,
             collectionRepository = collectionRepository,
             localRepository = localRepository,
+            downloadRepository = downloadRepository,
             progressTracker = progressTracker,
         )
     }
@@ -149,6 +155,7 @@ private fun AppNavHost(
     historyRepository: HistoryRepository?,
     collectionRepository: CollectionRepository?,
     localRepository: dev.veneranative.data.local.LocalComicRepository?,
+    downloadRepository: DownloadRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -177,7 +184,7 @@ private fun AppNavHost(
 
         AppRoute.Library -> {
             val collection = collectionRepository
-            if (collection == null || localRepository == null) {
+            if (collection == null || localRepository == null || downloadRepository == null) {
                 androidx.compose.material3.CircularProgressIndicator()
             } else {
                 LibraryRoute(
@@ -186,6 +193,9 @@ private fun AppNavHost(
                     onRequestLocalImport = { consume -> pendingLocalImport = consume; localTreePicker.launch(null) },
                     onRequestArchiveImport = { consume -> pendingArchiveImport = consume; localArchivePicker.launch(arrayOf("application/zip", "application/x-7z-compressed", "application/octet-stream")) },
                     onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
+                    onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
+                    downloads = downloadRepository,
+                    onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                     onBack = { onRouteChange(AppRoute.Home) },
                 )
             }
@@ -216,7 +226,9 @@ private fun AppNavHost(
             catalog = catalog,
             comicKey = current.comicKey,
             collection = collectionRepository,
-            onOpenChapter = { onRouteChange(AppRoute.Reader(it)) },
+            downloads = downloadRepository,
+            onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it))) },
+            onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
             onBack = { onRouteChange(AppRoute.Home) },
         )
 
@@ -232,7 +244,12 @@ private fun AppNavHost(
                 }
                 ReaderRoute(
                     chapter = current.chapter, provider = provider,
-                    onBack = { onRouteChange(AppRoute.ComicDetails(current.chapter.comicKey)) },
+                    onBack = {
+                        when (val chapter = current.chapter) {
+                            is ChapterRef.Local -> onRouteChange(AppRoute.Library)
+                            is ChapterRef.Remote -> onRouteChange(AppRoute.ComicDetails(chapter.key.comicKey))
+                        }
+                    },
                     decoderFactory = decoderFactory, progress = session,
                     onExit = { appScope.launch { runCatching { tracker.flush() } } },
                 )

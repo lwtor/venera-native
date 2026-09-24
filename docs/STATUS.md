@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-24 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-07B 下载用户流程 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06 DONE；S2-07A DONE；当前唯一执行任务 S2-07B |
+| 当前任务 | S2-07C Stage 2 质量复验 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；当前唯一执行任务 S2-07C |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -124,7 +124,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 ## S2-07 进展
 
 - **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
-- **S2-07B 下载用户流程 — IN_PROGRESS。** 当前切片已接入详情页排队、WorkManager 启动以及书架下载列表操作；将在本切片完成测试、文档并独立提交。
+- **S2-07B 下载用户流程 — DONE。** 详情 ViewModel 读取章节页并写入持久下载仓库；成功后由 Route 通知装配层启动唯一 WorkManager。书架 Downloads tab 展示页数进度并可暂停、继续、重试、移除；ViewModel 测试覆盖详情到队列的数据与下载列表控制委派。验证：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
+- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** Stage 退出门禁和最终审查记录待完成；依赖版本 lint 错误须按审查结论处理，不得把未通过写成 DONE。
 - **设备闭环未执行。** Stage 2 手工脚本：安装 Debug APK；从测试来源详情选择章节并点 Download；Library → Downloads 检查页数、暂停、继续与移除；Library → Local 导入测试目录及生成的 CBZ/7z，逐章阅读并离开重进；飞行模式重开已下载章节并翻页；检查 Reader 返回位置能恢复。当前只做 JVM 测试和构建，以上 Android UI / 飞行模式步骤未在设备执行。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。

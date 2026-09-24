@@ -50,6 +50,7 @@ internal fun LibraryScreen(
     state: LibraryUiState,
     onAction: (LibraryAction) -> Unit,
     onOpenComic: (ComicKey) -> Unit,
+    onOpenLocalChapter: (LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -88,6 +89,7 @@ internal fun LibraryScreen(
 
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Favorites)) }) { Text("Favorites") }
+                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Downloads)) }) { Text("Downloads") }
                 TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Local)) }) { Text("Local") }
             }
 
@@ -154,7 +156,7 @@ internal fun LibraryScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            } else {
+            } else if (state.tab == LibraryTab.Local) {
                 Column(Modifier.fillMaxSize()) {
                     Button(onClick = { onAction(LibraryAction.RequestLocalImport) }, modifier = Modifier.padding(16.dp)) { Text("Import directory") }
                     Button(onClick = { onAction(LibraryAction.RequestArchiveImport) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Import CBZ / ZIP / 7z") }
@@ -168,6 +170,33 @@ internal fun LibraryScreen(
                                 }
                                 TextButton(onClick = { onAction(LibraryAction.RemoveLocalComic(comic.id)) }) { Text("Remove") }
                             }
+                            state.localChapters[comic.id].orEmpty().forEach { chapter ->
+                                TextButton(onClick = { onOpenLocalChapter(comic.id, chapter.id) }, modifier = Modifier.padding(start = 24.dp)) {
+                                    Text("Read ${chapter.title}")
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (state.downloads.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No downloads yet.") }
+                else LazyColumn(Modifier.fillMaxSize()) {
+                    items(state.downloads, key = { it.chapter.toString() }) { task ->
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(task.title, style = MaterialTheme.typography.titleMedium)
+                                Text("${task.completedPages}/${task.pageCount} pages · ${task.state}", style = MaterialTheme.typography.bodySmall)
+                            }
+                            when (task.state) {
+                                dev.veneranative.data.download.DownloadChapterState.Queued,
+                                dev.veneranative.data.download.DownloadChapterState.Running -> TextButton(onClick = { onAction(LibraryAction.PauseDownload(task.chapter)) }) { Text("Pause") }
+                                dev.veneranative.data.download.DownloadChapterState.Paused -> TextButton(onClick = { onAction(LibraryAction.ResumeDownload(task.chapter)) }) { Text("Resume") }
+                                dev.veneranative.data.download.DownloadChapterState.Partial,
+                                dev.veneranative.data.download.DownloadChapterState.Failed -> TextButton(onClick = { onAction(LibraryAction.RetryDownload(task.chapter)) }) { Text("Retry") }
+                                dev.veneranative.data.download.DownloadChapterState.Completed,
+                                dev.veneranative.data.download.DownloadChapterState.Canceled -> Unit
+                            }
+                            TextButton(onClick = { onAction(LibraryAction.CancelDownload(task.chapter)) }) { Text("Remove") }
                         }
                     }
                 }

@@ -9,6 +9,13 @@ import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.collection.FavoriteFolder
 import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.collection.ShelfSort
+import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.download.DownloadTask
+import dev.veneranative.data.download.DownloadPage
+import dev.veneranative.data.download.RecoveryReport
+import dev.veneranative.data.download.DownloadError
+import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.SourcePage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
@@ -86,6 +93,29 @@ internal class FakeCollectionRepository : CollectionRepository {
         refreshUpdatesError?.let { throw it }
         return refreshUpdatesResult
     }
+}
+
+internal class FakeDownloadRepository : DownloadRepository {
+    val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    val paused = mutableListOf<ChapterRef>()
+    val resumed = mutableListOf<ChapterRef>()
+    val canceled = mutableListOf<ChapterRef>()
+    val retried = mutableListOf<ChapterRef>()
+    override fun observeTasks(): Flow<List<DownloadTask>> = tasks
+    override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = MutableStateFlow(tasks.value.firstOrNull { it.chapter == chapter })
+    override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) = Unit
+    override suspend fun pause(chapter: ChapterRef) { paused += chapter }
+    override suspend fun resume(chapter: ChapterRef) { resumed += chapter }
+    override suspend fun cancel(chapter: ChapterRef) { canceled += chapter }
+    override suspend fun retryFailed(chapter: ChapterRef) { retried += chapter }
+    override suspend fun recover(workerId: String) = RecoveryReport(workerId, 0, 0, 0, 0, emptyList())
+    override suspend fun isCompleteOffline(chapter: ChapterRef) = false
+    override suspend fun pagesOf(chapter: ChapterRef) = emptyList<DownloadPage>()
+    override suspend fun queuedPages(limit: Int) = emptyList<DownloadPage>()
+    override suspend fun markRunning(chapter: ChapterRef, index: Int) = false
+    override suspend fun markPaused(chapter: ChapterRef, index: Int) = false
+    override suspend fun markSucceeded(chapter: ChapterRef, index: Int, relativePath: String, bytes: Long) = false
+    override suspend fun markFailed(chapter: ChapterRef, index: Int, error: DownloadError) = false
 }
 
 internal fun comicRef(comicId: String): ComicRef =

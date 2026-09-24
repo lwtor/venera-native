@@ -5,6 +5,10 @@ import dev.veneranative.data.collection.FavoriteFolder
 import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.collection.ShelfSort
 import dev.veneranative.data.local.LocalComic
+import dev.veneranative.data.local.LocalChapter
+import dev.veneranative.core.model.LocalComicId
+import dev.veneranative.data.download.DownloadTask
+import dev.veneranative.core.model.ChapterRef
 
 /** A folder the user is naming or renaming; [folderId] is null while creating a new one. */
 data class FolderEditor(
@@ -19,13 +23,15 @@ data class FolderEditor(
  * "nothing here yet" instead of showing a blank grid that looks broken.
  */
 enum class LibraryStatus { Loading, Empty, Ready, Failed }
-enum class LibraryTab { Favorites, Local }
+enum class LibraryTab { Favorites, Downloads, Local }
 
 /** Everything the library screen needs to render. */
 data class LibraryUiState(
     val status: LibraryStatus = LibraryStatus.Loading,
     val tab: LibraryTab = LibraryTab.Favorites,
     val localComics: List<LocalComic> = emptyList(),
+    val localChapters: Map<LocalComicId, List<LocalChapter>> = emptyMap(),
+    val downloads: List<DownloadTask> = emptyList(),
     val folders: List<FavoriteFolder> = emptyList(),
     /** Null shows every folder. */
     val selectedFolderId: String? = null,
@@ -70,6 +76,10 @@ sealed interface LibraryAction {
 
     data object RequestLocalImport : LibraryAction
     data object RequestArchiveImport : LibraryAction
+    data class PauseDownload(val chapter: ChapterRef) : LibraryAction
+    data class ResumeDownload(val chapter: ChapterRef) : LibraryAction
+    data class CancelDownload(val chapter: ChapterRef) : LibraryAction
+    data class RetryDownload(val chapter: ChapterRef) : LibraryAction
 
     data class ImportTree(val uri: String) : LibraryAction
     data class ImportArchive(val uri: String) : LibraryAction

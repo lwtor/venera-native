@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":data:collection"))
     implementation(project(":data:local"))
+    implementation(project(":data:download"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)

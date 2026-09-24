@@ -21,4 +21,6 @@ sealed interface DetailsAction {
      * screen that only ever sees one comic has nothing to choose between.
      */
     data object ToggleFavorite : DetailsAction
+
+    data class DownloadChapter(val chapter: dev.veneranative.core.model.ChapterKey) : DetailsAction
 }

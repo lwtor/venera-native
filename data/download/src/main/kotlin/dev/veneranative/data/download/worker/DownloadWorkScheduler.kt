@@ -43,9 +43,10 @@ object DownloadWorkScheduler {
             }
             .build()
 
-    fun start(context: Context, expedited: Boolean = false): Operation =
+    fun start(context: Context, expedited: Boolean = false) {
         WorkManager.getInstance(context.applicationContext)
             .enqueueUniqueWork(WORK_NAME, ExistingWorkPolicy.KEEP, request(expedited))
+    }
 
     fun cancel(context: Context): Operation =
         WorkManager.getInstance(context.applicationContext).cancelUniqueWork(WORK_NAME)

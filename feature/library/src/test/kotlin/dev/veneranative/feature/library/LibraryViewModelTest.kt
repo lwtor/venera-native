@@ -15,6 +15,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.core.model.RemoteComicId
+import dev.veneranative.core.model.SourceId
+import dev.veneranative.data.download.DownloadChapterState
+import dev.veneranative.data.download.DownloadTask
 
 /**
  * The screen's four states and the guarantee behind them: the shelf is whatever the repository
@@ -50,6 +58,25 @@ class LibraryViewModelTest {
         assertEquals(LibraryStatus.Ready, viewModel.state.value.status)
         assertEquals(listOf("Comic One"), viewModel.state.value.items.map { it.title })
         assertEquals(listOf("default", "reading"), viewModel.state.value.folders.map { it.id })
+    }
+
+    @Test fun `download list observes persisted tasks and delegates all controls`() = runTest(dispatcher) {
+        val downloads = FakeDownloadRepository()
+        val chapter = ChapterRef.Remote(ChapterKey(ComicKey(SourceId("source"), RemoteComicId("comic")), RemoteChapterId("chapter")))
+        downloads.tasks.value = listOf(DownloadTask(chapter, "Chapter 1", "Comic", 8, 3,
+            DownloadChapterState.Paused, 1, 2))
+        val viewModel = LibraryViewModel(repository, downloads = downloads)
+        advanceUntilIdle()
+        assertEquals(listOf(3), viewModel.state.value.downloads.map { it.completedPages })
+        viewModel.onAction(LibraryAction.ResumeDownload(chapter))
+        viewModel.onAction(LibraryAction.RetryDownload(chapter))
+        viewModel.onAction(LibraryAction.PauseDownload(chapter))
+        viewModel.onAction(LibraryAction.CancelDownload(chapter))
+        advanceUntilIdle()
+        assertEquals(listOf(chapter), downloads.resumed)
+        assertEquals(listOf(chapter), downloads.retried)
+        assertEquals(listOf(chapter), downloads.paused)
+        assertEquals(listOf(chapter), downloads.canceled)
     }
 
     @Test

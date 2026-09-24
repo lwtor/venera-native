@@ -120,6 +120,7 @@ private fun Content(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { Header(state = state, onAction = onAction) }
+        state.downloadMessage?.let { message -> item { Text(message, style = MaterialTheme.typography.bodyMedium) } }
 
         state.detail?.description?.takeIf { it.isNotBlank() }?.let { description ->
             item {
@@ -152,7 +153,7 @@ private fun Content(
             if (withHeaders) previousGroup = group ?: previousGroup
 
             item(key = chapter.key.remoteId.value) {
-                ChapterRow(chapter = chapter, onOpen = { onOpenChapter(chapter.key) })
+                ChapterRow(chapter = chapter, onOpen = { onOpenChapter(chapter.key) }, onDownload = { onAction(DetailsAction.DownloadChapter(chapter.key)) })
             }
         }
     }
@@ -359,8 +360,9 @@ private fun GroupHeader(name: String) {
 private fun ChapterRow(
     chapter: Chapter,
     onOpen: () -> Unit,
+    onDownload: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onOpen) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -372,6 +374,10 @@ private fun ChapterRow(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Column {
+                TextButton(onClick = onOpen) { Text("Read") }
+                TextButton(onClick = onDownload) { Text("Download") }
+            }
             Text(
                 text = chapter.title,
                 style = MaterialTheme.typography.bodyLarge,

@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ComicRef
+import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
 import dev.veneranative.data.comic.ComicCatalog
+import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
@@ -32,6 +35,7 @@ class DetailsViewModel(
     private val catalog: ComicCatalog,
     private val comicKey: ComicKey,
     private val collection: CollectionRepository?,
+    private val downloads: DownloadRepository? = null,
 ) : ViewModel() {
 
     private val comicRef = ComicRef.Remote(comicKey)
@@ -53,6 +57,7 @@ class DetailsViewModel(
             is DetailsAction.OrderSelected -> _state.update { it.copy(order = action.order) }
 
             DetailsAction.ToggleFavorite -> toggleFavorite()
+            is DetailsAction.DownloadChapter -> downloadChapter(action.chapter)
         }
     }
 
@@ -88,6 +93,34 @@ class DetailsViewModel(
             }.onFailure { failure ->
                 failUnlessCancelled(failure)
                 _state.update { it.copy(shelfMessage = "That change could not be saved.") }
+            }
+        }
+    }
+
+    private fun downloadChapter(chapter: ChapterKey) {
+        val repository = downloads ?: run {
+            _state.update { it.copy(downloadMessage = "Downloads are not ready yet.") }
+            return
+        }
+        viewModelScope.launch {
+            _state.update { it.copy(downloadMessage = null) }
+            try {
+                when (val outcome = catalog.pages(chapter)) {
+                    is SourceOutcome.Success -> {
+                        repository.enqueue(
+                            ChapterRef.Remote(chapter),
+                            _state.value.detail?.chapters?.firstOrNull { it.key == chapter }?.title ?: chapter.remoteId.value,
+                            outcome.value,
+                            _state.value.detail?.comic?.title,
+                        )
+                        _state.update { it.copy(downloadMessage = "Chapter queued for download.", downloadQueueVersion = it.downloadQueueVersion + 1) }
+                    }
+                    is SourceOutcome.Failure -> _state.update { it.copy(downloadMessage = "Chapter pages could not be loaded for download.") }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(downloadMessage = "The chapter could not be added to downloads.") }
             }
         }
     }

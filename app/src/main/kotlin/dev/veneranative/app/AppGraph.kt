@@ -53,6 +53,10 @@ import dev.veneranative.data.history.ReadingProgressTracker
 import dev.veneranative.data.local.AndroidSafTreeAccess
 import dev.veneranative.data.local.DefaultLocalComicRepository
 import dev.veneranative.data.local.AndroidSafArchiveAccess
+import dev.veneranative.data.local.DefaultLocalPageSource
+import dev.veneranative.data.local.LocalFirstPageProvider
+import dev.veneranative.data.local.LocalPageCache
+import dev.veneranative.data.local.LocalPageMaterializer
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
@@ -110,10 +114,20 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     )
     val catalog = DefaultComicCatalog(sourceRepository, EngineSourceCore(runtime))
     private val sourcePageProvider: PageProvider = SourcePageProvider(catalog, CoilPageImageSizer(imagePipeline))
-    val provider: PageProvider = OfflineFirstPageProvider(
+    private val offlineProvider: PageProvider = OfflineFirstPageProvider(
         downloads = { _download.value ?: _download.filterNotNull().first() },
         layout = DownloadEnvironment.get(getApplication()).layout(),
         source = sourcePageProvider,
+    )
+    private val localArchiveAccess = AndroidSafArchiveAccess(getApplication())
+    private val localMaterializer = LocalPageMaterializer(
+        LocalPageCache(File(getApplication<android.app.Application>().cacheDir, "local-pages")),
+        DefaultLocalPageSource(getApplication<android.app.Application>().contentResolver, localArchiveAccess),
+    )
+    val provider: PageProvider = LocalFirstPageProvider(
+        source = offlineProvider,
+        localRepository = { _local.value ?: _local.filterNotNull().first() },
+        materializer = localMaterializer,
     )
     val decoderFactory: (DecodeStrategy) -> PageImageDecoder = { strategy ->
         val decoder = when (strategy) {
@@ -143,7 +157,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))
             _download.value = DownloadEnvironment.get(getApplication()).repository()
             _local.value = DefaultLocalComicRepository(
-                db, AndroidSafTreeAccess(getApplication()), archiveAccess = AndroidSafArchiveAccess(getApplication()),
+                db, AndroidSafTreeAccess(getApplication()), archiveAccess = localArchiveAccess,
             )
         }
     }

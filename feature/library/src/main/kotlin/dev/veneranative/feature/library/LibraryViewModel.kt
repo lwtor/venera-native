@@ -6,12 +6,14 @@ import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.ShelfSort
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.local.LocalImportResult
+import dev.veneranative.data.download.DownloadRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -29,6 +31,7 @@ import kotlinx.coroutines.launch
 class LibraryViewModel(
     private val repository: CollectionRepository,
     private val localRepository: LocalComicRepository? = null,
+    private val downloads: DownloadRepository? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -42,6 +45,7 @@ class LibraryViewModel(
         observeFolders()
         startItems()
         observeLocalComics()
+        observeDownloads()
     }
 
     fun onAction(action: LibraryAction) {
@@ -69,6 +73,10 @@ class LibraryViewModel(
             is LibraryAction.ImportTree -> importTree(action.uri)
             is LibraryAction.RemoveLocalComic -> localRepository?.let { repo -> runSafely { repo.remove(action.id) } }
             is LibraryAction.ImportArchive -> importArchive(action.uri)
+            is LibraryAction.PauseDownload -> downloadTask { it.pause(action.chapter) }
+            is LibraryAction.ResumeDownload -> downloadTask { it.resume(action.chapter) }
+            is LibraryAction.CancelDownload -> downloadTask { it.cancel(action.chapter) }
+            is LibraryAction.RetryDownload -> downloadTask { it.retryFailed(action.chapter) }
             LibraryAction.DismissMessage -> _state.update { it.copy(message = null) }
         }
     }
@@ -76,9 +84,26 @@ class LibraryViewModel(
     private fun observeLocalComics() {
         val local = localRepository ?: return
         viewModelScope.launch {
-            try { local.observeComics().collect { comics -> _state.update { it.copy(localComics = comics) } } }
+            try {
+                local.observeComics().collect { comics ->
+                    val chapters = comics.associate { comic -> comic.id to local.observeChapters(comic.id).first() }
+                    _state.update { it.copy(localComics = comics, localChapters = chapters) }
+                }
+            }
             catch (failure: Throwable) { failUnlessCancelled(failure); _state.update { it.copy(message = "Local folders could not be read.") } }
         }
+    }
+
+    private fun observeDownloads() {
+        val repo = downloads ?: return
+        viewModelScope.launch {
+            repo.observeTasks().collect { tasks -> _state.update { it.copy(downloads = tasks) } }
+        }
+    }
+
+    private fun downloadTask(operation: suspend (DownloadRepository) -> Unit) {
+        val repo = downloads ?: return
+        viewModelScope.launch { runCatching { operation(repo) }.onFailure { failure -> failUnlessCancelled(failure) } }
     }
 
     private fun importArchive(uri: String) {
