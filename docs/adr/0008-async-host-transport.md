@@ -227,3 +227,12 @@ ADR-0008 §3 把"调用取消与超时"列为 spike 判据。实测结果分两�
 - https://developer.android.com/develop/ui/views/layout/webapps/jsengine
 - https://developer.android.com/reference/androidx/javascriptengine/JavaScriptIsolate
 - https://developer.android.com/reference/androidx/javascriptengine/MessagePort
+
+
+## 11. QuickJS binding 升级复验（2026-09-25）
+
+S2-07C12 将工具链升级到 AGP 9.3.1 / KGP 2.4.20 后，绑定升级到 `quickjs-kt:1.0.15`；来源引擎 JVM 合同测试、AndroidTest 源码编译和应用 Debug/Release 构建通过。§7 中 1.0.5 的锁定理由以及 §10 对 1.0.5 没有中断接口的说明保留为历史决策/实测记录，不再代表当前绑定 API。
+
+上游 1.0.15 暴露求值超时与 `interruptEvaluation()`，调用求值协程的取消也被设计为中断正在运行的 JavaScript（[上游 QuickJS-KT README](https://github.com/dokar3/quickjs-kt)）。但项目 `QuickJsRuntime` 把 evaluate 放在会话 scope 下的独立 `Deferred`，`withTimeout { deferred.await() }` 超时只取消等待者；目前 catch 路径会丢弃引擎，却没有 cancel 实际 Deferred。因此，应用侧死循环仍按未中断风险处理。后续 S2-07C13 需显式取消 evaluation、补真实 `while(true){}` 超时回归并验证后续调用可恢复，完成前不可声称中断已接通。
+
+本次升级已核验 Release APK 内四个 ABI 的 `libquickjs.so`（arm64-v8a、armeabi-v7a、x86、x86_64）；各 ELF `LOAD` segment 均为 `0x4000`（16 KB）alignment。

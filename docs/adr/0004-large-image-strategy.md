@@ -41,7 +41,7 @@ S0-06 在 `:feature:reader` 内引入 `PageImageDecoder` 抽象，实现两种�
 
 Coil 若按 S1-05 引入，其职责限定为：网络获取、内存/磁盘缓存、跨页面占位与变换；超长图的区域解码仍由自有解码器接管，Coil 不作为超长图的解码路径。此约束在 S1-05 生效时同步更新本 ADR。
 
-> **S1-05 已生效（2026-09-21）：Coil 3.4.0 已按上述职责引入，解码代码已迁往 `:core:image`。** 详见第 7 节。
+> **S1-05 已生效（2026-09-21）：Coil 已按上述职责引入，解码代码已迁往 `:core:image`。** 当前版本 3.6.3；版本变更依据见第 7.5 节。 详见第 7 节。
 
 ### 2.2 位图不进入 UI 状态
 
@@ -160,14 +160,14 @@ decodedBytes = width * height * 4           （ARGB_8888）
 3. **不引入 `coil-network-okhttp`。** 网络走 `:core:image` 自建的 `ComicImageFetcher` + `:core:network` 的共享 OkHttp，这样连接池、Dispatcher 与超时策略与全应用一致，也不必把 Header / Referer / Cookie / POST 语义塞进 Coil 的网络层。
 4. **解码代码从 `:feature:reader` 迁到 `:core:image`**，包名 `dev.veneranative.feature.reader.image` → `dev.veneranative.core.image`，类型名与公开签名不变，因此阅读器 UI 契约不受影响。第 4 节记录的架构债务就此解除。
 
-### 7.2 版本证据（不凭记忆）
+### 7.2 版本证据（2026-09-21 决策基线）
 
 | 依赖 | 选择 | 依据 |
 | --- | --- | --- |
 | Coil | **3.4.0**，不是最新的 3.6.3 | Maven Central 上 `coil-compose` 的最新 release 是 3.6.3，但自 3.5.0 起 Coil 改用 **Kotlin 2.4.x** 编译（`coil-compose-3.5.0.pom` → `kotlin-stdlib 2.4.0`，3.6.3 → 2.4.10）。本项目 AGP 9.2.1 内置 Kotlin / KGP 为 **2.2.10**，读不了 2.4 的元数据。3.4.0 → `kotlin-stdlib 2.3.10`，落在已验证可读区间内（同一结论已在仓库内被 `quickjs-kt` 1.0.5 可用 / 1.0.6 不可用所印证）。 |
 | KSP | **2.3.10**，只在 `build-logic` 声明 | KSP 必须与 KGP 对齐，本项目 KGP 为 AGP 9.2.1 内置的 2.2.10。最初按该对齐关系选的 `2.2.10-2.0.2` 在本仓库**实测失败**：它通过 `kotlin.sourceSets` 注册生成目录，而 AGP 9 内置 Kotlin 只接受 `android.sourceSets`（google/ksp#2729）。2.3.10 在支持的 KGP 范围内（2.2.10–2.3.x）且已含该修复，冒烟编译通过；**KGP 不动，也未加任何 gradle.properties 开关**。 |
 
-若将来要把 KGP 提到 2.4 以换用 Coil 3.6.3，必须单独决策并连带评估 `quickjs-kt` 的锁定策略。
+以上是 S1-05 时的有效决策，后由第 7.5 节的工具链复验取代。
 
 ### 7.3 缓存键与鉴权隔离
 
@@ -197,3 +197,12 @@ decodedBytes = width * height * 4           （ARGB_8888）
 ## 9. 按需页面解析（2026-09-22）
 
 章节先返回完整稳定页号与估计尺寸，PageProvider.resolve 只解析可见页邻域。失败页保留位置并显示独立重试，不再丢弃或伪装成空章节。ComicPage 携带 sourceId 与尺寸状态；图片层的 PipelinePageImageDecoder 将网络引用解析成租约内本地路径，再调用现有解码器，Feature 不实现网络。此节替代第 7.4 节“跳过坏页”的规则。
+
+
+## 7.5 工具链升级复验（2026-09-25）
+
+S2-07C12 将 AGP 升至 9.3.1（要求 Gradle 9.5.0），采用 AGP 内置 KGP 2.4.20 与 Compose Compiler 插件 2.4.20，并将 KSP 升至 2.3.12。KGP 官方兼容表涵盖 Gradle 9.5 与 AGP 9.3.1；升级后实测 Compose、Room/KSP 生成及 Android 模块编译均通过。
+
+因此，§7.2 中 Coil 3.4.0 / KSP 2.3.10 的版本选择及其“当前工具链无法读取 Kotlin 2.4 metadata”结论是历史记录，不再代表当前状态。Coil 更新为 3.6.3，`quickjs-kt` 更新为 1.0.15；图像模块和来源引擎 JVM 测试均通过，来源引擎 instrumentation 源码编译及 Debug/Release 构建通过。QuickJS 1.0.15 提供正在运行的求值中断 API，但项目当前的 timeout 路径尚未将取消传给独立 evaluation job，因此运行时死循环能否停止仍是待单独验证的实现任务，不因升级本身视为解决。版本兼容判断参考 [Kotlin Gradle 配置兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)、[Kotlin 2.4.20 发布说明](https://kotlinlang.org/docs/whatsnew2420.html)、[AGP 9.3 发布说明](https://developer.android.com/build/releases/agp-9-3-0-release-notes) 与 [KSP releases](https://github.com/google/ksp/releases)。
+
+WorkManager 2.12.0 的 `work-testing` 工件在当前镜像缺失，与工具链升级无关，仍保留 runtime/testing 2.11.2；这是 Stage 2 Lint 门禁的未解项，记录在 `docs/STATUS.md`。

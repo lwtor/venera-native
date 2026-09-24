@@ -3,15 +3,13 @@ activity = "1.13.0"
 androidxTestExtJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 androidxCore = "1.19.1"
-coil = "3.4.0"
-# Coil 3.5.0+ is compiled with Kotlin 2.4, whose metadata our KGP 2.2.10 toolchain cannot read.
-# See docs/adr/0004-large-image-strategy.md section 7.2.
+coil = "3.6.3"
 composeBom = "2026.09.00"
 coroutines = "1.11.0"
 javascriptEngine = "1.1.1"
 junit4 = "4.13.2"
 kotlinxSerialization = "1.11.0"
-quickjs = "1.0.5"
+quickjs = "1.0.15"
 # Test-only: android.jar ships org.json stubs, so unit tests that touch the runtime's JSON
 # boundaries need a real implementation on the classpath.
 json = "20260814"

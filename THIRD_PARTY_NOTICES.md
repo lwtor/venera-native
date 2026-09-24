@@ -2,7 +2,7 @@
 
 Venera Native currently includes these direct runtime components:
 
-- `io.github.dokar3:quickjs-kt:1.0.5`, Apache License 2.0.
+- `io.github.dokar3:quickjs-kt:1.0.15`, Apache License 2.0.
 - QuickJS, included by quickjs-kt, MIT License.
 - AndroidX (including DocumentFile 1.1.0), Kotlin/Kotlinx, OkHttp, Coil and Room under their respective published licenses.
 - Apache Commons Compress 1.28.0, Apache License 2.0.

@@ -75,13 +75,14 @@ S1-03 需要类型安全导航契约时重建，见 `docs/ARCHITECTURE.md` 第 3
 
 ## 技术基线
 
-- Android Gradle Plugin 9.2.1 + Gradle 9.4.1
-- AGP 内置 Kotlin（KGP 2.2.10）+ JDK 17
-- KSP 2.3.10（不得降级到 2.2.10：会与 AGP 内置 Kotlin 冲突，见 `docs/STATUS.md`）
+- Android Gradle Plugin 9.3.1 + Gradle 9.5.0
+- AGP 内置 Kotlin（KGP 2.4.20）+ JDK 17
+- KSP 2.3.12（与 AGP 9 内置 Kotlin 配合，见 `docs/STATUS.md`）
 - compileSdk / targetSdk 37，minSdk 26
 - Jetpack Compose + Material 3
 - Navigation 3
-- Coil 3.4.0（不引 `coil-network-okhttp`，网络走共享 OkHttp）
+- Coil 3.6.3（不引 `coil-network-okhttp`，网络走共享 OkHttp）
+- QuickJS 1.0.15
 - Room 2.8.5
 - Gradle Kotlin DSL + Version Catalog + Convention Plugins
 

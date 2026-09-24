@@ -11,13 +11,10 @@ java {
 }
 
 dependencies {
-    implementation("com.android.tools.build:gradle:9.2.1")
-    implementation("org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:2.2.10")
-    // KSP has to be at least 2.3.4: earlier versions register generated sources through the
-    // `kotlin.sourceSets` DSL, which AGP 9's built-in Kotlin rejects. 2.3.10 is the newest release
-    // that still supports the KGP 2.2.10 that AGP 9.2.1 ships, so the Kotlin version stays put.
-    // The same version is declared in the root build file's `buildscript` block.
-    implementation("com.google.devtools.ksp:symbol-processing-gradle-plugin:2.3.10")
+    implementation("com.android.tools.build:gradle:9.3.1")
+    implementation("org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin:2.4.20")
+    // KSP 2.3.12 supports Kotlin 2.4 metadata and AGP 9 built-in Kotlin.
+    implementation("com.google.devtools.ksp:symbol-processing-gradle-plugin:2.3.12")
 }
 
 gradlePlugin {

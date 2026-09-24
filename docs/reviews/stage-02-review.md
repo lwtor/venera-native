@@ -1,6 +1,6 @@
 # Stage 2 质量复验
 
-日期：2026-09-24
+日期：2026-09-25
 
 实现基线：`1f4f23d`（S2-07B；包含 S2-07A、S2-06、S2-05 及之前的 Stage 2 提交）
 结论：**未通过阶段退出门禁；Stage 2 保持 IN_PROGRESS。**
@@ -16,7 +16,7 @@
 | 全仓 JVM 单测 | 通过 | `testDebugUnitTest`：429 tests、0 failures、0 errors、0 skipped。 |
 | Debug APK | 通过 | `:app:assembleDebug`。 |
 | Release APK / Release Lint Vital | 通过 | `:app:assembleRelease` 含 `:app:lintVitalRelease` 成功；未签名构建。 |
-| 完整 Debug Lint | **失败** | 修复代码级 Lint 并更新 Core / JavaScriptEngine / Navigation3 后，2026-09-24 重跑 `lintDebug` 仍有 9 条 `GradleDependency` / `NewerVersionAvailable` 依赖提示，详见后续记录。未建立 baseline 或关闭检查。 |
+| 完整 Debug Lint | **失败（仅剩 2 项）** | 工具链与可兼容依赖更新后，完整 `lintDebug` 仅报告 WorkManager runtime/testing 2.12.0 提示；testing 工件当前无法从 Aliyun 镜像解析，版本保持配对的 2.11.2。未建立 baseline 或关闭检查。 |
 | 跨模块设备用户闭环 | **未验证** | 没有执行安装、详情下载、下载控制、本地导入/阅读、飞行模式阅读及恢复位置的人工脚本；不能由单测与构建替代。 |
 
 ## 真机补充复验（2026-09-24）
@@ -34,6 +34,8 @@
 
 ## 阶段门禁复验
 
+本报告初版日期为 2026-09-24；以下 C12 是 2026-09-25 增补复验。
+
 ### 后续复验发现（2026-09-24）
 
 按 JDK 17 重跑 `sh gradlew --offline --no-daemon --max-workers=2 lintDebug` 时，依次暴露下载通知的 `ObsoleteSdkInt`（`minSdk=26`，低于 API O 的分支不可达）、详情页 `DetailsRoute` 与书架 `LibraryRoute` / `LibraryScreen` 的 `ModifierParameter`。S2-07C2–C4 分别移除不可达分支并调整三个 Composable 的 `modifier` 参数位置；各受影响模块 Lint 和 Debug 编译均通过。完整全仓 Lint 仍需继续运行，原先记录的 13 条依赖提示暂不视为本轮复验已确认结果。
@@ -42,7 +44,9 @@
 
 WorkManager 2.12.0 亦已列入同一 AndroidX stable 清单，但更新后 `:data:download:compileDebugAndroidTestKotlin` 无法从环境实际使用的 `https://maven.aliyun.com/repository/google` 解析 `androidx.work:work-testing:2.12.0`（No matching artifact）。为保持 runtime/testing 版本配对且可复现，未提交该版本更新，保留 2.11.2 并将 S2-07C6 标为 BLOCKED。2026-09-25 工具链升级后再次尝试 `:data:download:compileDebugAndroidTestKotlin`，仍因 `work-testing:2.12.0.aar` 未出现在 Aliyun 镜像而失败；解除条件仍是镜像同步或可用的 Google Maven 访问路径。
 
-剩余候选的已知兼容性：Coil 3.5.0+ 上游 changelog 明确 Kotlin 2.4.0，当前 KGP 2.2.10，因此保持 3.4.0（[Coil changelog](https://github.com/coil-kt/coil/blob/main/CHANGELOG.md)）。QuickJS 1.0.15 上游 tag 的版本目录基于 Kotlin 2.4.10，当前工具链 2.2.10；QuickJS 还承担来源引擎执行合同，需避免无验证升级（[QuickJS 1.0.15 release](https://github.com/dokar3/quickjs-kt/releases/tag/v1.0.15)、[该 tag 构建版本目录](https://github.com/dokar3/quickjs-kt/blob/v1.0.15/gradle/libs.versions.toml)）。S2-07C8 将仅用于来源引擎测试运行时的 org.json 升至 20260814；`:source:engine:testDebugUnitTest :source:engine:lintDebug :app:assembleDebug` 通过，全仓 Lint 对应项消失（[JSON release notes](https://github.com/stleary/JSON-java/blob/master/docs/RELEASES.md)）。尝试把 QuickJS 升至 1.0.15 后，候选将 Kotlin stdlib 升为 2.4.10，当前编译器只接受至 2.3 的 metadata，`:source:engine:compileDebugKotlin` 失败；已恢复 1.0.5。QuickJS 更新被列为 BLOCKED，待 Kotlin 编译器/插件协调升级后重试。同样尝试 Coil 3.6.3 后，候选引入 Kotlin stdlib 2.4.10，`:core:image:compileDebugKotlin` 因 metadata 2.4 超出当前编译器上限 2.3 而失败；已恢复 3.4.0，列为同一 Kotlin 工具链升级阻塞。S2-07C10 新增书架导航 instrumentation smoke test，源码编译及 Debug APK 构建通过，但未运行。S2-07C7 将 XZ for Java 升至 1.12；上游 NEWS 记录该版修复 `LZMAInputStream` 使用 `ArrayCache` 时的解码异常，相关归档/本地测试与 Debug 编译均通过（[XZ for Java NEWS](https://github.com/tukaani-project/xz-java/blob/master/NEWS.md)）。
+C12（2026-09-25）将 AGP/Gradle/KGP/Compose Compiler/KSP 升至 9.3.1 / 9.5.0 / 2.4.20 / 2.4.20 / 2.3.12，并更新 Coil 3.6.3、QuickJS 1.0.15。此前分别阻塞 Coil、QuickJS 的 Kotlin 2.4 metadata 限制已解除。更新后图像和来源引擎 JVM 测试通过，来源引擎与应用 AndroidTest 源码编译通过，Debug/Release 构建及 Release Lint Vital 通过；429 项全仓 JVM 测试全部通过。Release APK 内四种 ABI 的 QuickJS `libquickjs.so` ELF LOAD alignment 均为 16 KB。工具链版本依据：[Kotlin/KGP 兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)、[Kotlin 2.4.20 发布说明](https://kotlinlang.org/docs/whatsnew2420.html)、[AGP 9.3 发布说明](https://developer.android.com/build/releases/agp-9-3-0-release-notes)、[KSP releases](https://github.com/google/ksp/releases)。
+
+完整 `lintDebug` 当前剩余 2 项，均是 WorkManager runtime/testing 2.12.0 更新提示；testing AAR 在配置的 Aliyun 镜像不存在，C6 重试后仍未解除。Coil 与 QuickJS 相关提示已清零。另，QuickJS 1.0.15 虽提供求值中断接口，但仓库超时路径仍只取消等待并丢弃引擎，未将取消传递到实际 evaluation job；不能推断死循环脚本会停止，需单独实现并回归。
 
 命令（JDK 17，离线）：
 
@@ -58,12 +62,12 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 
 结果：`BUILD SUCCESSFUL`；全仓 JVM 测试 429/429 通过，Debug、Release 与 Release Lint Vital 通过。`git diff --check` 在本审查提交前执行。
 
-初次报告有 13 条依赖版本提示。C5 已更新 Core 1.19.1、JavaScriptEngine 1.1.1 和 Navigation3 1.2.0；C7 已更新 XZ 1.12；C8 将 org.json 提示消除后，`lintDebug --rerun-tasks` 仍有 7 条：WorkManager 2.12.0（runtime/testing 各 1）、Coil 3.6.3（3）、quickjs-kt 1.0.15（2）。它们必须逐项验证，不能只为消掉提示而无验证地批量升级。已确认 Coil/QuickJS 的候选版本与 Kotlin 2.2.10 工具链不兼容；WorkManager 的测试工件目前无法从配置的 Maven 镜像获取。
+初次报告有 13 条依赖版本提示。C5 更新 Core / JavaScriptEngine / Navigation3，C7 更新 XZ 1.12，C8 更新 org.json，C12 更新 Coil / QuickJS 并升级工具链后，当前完整 Lint 仍有 WorkManager runtime/testing 两项提示；WorkManager 工件限制和恢复条件见 C6。
 
 ## 退出阻断项与解除条件
 
-1. 对当前 7 条版本提示逐项作出有证据的兼容性处理，并使完整 `lintDebug` 成功。允许升级的依赖应在独立小任务中逐个验证并提交；不能升级或无法获取工件的项需要明确兼容理由与恢复条件，不能用 baseline 或静默抑制代替结论。
-2. 在 Android API 26+ 设备或模拟器执行 `STATUS.md` 所列详情下载、暂停/继续、目录/归档阅读、飞行模式阅读及历史恢复闭环，并记录设备/API 与结果。本轮已验证 Xiaomi 25128PNA1C（API 36）的数据库与下载 Worker instrumentation，但 MIUI 拒绝 shell 输入事件，无法执行页面交互。新增书架导航 Compose instrumentation smoke test，`:app:compileDebugAndroidTestKotlin` 通过，但未在设备执行。本轮复查时 Android Studio Device Manager 与 ADB 均未发现连接设备，因此 UI 批次暂停；需重新连接设备并使用正常授权的控制方式完成页面闭环，不能通过修改安全设置绕过。
+1. 处理剩余 WorkManager runtime/testing 两条版本提示：须在 runtime/testing 配对更新可解析且完成 Worker 验证后使完整 `lintDebug` 成功；不能用 baseline 或静默抑制代替结论。
+2. 在 Android API 26+ 设备或模拟器执行 `STATUS.md` 所列详情下载、暂停/继续、目录/归档阅读、飞行模式阅读及历史恢复闭环，并记录设备/API 与结果。本轮已验证 Xiaomi 25128PNA1C（API 36）的数据库与下载 Worker instrumentation，但 MIUI 拒绝 shell 输入事件，无法执行页面交互。新增书架导航 Compose instrumentation smoke test，`:app:compileDebugAndroidTestKotlin` 通过，但未在设备执行。本报告复查时 Android Studio Device Manager 与 ADB 均未发现连接设备；2026-09-25 在用户表示重新连接后再查，`adb devices -l` 仍返回空列表，UI 批次暂停。待设备实际枚举后使用正常授权的控制方式完成页面闭环，不通过修改安全设置绕过。
 3. 完成以上处理后重跑规定 Stage 门禁，再更新本报告、`STATUS.md` 和 `IMPLEMENTATION_PLAN.md`；通过后才将 Stage 2 标为 `DONE`。
 
 本轮没有发现生产代码缺陷；已修复真机才暴露的 instrumentation 表清单断言错误。自动化证据仅覆盖报告列出的模块测试，不能推导页面设备闭环或 Stage 退出门禁通过。
