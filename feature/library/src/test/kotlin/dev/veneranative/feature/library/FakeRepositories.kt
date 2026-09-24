@@ -97,6 +97,7 @@ internal class FakeCollectionRepository : CollectionRepository {
 
 internal class FakeDownloadRepository : DownloadRepository {
     val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    var resumeGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
     val paused = mutableListOf<ChapterRef>()
     val resumed = mutableListOf<ChapterRef>()
     val canceled = mutableListOf<ChapterRef>()
@@ -105,7 +106,7 @@ internal class FakeDownloadRepository : DownloadRepository {
     override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = MutableStateFlow(tasks.value.firstOrNull { it.chapter == chapter })
     override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) = Unit
     override suspend fun pause(chapter: ChapterRef) { paused += chapter }
-    override suspend fun resume(chapter: ChapterRef) { resumed += chapter }
+    override suspend fun resume(chapter: ChapterRef) { resumeGate?.await(); resumed += chapter }
     override suspend fun cancel(chapter: ChapterRef) { canceled += chapter }
     override suspend fun retryFailed(chapter: ChapterRef) { retried += chapter }
     override suspend fun recover(workerId: String) = RecoveryReport(workerId, 0, 0, 0, 0, emptyList())

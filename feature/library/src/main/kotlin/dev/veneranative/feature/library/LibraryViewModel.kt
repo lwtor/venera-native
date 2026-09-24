@@ -74,9 +74,9 @@ class LibraryViewModel(
             is LibraryAction.RemoveLocalComic -> localRepository?.let { repo -> runSafely { repo.remove(action.id) } }
             is LibraryAction.ImportArchive -> importArchive(action.uri)
             is LibraryAction.PauseDownload -> downloadTask { it.pause(action.chapter) }
-            is LibraryAction.ResumeDownload -> downloadTask { it.resume(action.chapter) }
+            is LibraryAction.ResumeDownload -> downloadTask(scheduleOnSuccess = true) { it.resume(action.chapter) }
             is LibraryAction.CancelDownload -> downloadTask { it.cancel(action.chapter) }
-            is LibraryAction.RetryDownload -> downloadTask { it.retryFailed(action.chapter) }
+            is LibraryAction.RetryDownload -> downloadTask(scheduleOnSuccess = true) { it.retryFailed(action.chapter) }
             LibraryAction.DismissMessage -> _state.update { it.copy(message = null) }
         }
     }
@@ -101,9 +101,21 @@ class LibraryViewModel(
         }
     }
 
-    private fun downloadTask(operation: suspend (DownloadRepository) -> Unit) {
+    private fun downloadTask(
+        scheduleOnSuccess: Boolean = false,
+        operation: suspend (DownloadRepository) -> Unit,
+    ) {
         val repo = downloads ?: return
-        viewModelScope.launch { runCatching { operation(repo) }.onFailure { failure -> failUnlessCancelled(failure) } }
+        viewModelScope.launch {
+            try {
+                operation(repo)
+                if (scheduleOnSuccess) _state.update { it.copy(downloadQueueVersion = it.downloadQueueVersion + 1) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(message = "The download could not be updated.") }
+            }
+        }
     }
 
     private fun importArchive(uri: String) {

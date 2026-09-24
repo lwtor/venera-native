@@ -2,9 +2,11 @@ package dev.veneranative.feature.library
 
 import dev.veneranative.data.collection.ShelfSort
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -77,6 +79,25 @@ class LibraryViewModelTest {
         assertEquals(listOf(chapter), downloads.retried)
         assertEquals(listOf(chapter), downloads.paused)
         assertEquals(listOf(chapter), downloads.canceled)
+    }
+
+    @Test fun `download worker is signalled only after resume is saved`() = runTest(dispatcher) {
+        val downloads = FakeDownloadRepository()
+        val gate = CompletableDeferred<Unit>()
+        downloads.resumeGate = gate
+        val chapter = ChapterRef.Remote(ChapterKey(ComicKey(SourceId("source"), RemoteComicId("comic")), RemoteChapterId("chapter")))
+        val viewModel = LibraryViewModel(repository, downloads = downloads)
+        runCurrent()
+
+        viewModel.onAction(LibraryAction.ResumeDownload(chapter))
+        runCurrent()
+        assertEquals(0, viewModel.state.value.downloadQueueVersion)
+        assertTrue(downloads.resumed.isEmpty())
+
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(listOf(chapter), downloads.resumed)
+        assertEquals(1, viewModel.state.value.downloadQueueVersion)
     }
 
     @Test

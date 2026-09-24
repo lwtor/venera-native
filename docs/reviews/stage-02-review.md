@@ -70,4 +70,8 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 2. 在 Android API 26+ 设备或模拟器执行 `STATUS.md` 所列详情下载、暂停/继续、目录/归档阅读、飞行模式阅读及历史恢复闭环，并记录设备/API 与结果。本轮已验证 Xiaomi 25128PNA1C（API 36）的数据库与下载 Worker instrumentation，但 MIUI 拒绝 shell 输入事件，无法执行页面交互。新增书架导航 Compose instrumentation smoke test，`:app:compileDebugAndroidTestKotlin` 通过，但未在设备执行。本报告复查时 Android Studio Device Manager 与 ADB 均未发现连接设备；2026-09-25 在用户表示重新连接后再查，`adb devices -l` 仍返回空列表，UI 批次暂停。待设备实际枚举后使用正常授权的控制方式完成页面闭环，不通过修改安全设置绕过。
 3. 完成以上处理后重跑规定 Stage 门禁，再更新本报告、`STATUS.md` 和 `IMPLEMENTATION_PLAN.md`；通过后才将 Stage 2 标为 `DONE`。
 
-本轮没有发现生产代码缺陷；已修复真机才暴露的 instrumentation 表清单断言错误。自动化证据仅覆盖报告列出的模块测试，不能推导页面设备闭环或 Stage 退出门禁通过。
+初版审查只修复了真机暴露的 instrumentation 表清单断言错误；后续代码审查发现与修复见下节。自动化证据仅覆盖报告列出的模块测试，不能推导页面设备闭环或 Stage 退出门禁通过。
+
+## 后续代码审查发现（2026-09-25）
+
+- **S2-07C14，已修复：书架继续/重试的 Worker 启动顺序。** 原 Route 在 ViewModel 异步调用 `resume`/`retryFailed` 后立刻启动 Worker，数据库尚未变为 Queued 时 Worker 可看到空队列并成功退出。改为仓库操作返回后更新调度版本，再由 Route 启动；悬挂仓库操作的 JVM 回归证明写入前不会发出调度信号。验证：`:feature:library:testDebugUnitTest :app:assembleDebug` — PASS。设备下载闭环仍未执行。

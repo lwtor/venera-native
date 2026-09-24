@@ -149,6 +149,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C11 Coil 3.6.3 更新 — DONE（由 C12 工具链升级解除）。** KGP 2.4.20 下，`:core:image:testDebugUnitTest :app:assembleDebug` 通过，依赖升至 3.6.3.
 - **S2-07C12 Kotlin/Android 工具链协调升级 — DONE。** AGP 9.3.1、Gradle 9.5.0、KGP/Compose Compiler 2.4.20、KSP 2.3.12；Coil 3.6.3、QuickJS 1.0.15 相关测试及全仓 429 JVM 测试通过，Debug/Release 与 Release Lint Vital 通过。`lintDebug` 只剩 WorkManager runtime/testing 两项提示。
 - **S2-07C13 QuickJS 求值中断接入 — DONE。** timeout 与 `SourceScriptRuntime.cancel()` 取消实际 evaluation `Deferred`，有界等待最多 1 秒后丢弃运行时。真实 `while (true)` 测试：2 秒 timeout 在 2.02 秒返回，重建后调用成功；显式取消在 0.12 秒返回 `Cancelled`，重建后调用成功。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
+- **S2-07C14 书架下载调度顺序 — DONE。** 审查发现 Library Route 在 `resume/retryFailed` 的异步数据库写入前立即启动 Worker，可能让 Worker 先看到空队列并退出。现由 ViewModel 在写入完成后递增调度版本，Route 据此启动 Worker；悬挂写入回归确认写入前无调度。验证：`sh gradlew --offline --no-daemon --max-workers=2 :feature:library:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。未运行设备页面流程，仍归 S2-07D。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

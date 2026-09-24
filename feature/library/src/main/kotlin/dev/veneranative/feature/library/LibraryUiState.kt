@@ -32,6 +32,8 @@ data class LibraryUiState(
     val localComics: List<LocalComic> = emptyList(),
     val localChapters: Map<LocalComicId, List<LocalChapter>> = emptyMap(),
     val downloads: List<DownloadTask> = emptyList(),
+    /** Increments after a resume or retry has reached persistent storage. */
+    val downloadQueueVersion: Int = 0,
     val folders: List<FavoriteFolder> = emptyList(),
     /** Null shows every folder. */
     val selectedFolderId: String? = null,

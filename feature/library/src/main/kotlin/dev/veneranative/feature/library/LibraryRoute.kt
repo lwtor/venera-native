@@ -31,6 +31,9 @@ fun LibraryRoute(
 ) {
     val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection, localRepository, downloads) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(state.downloadQueueVersion) {
+        if (state.downloadQueueVersion > 0) onScheduleDownloads()
+    }
 
     LibraryScreen(
         state = state,
@@ -38,10 +41,7 @@ fun LibraryRoute(
             when (action) {
                 LibraryAction.RequestLocalImport -> onRequestLocalImport { uri -> viewModel.onAction(LibraryAction.ImportTree(uri)) }
                 LibraryAction.RequestArchiveImport -> onRequestArchiveImport { uri -> viewModel.onAction(LibraryAction.ImportArchive(uri)) }
-                else -> {
-                    viewModel.onAction(action)
-                    if (action is LibraryAction.ResumeDownload || action is LibraryAction.RetryDownload) onScheduleDownloads()
-                }
+                else -> viewModel.onAction(action)
             }
         },
         onOpenComic = onOpenComic,
