@@ -125,7 +125,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 
 - **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
 - **S2-07B 下载用户流程 — DONE。** 详情 ViewModel 读取章节页并写入持久下载仓库；成功后由 Route 通知装配层启动唯一 WorkManager。书架 Downloads tab 展示页数进度并可暂停、继续、重试、移除；ViewModel 测试覆盖详情到队列的数据与下载列表控制委派。验证：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
-- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-24 审查记录见 `docs/reviews/stage-02-review.md`。全仓 JVM 测试 429 项通过，Debug、Release 与 Release Lint Vital 通过；重跑 Lint 修复 4 处代码问题并更新三组 stable AndroidX 依赖及 XZ 1.12；org.json 已更新至 20260814 并通过来源引擎验证；QuickJS 1.0.15 被当前 Kotlin 编译器拒绝，故保留 1.0.5；全仓 `lintDebug` 仍有 7 条依赖版本提示。Xiaomi 25128PNA1C / API 36 数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过。完整 Debug Lint 失败、页面闭环未执行，Stage 2 不得标为 DONE。
+- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-24 审查记录见 `docs/reviews/stage-02-review.md`。全仓 JVM 测试 429 项通过，Debug、Release 与 Release Lint Vital 通过；重跑 Lint 修复 4 处代码问题并更新三组 stable AndroidX 依赖及 XZ 1.12；org.json 已更新至 20260814 并通过来源引擎验证；QuickJS 1.0.15 和 Coil 3.6.3 均被当前 Kotlin 编译器拒绝，故分别保留 1.0.5 和 3.4.0；全仓 `lintDebug` 仍有 7 条依赖版本提示。Xiaomi 25128PNA1C / API 36 数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过。完整 Debug Lint 失败、页面闭环未执行，Stage 2 不得标为 DONE。
 - **页面设备闭环仍未完成。** 当前 Debug APK 能正常启动到首页，未见启动崩溃。MIUI 拒绝 `adb shell input tap`（缺少 `INJECT_EVENTS`），因此尚未操作详情下载、Library Downloads 暂停/继续/移除、SAF 目录/归档导入阅读、飞行模式翻页及进度恢复。没有尝试修改设备安全设置；需使用允许 UI 自动化的设备连接方式完成这些流程。
 - **S2-07C2 下载通知 lint 修复 — DONE。** 2026-09-24 移除 `minSdk=26` 下永不可达的 API O 低版本提前返回。验证：`:data:download:lintDebug :app:assembleDebug` — PASS。
 - **S2-07C3 详情入口 Compose lint 修复 — DONE。** 全仓 `lintDebug` 后续发现 `DetailsRoute` 的 `modifier` 没有位于首个可选参数位置。将其移到必需回调之后、其他默认参数之前。验证：`:feature:details:lintDebug :app:assembleDebug` — PASS。全仓 Lint 仍需继续运行和复查。
@@ -135,7 +135,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C7 XZ for Java 1.12 更新 — DONE。** 1.10→1.12，包含上游记录的 LZMA `ArrayCache` 解码缺陷修复。验证：`:core:archive:testDebugUnitTest :core:archive:lintDebug :data:local:testDebugUnitTest :app:assembleDebug` — PASS；全仓 Lint 随后报告 8 条，XZ 项已消失。
 - **S2-07C8 org.json 20260814 更新 — DONE。** 该库只供来源引擎测试运行时使用；验证：`:source:engine:testDebugUnitTest :source:engine:lintDebug :app:assembleDebug` — PASS。全仓 `lintDebug --rerun-tasks` 报 7 条依赖版本提示，org.json 项已消失。
 - **S2-07C9 QuickJS 1.0.15 更新评估 — BLOCKED。** 候选 1.0.15 带入 Kotlin stdlib 2.4.10，当前 Kotlin 编译器最多支持 2.3 元数据，`:source:engine:compileDebugKotlin` 出现 `incompatible version of Kotlin` 并失败；已恢复 1.0.5。解除条件：在单独评估并协调升级 Kotlin 编译器/插件后，再跑 source-engine 单测、instrumentation 源码编译和 Debug 构建。
-- **S2-07C10 书架导航 instrumentation smoke test — DONE（仅编译）。** 新增设备测试覆盖首页打开 Library、切换 Downloads/Local tab 和空态/导入入口显示；`:app:compileDebugAndroidTestKotlin` — PASS。未在设备执行，不能视作页面闭环验收；本轮 Android Studio 无连接设备，先前 MIUI 也拒绝测试 APK 安装。
+- **S2-07C10 书架导航 instrumentation smoke test — DONE（仅编译）。** 新增设备测试覆盖首页打开 Library、切换 Downloads/Local tab 和空态/导入入口显示；`:app:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。未在设备执行，不能视作页面闭环验收；本轮 Android Studio 无连接设备，先前 MIUI 也拒绝测试 APK 安装。
+- **S2-07C11 Coil 3.6.3 更新评估 — BLOCKED。** 候选解析引入 Kotlin stdlib 2.4.10 后，`:core:image:compileDebugKotlin` 报 metadata 2.4 超出当前编译器最多读取 2.3 的范围并失败；已恢复 Coil 3.4.0。解除条件：单独协调升级 Kotlin 编译器/插件后，再跑图像模块 JVM 测试与 Debug 构建。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
