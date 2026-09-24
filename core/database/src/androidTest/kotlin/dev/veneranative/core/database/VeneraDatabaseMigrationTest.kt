@@ -180,6 +180,29 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+
+    @Test fun versionFourCreatesLocalLibraryTables() {
+        helper.createDatabase(TEST_DB, 3).close()
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, MIGRATION_3_4).use { db ->
+            assertEquals(
+                listOf("download_page", "download_task", "favorite_entry", "favorite_folder", "local_chapter", "local_comic", "local_grant", "local_page", "reading_history", "reading_progress"),
+                db.tableNames(),
+            )
+        }
+    }
+
+    @Test fun migratingFromThreeToFourPreservesDownloadedQueue() {
+        helper.createDatabase(TEST_DB, 3).apply {
+            execSQL("INSERT INTO download_task VALUES('task','s','c','ch','Chapter','Comic',1,0,'Queued',NULL,0,1,1)")
+            execSQL("INSERT INTO download_page VALUES('task',0,'https://example.invalid/0','Queued',NULL,0,0,NULL)")
+            close()
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 4, true, MIGRATION_3_4).use { db ->
+            assertEquals(1, db.query("SELECT COUNT(*) FROM download_task").use { it.moveToFirst(); it.getInt(0) })
+            assertEquals(1, db.query("SELECT COUNT(*) FROM download_page").use { it.moveToFirst(); it.getInt(0) })
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

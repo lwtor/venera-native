@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.ShelfSort
+import dev.veneranative.data.local.LocalComicRepository
+import dev.veneranative.data.local.LocalImportResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,7 @@ import kotlinx.coroutines.launch
  */
 class LibraryViewModel(
     private val repository: CollectionRepository,
+    private val localRepository: LocalComicRepository? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(LibraryUiState())
@@ -38,6 +41,7 @@ class LibraryViewModel(
     init {
         observeFolders()
         startItems()
+        observeLocalComics()
     }
 
     fun onAction(action: LibraryAction) {
@@ -59,7 +63,38 @@ class LibraryViewModel(
 
             LibraryAction.RefreshUpdates -> refreshUpdates()
             LibraryAction.Retry -> startItems()
+            is LibraryAction.SelectTab -> _state.update { it.copy(tab = action.tab) }
+            LibraryAction.RequestLocalImport -> Unit
+            is LibraryAction.ImportTree -> importTree(action.uri)
+            is LibraryAction.RemoveLocalComic -> localRepository?.let { repo -> runSafely { repo.remove(action.id) } }
             LibraryAction.DismissMessage -> _state.update { it.copy(message = null) }
+        }
+    }
+
+    private fun observeLocalComics() {
+        val local = localRepository ?: return
+        viewModelScope.launch {
+            try { local.observeComics().collect { comics -> _state.update { it.copy(localComics = comics) } } }
+            catch (failure: Throwable) { failUnlessCancelled(failure); _state.update { it.copy(message = "Local folders could not be read.") } }
+        }
+    }
+
+    private fun importTree(uri: String) {
+        val local = localRepository ?: return
+        viewModelScope.launch {
+            val result = try {
+                local.importTree(uri)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                LocalImportResult.Unavailable
+            }
+            when (result) {
+                is LocalImportResult.Imported -> _state.update { it.copy(message = "Folder imported.") }
+                LocalImportResult.Empty -> _state.update { it.copy(message = "No readable images were found.") }
+                LocalImportResult.PermissionLost -> _state.update { it.copy(message = "Folder access was not granted. Select it again.") }
+                LocalImportResult.Unavailable -> _state.update { it.copy(message = "The folder could not be imported.") }
+            }
         }
     }
 

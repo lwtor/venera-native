@@ -10,7 +10,7 @@ import kotlinx.coroutines.sync.withLock
 /**
  * Owns the process-wide [VeneraDatabase].
  *
- * The database holds no user content beyond reading positions and the shelf, so it is not encrypted
+ * The database holds reading positions, the shelf, download metadata and local-library indexes, so it is not encrypted
  * and there is no destructive fallback: corruption has to surface, not silently wipe someone's
  * progress — which is why every schema step has to be registered here, or an upgrading user would
  * simply be told their database cannot be opened.

@@ -105,6 +105,7 @@ private fun App(
 ) {
     val historyRepository by graph.history.collectAsStateWithLifecycle()
     val collectionRepository by graph.collection.collectAsStateWithLifecycle()
+    val localRepository by graph.local.collectAsStateWithLifecycle()
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -129,6 +130,7 @@ private fun App(
             activity = activity,
             historyRepository = historyRepository,
             collectionRepository = collectionRepository,
+            localRepository = localRepository,
             progressTracker = progressTracker,
         )
     }
@@ -146,9 +148,14 @@ private fun AppNavHost(
     activity: MainActivity,
     historyRepository: HistoryRepository?,
     collectionRepository: CollectionRepository?,
+    localRepository: dev.veneranative.data.local.LocalComicRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    var pendingLocalImport by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    val localTreePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+    ) { uri -> uri?.toString()?.let { pendingLocalImport?.invoke(it) }; pendingLocalImport = null }
     val scriptPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -166,11 +173,13 @@ private fun AppNavHost(
 
         AppRoute.Library -> {
             val collection = collectionRepository
-            if (collection == null) {
+            if (collection == null || localRepository == null) {
                 androidx.compose.material3.CircularProgressIndicator()
             } else {
                 LibraryRoute(
                     collection = collection,
+                    localRepository = localRepository,
+                    onRequestLocalImport = { consume -> pendingLocalImport = consume; localTreePicker.launch(null) },
                     onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
                     onBack = { onRouteChange(AppRoute.Home) },
                 )

@@ -8,9 +8,8 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:image"))
     implementation(project(":core:model"))
-    // Only the favourites tab exists in S2-01; the download and local shelves arrive with their own
-    // tasks and their own repositories, so those modules are not declared yet.
     implementation(project(":data:collection"))
+    implementation(project(":data:local"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)

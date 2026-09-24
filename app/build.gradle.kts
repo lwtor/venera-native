@@ -32,6 +32,7 @@ dependencies {
     // The assembly layer installs the download environment the worker reads (ADR-0005 §2.5).
     implementation(project(":data:download"))
     implementation(project(":data:history"))
+    implementation(project(":data:local"))
     implementation(project(":data:source"))
     implementation(project(":feature:details"))
     implementation(project(":feature:explore"))

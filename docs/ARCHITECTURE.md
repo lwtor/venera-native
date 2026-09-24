@@ -45,10 +45,11 @@ immutable UiState
 | `:core:database` | Room 持久化：`VeneraDatabase`、`ReadingHistoryEntity` / `ReadingProgressEntity` 与两个 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列，值对象在 `:data:history` 转换 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：`HistoryRepository` 契约、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:data:collection` | 书架收藏：文件夹增删改名、条目加入/移出/移动、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
+| `:data:local` | SAF 本地目录授权、扫描、自然排序、封面识别及本地漫画索引仓库 | `:core:model`、`:core:database`、DocumentFile |
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与书架的入口 | Design System、领域契约 |
-| `:feature:library` | 书架页：收藏 tab 的文件夹筛选、四种排序、更新标记与条目操作（`LibraryUiState` + `LibraryAction` + `LibraryViewModel`） | Design System、`:core:model`、`:core:image`、`:data:collection` |
+| `:feature:library` | 书架页：收藏与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记与条目操作，本地页接入 SAF 导入和移除 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:local` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏/取消收藏（写入默认分组），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
@@ -59,7 +60,7 @@ immutable UiState
 | `:source:engine` | QuickJS 主运行时、受控 Host binding，以及待移除的 AndroidX JavaScriptEngine 兼容实现 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
 
-表中“职责”是边界，不表示功能已经完成；当前处于 Stage 1，已落地范围见 `docs/STATUS.md`。
+表中“职责”是边界，不表示功能已经完成；当前处于 Stage 2，已落地范围见 `docs/STATUS.md`。
 
 S0-07 按本文件第 5 节的模块创建准则删除了两个零引用模块：`:core:common`（`AppResult`/`AppError`
 没有任何生产或测试引用）与 `:core:navigation`（`AppRoute` 唯一声明，`Navigation 3` 只被它使用，

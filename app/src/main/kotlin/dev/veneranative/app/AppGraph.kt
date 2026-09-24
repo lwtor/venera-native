@@ -50,6 +50,9 @@ import dev.veneranative.data.history.DefaultHistoryRepository
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.history.ReadingHistoryEntry
 import dev.veneranative.data.history.ReadingProgressTracker
+import dev.veneranative.data.local.AndroidSafTreeAccess
+import dev.veneranative.data.local.DefaultLocalComicRepository
+import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
 import dev.veneranative.data.source.SourcePackageStore
@@ -125,6 +128,8 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val _collection = kotlinx.coroutines.flow.MutableStateFlow<CollectionRepository?>(null)
     val collection: kotlinx.coroutines.flow.StateFlow<CollectionRepository?> = _collection
     private val _download = kotlinx.coroutines.flow.MutableStateFlow<DownloadRepository?>(null)
+    private val _local = kotlinx.coroutines.flow.MutableStateFlow<LocalComicRepository?>(null)
+    val local: kotlinx.coroutines.flow.StateFlow<LocalComicRepository?> = _local
     val download: kotlinx.coroutines.flow.StateFlow<DownloadRepository?> = _download
     init {
         scope.launch {
@@ -136,6 +141,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             // place that can see both the repository and the catalog.
             _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))
             _download.value = DownloadEnvironment.get(getApplication()).repository()
+            _local.value = DefaultLocalComicRepository(db, AndroidSafTreeAccess(getApplication()))
         }
     }
     fun flushProgress() { scope.launch { runCatching { progressTracker.get()?.flush() } } }

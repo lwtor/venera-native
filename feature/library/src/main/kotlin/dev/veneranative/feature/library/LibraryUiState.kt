@@ -4,6 +4,7 @@ import dev.veneranative.core.model.ComicRef
 import dev.veneranative.data.collection.FavoriteFolder
 import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.collection.ShelfSort
+import dev.veneranative.data.local.LocalComic
 
 /** A folder the user is naming or renaming; [folderId] is null while creating a new one. */
 data class FolderEditor(
@@ -18,10 +19,13 @@ data class FolderEditor(
  * "nothing here yet" instead of showing a blank grid that looks broken.
  */
 enum class LibraryStatus { Loading, Empty, Ready, Failed }
+enum class LibraryTab { Favorites, Local }
 
 /** Everything the library screen needs to render. */
 data class LibraryUiState(
     val status: LibraryStatus = LibraryStatus.Loading,
+    val tab: LibraryTab = LibraryTab.Favorites,
+    val localComics: List<LocalComic> = emptyList(),
     val folders: List<FavoriteFolder> = emptyList(),
     /** Null shows every folder. */
     val selectedFolderId: String? = null,
@@ -61,6 +65,14 @@ sealed interface LibraryAction {
     data object RefreshUpdates : LibraryAction
 
     data object Retry : LibraryAction
+
+    data class SelectTab(val tab: LibraryTab) : LibraryAction
+
+    data object RequestLocalImport : LibraryAction
+
+    data class ImportTree(val uri: String) : LibraryAction
+
+    data class RemoveLocalComic(val id: dev.veneranative.core.model.LocalComicId) : LibraryAction
 
     data object DismissMessage : LibraryAction
 }

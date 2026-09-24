@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -84,6 +86,12 @@ internal fun LibraryScreen(
                 }
             }
 
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Favorites)) }) { Text("Favorites") }
+                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Local)) }) { Text("Local") }
+            }
+
+            if (state.tab == LibraryTab.Favorites) {
             FolderChips(
                 folders = state.folders,
                 selectedFolderId = state.selectedFolderId,
@@ -145,6 +153,23 @@ internal fun LibraryScreen(
                     onRemove = { ref -> onAction(LibraryAction.RemoveItem(ref)) },
                     modifier = Modifier.fillMaxSize(),
                 )
+            }
+            } else {
+                Column(Modifier.fillMaxSize()) {
+                    Button(onClick = { onAction(LibraryAction.RequestLocalImport) }, modifier = Modifier.padding(16.dp)) { Text("Import directory") }
+                    if (state.localComics.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No local directories imported.") }
+                    else LazyColumn(Modifier.fillMaxSize()) {
+                        items(state.localComics, key = { it.id.value }) { comic ->
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(comic.title, style = MaterialTheme.typography.titleMedium)
+                                    Text("${comic.chapterCount} chapters", style = MaterialTheme.typography.bodySmall)
+                                }
+                                TextButton(onClick = { onAction(LibraryAction.RemoveLocalComic(comic.id)) }) { Text("Remove") }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

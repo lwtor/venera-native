@@ -29,6 +29,7 @@ include(
     ":data:collection",
     ":data:download",
     ":data:history",
+    ":data:local",
     ":data:source",
     ":feature:details",
     ":feature:explore",

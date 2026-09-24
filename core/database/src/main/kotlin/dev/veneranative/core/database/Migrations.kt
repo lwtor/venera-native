@@ -114,5 +114,17 @@ val MIGRATION_2_3: Migration = object : Migration(2, 3) {
     }
 }
 
+/** S2-05: SAF grants and imported directory indexes; local_page also reserves archive fields for S2-06. */
+val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS local_grant (uri TEXT NOT NULL, kind TEXT NOT NULL, granted_at INTEGER NOT NULL, PRIMARY KEY(uri))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS local_comic (comic_id TEXT NOT NULL, title TEXT NOT NULL, kind TEXT NOT NULL, root_uri TEXT NOT NULL, cover_path TEXT, chapter_count INTEGER NOT NULL, added_at INTEGER NOT NULL, PRIMARY KEY(comic_id))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_local_comic_added_at ON local_comic (added_at)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS local_chapter (comic_id TEXT NOT NULL, chapter_id TEXT NOT NULL, title TEXT NOT NULL, sort_index INTEGER NOT NULL, entry_name TEXT, PRIMARY KEY(comic_id, chapter_id))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS local_page (comic_id TEXT NOT NULL, chapter_id TEXT NOT NULL, page_index INTEGER NOT NULL, entry_name TEXT NOT NULL, display_name TEXT NOT NULL, size_bytes INTEGER NOT NULL, PRIMARY KEY(comic_id, chapter_id, page_index))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_local_page_comic_id_chapter_id ON local_page (comic_id, chapter_id)")
+    }
+}
+
 /** Every migration the database knows about, in order. */
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3)
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)

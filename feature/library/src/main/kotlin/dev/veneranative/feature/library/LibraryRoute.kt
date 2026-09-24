@@ -7,6 +7,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.collection.CollectionRepository
+import dev.veneranative.data.local.LocalComicRepository
 
 /**
  * Entry point of the library screen: owns the ViewModel, collects state and forwards navigation.
@@ -17,16 +18,20 @@ import dev.veneranative.data.collection.CollectionRepository
 @Composable
 fun LibraryRoute(
     collection: CollectionRepository,
+    localRepository: LocalComicRepository? = null,
+    onRequestLocalImport: ((String) -> Unit) -> Unit = {},
     onOpenComic: (ComicKey) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection) }
+    val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection, localRepository) }
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     LibraryScreen(
         state = state,
-        onAction = viewModel::onAction,
+        onAction = { action ->
+            if (action == LibraryAction.RequestLocalImport) onRequestLocalImport { uri -> viewModel.onAction(LibraryAction.ImportTree(uri)) } else viewModel.onAction(action)
+        },
         onOpenComic = onOpenComic,
         onBack = onBack,
         modifier = modifier,
