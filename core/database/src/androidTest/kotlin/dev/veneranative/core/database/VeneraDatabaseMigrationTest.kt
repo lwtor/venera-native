@@ -37,7 +37,7 @@ class VeneraDatabaseMigrationTest {
 
         val tables = created.query(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +
-                "AND name NOT LIKE 'android_%' ORDER BY name",
+                "AND name NOT LIKE 'android_%' AND name != 'room_master_table' ORDER BY name",
         ).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) add(cursor.getString(0))
@@ -212,7 +212,7 @@ class VeneraDatabaseMigrationTest {
 
     private fun SupportSQLiteDatabase.tableNames(): List<String> = query(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' " +
-            "AND name NOT LIKE 'android_%' ORDER BY name",
+            "AND name NOT LIKE 'android_%' AND name != 'room_master_table' ORDER BY name",
     ).use { cursor ->
         buildList {
             while (cursor.moveToNext()) add(cursor.getString(0))

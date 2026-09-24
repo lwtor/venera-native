@@ -125,8 +125,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 
 - **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
 - **S2-07B 下载用户流程 — DONE。** 详情 ViewModel 读取章节页并写入持久下载仓库；成功后由 Route 通知装配层启动唯一 WorkManager。书架 Downloads tab 展示页数进度并可暂停、继续、重试、移除；ViewModel 测试覆盖详情到队列的数据与下载列表控制委派。验证：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
-- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-24 复验记录见 `docs/reviews/stage-02-review.md`。全仓 JVM 测试 429 项通过，Debug、Release 与 Release Lint Vital 通过；完整 `lintDebug` 因 13 条依赖版本新鲜度错误失败。由于 `warningsAsErrors=true`，且 Stage 门禁要求完整 Lint 通过，Stage 2 不得标为 DONE。候选依赖须先做兼容性判断，不能用 baseline 或抑制规避。
-- **设备闭环未执行。** Stage 2 手工脚本：安装 Debug APK；从测试来源详情选择章节并点 Download；Library → Downloads 检查页数、暂停、继续与移除；Library → Local 导入测试目录及生成的 CBZ/7z，逐章阅读并离开重进；飞行模式重开已下载章节并翻页；检查 Reader 返回位置能恢复。本轮 `adb devices -l` 无设备；尝试启动现有 `DeviceTest_1` headless AVD 以退出码 132 结束，之后 ADB 仍无设备，因此以上 Android UI / 飞行模式步骤未执行，不能记为通过。
+- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-24 审查记录见 `docs/reviews/stage-02-review.md`。全仓 JVM 测试 429 项通过，Debug、Release 与 Release Lint Vital 通过；完整 `lintDebug` 因 13 条依赖版本新鲜度错误失败。真机 Xiaomi 25128PNA1C / API 36 上，数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过。由于完整 Debug Lint 失败且页面闭环未执行，Stage 2 不得标为 DONE。
+- **页面设备闭环仍未完成。** 当前 Debug APK 能正常启动到首页，未见启动崩溃。MIUI 拒绝 `adb shell input tap`（缺少 `INJECT_EVENTS`），因此尚未操作详情下载、Library Downloads 暂停/继续/移除、SAF 目录/归档导入阅读、飞行模式翻页及进度恢复。没有尝试修改设备安全设置；需使用允许 UI 自动化的设备连接方式完成这些流程。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
