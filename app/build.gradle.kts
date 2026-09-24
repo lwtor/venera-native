@@ -7,6 +7,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.veneranative"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -64,4 +65,10 @@ dependencies {
     // so it names Coil's Compose artifact even though it draws no images itself.
     implementation(libs.coil.compose)
     debugImplementation(libs.compose.ui.tooling)
+
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    debugImplementation(libs.compose.ui.test.manifest)
 }

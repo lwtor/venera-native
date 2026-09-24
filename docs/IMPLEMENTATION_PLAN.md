@@ -472,6 +472,7 @@ S2-07 当前切片与验收：
 - **S2-07C7 — XZ for Java 1.12 更新：DONE。** 为获取 `LZMAInputStream` 使用 `ArrayCache` 时的解码缺陷修复，将 1.10 升至 1.12；验证：`:core:archive:testDebugUnitTest :core:archive:lintDebug :data:local:testDebugUnitTest :app:assembleDebug` — PASS。全仓 `lintDebug` 复验为 8 条版本提示，XZ 提示已消失，剩余提示归属与证据见审查记录。
 - **S2-07C8 — org.json 20260814 更新：DONE。** 该库仅用于 `:source:engine` 测试运行时；`:source:engine:testDebugUnitTest :source:engine:lintDebug :app:assembleDebug` 通过，全仓 `lintDebug --rerun-tasks` 中对应提示已消失，剩余 7 项。
 - **S2-07C9 — QuickJS 1.0.15 更新评估：BLOCKED。** 尝试升级后 Kotlin 编译器因候选带入 stdlib 2.4.10、metadata 2.4 超出当前读取上限 2.3 而无法编译；恢复 1.0.5。解除条件：单独完成 Kotlin 编译器/插件协调升级并重跑来源引擎合同测试和 Debug 构建。
+- **S2-07C10 — 书架导航 instrumentation smoke test：DONE（仅编译）。** 覆盖首页打开 Library、切换 Downloads/Local tab 与主要空态/导入入口显示；`:app:compileDebugAndroidTestKotlin` 通过。没有设备运行证据，不替代 Stage 2 手动闭环。
 
 ## 7. Stage 3：来源扩展能力
 

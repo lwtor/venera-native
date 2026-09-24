@@ -63,7 +63,7 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 ## 退出阻断项与解除条件
 
 1. 对当前 7 条版本提示逐项作出有证据的兼容性处理，并使完整 `lintDebug` 成功。允许升级的依赖应在独立小任务中逐个验证并提交；不能升级或无法获取工件的项需要明确兼容理由与恢复条件，不能用 baseline 或静默抑制代替结论。
-2. 在 Android API 26+ 设备或模拟器执行 `STATUS.md` 所列详情下载、暂停/继续、目录/归档阅读、飞行模式阅读及历史恢复闭环，并记录设备/API 与结果。本轮已验证 Xiaomi 25128PNA1C（API 36）的数据库与下载 Worker instrumentation，但 MIUI 拒绝 shell 输入事件，无法执行页面交互。后续需用允许 UI 自动化的设备连接方式完成页面闭环；不得通过修改设备安全设置绕过。
+2. 在 Android API 26+ 设备或模拟器执行 `STATUS.md` 所列详情下载、暂停/继续、目录/归档阅读、飞行模式阅读及历史恢复闭环，并记录设备/API 与结果。本轮已验证 Xiaomi 25128PNA1C（API 36）的数据库与下载 Worker instrumentation，但 MIUI 拒绝 shell 输入事件，无法执行页面交互。新增书架导航 Compose instrumentation smoke test，`:app:compileDebugAndroidTestKotlin` 通过，但未在设备执行。本轮复查时 Android Studio Device Manager 与 ADB 均未发现连接设备，因此 UI 批次暂停；需重新连接设备并使用正常授权的控制方式完成页面闭环，不能通过修改安全设置绕过。
 3. 完成以上处理后重跑规定 Stage 门禁，再更新本报告、`STATUS.md` 和 `IMPLEMENTATION_PLAN.md`；通过后才将 Stage 2 标为 `DONE`。
 
 本轮没有发现生产代码缺陷；已修复真机才暴露的 instrumentation 表清单断言错误。自动化证据仅覆盖报告列出的模块测试，不能推导页面设备闭环或 Stage 退出门禁通过。

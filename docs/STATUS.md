@@ -135,6 +135,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C7 XZ for Java 1.12 更新 — DONE。** 1.10→1.12，包含上游记录的 LZMA `ArrayCache` 解码缺陷修复。验证：`:core:archive:testDebugUnitTest :core:archive:lintDebug :data:local:testDebugUnitTest :app:assembleDebug` — PASS；全仓 Lint 随后报告 8 条，XZ 项已消失。
 - **S2-07C8 org.json 20260814 更新 — DONE。** 该库只供来源引擎测试运行时使用；验证：`:source:engine:testDebugUnitTest :source:engine:lintDebug :app:assembleDebug` — PASS。全仓 `lintDebug --rerun-tasks` 报 7 条依赖版本提示，org.json 项已消失。
 - **S2-07C9 QuickJS 1.0.15 更新评估 — BLOCKED。** 候选 1.0.15 带入 Kotlin stdlib 2.4.10，当前 Kotlin 编译器最多支持 2.3 元数据，`:source:engine:compileDebugKotlin` 出现 `incompatible version of Kotlin` 并失败；已恢复 1.0.5。解除条件：在单独评估并协调升级 Kotlin 编译器/插件后，再跑 source-engine 单测、instrumentation 源码编译和 Debug 构建。
+- **S2-07C10 书架导航 instrumentation smoke test — DONE（仅编译）。** 新增设备测试覆盖首页打开 Library、切换 Downloads/Local tab 和空态/导入入口显示；`:app:compileDebugAndroidTestKotlin` — PASS。未在设备执行，不能视作页面闭环验收；本轮 Android Studio 无连接设备，先前 MIUI 也拒绝测试 APK 安装。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
