@@ -46,6 +46,7 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 ```text
 :app
 :core:database
+:core:archive
 :core:designsystem
 :core:image
 :core:model

@@ -65,8 +65,10 @@ class LibraryViewModel(
             LibraryAction.Retry -> startItems()
             is LibraryAction.SelectTab -> _state.update { it.copy(tab = action.tab) }
             LibraryAction.RequestLocalImport -> Unit
+            LibraryAction.RequestArchiveImport -> Unit
             is LibraryAction.ImportTree -> importTree(action.uri)
             is LibraryAction.RemoveLocalComic -> localRepository?.let { repo -> runSafely { repo.remove(action.id) } }
+            is LibraryAction.ImportArchive -> importArchive(action.uri)
             LibraryAction.DismissMessage -> _state.update { it.copy(message = null) }
         }
     }
@@ -76,6 +78,18 @@ class LibraryViewModel(
         viewModelScope.launch {
             try { local.observeComics().collect { comics -> _state.update { it.copy(localComics = comics) } } }
             catch (failure: Throwable) { failUnlessCancelled(failure); _state.update { it.copy(message = "Local folders could not be read.") } }
+        }
+    }
+
+    private fun importArchive(uri: String) {
+        val repo = localRepository ?: return
+        viewModelScope.launch {
+            when (val result = repo.importArchive(uri)) {
+                is LocalImportResult.Imported -> _state.update { it.copy(message = "Archive imported.") }
+                LocalImportResult.Empty -> _state.update { it.copy(message = "No readable images were found in the archive.") }
+                LocalImportResult.PermissionLost -> _state.update { it.copy(message = "Archive access was not granted. Select it again.") }
+                LocalImportResult.Unavailable -> _state.update { it.copy(message = "The archive could not be read. Check that it is a supported ZIP or 7z file.") }
+            }
         }
     }
 
@@ -108,6 +122,7 @@ class LibraryViewModel(
         }
     }
 
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun startItems() {
         itemsJob?.cancel()
         itemsJob = viewModelScope.launch {

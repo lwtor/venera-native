@@ -52,6 +52,7 @@ import dev.veneranative.data.history.ReadingHistoryEntry
 import dev.veneranative.data.history.ReadingProgressTracker
 import dev.veneranative.data.local.AndroidSafTreeAccess
 import dev.veneranative.data.local.DefaultLocalComicRepository
+import dev.veneranative.data.local.AndroidSafArchiveAccess
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
@@ -141,7 +142,9 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             // place that can see both the repository and the catalog.
             _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))
             _download.value = DownloadEnvironment.get(getApplication()).repository()
-            _local.value = DefaultLocalComicRepository(db, AndroidSafTreeAccess(getApplication()))
+            _local.value = DefaultLocalComicRepository(
+                db, AndroidSafTreeAccess(getApplication()), archiveAccess = AndroidSafArchiveAccess(getApplication()),
+            )
         }
     }
     fun flushProgress() { scope.launch { runCatching { progressTracker.get()?.flush() } } }

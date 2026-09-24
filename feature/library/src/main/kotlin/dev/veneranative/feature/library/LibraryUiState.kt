@@ -69,8 +69,10 @@ sealed interface LibraryAction {
     data class SelectTab(val tab: LibraryTab) : LibraryAction
 
     data object RequestLocalImport : LibraryAction
+    data object RequestArchiveImport : LibraryAction
 
     data class ImportTree(val uri: String) : LibraryAction
+    data class ImportArchive(val uri: String) : LibraryAction
 
     data class RemoveLocalComic(val id: dev.veneranative.core.model.LocalComicId) : LibraryAction
 

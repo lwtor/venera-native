@@ -13,12 +13,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import dev.veneranative.core.archive.ArchiveReadException
 
 class DefaultLocalComicRepository(
     private val database: VeneraDatabase,
     private val access: SafTreeAccess,
     private val clock: () -> Long = System::currentTimeMillis,
     private val scanner: LocalDirectoryScanner = LocalDirectoryScanner(),
+    private val archiveAccess: LocalArchiveAccess? = null,
 ) : LocalComicRepository {
     private val dao: LocalDao get() = database.localDao()
 
@@ -26,14 +28,20 @@ class DefaultLocalComicRepository(
     override fun observeChapters(comicId: LocalComicId): Flow<List<LocalChapter>> =
         dao.observeChapters(comicId.value).map { rows -> rows.map { LocalChapter(LocalChapterId(it.chapterId), comicId, it.title, it.sortIndex) } }
     override suspend fun pages(comicId: LocalComicId, chapterId: LocalChapterId): List<LocalPage> =
-        withContext(Dispatchers.IO) { dao.pages(comicId.value, chapterId.value).map { LocalPage(comicId, chapterId, it.pageIndex, it.entryName, it.displayName, it.sizeBytes) } }
+        withContext(Dispatchers.IO) {
+            val comic = dao.comic(comicId.value) ?: return@withContext emptyList()
+            val kind = runCatching { LocalKind.valueOf(comic.kind) }.getOrDefault(LocalKind.Directory)
+            dao.pages(comicId.value, chapterId.value).map {
+                LocalPage(comicId, chapterId, it.pageIndex, it.entryName, it.displayName, it.sizeBytes, comic.rootUri, kind)
+            }
+        }
 
     override suspend fun importTree(uri: String): LocalImportResult = withContext(Dispatchers.IO) {
         val root = try { access.read(uri) } catch (_: SecurityException) { return@withContext LocalImportResult.PermissionLost }
             ?: return@withContext LocalImportResult.Unavailable
         val tree = scanner.scan(root)
         if (tree.chapters.isEmpty()) return@withContext LocalImportResult.Empty
-        try { access.take(uri) } catch (_: SecurityException) { return@withContext LocalImportResult.PermissionLost }
+        try { this@DefaultLocalComicRepository.access.take(uri) } catch (_: SecurityException) { return@withContext LocalImportResult.PermissionLost }
         val comicId = LocalDirectoryScanner.stableId(uri)
         val existing = dao.comic(comicId)
         val comic = LocalComicEntity(comicId, tree.title, LocalKind.Directory.name, uri, tree.coverUri,
@@ -52,6 +60,40 @@ class DefaultLocalComicRepository(
             } })
         }
         LocalImportResult.Imported(comic.toDomain()!!, tree.chapters.sumOf { it.pages.size })
+    }
+
+    override suspend fun importArchive(uri: String): LocalImportResult = withContext(Dispatchers.IO) {
+        val access = archiveAccess ?: return@withContext LocalImportResult.Unavailable
+        val indexed = try {
+            access.open(uri).use { archive ->
+                val pages = archive.entries().asSequence()
+                    .filter { !it.isDirectory && isImageName(it.name) }
+                    .sortedWith(compareBy(NaturalOrderComparator) { it.name })
+                    .toList()
+                val cover = pages.firstOrNull { it.name.substringAfterLast('/').substringBeforeLast('.', "").equals("cover", true) }
+                val bodyPages = pages.filterNot { it == cover }
+                bodyPages to cover
+            }
+        } catch (e: SecurityException) { return@withContext LocalImportResult.PermissionLost }
+          catch (e: ArchiveReadException) { return@withContext LocalImportResult.Unavailable }
+          catch (_: Exception) { return@withContext LocalImportResult.Unavailable }
+        val (pages, cover) = indexed
+        if (pages.isEmpty()) return@withContext LocalImportResult.Empty
+        try { this@DefaultLocalComicRepository.access.take(uri) } catch (_: SecurityException) { return@withContext LocalImportResult.PermissionLost }
+        val comicId = LocalDirectoryScanner.stableId(uri)
+        val existing = dao.comic(comicId)
+        val chapterId = LocalDirectoryScanner.stableId("$uri#chapter")
+        val comic = LocalComicEntity(comicId, uri.substringAfterLast('/').substringBeforeLast('.').ifBlank { "Local archive" },
+            LocalKind.Archive.name, uri, cover?.name, 1, existing?.addedAt ?: clock())
+        database.withTransaction {
+            dao.upsertGrant(LocalGrantEntity(uri, "archive", existing?.addedAt ?: clock()))
+            dao.deletePages(comicId); dao.deleteChapters(comicId); dao.upsertComic(comic)
+            dao.upsertChapters(listOf(LocalChapterEntity(comicId, chapterId, "Chapter 1", 0, null)))
+            dao.upsertPages(pages.mapIndexed { index, entry ->
+                LocalPageEntity(comicId, chapterId, index, entry.name, entry.name.substringAfterLast('/'), entry.sizeBytes)
+            })
+        }
+        LocalImportResult.Imported(comic.toDomain()!!, pages.size)
     }
 
     override suspend fun remove(comicId: LocalComicId) = withContext(Dispatchers.IO) {
@@ -81,6 +123,9 @@ class DefaultLocalComicRepository(
         dao.deleteGrant(uri)
     }
 }
+
+private fun isImageName(name: String): Boolean = name.substringAfterLast('.', "").lowercase() in
+    setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "avif")
 
 private fun LocalComicEntity.toDomain(): LocalComic? = runCatching {
     LocalComic(LocalComicId(comicId), title, LocalKind.valueOf(kind), rootUri, coverPath, chapterCount, addedAt)

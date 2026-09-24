@@ -157,6 +157,7 @@ internal fun LibraryScreen(
             } else {
                 Column(Modifier.fillMaxSize()) {
                     Button(onClick = { onAction(LibraryAction.RequestLocalImport) }, modifier = Modifier.padding(16.dp)) { Text("Import directory") }
+                    Button(onClick = { onAction(LibraryAction.RequestArchiveImport) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Import CBZ / ZIP / 7z") }
                     if (state.localComics.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No local directories imported.") }
                     else LazyColumn(Modifier.fillMaxSize()) {
                         items(state.localComics, key = { it.id.value }) { comic ->

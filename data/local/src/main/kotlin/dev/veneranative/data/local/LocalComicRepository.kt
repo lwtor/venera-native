@@ -3,6 +3,7 @@ package dev.veneranative.data.local
 import dev.veneranative.core.model.LocalChapterId
 import dev.veneranative.core.model.LocalComicId
 import kotlinx.coroutines.flow.Flow
+import dev.veneranative.core.archive.ArchiveReader
 
 enum class LocalKind { Directory, Archive }
 data class LocalComic(
@@ -10,7 +11,12 @@ data class LocalComic(
     val coverPath: String?, val chapterCount: Int, val addedAtEpochMillis: Long,
 )
 data class LocalChapter(val id: LocalChapterId, val comicId: LocalComicId, val title: String, val index: Int)
-data class LocalPage(val comicId: LocalComicId, val chapterId: LocalChapterId, val index: Int, val uri: String, val name: String, val sizeBytes: Long)
+data class LocalPage(
+    val comicId: LocalComicId, val chapterId: LocalChapterId, val index: Int,
+    val uri: String, val name: String, val sizeBytes: Long,
+    val rootUri: String = "", val kind: LocalKind = LocalKind.Directory,
+)
+interface LocalArchiveAccess { fun open(uri: String): ArchiveReader }
 data class SafGrant(val uri: String, val kind: LocalKind, val grantedAtEpochMillis: Long)
 sealed interface LocalImportResult {
     data class Imported(val comic: LocalComic, val pageCount: Int) : LocalImportResult
@@ -23,6 +29,7 @@ interface LocalComicRepository {
     fun observeChapters(comicId: LocalComicId): Flow<List<LocalChapter>>
     suspend fun pages(comicId: LocalComicId, chapterId: LocalChapterId): List<LocalPage>
     suspend fun importTree(uri: String): LocalImportResult
+    suspend fun importArchive(uri: String): LocalImportResult
     suspend fun remove(comicId: LocalComicId)
     suspend fun refresh(comicId: LocalComicId)
     suspend fun grants(): List<SafGrant>

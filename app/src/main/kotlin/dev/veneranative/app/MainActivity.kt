@@ -153,9 +153,13 @@ private fun AppNavHost(
 ) {
     var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
     var pendingLocalImport by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    var pendingArchiveImport by remember { mutableStateOf<((String) -> Unit)?>(null) }
     val localTreePicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
     ) { uri -> uri?.toString()?.let { pendingLocalImport?.invoke(it) }; pendingLocalImport = null }
+    val localArchivePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.toString()?.let { pendingArchiveImport?.invoke(it) }; pendingArchiveImport = null }
     val scriptPicker = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -180,6 +184,7 @@ private fun AppNavHost(
                     collection = collection,
                     localRepository = localRepository,
                     onRequestLocalImport = { consume -> pendingLocalImport = consume; localTreePicker.launch(null) },
+                    onRequestArchiveImport = { consume -> pendingArchiveImport = consume; localArchivePicker.launch(arrayOf("application/zip", "application/x-7z-compressed", "application/octet-stream")) },
                     onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
                     onBack = { onRouteChange(AppRoute.Home) },
                 )

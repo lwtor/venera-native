@@ -20,6 +20,7 @@ fun LibraryRoute(
     collection: CollectionRepository,
     localRepository: LocalComicRepository? = null,
     onRequestLocalImport: ((String) -> Unit) -> Unit = {},
+    onRequestArchiveImport: ((String) -> Unit) -> Unit = {},
     onOpenComic: (ComicKey) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -30,7 +31,11 @@ fun LibraryRoute(
     LibraryScreen(
         state = state,
         onAction = { action ->
-            if (action == LibraryAction.RequestLocalImport) onRequestLocalImport { uri -> viewModel.onAction(LibraryAction.ImportTree(uri)) } else viewModel.onAction(action)
+            when (action) {
+                LibraryAction.RequestLocalImport -> onRequestLocalImport { uri -> viewModel.onAction(LibraryAction.ImportTree(uri)) }
+                LibraryAction.RequestArchiveImport -> onRequestArchiveImport { uri -> viewModel.onAction(LibraryAction.ImportArchive(uri)) }
+                else -> viewModel.onAction(action)
+            }
         },
         onOpenComic = onOpenComic,
         onBack = onBack,

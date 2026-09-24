@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-24 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-06 CBZ/ZIP 与 7z 支持 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-05 DONE；当前唯一下一任务 S2-06 |
+| 当前任务 | S2-07 Stage 2 集成验收 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06 DONE；当前唯一下一任务 S2-07 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -114,6 +114,12 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 新增 `:data:local` 与 Room v4：持久化 SAF tree 授权、本地漫画/章节/页索引。系统目录选择器接入书架 Local tab；可导入、查看和移除目录。扫描支持图片直接位于根目录的一章布局及子目录分章布局；自然排序处理数字段、前导零和大小写，根 `cover.*` 优先且不作为正文页，否则取首张正文图。重复导入以授权 URI 生成稳定漫画 ID 并替换索引；删除最后一个持有者后释放系统授权。
 
 验证：`:data:local:testDebugUnitTest :app:assembleDebug` — PASS（扫描、自然排序、封面解析 6 项通过，Debug APK 构建通过）；`:core:database:compileDebugKotlin` — PASS，schema v4 已生成。迁移 instrumentation 已新增 v3→v4 schema 和下载行保留用例，尚未在设备上运行。此任务只完成目录导入；本地页阅读闭环列入 S2-07。
+
+## 最近完成：S2-06 CBZ/ZIP 与 7z — DONE
+
+新增 `:core:archive`，以 Commons Compress 1.28.0 / XZ 1.10 读取 SAF URI 支持的 ZIP/CBZ、7z/CB7；未知格式与损坏归档有结构化错误。书架 Local tab 增加归档文件导入，归档条目按自然序索引至 Room v4；`LocalPageMaterializer` 将 SAF 或归档页原子写入有 256 MiB 总量上限、100 MiB 单页上限的 LRU 缓存。单页坏数据可单独重试物化，归档读取出错映射为页面失败。
+
+验证：`:core:archive:testDebugUnitTest :data:local:testDebugUnitTest :feature:library:compileDebugKotlin :app:assembleDebug` — PASS（ZIP/7z fixture 读回、格式判定/自然排序、缓存淘汰及超限清理）；`git diff --check` — PASS。7z 单测 fixture 使用 COPY 编码；未覆盖所有 7z 编码、密码归档或真实 SAF Provider；本地阅读器闭环仍由 S2-07 验收。
 
 ## 最近完成：S2-04 离线阅读整合 — DONE
 
