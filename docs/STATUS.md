@@ -125,11 +125,13 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 
 - **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
 - **S2-07B 下载用户流程 — DONE。** 详情 ViewModel 读取章节页并写入持久下载仓库；成功后由 Route 通知装配层启动唯一 WorkManager。书架 Downloads tab 展示页数进度并可暂停、继续、重试、移除；ViewModel 测试覆盖详情到队列的数据与下载列表控制委派。验证：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
-- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-24 审查记录见 `docs/reviews/stage-02-review.md`。全仓 JVM 测试 429 项通过，Debug、Release 与 Release Lint Vital 通过；重跑 `lintDebug` 已发现并修复四处代码级问题，但全仓门禁仍在继续检查中。真机 Xiaomi 25128PNA1C / API 36 上，数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过。由于完整 Debug Lint 失败且页面闭环未执行，Stage 2 不得标为 DONE。
+- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-24 审查记录见 `docs/reviews/stage-02-review.md`。全仓 JVM 测试 429 项通过，Debug、Release 与 Release Lint Vital 通过；重跑 Lint 修复 4 处代码问题并更新三组 stable AndroidX 依赖；当前 `lintDebug` 仍报 9 条依赖版本提示。Xiaomi 25128PNA1C / API 36 数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过。完整 Debug Lint 失败、页面闭环未执行，Stage 2 不得标为 DONE。
 - **页面设备闭环仍未完成。** 当前 Debug APK 能正常启动到首页，未见启动崩溃。MIUI 拒绝 `adb shell input tap`（缺少 `INJECT_EVENTS`），因此尚未操作详情下载、Library Downloads 暂停/继续/移除、SAF 目录/归档导入阅读、飞行模式翻页及进度恢复。没有尝试修改设备安全设置；需使用允许 UI 自动化的设备连接方式完成这些流程。
 - **S2-07C2 下载通知 lint 修复 — DONE。** 2026-09-24 移除 `minSdk=26` 下永不可达的 API O 低版本提前返回。验证：`:data:download:lintDebug :app:assembleDebug` — PASS。
 - **S2-07C3 详情入口 Compose lint 修复 — DONE。** 全仓 `lintDebug` 后续发现 `DetailsRoute` 的 `modifier` 没有位于首个可选参数位置。将其移到必需回调之后、其他默认参数之前。验证：`:feature:details:lintDebug :app:assembleDebug` — PASS。全仓 Lint 仍需继续运行和复查。
 - **S2-07C4 书架入口 Compose lint 修复 — DONE。** `LibraryRoute` 和 `LibraryScreen` 的 `modifier` 均未位于首个可选参数位置。调整到必需参数之后、其他默认参数之前。验证：`:feature:library:lintDebug :app:assembleDebug` — PASS。全仓 Lint 仍需继续复查。
+- **S2-07C5 stable AndroidX 依赖更新 — DONE。** Core 1.19.1、JavaScriptEngine 1.1.1、Navigation3 1.2.0 均在 AndroidX stable 清单；验证：`:core:navigation:testDebugUnitTest :source:engine:testDebugUnitTest :data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
+- **S2-07C6 WorkManager stable 更新 — BLOCKED。** AndroidX 已发布 WorkManager 2.12.0 stable，但在线解析 `androidx.work:work-testing:2.12.0` 时，环境将 Google Maven 重定向至 Aliyun 镜像并返回缺包，故测试源码无法编译。暂留 WorkManager runtime/testing 2.11.2 配对版本；解除条件：镜像提供 `work-testing:2.12.0` 或可用的 Google Maven 访问路径，届时需重新编译并验证 Worker 测试。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
