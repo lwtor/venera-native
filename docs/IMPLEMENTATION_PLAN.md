@@ -23,6 +23,10 @@
 - 普通开发节点以受影响代码编译通过为验证底线；完整 Lint、测试、实机和压力验证只在 Stage 退出、发布、专项验证任务或用户明确要求时执行。
 - 测试代码和文档仍属于交付物，但普通节点只要求测试源码编译，不默认执行完整测试套件。
 
+### PL-01 全局计划复核 — DONE（2026-09-25）
+
+范围：审核 Stage 0–4 的目标、依赖、执行状态和最终 90% 对齐口径。调整记录见 `docs/reviews/plan-review-2026-09-25.md`。这是用户指定的计划审查任务，不占用当前唯一工程任务 S2-07C；纯文档切片不涉及编译，验收为计划/状态/产品文档一致与差异检查通过。
+
 ## 3. 总体里程碑
 
 | 阶段 | 目标 | 退出条件 | 状态 |
@@ -30,7 +34,7 @@
 | Stage 0 | 验证 JS 漫画源和阅读器两项最高风险技术 | JavaScriptEngine 与大图方案形成有证据的 ADR | DONE（2026-09-20 退出） |
 | Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | DONE（Q00–Q13 整改及阶段复验通过） |
 | Stage 2 | 完成书架、下载和本地阅读 | 离线可浏览书架并阅读下载或本地漫画 | IN_PROGRESS（S2-01–S2-06 DONE，当前 S2-07） |
-| Stage 3 | 补齐来源扩展能力 | Core/Extended 协议测试通过，Advanced 有支持矩阵 | TODO |
+| Stage 3 | 冻结上游对照基线并补齐来源扩展能力 | 逐项对照清单就绪；Core/Extended 协议测试通过，Advanced 有支持矩阵 | TODO |
 | Stage 4 | 同步、自适应、产品体验对齐与发布 | RC 通过迁移、压力、无障碍与发布检查；全 App 功能、页面逻辑、视觉设计对照基线分别达到 ≥90% | TODO |
 
 ## 4. Stage 0：技术验证
@@ -462,7 +466,7 @@ S2-07 当前切片与验收：
 
 - **S2-07A — 统一章节身份与本地阅读：DONE。** `AppRoute.Reader` / `PageProvider` / Reader 使用 `ChapterRef`；SAF 目录与归档章节都可选入现有 Reader；进度写入 `@local` 历史命名空间。验收：远端旧路由 round-trip 兼容、本地路由 round-trip、本地页不调用来源、历史恢复命中同一 local chapter。
 - **S2-07B — 下载用户流程：DONE。** 详情可排入章节下载并启动唯一 WorkManager；Library Downloads 显示页进度并提供暂停、继续、重试、移除。验收：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` 通过。
-- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。全仓 429 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；复验修复 4 处代码级 Lint 问题，并更新 Core、JavaScriptEngine、Navigation3、XZ、org.json。C12 已升级 AGP 9.3.1 / Gradle 9.5.0 / KGP 2.4.20 / KSP 2.3.12，并通过 Coil 3.6.3 与 QuickJS 1.0.15 相关回归；完整 Lint 只剩 WorkManager runtime/testing 两项版本提示（2.12.0 测试工件未同步到 Aliyun）。设备用户闭环未执行。继续处理 Lint 与设备验收，才可重新审查 Stage 退出；不得把未通过写成 DONE。
+- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。全仓 429 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；复验修复 4 处代码级 Lint 问题，并更新 Core、JavaScriptEngine、Navigation3、XZ、org.json。C12 已升级 AGP 9.3.1 / Gradle 9.5.0 / KGP 2.4.20 / KSP 2.3.12，并通过 Coil 3.6.3 与 QuickJS 1.0.15 相关回归；完整 Lint 只剩 WorkManager runtime/testing 两项版本提示（2.12.0 测试工件未同步到 Aliyun）。继续完成可在本地运行的代码审查与复验；设备项由 S2-07D 记录并等待用户确认，不得把未执行的设备闭环写成通过或将 Stage 标为 DONE。
 - **S2-07C1 — Room migration 真机断言：DONE。** 真机运行暴露表名断言将 `room_master_table` 误作应用 schema；仅过滤该 Room 内部表后，`:core:database:connectedDebugAndroidTest` 25 项通过。`:data:download:connectedDebugAndroidTest` 同设备 4 项通过。修复与证据记入 Stage 2 审查记录。
 - **S2-07C2 — 删除无效通知 API 兼容分支：DONE。** `:data:download:lintDebug` 首次暴露 `ObsoleteSdkInt`：项目 minSdk 为 26，而下载通知 channel 要求 API 26，低于 O 的检查不可达。移除该无效分支后，`:data:download:lintDebug :app:assembleDebug` 均通过。
 - **S2-07C3 — 修正详情入口 Modifier 参数顺序：DONE。** 全仓 `lintDebug` 随后暴露 `feature/details/DetailsRoute.kt` 的 `ModifierParameter`：默认参数 `modifier` 之前还有另一个默认参数。把 `modifier` 移至必需回调之后、其他默认参数之前；`:feature:details:lintDebug :app:assembleDebug` 通过。
@@ -476,37 +480,41 @@ S2-07 当前切片与验收：
 - **S2-07C11 — Coil 3.6.3 更新：DONE（C12 解锁）。** KGP 2.4.20 下 `:core:image:testDebugUnitTest :app:assembleDebug` 通过。
 - **S2-07C12 — Kotlin/Android 构建工具链协调升级：DONE。** AGP 9.3.1、Gradle 9.5.0、AGP 内置 KGP/Compose Compiler 2.4.20、KSP 2.3.12；同时升级 Coil 3.6.3 / QuickJS 1.0.15。429 项 JVM 测试及图像/来源引擎回归、下载与数据库 AndroidTest 源码编译、Debug/Release 构建和 Release Lint Vital 均通过。全仓 `lintDebug` 仍由 WorkManager runtime/testing 两条更新提示失败。QuickJS 求值取消现已由 C13 接入并以死循环 timeout/cancel 回归验证。版本兼容依据与细节见 Stage 2 审查及 ADR-0004 §7.5。
 - **S2-07C13 — QuickJS evaluation cancellation：DONE。** timeout 与 `SourceScriptRuntime.cancel()` 取消实际 evaluation `Deferred`，最多有界等待 1 秒后丢弃引擎；死循环 timeout 返回 `Timeout`、显式取消返回 `Cancelled`，两种路径后的同源重调用都成功。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
+- **S2-07D — 真机用户闭环：BLOCKED（待用户确认执行）。** 保留详情发起下载、暂停/继续/重试/移除、飞行模式离线阅读、SAF 目录/归档导入、进度恢复、长图手势/内存与低 API 兼容等待验证项；执行前记录设备型号/API、步骤和预期，不在本轮审查中安装 APK、运行 instrumentation 或操作真机。解除条件：用户确认可以进行真机验证并提供可操作设备。
 
 ## 7. Stage 3：来源扩展能力
 
-| ID | 任务 | 关键交付物 |
-| --- | --- | --- |
-| S3-01 | 分类、排行和聚合搜索 | 能力驱动 UI、并发限制、单源失败隔离 |
-| S3-02 | 来源设置与私有数据 | 强类型设置、每源隔离、敏感字段保护 |
-| S3-03 | 登录与 Cookie | 密码登录、Cookie 导入、Keystore 策略 |
-| S3-04 | WebView 登录 | 隔离 WebView、Cookie 同步、验证码流程 |
-| S3-05 | 收藏与账户能力 | 远端收藏夹、本地映射、一致性处理 |
-| S3-06 | 评论、评分与交互 | 可选能力、分页、错误和权限状态 |
-| S3-07 | 高级图片处理 | 二进制变换、解密允许边界、缓存语义 |
-| S3-08 | 兼容矩阵与调试工具 | Source Contract Suite、脱敏日志、导出诊断 |
+S3-00 在扩展实现前冻结上游基线。后续任务按该基线维护功能、页面流程与设计的差距清单；每个大项在开始实现时再拆为有独立验收和 commit 的小切片。现有编号保持稳定。
+
+| ID | 任务 | 关键交付物与验收 | 前置 | 状态 |
+| --- | --- | --- | --- | --- |
+| S3-00 | Venera 对照基线 | 固定上游版本/提交；盘点适用功能、页面流程、关键页面/组件及截图，记录权重、差距、排除理由与证据路径；建立各维度初始分数，不把未测项计为通过；记录上游资源/标识的许可证边界 | S2-07 | TODO |
+| S3-01 | 分类、排行和聚合搜索 | 能力驱动 UI、并发限制、单源失败隔离；对照清单中的对应流程和状态验收 | S3-00 | TODO |
+| S3-02 | 来源设置与私有数据 | 强类型设置、每源隔离、敏感字段保护；迁移与异常状态有测试 | S3-00 | TODO |
+| S3-03 | 登录与 Cookie | 密码登录、Cookie 导入、Keystore 策略；会话隔离、过期与失败恢复有测试 | S3-02 | TODO |
+| S3-04 | WebView 登录 | 隔离 WebView、Cookie 同步、验证码流程；退出与失败后的会话清理有测试 | S3-03 | TODO |
+| S3-05 | 收藏与账户能力 | 远端收藏夹、本地映射、一致性与冲突处理有测试 | S3-03 | TODO |
+| S3-06 | 评论、评分与交互 | 可选能力、分页、错误和权限状态有测试 | S3-03 | TODO |
+| S3-07 | 高级图片处理 | 二进制变换、解密允许边界、缓存语义；固定 fixture 与超限/失败测试 | S3-00 | TODO |
+| S3-08 | 兼容矩阵与调试工具 | Source Contract Suite、脱敏日志、导出诊断；逐项复核 Stage 3 对照差距 | S3-01 至 S3-07 | TODO |
 
 ## 8. Stage 4：同步、体验与发布
 
-| ID | 任务 | 关键交付物 |
-| --- | --- | --- |
-| S4-01 | Proto DataStore 设置 | 外观、阅读、网络设置与迁移 |
-| S4-02 | WebDAV 备份恢复 | 格式版本、预览、冲突、安全默认值 |
-| S4-03 | Material 3 Adaptive | Navigation Rail、列表详情、折叠屏 |
-| S4-04 | 无障碍与国际化 | TalkBack、字体缩放、键盘、简繁体/英文 |
-| S4-05 | 性能基线 | Macrobenchmark、Baseline Profile、回归阈值 |
-| S4-06 | CI 与供应链 | Wrapper 校验、测试、Lint、SBOM、许可证报告 |
-| S4-07 | 发布准备 | 图标、包名、签名、隐私、GPL 义务、Release 文档 |
-| S4-08 | 首页信息架构与视觉对齐 | 对照原 Venera 首页完成信息架构盘点、原生视觉规范和首页实现；最近阅读、收藏更新、本地入口、来源探索与加载/空/错误状态符合产品规划。依赖：S2-07、S3-01；状态：TODO |
-| S4-09 | 全 App Venera 对照审计与差距收敛 | 冻结上游基线并建立功能、页面逻辑、设计三类逐项清单；修复差距并提交证据，三个维度分别达到至少 90%。依赖：S3-08、S4-08；状态：TODO |
+| ID | 任务 | 关键交付物与验收 | 前置 | 状态 |
+| --- | --- | --- | --- | --- |
+| S4-01 | Proto DataStore 设置 | 外观、阅读、网络设置与迁移；配置变更与进程恢复有测试 | S3-08 | TODO |
+| S4-02 | WebDAV 备份恢复 | 格式版本、预览、冲突、安全默认值；往返和旧版本恢复测试 | S4-01 | TODO |
+| S4-03 | Material 3 Adaptive | Navigation Rail、列表详情、折叠屏；手机与宽屏关键布局验收 | S3-08 | TODO |
+| S4-04 | 无障碍与国际化 | TalkBack、字体缩放、键盘、简繁体/英文；关键页面与操作覆盖 | S4-03、S4-08 | TODO |
+| S4-05 | 性能基线 | Macrobenchmark、Baseline Profile、回归阈值；记录基线设备与波动范围 | S4-08 | TODO |
+| S4-06 | CI 与供应链 | Wrapper 校验、测试、Lint、SBOM、许可证报告；CI 与本地结果一致 | S3-08 | TODO |
+| S4-08 | 首页信息架构与视觉对齐 | 对照 S3-00 基线完成原生视觉规范和首页实现；最近阅读、收藏更新、本地入口、来源探索与加载/空/错误状态符合产品规划 | S3-01、S3-00 | TODO |
+| S4-09 | 全 App Venera 对照审计与差距收敛 | 复核 S3-00 清单、补齐差距并提交证据；功能、页面逻辑、设计三个维度分别达到至少 90% | S3-08、S4-01 至 S4-06、S4-08 | TODO |
+| S4-07 | 发布准备 | 图标、包名、签名、隐私、GPL 义务、Release 文档；RC 门禁与全 App 对齐结果已通过 | S4-09 | TODO |
 
 S4-08 验收要求：
 
-- 先记录原 Venera 首页的主要分区、导航关系、卡片层级与关键交互，形成可复核的设计依据；不得只凭印象重画。
+- 使用 S3-00 冻结的原 Venera 基线，记录首页主要分区、导航关系、卡片层级与关键交互，形成可复核的设计依据。
 - 首页应呈现最近阅读、收藏更新、本地漫画和来源探索等已规划内容，并能通过可见交互进入对应功能；数据加载、无内容、失败与重试状态完整。
 - Android 端使用 Compose / Material 3 实现，整体布局、信息层级和视觉语言应明显贴近原项目；按原生平台适配，不要求逐像素复制 Flutter 布局。
 - 实现前确定首页视觉 Token（颜色、间距、形状、文字层级）及品牌标识的处理方式；完成后以截图/设备验收覆盖首页初始态、滚动态与深色/动态主题适配。
@@ -514,7 +522,7 @@ S4-08 验收要求：
 
 S4-09 验收要求：
 
-- 记录所对照 Venera 的上游仓库、版本/提交和核验日期；形成完整适用范围清单，逐项标注功能、流程/状态、页面/组件及其权重、证据与不适用理由。
+- 复核 S3-00 所定的 Venera 上游仓库、版本/提交和适用范围清单；任何基线变更须说明对三维度分母、已有验收与时间的影响。
 - 功能覆盖、页面逻辑覆盖、设计相似度分别计算，不以跨维度平均分掩盖不足；每一项必须有代码、测试、可复现流程或截图/设备证据支撑。
 - 三个维度各自达到 ≥90%；低于门槛的维度继续保持 Stage 4 未完成，缺口拆为可独立提交的小任务并复验。
 - 保存完整审计矩阵、计算口径、证据和剩余风险至 `docs/reviews/`；Stage 质量审查确认后才允许将最终产品对齐目标标为 DONE。

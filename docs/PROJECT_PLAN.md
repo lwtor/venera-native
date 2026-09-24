@@ -6,7 +6,7 @@
 | --- | --- |
 | 项目名称 | Venera Native |
 | 项目类型 | Android 原生漫画阅读器 |
-| 当前阶段 | Stage 0：技术验证 |
+| 当前阶段 | 以 `docs/STATUS.md` 为准（本表保留长期规划信息） |
 | 目标平台 | Android 手机、平板、折叠屏、ChromeOS |
 | UI 技术 | Jetpack Compose + Material 3 |
 | 架构方向 | 多 Module + 分层架构 + MVI/UDF |
@@ -16,7 +16,7 @@ Venera Native 是一个受 Venera 启发的非官方 Android 原生重构项目�
 
 **最终产品目标是整个 App 与选定基线版本的 Venera 在适用功能、页面逻辑和视觉设计三个维度分别达到至少 90% 的覆盖/相似度。** 这不是首页单项目标，也不能用某一维的高分抵消另一维的缺口。Android 原生交互可以按平台习惯适配，但不得因此省略原项目的主要功能、流程或页面设计特征。
 
-90% 的核验以冻结的上游版本和逐项对照清单为准：功能按用户可见能力清点，页面逻辑按关键用户流程与状态迁移清点，设计按页面/组件的布局层级、导航、色彩、排版、图标和交互反馈清点。每项记录权重、证据和不适用理由；三类分别计算通过项占适用项的比例，均须达到 90%。先完成上游基线选择和清单，再报告百分比；未经证据核验不得宣称达标。
+90% 的核验以 Stage 3 扩展功能开始前冻结的上游版本和逐项对照清单为准：功能按用户可见能力清点，页面逻辑按关键用户流程与状态迁移清点，设计按页面/组件的布局层级、导航、色彩、排版、图标和交互反馈清点。每项预先记录权重、证据和不适用理由；每个维度的得分为「有证据通过的适用项权重之和 ÷ 全部适用项权重之和」，三个维度分别须达到 90%。未验证项计入分母且不得计为通过，排除项须在实现前给出平台差异理由。来源安装—搜索/探索—详情—阅读—恢复、下载离线阅读、本地导入阅读等核心闭环必须逐项通过，不能用总分掩盖关键流程失败。未经证据核验不得宣称达标。
 
 > 本文是长期产品与技术蓝图。实时进度、当前唯一下一任务和逐项验收标准分别见 `STATUS.md` 与 `IMPLEMENTATION_PLAN.md`；模块硬边界见 `ARCHITECTURE.md`。
 
@@ -106,7 +106,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 
 | Module | 职责 |
 | --- | --- |
-| `:app` | Application、MainActivity、根导航、Hilt 装配、应用级配置 |
+| `:app` | Application、MainActivity、根导航、依赖装配、应用级配置 |
 | `:build-logic` | Convention Plugins、Compose/Kotlin/Android 公共构建配置 |
 | `:benchmark` | Macrobenchmark、Baseline Profile、启动和滚动性能测试 |
 
@@ -144,7 +144,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 | Module | 职责 |
 | --- | --- |
 | `:data:comic` | 漫画详情、章节、远端页面、搜索与探索数据 |
-| `:data:library` | 本地收藏、网络收藏映射和书架管理 |
+| `:data:collection` | 本地收藏、网络收藏映射和书架管理（当前已有本地收藏能力） |
 | `:data:history` | 阅读历史、章节进度和最近阅读 |
 | `:data:download` | 下载队列、文件布局、恢复扫描和状态持久化 |
 | `:data:source` | 漫画源安装、更新、启停、账户和源设置 |
@@ -161,9 +161,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 | `:feature:search` | 单源搜索、聚合搜索、筛选和搜索历史 |
 | `:feature:details` | 详情、标签、章节、推荐、评分和评论入口 |
 | `:feature:reader` | 网络、本地和下载漫画统一阅读器 |
-| `:feature:library` | 本地收藏、来源收藏夹和追更 |
-| `:feature:downloads` | 下载队列、已下载内容和存储管理 |
-| `:feature:local` | 本地漫画导入、扫描和管理 |
+| `:feature:library` | 收藏、追更、Downloads tab 和 Local tab；仅在后续职责或独立测试需求明确时拆分独立 Feature |
 | `:feature:sources` | 漫画源仓库、安装、更新、编辑和调试 |
 | `:feature:login` | 账号密码、Cookie、WebView 登录 |
 | `:feature:settings` | 外观、阅读器、网络、同步、关于和调试设置 |
@@ -176,7 +174,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 | UI | Compose + Material 3 | Edge-to-edge、动态颜色、深色模式 |
 | 自适应 | Material 3 Adaptive | 手机、平板、折叠屏和窗口化 |
 | 导航 | Navigation 3 | 类型安全 BackStack；通过 core 接口隔离版本变化 |
-| DI | Hilt + KSP | 官方推荐方案和编译期校验 |
+| DI | 当前手工 AppGraph 装配；需要时再评估 Hilt + KSP | 不为规划中的依赖注入框架提前迁移现有功能 |
 | 异步 | Coroutines + Flow | 层间数据与状态传递 |
 | 数据库 | Room | Schema 导出、自动迁移与显式迁移测试 |
 | 偏好 | Proto DataStore | 强类型设置，禁止新增 SharedPreferences |
@@ -185,7 +183,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 | JSON | kotlinx.serialization | 源桥接、设置和备份格式 |
 | HTML | Jsoup | 由 Source Host API 包装后提供给脚本 |
 | 图片 | Coil 3 | 自定义 Fetcher、Decoder、Cache Key 和鉴权请求 |
-| JS | AndroidX JavaScriptEngine | 首选隔离进程；PoC 后决定 QuickJS fallback |
+| JS | QuickJS 主运行时 | 已由 Stage 1 选定；AndroidX JavaScriptEngine 为待移除的兼容实现，详见 ADR-0008 |
 | 后台任务 | WorkManager | 追更、源更新、备份和可延迟同步 |
 | 用户下载 | UIDT + fallback | Android 14+ UIDT；低版本前台 Worker 回退 |
 | 文件 | SAF | 用户授权目录，不申请宽泛存储权限 |
@@ -255,7 +253,7 @@ interface SourceScriptRuntime {
 
 ### 6.4 安全策略
 
-- JavaScript 运行在隔离环境，不暴露 `Context`、反射或 Java 对象。
+- 当前 QuickJS 按来源隔离会话并限制 Host API，但运行在应用进程内，不具备独立 OS 进程沙箱；不得把会话隔离写成进程隔离。
 - 每个源独立 Cookie、私有数据和执行会话。
 - 单次调用有超时、取消、最大响应体和最大并发限制。
 - 来源安装记录 URL、版本、SHA-256 和更新时间。
@@ -583,7 +581,7 @@ sealed interface ComicPage {
 - 崩溃恢复、数据库迁移和发布签名流程。
 - 隐私说明、第三方许可证和正式文档。
 
-退出标准：Release Candidate 通过功能、迁移、压力、无障碍和真实设备测试。
+退出标准：Release Candidate 通过功能、迁移、压力、无障碍和经用户确认后的真实设备测试；全 App 功能、页面逻辑、视觉设计对冻结基线分别达到至少 90%，且核心闭环逐项通过。设备验证未获确认时保持未通过状态。
 
 ## 15. 每阶段质量门禁
 
@@ -649,9 +647,9 @@ Release 流水线：
 - 使用 Kotlin 和 Jetpack Compose。
 - 使用多 Module，`:app` 是唯一应用入口。
 - 使用 ViewModel、StateFlow 和轻量 MVI/UDF。
-- 使用 Hilt、Room、DataStore、Paging 3、OkHttp 5 和 Coil 3。
+- 当前使用手工 AppGraph、Room、Paging 3、OkHttp 5 和 Coil 3；DataStore 与 Hilt 是后续按任务需要评估的方案。
 - 以兼容现有 Venera JavaScript 漫画源协议为重要目标。
-- JavaScriptEngine 先进行 PoC，再决定是否增加 QuickJS fallback。
+- JavaScriptEngine PoC 已完成，当前以 QuickJS 为主运行时；历史选型与剩余风险见 ADR-0002、ADR-0008。
 - 全 App 以选定版本的原 Venera 为对照，功能、页面逻辑、视觉设计各自达到至少 90% 的覆盖/相似度；采用 Android 原生实现，不要求逐像素复制 Flutter UI。
 - 功能按技术验证、核心闭环、离线能力、完整来源能力和发布优化分阶段交付。
 

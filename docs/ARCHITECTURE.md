@@ -116,7 +116,7 @@ S1-05 已建立 `:core:image`，S0-06 的解码代码随之从 `:feature:reader`
 ```
 
 Feature 间跳转通过类型安全 Route 或 Feature Entry 契约完成，不通过直接依赖。承载 Route 的模块
-（目标名 `:core:navigation`）在 S1-03 首次需要导航时创建，目前不存在。
+`:core:navigation` 已在 S1-03 创建，用于承载当前的 `AppRoute` 契约。
 
 ## 5. 模块创建准则
 
