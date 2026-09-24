@@ -18,7 +18,8 @@ class LocalDirectoryScanner {
         require(root.directory) { "selected document is not a directory" }
         val files = root.children.filter { !it.directory && isImage(it.name) }
         val dirs = root.children.filter { it.directory }
-        val chapterNodes = if (files.isNotEmpty()) listOf(root) else dirs.sortedWith(compareBy(NaturalOrderComparator) { it.name })
+        val chapterNodes = (if (files.any { !isCover(it.name) }) listOf(root) else emptyList()) +
+            dirs.sortedWith(compareBy(NaturalOrderComparator) { it.name })
         val chapters = chapterNodes.mapNotNull { chapter ->
             val pageNodes = (if (chapter == root) root.children else chapter.children)
                 .filter { !it.directory && isImage(it.name) && !(chapter == root && isCover(it.name)) }
