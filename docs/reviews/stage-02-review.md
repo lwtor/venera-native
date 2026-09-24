@@ -36,7 +36,7 @@
 
 ### 后续复验发现（2026-09-24）
 
-按 JDK 17 重跑 `sh gradlew --offline --no-daemon --max-workers=2 lintDebug` 时，任务没有到达先前报告中的依赖版本告警，而先在 `data/download/.../DownloadNotifier.kt:25` 因 `ObsoleteSdkInt` 失败：项目 `minSdk=26`，但代码仍判断低于 API O（26）。S2-07C2 已移除永不可达的提前返回。后续 `:data:download:lintDebug :app:assembleDebug` 通过；此前的 13 条依赖提示暂不视为本次全仓复验确认结果。
+按 JDK 17 重跑 `sh gradlew --offline --no-daemon --max-workers=2 lintDebug` 时，任务先在 `data/download/.../DownloadNotifier.kt:25` 因 `ObsoleteSdkInt` 失败：项目 `minSdk=26`，但代码仍判断低于 API O（26）。S2-07C2 已移除永不可达的提前返回，`:data:download:lintDebug :app:assembleDebug` 通过。第二次全仓 Lint 继续后，在 `feature/details/DetailsRoute.kt:33` 因 `ModifierParameter` 失败；S2-07C3 已将 `modifier` 放到首个可选参数位置，`:feature:details:lintDebug :app:assembleDebug` 通过。此前的 13 条依赖提示暂不视为本次全仓复验确认结果。
 
 命令（JDK 17，离线）：
 

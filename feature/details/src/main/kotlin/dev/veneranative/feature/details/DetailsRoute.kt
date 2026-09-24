@@ -26,11 +26,11 @@ fun DetailsRoute(
     catalog: ComicCatalog,
     comicKey: ComicKey,
     collection: CollectionRepository?,
-    downloads: DownloadRepository? = null,
     onOpenChapter: (ChapterKey) -> Unit,
-    onScheduleDownloads: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    downloads: DownloadRepository? = null,
+    onScheduleDownloads: () -> Unit = {},
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads)
