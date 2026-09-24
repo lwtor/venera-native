@@ -4,6 +4,7 @@ import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.PageProvider
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
@@ -150,7 +151,7 @@ class ReaderViewModelTest {
         val resolved = mutableListOf<Int>()
         var fail = true
         val provider = object : PageProvider {
-            override suspend fun loadChapter(chapter: ChapterKey) = ChapterContent("Chapter", List(20) {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent("Chapter", List(20) {
                 dev.veneranative.core.model.ComicPage(it, "https://image/$it", 1080, 1440,
                     sizeState = dev.veneranative.core.model.PageSizeState.Pending)
             })
@@ -173,7 +174,7 @@ class ReaderViewModelTest {
     }
 
     private class FailingPageProvider : PageProvider {
-        override suspend fun loadChapter(chapter: ChapterKey): ChapterContent =
+        override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
             throw IllegalStateException("provider unavailable")
     }
 }

@@ -23,7 +23,7 @@ data class ChapterContent(
  */
 interface PageProvider {
 
-    suspend fun loadChapter(chapter: ChapterKey): ChapterContent
+    suspend fun loadChapter(chapter: ChapterRef): ChapterContent
 
     /** Resolve one page on demand without changing its stable position in the chapter. */
     suspend fun resolve(page: ComicPage): ComicPage = page

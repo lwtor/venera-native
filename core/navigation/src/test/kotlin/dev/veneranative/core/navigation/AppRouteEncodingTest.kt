@@ -5,6 +5,9 @@ import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.LocalChapterId
+import dev.veneranative.core.model.LocalComicId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -27,10 +30,13 @@ class AppRouteEncodingTest {
         AppRoute.ComicDetails(comicKey("manga_dex", "id:with:colons")),
         AppRoute.ComicDetails(comicKey("manga_dex", "100%25")),
         AppRoute.Reader(
-            ChapterKey(
+            ChapterRef.Remote(ChapterKey(
                 comicKey = comicKey("manga_dex", "a1b2c3"),
                 remoteId = RemoteChapterId("chapter:1"),
-            ),
+            )),
+        ),
+        AppRoute.Reader(
+            ChapterRef.Local(LocalComicId("local-comic"), LocalChapterId("local-chapter")),
         ),
     )
 

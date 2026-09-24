@@ -36,7 +36,7 @@ immutable UiState
 | 模块 | 当前职责 | 可依赖 |
 | --- | --- | --- |
 | `:app` | MainActivity、应用 Theme、根装配 | Feature、Core、实现模块 |
-| `:core:model` | 稳定领域 ID 与跨层模型 | 尽量只依赖 Kotlin |
+| `:core:model` | 稳定领域 ID 与跨层模型（包括远端/本地 `ChapterRef`） | 尽量只依赖 Kotlin |
 | `:core:archive` | ZIP/CBZ、7z/CB7 只读访问接口与 Commons Compress 适配 | Commons Compress、XZ、Android Framework |
 | `:data:source` | 来源包的安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
@@ -54,7 +54,7 @@ immutable UiState
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏/取消收藏（写入默认分组），选中的章节只作为 `ChapterKey` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
-| `:feature:reader` | 阅读器原型：页面描述符渲染、方向切换、页码、预取骨架 | Design System、`:core:model`、`:core:image` |
+| `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度 | Design System、`:core:model`、`:core:image` |
 | `:feature:sources` | 来源列表：安装、启停、卸载，以及加载 / 空 / 失败 / 成功四种页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |

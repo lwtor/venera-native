@@ -3,6 +3,7 @@ package dev.veneranative.feature.reader
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.PageProvider
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +20,7 @@ import kotlinx.coroutines.launch
  * tested without any decoding pipeline in place.
  */
 class ReaderViewModel(
-    private val chapter: ChapterKey,
+    private val chapter: ChapterRef,
     private val provider: PageProvider,
     /** Page to open at; a resumed session starts where it was left. */
     private val startPageIndex: Int = 0,
@@ -36,6 +37,14 @@ class ReaderViewModel(
 
     private val prefetched = mutableSetOf<Int>()
     private val pageJobs = mutableMapOf<Int, kotlinx.coroutines.Job>()
+
+    constructor(
+        chapter: ChapterKey,
+        provider: PageProvider,
+        startPageIndex: Int = 0,
+        progress: dev.veneranative.core.model.ReaderProgress? = null,
+        prefetchRadius: Int = DEFAULT_PREFETCH_RADIUS,
+    ) : this(ChapterRef.Remote(chapter), provider, startPageIndex, progress, prefetchRadius)
 
     init {
         load()

@@ -1,6 +1,6 @@
 package dev.veneranative.core.navigation
 
-import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicKey
 
 /**
@@ -40,5 +40,5 @@ sealed interface AppRoute {
     data class ComicDetails(val comicKey: ComicKey) : AppRoute
 
     /** The reader, showing one chapter. */
-    data class Reader(val chapter: ChapterKey) : AppRoute
+    data class Reader(val chapter: ChapterRef) : AppRoute
 }

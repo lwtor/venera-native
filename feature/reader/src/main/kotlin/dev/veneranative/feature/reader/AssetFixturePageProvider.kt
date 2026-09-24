@@ -3,7 +3,7 @@ package dev.veneranative.feature.reader
 import android.content.Context
 import android.graphics.BitmapFactory
 import dev.veneranative.core.model.ChapterContent
-import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageProvider
 import java.io.File
@@ -23,7 +23,7 @@ class AssetFixturePageProvider(
     private val assetDir: String = DEFAULT_ASSET_DIR,
 ) : PageProvider {
 
-    override suspend fun loadChapter(chapter: ChapterKey): ChapterContent = withContext(Dispatchers.IO) {
+    override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = withContext(Dispatchers.IO) {
         val pages = fixtureNames().mapIndexed { index, name -> page(index, name) }
         ChapterContent(title = "Generated fixtures (${pages.size})", pages = pages)
     }

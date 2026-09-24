@@ -1,7 +1,7 @@
 package dev.veneranative.feature.reader
 
 import dev.veneranative.core.model.ChapterContent
-import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageProvider
 import kotlinx.coroutines.delay
@@ -24,18 +24,22 @@ class FakePageProvider(
     /** Indices passed to [prefetch], in call order. Exposed so tests can assert prefetching. */
     val prefetchedPages: List<Int> get() = prefetched.toList()
 
-    override suspend fun loadChapter(chapter: ChapterKey): ChapterContent {
+    override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+        val chapterLabel = when (chapter) {
+            is ChapterRef.Remote -> chapter.key.remoteId.value
+            is ChapterRef.Local -> chapter.chapterId.value
+        }
         if (loadDelayMillis > 0) delay(loadDelayMillis)
         val pages = List(pageCount) { index ->
             ComicPage(
                 index = index,
-                imageRef = "fake://${chapter.remoteId.value}/$index",
+                imageRef = "fake://$chapterLabel/$index",
                 widthPx = PAGE_WIDTH_PX,
                 // Every fourth page is a taller one so scrolling behaviour is not uniform.
                 heightPx = if (index % 4 == 3) TALL_PAGE_HEIGHT_PX else PAGE_HEIGHT_PX,
             )
         }
-        return ChapterContent(title = "Chapter ${chapter.remoteId.value}", pages = pages)
+        return ChapterContent(title = "Chapter $chapterLabel", pages = pages)
     }
 
     override suspend fun prefetch(page: ComicPage) {

@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-24 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-07 Stage 2 集成验收 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06 DONE；当前唯一下一任务 S2-07 |
+| 当前任务 | S2-07B 下载用户流程 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06 DONE；S2-07A DONE；当前唯一执行任务 S2-07B |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -120,6 +120,14 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 新增 `:core:archive`，以 Commons Compress 1.28.0 / XZ 1.10 读取 SAF URI 支持的 ZIP/CBZ、7z/CB7；未知格式与损坏归档有结构化错误。书架 Local tab 增加归档文件导入，归档条目按自然序索引至 Room v4；`LocalPageMaterializer` 将 SAF 或归档页原子写入有 256 MiB 总量上限、100 MiB 单页上限的 LRU 缓存。单页坏数据可单独重试物化，归档读取出错映射为页面失败。
 
 验证：`:core:archive:testDebugUnitTest :data:local:testDebugUnitTest :feature:library:compileDebugKotlin :app:assembleDebug` — PASS（ZIP/7z fixture 读回、格式判定/自然排序、缓存淘汰及超限清理）；`git diff --check` — PASS。7z 单测 fixture 使用 COPY 编码；未覆盖所有 7z 编码、密码归档或真实 SAF Provider；本地阅读器闭环仍由 S2-07 验收。
+
+## S2-07 进展
+
+- **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
+- **S2-07B 下载用户流程 — IN_PROGRESS。** 当前切片已接入详情页排队、WorkManager 启动以及书架下载列表操作；将在本切片完成测试、文档并独立提交。
+- **设备闭环未执行。** Stage 2 手工脚本：安装 Debug APK；从测试来源详情选择章节并点 Download；Library → Downloads 检查页数、暂停、继续与移除；Library → Local 导入测试目录及生成的 CBZ/7z，逐章阅读并离开重进；飞行模式重开已下载章节并翻页；检查 Reader 返回位置能恢复。当前只做 JVM 测试和构建，以上 Android UI / 飞行模式步骤未在设备执行。
+
+既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
 ## 最近完成：S2-04 离线阅读整合 — DONE
 

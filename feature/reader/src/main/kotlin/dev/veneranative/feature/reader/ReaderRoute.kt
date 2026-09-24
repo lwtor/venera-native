@@ -7,7 +7,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.image.decode.PageImageDecoder
 import dev.veneranative.core.image.tiling.DecodeStrategy
-import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.PageProvider
 
 
@@ -20,7 +20,7 @@ import dev.veneranative.core.model.PageProvider
  */
 @Composable
 fun ReaderRoute(
-    chapter: ChapterKey,
+    chapter: ChapterRef,
     provider: PageProvider,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,

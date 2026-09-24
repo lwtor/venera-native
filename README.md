@@ -6,7 +6,7 @@ Venera Native 是一个受 [Venera](https://github.com/venera-app/venera) 启发
 
 ## 当前状态
 
-**Stage 0（技术验证）已完成，Stage 1（核心阅读闭环）已完成**。Stage 1 全部切片均已交付：S1-01 稳定领域模型
+**Stage 0（技术验证）和 Stage 1（核心阅读闭环）已完成；Stage 2 仍在进行，S2-01 至 S2-06 已交付，S2-07 集成复验进行中。** Stage 1 全部切片均已交付：S1-01 稳定领域模型
 与 Source Core 协议、S1-02 来源包安装与管理、S1-03 探索与搜索、S1-04 漫画详情与章节、S1-05 Coil 漫画图片
 管线、S1-06 Room 历史与阅读进度、S1-07 核心闭环集成。
 

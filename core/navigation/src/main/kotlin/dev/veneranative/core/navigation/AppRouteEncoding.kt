@@ -1,6 +1,9 @@
 package dev.veneranative.core.navigation
 
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.LocalComicId
+import dev.veneranative.core.model.LocalChapterId
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
@@ -24,9 +27,11 @@ fun AppRoute.encode(): String = when (this) {
     is AppRoute.ComicDetails ->
         "comic:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}"
 
-    is AppRoute.Reader ->
-        "reader:${chapter.comicKey.sourceId.value.escape()}:" +
-            "${chapter.comicKey.remoteId.value.escape()}:${chapter.remoteId.value.escape()}"
+    is AppRoute.Reader -> when (val ref = chapter) {
+        is ChapterRef.Remote -> "reader:${ref.key.comicKey.sourceId.value.escape()}:" +
+            "${ref.key.comicKey.remoteId.value.escape()}:${ref.key.remoteId.value.escape()}"
+        is ChapterRef.Local -> "reader:@local:${ref.comicId.value.escape()}:${ref.chapterId.value.escape()}"
+    }
 }
 
 /** The route [encoded] describes, or null when it is not a route this app version understands. */
@@ -50,6 +55,12 @@ fun decodeAppRoute(encoded: String): AppRoute? {
         }
 
         "reader" -> {
+            if (parts.getOrNull(1) == "@local") {
+                val comicId = parts.getOrNull(2)?.unescapeOrNull()
+                val chapterId = parts.getOrNull(3)?.unescapeOrNull()
+                return if (comicId.isNullOrEmpty() || chapterId.isNullOrEmpty()) null
+                else AppRoute.Reader(ChapterRef.Local(LocalComicId(comicId), LocalChapterId(chapterId)))
+            }
             val sourceId = parts.getOrNull(1)?.unescapeOrNull()
             val comicId = parts.getOrNull(2)?.unescapeOrNull()
             val chapterId = parts.getOrNull(3)?.unescapeOrNull()
@@ -57,10 +68,10 @@ fun decodeAppRoute(encoded: String): AppRoute? {
                 null
             } else {
                 AppRoute.Reader(
-                    ChapterKey(
+                    ChapterRef.Remote(ChapterKey(
                         comicKey = ComicKey(SourceId(sourceId), RemoteComicId(comicId)),
                         remoteId = RemoteChapterId(chapterId),
-                    ),
+                    )),
                 )
             }
         }

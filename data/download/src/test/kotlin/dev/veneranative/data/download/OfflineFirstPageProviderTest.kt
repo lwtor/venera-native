@@ -10,6 +10,7 @@ import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageProvider
+import dev.veneranative.core.model.ChapterRef
 
 class OfflineFirstPageProviderTest {
     @get:Rule val folder = TemporaryFolder()
@@ -51,7 +52,7 @@ class OfflineFirstPageProviderTest {
 
     private class RecordingPageProvider : PageProvider {
         var calls = 0
-        override suspend fun loadChapter(chapter: ChapterKey): ChapterContent {
+        override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
             calls++
             return ChapterContent("Online", emptyList())
         }

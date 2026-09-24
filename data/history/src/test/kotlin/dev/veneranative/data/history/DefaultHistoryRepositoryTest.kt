@@ -4,6 +4,10 @@ import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.LocalComicId
+import dev.veneranative.core.model.LocalChapterId
+import dev.veneranative.core.model.LOCAL_REF_NAMESPACE
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -60,6 +64,22 @@ class DefaultHistoryRepositoryTest {
 
         assertEquals(1, historyDao.rows.value.size)
         assertEquals(1, progressDao.rows.value.size)
+    }
+
+    @Test fun `local reader progress uses a reserved history namespace and resumes`() = runTest {
+        val localComic = LocalComicId("local-comic")
+        val localChapter = LocalChapterId("chapter-1")
+        val localKey = ComicKey(SourceId(LOCAL_REF_NAMESPACE), RemoteComicId(localComic.value))
+        repository.record(entry(chapterId = localChapter.value, pageIndex = 4).copy(comicKey = localKey))
+        val tracker = ReadingProgressTracker(repository, this, { 3_000L })
+        val session = ReaderProgressSession(ChapterRef.Local(localComic, localChapter), repository, tracker, { 3_000L })
+        assertEquals(4, session.resumePage())
+        session.record(dev.veneranative.core.model.ChapterContent(
+            "Local chapter", listOf(dev.veneranative.core.model.ComicPage(0, "local-file", 10, 10)),
+            comicTitle = "Local comic",
+        ), 0)
+        tracker.flush()
+        assertEquals(LOCAL_REF_NAMESPACE, repository.observeRecent(1).first().first().comicKey.sourceId.value)
     }
 
     @Test fun `recording the same comic and chapter replaces the row instead of duplicating it`() =

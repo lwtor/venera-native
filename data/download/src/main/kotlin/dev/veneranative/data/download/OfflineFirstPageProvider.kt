@@ -18,8 +18,9 @@ class OfflineFirstPageProvider(
     private val source: PageProvider,
 ) : PageProvider {
 
-    override suspend fun loadChapter(chapter: ChapterKey): ChapterContent {
-        val ref = ChapterRef.Remote(chapter)
+    override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+        val key = (chapter as? ChapterRef.Remote)?.key ?: return source.loadChapter(chapter)
+        val ref = ChapterRef.Remote(key)
         val repository = downloads()
         if (!repository.isCompleteOffline(ref)) return source.loadChapter(chapter)
         val task = repository.observeTask(ref).first()
@@ -43,6 +44,8 @@ class OfflineFirstPageProvider(
         }
         return ChapterContent(task.title, pages, task.comicTitle)
     }
+
+    suspend fun loadChapter(chapter: ChapterKey): ChapterContent = loadChapter(ChapterRef.Remote(chapter))
 
     override suspend fun resolve(page: ComicPage): ComicPage {
         if (page.sourceId != null) return source.resolve(page)

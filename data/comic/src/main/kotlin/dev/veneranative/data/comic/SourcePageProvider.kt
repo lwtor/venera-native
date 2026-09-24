@@ -2,6 +2,7 @@ package dev.veneranative.data.comic
 
 import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageImageSizer
 import dev.veneranative.core.model.PageProvider
@@ -16,21 +17,24 @@ class SourcePageProvider(
     private val chapterTitle: suspend (ChapterKey) -> String = { chapter -> chapter.remoteId.value },
 ) : PageProvider {
 
-    override suspend fun loadChapter(chapter: ChapterKey): ChapterContent {
-        val references = when (val outcome = catalog.pages(chapter)) {
+    override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+        val key = (chapter as? ChapterRef.Remote)?.key ?: throw IllegalArgumentException("Source provider only accepts remote chapters")
+        val references = when (val outcome = catalog.pages(key)) {
             is SourceOutcome.Success -> outcome.value
             is SourceOutcome.Failure -> throw SourceLoadException(outcome.error)
         }
         val pages = references.mapIndexed { index, reference ->
-            ComicPage(index, reference.imageRef, 1080, 1440, chapter.comicKey.sourceId,
+            ComicPage(index, reference.imageRef, 1080, 1440, key.comicKey.sourceId,
                 dev.veneranative.core.model.PageSizeState.Pending)
         }
-        val detail = (catalog.detail(chapter.comicKey) as? SourceOutcome.Success)?.value
+        val detail = (catalog.detail(key.comicKey) as? SourceOutcome.Success)?.value
         return ChapterContent(
-            title = detail?.chapters?.firstOrNull { it.key == chapter }?.title ?: chapterTitle(chapter),
+            title = detail?.chapters?.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
             pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
         )
     }
+
+    suspend fun loadChapter(chapter: ChapterKey): ChapterContent = loadChapter(ChapterRef.Remote(chapter))
 
     override suspend fun resolve(page: ComicPage): ComicPage {
         val sourceId = requireNotNull(page.sourceId)
