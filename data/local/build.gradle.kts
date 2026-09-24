@@ -6,6 +6,7 @@ dependencies {
     api(project(":core:model"))
     implementation(project(":core:database"))
     implementation(project(":core:archive"))
+    implementation(project(":core:image"))
     implementation(libs.androidx.documentfile)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.androidx.room.ktx)

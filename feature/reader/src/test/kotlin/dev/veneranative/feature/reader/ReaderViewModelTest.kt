@@ -117,6 +117,32 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun `revisiting a local page resolves it again after it leaves the visible window`() = runTest(dispatcher) {
+        val resolved = mutableListOf<Int>()
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent("Local", List(3) {
+                dev.veneranative.core.model.ComicPage(it, "local://$it", 1080, 1440,
+                    sizeState = dev.veneranative.core.model.PageSizeState.Pending)
+            })
+            override suspend fun resolve(page: dev.veneranative.core.model.ComicPage): dev.veneranative.core.model.ComicPage {
+                resolved += page.index
+                return page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Ready)
+            }
+        }
+        val chapter = ChapterRef.Local(dev.veneranative.core.model.LocalComicId("comic"),
+            dev.veneranative.core.model.LocalChapterId("chapter"))
+        val viewModel = ReaderViewModel(chapter, provider, prefetchRadius = 0)
+        advanceUntilIdle()
+        viewModel.onAction(ReaderAction.PageShown(1))
+        advanceUntilIdle()
+        viewModel.onAction(ReaderAction.PageShown(0))
+        advanceUntilIdle()
+
+        assertEquals(listOf(0, 1, 0), resolved)
+        assertEquals(dev.veneranative.core.model.PageSizeState.Ready, viewModel.state.value.pages[0].sizeState)
+    }
+
+    @Test
     fun `provider failure becomes a domain failure state`() = runTest(dispatcher) {
         val viewModel = ReaderViewModel(chapterKey, FailingPageProvider())
         advanceUntilIdle()

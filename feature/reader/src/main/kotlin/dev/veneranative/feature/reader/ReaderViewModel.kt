@@ -108,6 +108,7 @@ class ReaderViewModel(
         val first = (center - prefetchRadius).coerceAtLeast(0)
         val last = (center + prefetchRadius).coerceAtMost(pages.lastIndex)
         pageJobs.keys.filter { it !in first..last }.forEach { pageJobs.remove(it)?.cancel() }
+        prefetched.removeAll { it !in first..last }
         for (index in first..last) resolvePage(index)
     }
 
@@ -116,7 +117,11 @@ class ReaderViewModel(
         if (index in prefetched || pageJobs[index]?.isActive == true) return
         pageJobs[index] = viewModelScope.launch {
             try {
-                if (page.sizeState == dev.veneranative.core.model.PageSizeState.Ready) {
+                if (page.sizeState == dev.veneranative.core.model.PageSizeState.Ready && chapter is ChapterRef.Local) {
+                    // A bounded SAF cache may have evicted this page while it was off screen.
+                    updatePage(index, page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Pending))
+                    updatePage(index, provider.resolve(page))
+                } else if (page.sizeState == dev.veneranative.core.model.PageSizeState.Ready) {
                     provider.prefetch(page)
                 } else {
                     updatePage(index, page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Pending))
