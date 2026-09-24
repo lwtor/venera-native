@@ -150,6 +150,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C12 Kotlin/Android 工具链协调升级 — DONE。** AGP 9.3.1、Gradle 9.5.0、KGP/Compose Compiler 2.4.20、KSP 2.3.12；Coil 3.6.3、QuickJS 1.0.15 相关测试及全仓 429 JVM 测试通过，Debug/Release 与 Release Lint Vital 通过。`lintDebug` 只剩 WorkManager runtime/testing 两项提示。
 - **S2-07C13 QuickJS 求值中断接入 — DONE。** timeout 与 `SourceScriptRuntime.cancel()` 取消实际 evaluation `Deferred`，有界等待最多 1 秒后丢弃运行时。真实 `while (true)` 测试：2 秒 timeout 在 2.02 秒返回，重建后调用成功；显式取消在 0.12 秒返回 `Cancelled`，重建后调用成功。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 - **S2-07C14 书架下载调度顺序 — DONE。** 审查发现 Library Route 在 `resume/retryFailed` 的异步数据库写入前立即启动 Worker，可能让 Worker 先看到空队列并退出。现由 ViewModel 在写入完成后递增调度版本，Route 据此启动 Worker；悬挂写入回归确认写入前无调度。验证：`sh gradlew --offline --no-daemon --max-workers=2 :feature:library:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。未运行设备页面流程，仍归 S2-07D。
+- **S2-07C15 过期下载任务所有权恢复 — DONE。** 原恢复只认领无所有者或同 ID 任务，已过期的旧 Worker 任务即使 Running 页被重排，也仍由旧 ID 持有，当前 Worker 心跳不会更新。新增先重排后认领过期/新收养任务；2 项回归在修复前失败、修复后通过。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。未运行 Room 设备测试，保留 S2-07D。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

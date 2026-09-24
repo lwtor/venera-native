@@ -49,12 +49,14 @@ class DownloadRecovery(
         val now = clock()
         val staleBefore = now - staleAfterMillis
 
-        dao.claimTasks(workerId, now)
         val zombies = dao.countZombiePages(workerId, staleBefore)
         dao.resetZombiePages(workerId, staleBefore)
 
         val repaired = verifyFiles()
         val adoption = adoptFromManifests(now)
+        // Claim only after the old owner is used to identify running pages; adopted tasks are
+        // included so this worker can keep their heartbeat fresh while it drains the queue.
+        dao.claimTasks(workerId, now, staleBefore)
         val orphans = findOrphans()
 
         return RecoveryReport(

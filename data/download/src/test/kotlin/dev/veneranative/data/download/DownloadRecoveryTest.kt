@@ -57,6 +57,8 @@ class DownloadRecoveryTest {
 
         assertEquals(1, report.requeuedZombies)
         assertEquals(DownloadPageState.Queued, dao.pages.value.single().pageState())
+        assertEquals("live-worker", dao.tasks.value.single().workerId)
+        assertEquals(600_000L, dao.tasks.value.single().heartbeatAt)
     }
 
     @Test
@@ -159,6 +161,7 @@ class DownloadRecoveryTest {
         assertEquals(1, report.adoptedTasks)
         assertEquals(2, report.adoptedPages)
         assertEquals(chapter, dao.tasks.value.single().chapterOrNull())
+        assertEquals("live-worker", dao.tasks.value.single().workerId)
         assertEquals(listOf(0, 1), dao.pages.value.map { it.pageIndex })
     }
 

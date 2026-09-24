@@ -115,9 +115,9 @@ internal class FakeDownloadDao : DownloadDao {
         }
     }
 
-    override suspend fun claimTasks(workerId: String, now: Long) {
+    override suspend fun claimTasks(workerId: String, now: Long, staleBefore: Long) {
         tasks.value = tasks.value.map { row ->
-            if (row.workerId == null || row.workerId == workerId) {
+            if (row.workerId == null || row.workerId == workerId || row.heartbeatAt < staleBefore) {
                 row.copy(workerId = workerId, heartbeatAt = now)
             } else {
                 row

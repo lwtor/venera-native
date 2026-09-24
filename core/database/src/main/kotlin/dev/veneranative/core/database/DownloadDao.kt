@@ -104,17 +104,12 @@ interface DownloadDao {
     )
     suspend fun updateTaskProgress(taskId: String, state: String, completedPages: Int, updatedAt: Long)
 
-    /**
-     * Takes ownership of every task nobody owns, or that this worker already owned.
-     *
-     * A worker that died left its id behind, so claiming is what makes the next run able to tell
-     * "mine, from before" from "someone else's, probably dead".
-     */
+    /** Takes ownership of unclaimed, own, or stale tasks after old running pages are requeued. */
     @Query(
         """UPDATE download_task SET worker_id = :workerId, heartbeat_at = :now
-           WHERE worker_id IS NULL OR worker_id = :workerId""",
+           WHERE worker_id IS NULL OR worker_id = :workerId OR heartbeat_at < :staleBefore""",
     )
-    suspend fun claimTasks(workerId: String, now: Long)
+    suspend fun claimTasks(workerId: String, now: Long, staleBefore: Long)
 
     @Query("UPDATE download_task SET heartbeat_at = :now WHERE worker_id = :workerId")
     suspend fun heartbeat(workerId: String, now: Long)

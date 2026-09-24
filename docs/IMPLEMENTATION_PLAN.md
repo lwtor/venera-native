@@ -481,6 +481,7 @@ S2-07 当前切片与验收：
 - **S2-07C12 — Kotlin/Android 构建工具链协调升级：DONE。** AGP 9.3.1、Gradle 9.5.0、AGP 内置 KGP/Compose Compiler 2.4.20、KSP 2.3.12；同时升级 Coil 3.6.3 / QuickJS 1.0.15。429 项 JVM 测试及图像/来源引擎回归、下载与数据库 AndroidTest 源码编译、Debug/Release 构建和 Release Lint Vital 均通过。全仓 `lintDebug` 仍由 WorkManager runtime/testing 两条更新提示失败。QuickJS 求值取消现已由 C13 接入并以死循环 timeout/cancel 回归验证。版本兼容依据与细节见 Stage 2 审查及 ADR-0004 §7.5。
 - **S2-07C13 — QuickJS evaluation cancellation：DONE。** timeout 与 `SourceScriptRuntime.cancel()` 取消实际 evaluation `Deferred`，最多有界等待 1 秒后丢弃引擎；死循环 timeout 返回 `Timeout`、显式取消返回 `Cancelled`，两种路径后的同源重调用都成功。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 - **S2-07C14 — 书架下载调度顺序：DONE。** Resume/Retry 先完成仓库持久化，再通过状态版本通知 Route 启动唯一 Worker；仓库操作失败不触发调度。新增悬挂仓库操作的时序回归；验证：`:feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
+- **S2-07C15 — 过期下载任务所有权恢复：DONE。** 恢复先识别并重排旧 Worker 留下的 Running 页，再把过期任务及从清单收养的新任务认领给当前 Worker，心跳可持续更新。回归测试先复现 2 项失败，修复后 `:data:download:testDebugUnitTest :app:assembleDebug` 通过；Room SQL 的设备执行保留 S2-07D。
 - **S2-07D — 真机用户闭环：BLOCKED（待用户确认执行）。** 保留详情发起下载、暂停/继续/重试/移除、飞行模式离线阅读、SAF 目录/归档导入、进度恢复、长图手势/内存与低 API 兼容等待验证项；执行前记录设备型号/API、步骤和预期，不在本轮审查中安装 APK、运行 instrumentation 或操作真机。解除条件：用户确认可以进行真机验证并提供可操作设备。
 
 ## 7. Stage 3：来源扩展能力
