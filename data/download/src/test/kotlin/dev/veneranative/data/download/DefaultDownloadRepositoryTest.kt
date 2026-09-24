@@ -180,6 +180,20 @@ class DefaultDownloadRepositoryTest {
     }
 
     @Test
+    fun `a concurrent cancellation cannot be overwritten by a stale page update`() = runTest {
+        val dao = FakeDownloadDao()
+        dao.tasks.value = listOf(taskEntity(chapter))
+        dao.pages.value = listOf(pageEntity(chapter.taskId(), 0, DownloadPageState.Running))
+        dao.beforeUpdatePage = {
+            dao.pages.value = dao.pages.value.map { it.copy(state = DownloadPageState.Canceled.name) }
+            dao.beforeUpdatePage = null
+        }
+
+        assertFalse(repository(dao).markSucceeded(chapter, 0, "page.bin", 24L))
+        assertEquals(DownloadPageState.Canceled, dao.pages.value.single().pageState())
+    }
+
+    @Test
     fun `cancelling deletes the rows and leaves no files behind`() = runTest {
         val (repo, dao) = FakeDownloadDao().let { repository(it) to it }
         repo.enqueue(chapter, "Chapter 1", sourcePages(2))

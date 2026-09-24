@@ -18,6 +18,7 @@ internal class FakeDownloadDao : DownloadDao {
 
     val tasks = MutableStateFlow<List<DownloadTaskEntity>>(emptyList())
     val pages = MutableStateFlow<List<DownloadPageEntity>>(emptyList())
+    var beforeUpdatePage: (() -> Unit)? = null
 
     override fun observeTasks(): Flow<List<DownloadTaskEntity>> =
         tasks.map { rows -> rows.sortedBy { it.createdAt } }
@@ -68,12 +69,15 @@ internal class FakeDownloadDao : DownloadDao {
     override suspend fun updatePage(
         taskId: String,
         pageIndex: Int,
+        expectedState: String,
         state: String,
         relativePath: String?,
         bytes: Long,
         attempts: Int,
         lastError: String?,
-    ) {
+    ): Int {
+        beforeUpdatePage?.invoke()
+        if (page(taskId, pageIndex)?.state != expectedState) return 0
         replace(taskId, pageIndex) {
             it.copy(
                 state = state,
@@ -83,6 +87,7 @@ internal class FakeDownloadDao : DownloadDao {
                 lastError = lastError,
             )
         }
+        return 1
     }
 
     override suspend fun pauseQueuedPages(taskId: String) {

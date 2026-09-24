@@ -66,17 +66,18 @@ interface DownloadDao {
     @Query(
         """UPDATE download_page SET state = :state, relative_path = :relativePath, bytes = :bytes,
            attempts = :attempts, last_error = :lastError
-           WHERE task_id = :taskId AND page_index = :pageIndex""",
+           WHERE task_id = :taskId AND page_index = :pageIndex AND state = :expectedState""",
     )
     suspend fun updatePage(
         taskId: String,
         pageIndex: Int,
+        expectedState: String,
         state: String,
         relativePath: String?,
         bytes: Long,
         attempts: Int,
         lastError: String?,
-    )
+    ): Int
 
     /** Pausing stops future work; a page already in flight is allowed to finish. */
     @Query("UPDATE download_page SET state = 'Paused' WHERE task_id = :taskId AND state = 'Queued'")

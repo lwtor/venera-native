@@ -160,15 +160,17 @@ class DefaultDownloadRepository(
         if (!DownloadStateMachine.canMove(from, to)) return@withContext false
 
         val next = change(row, from)
-        dao.updatePage(
+        val changed = dao.updatePage(
             taskId = taskId,
             pageIndex = index,
+            expectedState = from.name,
             state = to.name,
             relativePath = next.relativePath,
             bytes = next.bytes,
             attempts = next.attempts,
             lastError = next.lastError,
         )
+        if (changed == 0) return@withContext false
         refreshProgress(taskId)
         true
     }

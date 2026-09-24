@@ -79,3 +79,4 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 - **S2-07C16，已修复：无路径成功页被漏检。** 数据库中 `Succeeded` 页的 `relativePath` 为 null 时，旧恢复逻辑直接跳过，致使损坏记录无法重试；新增回归先复现失败，现与文件缺失一样重排入队。验证：`:data:download:testDebugUnitTest :app:assembleDebug` — PASS。
 - **S2-07C17，已修复：混合目录丢失章节。** 根目录有图片（包括仅有封面）时旧扫描完全忽略章节子目录。新增两项失败先行回归，现合并根目录有效图片章与自然排序的子目录章。验证：`:data:local:testDebugUnitTest :app:assembleDebug` — PASS；真实 SAF 设备验证等待 S2-07D。
 - **S2-07C18，已修复：Queue 异常结果未落库。** 页面执行抛出非取消异常时 Queue 返回 `PageRunResult(error)`，原 Worker 未消费该结果，页保持 `Running` 且 Worker 返回成功。现对失败结果调用受状态机保护的 `markFailed`；新增真实 Worker + Room 回归源码并通过编译，设备运行等待 S2-07D，不能记作已通过。
+- **S2-07C19，已修复：下载页读写竞态。** `movePage` 旧实现按读到的状态判断后无条件写入，期间用户取消/暂停可能被覆盖。新增回归在读写之间取消，先复现失败；Room 更新现带 `expectedState` 条件，影响行数为 0 则保持用户新状态。验证：`:data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；真实 Room 并发设备执行待 S2-07D。
