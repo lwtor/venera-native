@@ -2,6 +2,8 @@ package dev.veneranative.source.network
 
 import dev.veneranative.core.model.SourceId
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.*
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -45,5 +47,24 @@ class SourceNetworkBodyTest {
         }.build()
         val result = withTimeout(2000) { SourceNetworkExecutor(baseClient = client).execute(SourceId("test"), SourceHttpRequest("https://example.invalid/", SourceHttpRequest.Method.GET)) }
         assertEquals(SourceNetworkError.Connection, (result as SourceHttpResult.Failure).error)
+    }
+    @Test fun clearingASourceCancelsItsActiveRequest() = runBlocking {
+        val started = CountDownLatch(1)
+        val client = OkHttpClient.Builder().addInterceptor { chain ->
+            started.countDown()
+            while (!chain.call().isCanceled()) Thread.sleep(10)
+            throw IOException("source cleared")
+        }.build()
+        val source = SourceId("cleared")
+        val executor = SourceNetworkExecutor(baseClient = client)
+        val request = async(Dispatchers.IO) {
+            executor.execute(source, SourceHttpRequest("https://example.invalid/", SourceHttpRequest.Method.GET))
+        }
+        assertTrue(started.await(2, TimeUnit.SECONDS))
+
+        executor.clearSource(source)
+
+        val result = withTimeout(2_000) { request.await() }
+        assertEquals(SourceNetworkError.Cancelled, (result as SourceHttpResult.Failure).error)
     }
 }

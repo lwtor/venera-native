@@ -26,6 +26,8 @@ class SourceNetworkExecutor(
 ) {
     private val clients = ConcurrentHashMap<SourceId, OkHttpClient>()
     private val activeCounts = ConcurrentHashMap<SourceId, AtomicInteger>()
+    private val activeCalls = mutableMapOf<SourceId, MutableSet<Call>>()
+    private val epochs = mutableMapOf<SourceId, Long>()
 
     init {
         require(maxConcurrentPerSource > 0)
@@ -33,6 +35,7 @@ class SourceNetworkExecutor(
     }
 
     suspend fun execute(sourceId: SourceId, request: SourceHttpRequest): SourceHttpResult {
+        val epoch = synchronized(activeCalls) { epochs[sourceId] ?: 0L }
         val counter = activeCounts.computeIfAbsent(sourceId) { AtomicInteger() }
         if (!tryAcquire(counter)) {
             return SourceHttpResult.Failure(SourceNetworkError.ConcurrencyLimit)
@@ -45,16 +48,39 @@ class SourceNetworkExecutor(
                 } catch (_: IllegalArgumentException) {
                     return SourceHttpResult.Failure(SourceNetworkError.InvalidRequest)
                 }
-            executeCall(call)
+            val registered = synchronized(activeCalls) {
+                if ((epochs[sourceId] ?: 0L) != epoch) false
+                else {
+                    activeCalls.getOrPut(sourceId) { mutableSetOf() }.add(call)
+                    true
+                }
+            }
+            if (!registered) {
+                call.cancel()
+                return SourceHttpResult.Failure(SourceNetworkError.Cancelled)
+            }
+            try {
+                executeCall(call)
+            } finally {
+                synchronized(activeCalls) {
+                    activeCalls[sourceId]?.remove(call)
+                    if (activeCalls[sourceId]?.isEmpty() == true) activeCalls.remove(sourceId)
+                }
+            }
         } finally {
             counter.decrementAndGet()
         }
     }
 
     fun clearSource(sourceId: SourceId) {
-        clients.remove(sourceId)
-        cookieJars.clear(sourceId)
-        activeCounts.remove(sourceId)
+        val calls = synchronized(activeCalls) {
+            epochs[sourceId] = (epochs[sourceId] ?: 0L) + 1L
+            clients.remove(sourceId)
+            cookieJars.clear(sourceId)
+            activeCounts.remove(sourceId)
+            activeCalls.remove(sourceId)?.toList().orEmpty()
+        }
+        calls.forEach(Call::cancel)
     }
 
     private fun clientFor(sourceId: SourceId): OkHttpClient =
