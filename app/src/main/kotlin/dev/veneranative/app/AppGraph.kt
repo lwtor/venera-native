@@ -43,6 +43,7 @@ import dev.veneranative.data.comic.SourcePageProvider
 import dev.veneranative.data.collection.ComicCatalogChapterProbe
 import dev.veneranative.data.download.DownloadEnvironment
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.download.OfflineFirstPageProvider
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.DefaultCollectionRepository
 import dev.veneranative.data.history.DefaultHistoryRepository
@@ -72,6 +73,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class AppGraph(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
@@ -102,7 +105,12 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         onSourceChanged = { network.clearSource(it) },
     )
     val catalog = DefaultComicCatalog(sourceRepository, EngineSourceCore(runtime))
-    val provider: PageProvider = SourcePageProvider(catalog, CoilPageImageSizer(imagePipeline))
+    private val sourcePageProvider: PageProvider = SourcePageProvider(catalog, CoilPageImageSizer(imagePipeline))
+    val provider: PageProvider = OfflineFirstPageProvider(
+        downloads = { _download.value ?: _download.filterNotNull().first() },
+        layout = DownloadEnvironment.get(getApplication()).layout(),
+        source = sourcePageProvider,
+    )
     val decoderFactory: (DecodeStrategy) -> PageImageDecoder = { strategy ->
         val decoder = when (strategy) {
             DecodeStrategy.Sampled -> SampledPageImageDecoder()

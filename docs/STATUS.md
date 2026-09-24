@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-24 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-04 离线阅读整合 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-03 DONE；S2-04 TODO |
+| 当前任务 | S2-05 SAF 本地目录导入 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-04 DONE；当前唯一下一任务 S2-05 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -108,6 +108,12 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
            :core:database:compileDebugAndroidTestKotlin :app:assembleDebug
 结果：BUILD SUCCESSFUL
 ```
+
+## 最近完成：S2-04 离线阅读整合 — DONE
+
+`:data:download` 新增 `OfflineFirstPageProvider` 并由 `AppGraph` 装配为阅读器的 `PageProvider`。章节完整且文件仍完整时，阅读器直接使用下载目录中的绝对文件路径，图片描述不携带来源 ID；本地图片尺寸从文件头解析，并继续经现有 Region/Sampled 解码器解码。缺少完整下载、页状态不完整、文件不可用时会回退到来源提供器。阅读身份仍是原 `ChapterKey`，因此现有阅读进度仓库继续复用。
+
+回归测试覆盖完整下载离线读取（包括无来源 ID 与真实图片尺寸解析）和不完整下载回退。验证：`sh gradlew :data:download:testDebugUnitTest :app:assembleDebug` — PASS（下载模块 JVM 测试通过，Debug APK 构建通过）。未执行设备飞行模式验收；详情页下载入口、下载列表和用户闭环仍归 S2-07。
 
 ## 最近完成：S2-03 Android 后台下载执行 — DONE
 

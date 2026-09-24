@@ -110,7 +110,7 @@ Stage 1 的完整本地来源闭环使用 `tools/test-sources/demo_comic_source.
 服务、通过系统文件选择器安装以及离线重试步骤见 `tools/test-sources/README.md`。
 
 Stage 2 的下载队列由 Room 持久化，并通过 WorkManager 前台 Worker 在非计量网络且存储空间充足时执行；下载
-复用阅读器的来源 Cookie 和图片管线。详情页下载入口、下载列表及离线阅读的端到端验收列在 S2-07。
+复用阅读器的来源 Cookie 和图片管线。阅读器已支持完整章节直接从下载文件读取，缺页时回退到来源；详情页下载入口、下载列表以及飞行模式下的端到端闭环验收列在 S2-07。
 
 ## 许可与来源说明
 

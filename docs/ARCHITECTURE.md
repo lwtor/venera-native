@@ -45,7 +45,7 @@ immutable UiState
 | `:core:database` | Room 持久化：`VeneraDatabase`、`ReadingHistoryEntity` / `ReadingProgressEntity` 与两个 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列，值对象在 `:data:history` 转换 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：`HistoryRepository` 契约、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:data:collection` | 书架收藏：文件夹增删改名、条目加入/移出/移动、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
-| `:data:download` | 下载队列：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
+| `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与书架的入口 | Design System、领域契约 |
 | `:feature:library` | 书架页：收藏 tab 的文件夹筛选、四种排序、更新标记与条目操作（`LibraryUiState` + `LibraryAction` + `LibraryViewModel`） | Design System、`:core:model`、`:core:image`、`:data:collection` |
