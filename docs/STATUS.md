@@ -157,6 +157,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C19 下载页状态原子转换 — DONE（设备回归待执行）。** 原仓库先读页状态、后无条件更新，暂停/取消可在两步之间发生并被旧 Worker 覆盖。新增失败先行的并发插入回归；Room `UPDATE` 现要求旧状态仍匹配并返回受影响行数，冲突时拒绝转换。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；真实 Room 并发设备回归归 S2-07D。
 - **S2-07C20 WorkManager 重试恢复 — DONE（设备回归待执行）。** 同一 WorkSpec 重试沿用 ID，旧恢复因排除相同 ID 的 Running 页而永不重排；不同 ID 的新 Worker 若见旧任务心跳尚新也可能空队列成功退出。现每次 attempt 恢复同 ID 遗留页，旧 ID 心跳未过期时让 WorkManager 重试。相同 ID/新心跳回归先失败。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；设备恢复场景归 S2-07D。
 - **S2-07C21 本地阅读按需物化 — DONE（设备回归待执行）。** 原章节加载一次物化全部 SAF/归档页面，超过 256 MiB 缓存时第一页可能在显示前被淘汰；现只建立页面引用，进入可见页时物化并解析尺寸。阅读器本地页只处理当前页，离开可见窗口后返回时重新解析，恢复被淘汰的文件。新增物化次数、淘汰后重访及阅读器回访回归。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:local:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；长章节/归档真机性能归 S2-07D。
+- **S2-07C22 归档刷新与取消传播 — DONE（设备回归待执行）。** 原 `refresh()` 把归档 URI 当目录扫描，可能误删已导入漫画；归档导入的兜底 `Exception` 又会吞掉协程取消。现归档走归档重建路径，并原样传播 `CancellationException`。新增 Room 归档刷新和取消回归源码；验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:local:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；设备执行归 S2-07D。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

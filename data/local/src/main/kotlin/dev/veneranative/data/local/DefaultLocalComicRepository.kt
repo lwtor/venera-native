@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 import dev.veneranative.core.archive.ArchiveReadException
 
 class DefaultLocalComicRepository(
@@ -76,6 +77,7 @@ class DefaultLocalComicRepository(
             }
         } catch (e: SecurityException) { return@withContext LocalImportResult.PermissionLost }
           catch (e: ArchiveReadException) { return@withContext LocalImportResult.Unavailable }
+          catch (e: CancellationException) { throw e }
           catch (_: Exception) { return@withContext LocalImportResult.Unavailable }
         val (pages, cover) = indexed
         if (pages.isEmpty()) return@withContext LocalImportResult.Empty
@@ -107,6 +109,10 @@ class DefaultLocalComicRepository(
 
     override suspend fun refresh(comicId: LocalComicId) = withContext(Dispatchers.IO) {
         val comic = dao.comic(comicId.value) ?: return@withContext
+        if (comic.kind == LocalKind.Archive.name) {
+            importArchive(comic.rootUri)
+            return@withContext
+        }
         val tree = try { access.read(comic.rootUri) } catch (_: SecurityException) { return@withContext }
         if (tree == null || scanner.scan(tree).chapters.isEmpty()) {
             remove(comicId)

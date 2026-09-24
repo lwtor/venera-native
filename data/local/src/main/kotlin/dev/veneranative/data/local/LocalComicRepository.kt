@@ -16,7 +16,7 @@ data class LocalPage(
     val uri: String, val name: String, val sizeBytes: Long,
     val rootUri: String = "", val kind: LocalKind = LocalKind.Directory,
 )
-interface LocalArchiveAccess { fun open(uri: String): ArchiveReader }
+fun interface LocalArchiveAccess { fun open(uri: String): ArchiveReader }
 data class SafGrant(val uri: String, val kind: LocalKind, val grantedAtEpochMillis: Long)
 sealed interface LocalImportResult {
     data class Imported(val comic: LocalComic, val pageCount: Int) : LocalImportResult
