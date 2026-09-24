@@ -25,7 +25,7 @@ documentfile = "1.1.0"
 # Apache-2.0. Only the SeekableByteChannel constructors are used: see docs/adr/0010.
 commonsCompress = "1.28.0"
 # Public domain. Needed by commons-compress for LZMA/LZMA2 (7z).
-xz = "1.10"
+xz = "1.12"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
