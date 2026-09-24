@@ -29,6 +29,8 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":data:comic"))
     implementation(project(":data:collection"))
+    // The assembly layer installs the download environment the worker reads (ADR-0005 §2.5).
+    implementation(project(":data:download"))
     implementation(project(":data:history"))
     implementation(project(":data:source"))
     implementation(project(":feature:details"))

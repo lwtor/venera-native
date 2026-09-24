@@ -1,12 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The download worker runs in the foreground: without a foreground-service permission the
+         system stops it, and from API 34 a foreground service must also declare the type it runs
+         under (ADR-0005 §2.2). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Declared here, granted at runtime: on API 33+ the user has to allow notifications. Until
+         they do the download still runs, only its progress is hidden. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
+        android:name=".VeneraApplication"
         android:icon="@drawable/ic_launcher"
         android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.VeneraNative">
+        <!-- WorkManager owns this service; API 34+ requires the type on the merged service entry. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
         <activity
             android:name=".MainActivity"
             android:exported="true">

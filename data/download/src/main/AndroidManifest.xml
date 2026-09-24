@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- The notification's pause / resume / cancel buttons. Not exported: only the system
+             notification, which is our own, can send these actions. -->
+        <receiver
+            android:name="dev.veneranative.data.download.worker.DownloadControlReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

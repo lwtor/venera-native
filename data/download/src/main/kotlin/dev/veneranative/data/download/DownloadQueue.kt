@@ -5,6 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import java.util.concurrent.ConcurrentHashMap
 
@@ -77,8 +78,14 @@ class DownloadQueue(
                 }
                 withPermit(global) {
                     withPermit(sourceSemaphore) {
-                        val error = runCatching { block(page) }
-                            .getOrElse { DownloadError.Corrupt("the page could not be written") }
+                        val error = try {
+                            block(page)
+                        } catch (cancelled: CancellationException) {
+                            // WorkManager cancellation is an interruption, not a corrupt page.
+                            throw cancelled
+                        } catch (_: Exception) {
+                            DownloadError.Corrupt("the page could not be written")
+                        }
                         PageRunResult(page = page, error = error)
                     }
                 }

@@ -121,6 +121,18 @@ class DefaultDownloadRepositoryTest {
     }
 
     @Test
+    fun `a worker interruption can pause pages it already claimed`() = runTest {
+        val (repo, dao) = FakeDownloadDao().let { repository(it) to it }
+        repo.enqueue(chapter, "Chapter 1", sourcePages(1))
+        assertTrue(repo.markRunning(chapter, 0))
+
+        assertTrue(repo.markPaused(chapter, 0))
+
+        assertEquals(DownloadPageState.Paused, dao.pages.value.single().pageState())
+        assertEquals(DownloadChapterState.Paused, dao.tasks.value.single().toDomain()!!.state)
+    }
+
+    @Test
     fun `resuming puts exactly the paused pages back`() = runTest {
         val (repo, dao) = FakeDownloadDao().let { repository(it) to it }
         repo.enqueue(chapter, "Chapter 1", sourcePages(2))

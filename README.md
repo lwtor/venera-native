@@ -109,10 +109,13 @@ java -Xmx2g tools/test-images/GenerateTestImages.java feature/reader/src/main/as
 Stage 1 的完整本地来源闭环使用 `tools/test-sources/demo_comic_source.js`。生成图片、启动本地 HTTP
 服务、通过系统文件选择器安装以及离线重试步骤见 `tools/test-sources/README.md`。
 
+Stage 2 的下载队列由 Room 持久化，并通过 WorkManager 前台 Worker 在非计量网络且存储空间充足时执行；下载
+复用阅读器的来源 Cookie 和图片管线。详情页下载入口、下载列表及离线阅读的端到端验收列在 S2-07。
+
 ## 许可与来源说明
 
 Venera 原项目采用 GPL-3.0。本仓库当前按公开漫画源约定独立实现，没有有意复制 Venera 源码或其捆绑内容。
 直接依赖和发布前仍需完成的许可工作见 `THIRD_PARTY_NOTICES.md`；在选择项目许可证和生成完整依赖
 许可报告前，不把当前构建视为可公开发布版本。
 
-质量门禁与逐任务提交见 `AGENTS.md`；当前整改状态见 `docs/reviews/stage-01-remediation.md`。根依赖由保留的 `AppGraph` 装配，启用来源支持冷启动恢复。
+质量门禁与逐任务提交见 `AGENTS.md`；Stage 1 最终审查见 `docs/reviews/stage-01-final.md`。根依赖由保留的 `AppGraph` 装配，启用来源支持冷启动恢复。

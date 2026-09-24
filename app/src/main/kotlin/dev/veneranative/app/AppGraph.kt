@@ -20,11 +20,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.veneranative.core.database.VeneraDatabase
 import dev.veneranative.core.database.VeneraDatabaseFactory
 import dev.veneranative.core.designsystem.VeneraNativeTheme
-import dev.veneranative.core.image.CoilComicImagePipeline
 import dev.veneranative.core.image.CoilPageImageSizer
 import dev.veneranative.core.image.ComicImageAuthProvider
-import dev.veneranative.core.image.comicImageDiskCache
-import dev.veneranative.core.image.comicImageLoader
 import dev.veneranative.core.image.compose.LocalComicImageLoader
 import dev.veneranative.core.image.decode.CachingPageImageDecoder
 import dev.veneranative.core.image.decode.PageImageCache
@@ -41,10 +38,11 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.decodeAppRoute
 import dev.veneranative.core.navigation.encode
-import dev.veneranative.core.network.AppHttpClientFactory
 import dev.veneranative.data.comic.DefaultComicCatalog
 import dev.veneranative.data.comic.SourcePageProvider
 import dev.veneranative.data.collection.ComicCatalogChapterProbe
+import dev.veneranative.data.download.DownloadEnvironment
+import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.DefaultCollectionRepository
 import dev.veneranative.data.history.DefaultHistoryRepository
@@ -64,7 +62,6 @@ import dev.veneranative.feature.sources.SourcesRoute
 import dev.veneranative.source.core.EngineSourceCore
 import dev.veneranative.source.engine.QuickJsMetadataReader
 import dev.veneranative.source.engine.QuickJsRuntime
-import dev.veneranative.source.network.PerSourceCookieJarRegistry
 import dev.veneranative.source.network.SourceNetworkExecutor
 import dev.veneranative.source.network.SourceNetworkHostApi
 import java.io.File
@@ -78,16 +75,22 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class AppGraph(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
+    /**
+     * The shared half of the graph. It lives on the Application because the download worker runs in
+     * this process too, and it must fetch pages with the same client, cookies and pipeline the
+     * screens use — see `VeneraApplication`.
+     */
+    private val host = application as VeneraApplication
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     val progressTracker = AtomicReference<ReadingProgressTracker?>(null)
     private val imageCache = PageImageCache(64L * 1024 * 1024)
-    private val httpClient = AppHttpClientFactory.create(AppHttpClientFactory.createDispatcher())
-    private val cookieJars = PerSourceCookieJarRegistry()
+    private val httpClient = host.httpClient
+    private val cookieJars = host.cookieJars
     private val network = SourceNetworkExecutor(baseClient = httpClient, cookieJars = cookieJars)
-    private val authProvider = SourceCookieImageAuth(cookieJars)
-    private val diskCache = comicImageDiskCache(getApplication())
-    private val imagePipeline = CoilComicImagePipeline(httpClient, diskCache, authProvider)
-    val imageLoader = comicImageLoader(getApplication(), authProvider, imagePipeline, diskCache)
+    private val authProvider = host.authProvider
+    private val diskCache = host.diskCache
+    private val imagePipeline = host.imagePipeline
+    val imageLoader = host.imageLoader
     private val runtime = QuickJsRuntime(
         hostApi = SourceNetworkHostApi(network), appLocale = Locale.getDefault().toString(),
     )
@@ -113,6 +116,8 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     val history: kotlinx.coroutines.flow.StateFlow<HistoryRepository?> = _history
     private val _collection = kotlinx.coroutines.flow.MutableStateFlow<CollectionRepository?>(null)
     val collection: kotlinx.coroutines.flow.StateFlow<CollectionRepository?> = _collection
+    private val _download = kotlinx.coroutines.flow.MutableStateFlow<DownloadRepository?>(null)
+    val download: kotlinx.coroutines.flow.StateFlow<DownloadRepository?> = _download
     init {
         scope.launch {
             val db = VeneraDatabaseFactory.get(getApplication())
@@ -122,17 +127,17 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             // The shelf asks installed sources for chapter snapshots; the assembly layer is the only
             // place that can see both the repository and the catalog.
             _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))
+            _download.value = DownloadEnvironment.get(getApplication()).repository()
         }
     }
     fun flushProgress() { scope.launch { runCatching { progressTracker.get()?.flush() } } }
     override fun onCleared() {
         scope.launch(NonCancellable) {
             try { progressTracker.get()?.flush() } finally {
+                // Only what this graph owns is closed here. The HTTP client, disk cache, image
+                // pipeline and image loader belong to the process: shutting them down when a screen
+                // goes away would stop downloads that are still running behind it.
                 runtime.close()
-                imageLoader.shutdown()
-                diskCache.shutdown()
-                httpClient.dispatcher.cancelAll()
-                httpClient.connectionPool.evictAll()
                 imageCache.clear()
                 scope.cancel()
             }

@@ -120,6 +120,9 @@ interface DownloadRepository {
     /** False when the page is not in a state that may start, e.g. it was cancelled. */
     suspend fun markRunning(chapter: ChapterRef, index: Int): Boolean
 
+    /** Stops an in-flight page without counting an interruption as a failed network attempt. */
+    suspend fun markPaused(chapter: ChapterRef, index: Int): Boolean
+
     suspend fun markSucceeded(chapter: ChapterRef, index: Int, relativePath: String, bytes: Long): Boolean
 
     suspend fun markFailed(chapter: ChapterRef, index: Int, error: DownloadError): Boolean

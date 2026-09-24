@@ -29,7 +29,7 @@
 | --- | --- | --- | --- |
 | Stage 0 | 验证 JS 漫画源和阅读器两项最高风险技术 | JavaScriptEngine 与大图方案形成有证据的 ADR | DONE（2026-09-20 退出） |
 | Stage 1 | 打通网络漫画核心阅读闭环 | 测试源可完成搜索、详情、选章、阅读和恢复进度 | DONE（Q00–Q13 整改及阶段复验通过） |
-| Stage 2 | 完成书架、下载和本地阅读 | 离线可浏览书架并阅读下载或本地漫画 | TODO |
+| Stage 2 | 完成书架、下载和本地阅读 | 离线可浏览书架并阅读下载或本地漫画 | IN_PROGRESS（S2-01–S2-03 DONE，当前 S2-04） |
 | Stage 3 | 补齐来源扩展能力 | Core/Extended 协议测试通过，Advanced 有支持矩阵 | TODO |
 | Stage 4 | 同步、自适应、性能与发布 | RC 通过迁移、压力、无障碍与发布检查 | TODO |
 
@@ -452,11 +452,11 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 | --- | --- | --- | --- | --- |
 | S2-01 | 本地收藏与书架 | 收藏夹、排序、更新标记、Room 单一事实来源 | S1-07 | DONE |
 | S2-02 | 下载领域与持久队列 | 页级任务、暂停/继续/取消、恢复扫描 | S2-01 | DONE |
-| S2-03 | Android 后台下载执行 | UIDT/Foreground Worker 策略、通知、约束 | S2-02 | TODO |
+| S2-03 | Android 后台下载执行 | UIDT/Foreground Worker 策略、通知、约束 | S2-02 | DONE |
 | S2-04 | 离线阅读整合 | 下载内容脱离来源仍可阅读 | S2-02 | TODO |
 | S2-05 | SAF 本地目录导入 | 权限持久化、自然排序、封面识别 | S1-07 | TODO |
 | S2-06 | CBZ/ZIP 与 7z 系列 | 索引缓存、ArchiveEntry 页面、错误恢复 | S2-05 | TODO |
-| S2-07 | Stage 2 集成验收 | 飞行模式下书架、下载、本地阅读和进度 | S2-01 至 S2-06 | TODO |
+| S2-07 | Stage 2 集成验收 | 从详情发起并控制下载；飞行模式下书架、下载、本地目录、阅读和进度闭环 | S2-01 至 S2-06 | TODO |
 
 ## 7. Stage 3：来源扩展能力
 
@@ -512,7 +512,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 
 ## 10. Stage 0/1 质量整改
 
-执行表与验收：`docs/reviews/stage-01-remediation.md`。Q00–Q13 全部 DONE，Stage 1 已通过阶段复验；当前唯一下一任务为 S2-01。
+执行表与验收：`docs/reviews/stage-01-remediation.md`。Q00–Q13 全部 DONE，Stage 1 已通过阶段复验；当前任务已进入 Stage 2。
 
 - Q01 DONE：修复正文有界读取与回调异常映射；新增短/空/边界、chunked 超限和读取异常回归。；验证见 STATUS 与整改台账。下一项 Q02 IN_PROGRESS。
 

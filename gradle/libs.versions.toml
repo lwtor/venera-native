@@ -20,6 +20,12 @@ paging = "3.5.1"
 navigation3 = "1.1.7"
 okhttp = "5.5.0"
 room = "2.8.5"
+workmanager = "2.11.2"
+documentfile = "1.1.0"
+# Apache-2.0. Only the SeekableByteChannel constructors are used: see docs/adr/0010.
+commonsCompress = "1.28.0"
+# Public domain. Needed by commons-compress for LZMA/LZMA2 (7z).
+xz = "1.10"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -59,3 +65,8 @@ json = { module = "org.json:json", version.ref = "json" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }
+androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "workmanager" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }

@@ -6,10 +6,10 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-09-23 |
+| 最后更新 | 2026-09-24 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-03 Android 后台下载执行 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01 DONE；S2-02 DONE；S2-03 TODO |
+| 当前任务 | S2-04 离线阅读整合 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-03 DONE；S2-04 TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -90,12 +90,12 @@
 | 恢复扫描 | 通过 | `DownloadRecoveryTest`：僵尸页重置、文件缺失/截断重置、清单收养、孤儿只报告不删除 |
 | v3 迁移与基线 | 通过 | `3.json` 入库；`VeneraDatabaseMigrationTest` 新增 v2→v3、v1→v3 两个数据保留用例（编译级） |
 
-已知缺口（明确留给后续，不是遗漏）：
+S2-02 完成时的已知缺口（截至 2026-09-23；S2-03 已在下方完成）：
 
-- **还没有后台执行者**：`DownloadRepository` 已可用，但没人调用它。Worker、通知、约束是 S2-03。
-- **没有 UI**：没有下载列表页，也没有从详情页触发下载的入口，属 S2-03 之后的装配。
+- 当时还没有后台执行者；现由 S2-03 提供 Worker、通知与约束。
+- **没有 UI**：没有下载列表页，也没有从详情页触发下载的入口。S2-03 提供的唯一工作调度入口已就绪，用户操作与整条产品闭环纳入 S2-07 集成验收。
 - 心跳过期阈值定为 5 分钟（`HEARTBEAT_STALE_AFTER_MILLIS`），未经真机验证；Worker 多久打一次心跳
-  由 S2-03 决定，届时若心跳周期接近 5 分钟需要一起调整。
+  已由 S2-03 定为每次认领批次前更新；仍需 S2-07 在慢网络和长章节上实测阈值是否合适。
 - instrumentation 测试（迁移）只编译未执行；未跑 Lint、未装 APK。
 
 验证记录：
@@ -107,8 +107,23 @@ ANDROID_HOME=/Users/lwtor/Library/Android/sdk
 sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
            :core:database:compileDebugAndroidTestKotlin :app:assembleDebug
 结果：BUILD SUCCESSFUL
+```
 
-新增 JVM 单测：data:download 69（DefaultDownloadRepositoryTest 15 / DownloadRecoveryTest 12 /
+## 最近完成：S2-03 Android 后台下载执行 — DONE
+
+交付 WorkManager `CoroutineWorker`、唯一工作串与非计量网络/存储约束、可选 expedited 调度、前台进度通知及
+暂停/继续/取消操作。`VeneraApplication` 安装进程级下载环境，并与阅读器共享 HTTP、Cookie、Coil 管线；Worker
+不依赖 Activity。Manifest 为 WorkManager 前台服务声明 API 34+ `dataSync` 类型及对应权限。中断会通过协程取消
+传播，并把尚未完成的已领取页面转为 Paused；取消通知不删除已完成章节。
+
+验证：`:data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；
+80 项 JVM 测试通过，instrumentation 测试源码编译通过，Debug APK 构建通过。
+合并 Manifest 已核对 `SystemForegroundService` 的 `dataSync` 类型。当前没有可用 ADB 设备，instrumentation 未实跑。
+详情页触发下载和下载列表 UI 尚未接入，用户侧闭环明确留在 S2-07 验收任务。
+通知权限在 API 33+ 仍没有运行时申请 UI，留待下载界面任务；Android 16 长时 Worker 配额与 5 分钟僵尸阈值
+仍需 S2-07 实机验收。WorkManager/UIDT 选择及 Android 16 风险见 ADR-0005。
+
+S2-02 原有新增 JVM 单测：data:download 69（DefaultDownloadRepositoryTest 15 / DownloadRecoveryTest 12 /
   DownloadStateMachineTest 10 / DownloadFileLayoutTest 11 / DownloadMappersTest 8 /
   PageDownloaderTest 7 / DownloadQueueTest 6）、core:model 5（ChapterRefTest）
 全量 testDebugUnitTest：BUILD SUCCESSFUL

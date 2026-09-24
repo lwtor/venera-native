@@ -124,6 +124,9 @@ class DefaultDownloadRepository(
             row.copy(attempts = row.attempts + 1)
         }
 
+    override suspend fun markPaused(chapter: ChapterRef, index: Int): Boolean =
+        movePage(chapter, index, DownloadPageState.Paused) { row, _ -> row }
+
     override suspend fun markSucceeded(
         chapter: ChapterRef,
         index: Int,

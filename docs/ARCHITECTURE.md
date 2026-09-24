@@ -45,7 +45,7 @@ immutable UiState
 | `:core:database` | Room 持久化：`VeneraDatabase`、`ReadingHistoryEntity` / `ReadingProgressEntity` 与两个 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列，值对象在 `:data:history` 转换 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：`HistoryRepository` 契约、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:data:collection` | 书架收藏：文件夹增删改名、条目加入/移出/移动、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
-| `:data:download` | 下载队列：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描（`DownloadRepository` / `DownloadQueue` / `DownloadRecovery`）。Room 是唯一事实来源；章节状态由页状态派生，不单独存储 | `:core:model`、`:core:database`、`:core:image`（复用页缓存与头部解析） |
+| `:data:download` | 下载队列：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | 首页占位 UI：来源、探索、搜索与书架的入口 | Design System、领域契约 |
 | `:feature:library` | 书架页：收藏 tab 的文件夹筛选、四种排序、更新标记与条目操作（`LibraryUiState` + `LibraryAction` + `LibraryViewModel`） | Design System、`:core:model`、`:core:image`、`:data:collection` |
@@ -277,6 +277,13 @@ SharedPreferences 不用于新功能。数据库实体不得直接传到 UI；�
 - 改变超长图解码策略。
 - 复用 GPL-3.0 上游实现或资源。
 - 修改备份格式的兼容承诺。
+
+### 应用级共享网络与下载执行
+
+`VeneraApplication` 持有进程级 OkHttp、来源 Cookie 仓库、Coil 缓存与图片管线；阅读器和下载 Worker 使用同一组实例，
+避免来源图片因 Cookie/Referer 不一致而无法保存。Application 同时安装 `DownloadEnvironment`，所以 WorkManager
+在没有 Activity 的冷启动进程里也能创建 Repository 和下载器。`AppGraph` 只关闭本图拥有的 Runtime 与内存缓存，
+不关闭仍可能被后台 Worker 使用的网络和图片资源。WorkManager 前台服务类型在 App Manifest 与 API 34+ 权限中声明。
 
 ### Stage 1 质量整改：依赖生命周期
 

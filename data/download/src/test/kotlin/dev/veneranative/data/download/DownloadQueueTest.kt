@@ -1,6 +1,7 @@
 package dev.veneranative.data.download
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -124,5 +125,19 @@ class DownloadQueueTest {
         advanceUntilIdle()
         assertEquals(DownloadError.Network, results[0].error)
         assertNull(results[1].error)
+    }
+
+    @Test
+    fun `cancellation propagates instead of becoming a corrupt page`() = runTest {
+        val queue = DownloadQueue(dispatcher = StandardTestDispatcher(testScheduler))
+        var cancelled = false
+
+        try {
+            queue.run(pages(1)) { throw CancellationException("work stopped") }
+        } catch (_: CancellationException) {
+            cancelled = true
+        }
+
+        org.junit.Assert.assertTrue("queue cancellation must reach the worker", cancelled)
     }
 }
