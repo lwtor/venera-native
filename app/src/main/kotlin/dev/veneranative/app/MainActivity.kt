@@ -39,6 +39,7 @@ import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.navigation.AppRoute
+import dev.veneranative.core.navigation.detailsOriginAfterNavigation
 import dev.veneranative.core.navigation.decodeAppRoute
 import dev.veneranative.core.navigation.encode
 import dev.veneranative.core.network.AppHttpClientFactory
@@ -122,11 +123,18 @@ private fun App(
     var route by rememberSaveable(stateSaver = AppRouteSaver) {
         mutableStateOf<AppRoute>(AppRoute.Home)
     }
+    var detailsOrigin by rememberSaveable(stateSaver = AppRouteSaver) {
+        mutableStateOf<AppRoute>(AppRoute.Home)
+    }
 
     CompositionLocalProvider(LocalComicImageLoader provides imageLoader) {
         AppNavHost(
             route = route,
-            onRouteChange = { route = it },
+            onRouteChange = { next ->
+                detailsOrigin = detailsOriginAfterNavigation(route, next, detailsOrigin)
+                route = next
+            },
+            detailsOrigin = detailsOrigin,
             catalog = catalog,
             sourceRepository = sourceRepository,
             provider = provider,
@@ -146,6 +154,7 @@ private fun App(
 private fun AppNavHost(
     route: AppRoute,
     onRouteChange: (AppRoute) -> Unit,
+    detailsOrigin: AppRoute,
     catalog: DefaultComicCatalog,
     sourceRepository: DefaultSourceRepository,
     provider: PageProvider,
@@ -229,7 +238,7 @@ private fun AppNavHost(
             downloads = downloadRepository,
             onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
-            onBack = { onRouteChange(AppRoute.Home) },
+            onBack = { onRouteChange(detailsOrigin) },
         )
 
         is AppRoute.Reader -> {

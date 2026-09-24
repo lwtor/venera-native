@@ -159,6 +159,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C21 本地阅读按需物化 — DONE（设备回归待执行）。** 原章节加载一次物化全部 SAF/归档页面，超过 256 MiB 缓存时第一页可能在显示前被淘汰；现只建立页面引用，进入可见页时物化并解析尺寸。阅读器本地页只处理当前页，离开可见窗口后返回时重新解析，恢复被淘汰的文件。新增物化次数、淘汰后重访及阅读器回访回归。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:local:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；长章节/归档真机性能归 S2-07D。
 - **S2-07C22 归档刷新与取消传播 — DONE（设备回归待执行）。** 原 `refresh()` 把归档 URI 当目录扫描，可能误删已导入漫画；归档导入的兜底 `Exception` 又会吞掉协程取消。现归档走归档重建路径，并原样传播 `CancellationException`。新增 Room 归档刷新和取消回归源码；验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:local:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；设备执行归 S2-07D。
 - **S2-07C23 来源清理取消活动请求 — DONE。** 原 `clearSource` 只删除客户端/Cookie/计数映射，已开始的来源 HTTP 请求会继续执行。现清理时取消该来源全部活动 Call，并用代际检查拒绝清理期间注册的旧请求。阻塞请求回归先超时、修复后收到 `Cancelled`。验证：`sh gradlew --offline --no-daemon --max-workers=2 :source:network:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。
+- **S2-07C24 详情返回原列表 — DONE（页面设备复验待执行）。** 旧根导航从探索、搜索或书架打开详情后，详情返回一律跳首页。现保存打开详情的列表路由，阅读器返回详情后仍保留该来源；进程恢复也持久化此路由。导航回归覆盖三种入口与阅读器回返。验证：`sh gradlew --offline --no-daemon --max-workers=2 :core:navigation:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；页面返回路径归 S2-07D。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

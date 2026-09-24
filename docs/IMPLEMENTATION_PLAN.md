@@ -490,6 +490,7 @@ S2-07 当前切片与验收：
 - **S2-07C21 — 本地页面延迟物化和淘汰后重访：DONE（设备回归待执行）。** 本地章节加载只建立引用，当前可见页按需解档/缓存，返回已淘汰页时重新物化；避免大章节加载时把第一页提前淘汰。`:data:local:testDebugUnitTest :feature:reader:testDebugUnitTest :app:assembleDebug` 通过；真实 SAF/归档长章节等待 S2-07D。
 - **S2-07C22 — 归档刷新与取消传播：DONE（设备回归待执行）。** 归档刷新按归档重新索引，不以目录扫描失败删除既有记录；导入取消不转为普通失败。Room/协程回归源码通过 `:data:local:compileDebugAndroidTestKotlin :app:assembleDebug`，真实运行归 S2-07D。
 - **S2-07C23 — 来源清理取消活动 HTTP：DONE。** `clearSource` 取消该来源全部已注册 Call，并拒绝清理竞态中尚未注册的旧请求，避免禁用/删除后继续发出网络响应。阻塞请求 JVM 回归先超时，修复后通过；`:source:network:testDebugUnitTest :app:assembleDebug` 通过。
+- **S2-07C24 — 详情页返回原列表：DONE（设备复验待执行）。** 详情从探索、搜索、书架进入时记录入口；阅读器返回详情不覆盖入口，详情返回时回到原列表。导航 JVM 回归及 `:app:assembleDebug` 通过；页面实际路径归 S2-07D。
 - **S2-07D — 真机用户闭环：BLOCKED（待用户确认执行）。** 保留详情发起下载、暂停/继续/重试/移除、飞行模式离线阅读、SAF 目录/归档导入与刷新、进度恢复、长章节/长图手势和内存、低 API 兼容等待验证项；C18 的 Worker 意外异常、C20 的进程恢复、C22 的归档刷新/取消，以及 C15/C16/C19 的 Room 恢复/竞态回归也须执行。执行前记录设备型号/API、步骤和预期，不在本轮审查中安装 APK、运行 instrumentation 或操作真机。解除条件：用户确认可以进行真机验证并提供可操作设备。
 
 ## 7. Stage 3：来源扩展能力
