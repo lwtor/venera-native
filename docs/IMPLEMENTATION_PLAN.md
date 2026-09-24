@@ -486,6 +486,7 @@ S2-07 当前切片与验收：
 - **S2-07C17 — 混合目录与封面扫描：DONE。** 根目录图片和章节子目录同时导入；仅有根封面时不屏蔽子目录，亦不生成空章。2 项回归先复现，`:data:local:testDebugUnitTest :app:assembleDebug` 通过；SAF 真机导入归 S2-07D。
 - **S2-07C18 — Worker 处理队列异常结果：DONE（设备回归待执行）。** 把 Queue 捕获的页面意外异常记录为失败页，避免滞留 `Running`；新增 Worker/Room instrumentation 回归并编译，真实执行归 S2-07D。验证：`:data:download:compileDebugAndroidTestKotlin :app:assembleDebug` 通过。
 - **S2-07C19 — 下载页状态条件更新：DONE（设备回归待执行）。** 所有页状态变更使用旧状态条件的单条 Room UPDATE，并按影响行数拒绝并发冲突，防止 Worker 覆盖暂停/取消。JVM 并发插入回归先失败、修复后通过；真实 Room 并发回归归 S2-07D。
+- **S2-07C20 — WorkManager 重试时恢复 Running 页：DONE（设备回归待执行）。** 同 ID 的新 attempt 直接重排上次遗留页；不同 ID 但旧心跳未过期时返回 Retry 而非提前结束，直到旧页可认领。JVM 回归先复现，相关测试及 AndroidTest 编译通过；真实进程终止/恢复归 S2-07D。
 - **S2-07D — 真机用户闭环：BLOCKED（待用户确认执行）。** 保留详情发起下载、暂停/继续/重试/移除、飞行模式离线阅读、SAF 目录/归档导入、进度恢复、长图手势/内存与低 API 兼容等待验证项；C18 的 Worker 意外异常回归、C15 的 Room 所有权恢复与 C16 的缺路径恢复也须执行。执行前记录设备型号/API、步骤和预期，不在本轮审查中安装 APK、运行 instrumentation 或操作真机。解除条件：用户确认可以进行真机验证并提供可操作设备。
 
 ## 7. Stage 3：来源扩展能力

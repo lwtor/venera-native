@@ -118,28 +118,28 @@ interface DownloadDao {
     @Query("SELECT * FROM download_task WHERE worker_id = :workerId")
     suspend fun tasksOf(workerId: String): List<DownloadTaskEntity>
 
-    /** How many pages another, apparently dead worker left running. */
+    /** Pages left by this WorkSpec's previous attempt or another worker with a stale heartbeat. */
     @Query(
         """SELECT COUNT(*) FROM download_page
            WHERE state = 'Running'
            AND task_id IN (SELECT task_id FROM download_task
-                           WHERE worker_id IS NOT NULL AND worker_id <> :workerId
-                           AND heartbeat_at < :staleBefore)""",
+                           WHERE worker_id = :workerId OR
+                           (worker_id IS NOT NULL AND heartbeat_at < :staleBefore))""",
     )
     suspend fun countZombiePages(workerId: String, staleBefore: Long): Int
 
     /**
      * Sends pages back to the queue when the worker that owned them stopped reporting.
      *
-     * Only another worker's stale tasks are touched: this worker's own running pages are running
-     * right now, and a task nobody ever claimed never started a page.
+     * Recovery runs once at the start of a WorkManager attempt, so any page still marked Running
+     * under the same WorkSpec ID belongs to its previous attempt, even with a fresh heartbeat.
      */
     @Query(
         """UPDATE download_page SET state = 'Queued'
            WHERE state = 'Running'
            AND task_id IN (SELECT task_id FROM download_task
-                           WHERE worker_id IS NOT NULL AND worker_id <> :workerId
-                           AND heartbeat_at < :staleBefore)""",
+                           WHERE worker_id = :workerId OR
+                           (worker_id IS NOT NULL AND heartbeat_at < :staleBefore))""",
     )
     suspend fun resetZombiePages(workerId: String, staleBefore: Long)
 

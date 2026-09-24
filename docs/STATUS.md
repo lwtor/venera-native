@@ -155,6 +155,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C17 混合目录章节扫描 — DONE。** 根目录含图片或封面时原扫描会忽略全部章节子目录；现根图片独立成章，子目录继续按自然顺序成章，只有封面则不制造空章。2 项回归先失败。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:local:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；SAF 实际权限与导入流程等待 S2-07D。
 - **S2-07C18 下载队列意外异常落库 — DONE（设备回归待执行）。** Queue 会把页面任务抛出的非取消异常转为错误结果，但 Worker 原先忽略结果，使页面滞留 `Running`。现 Worker 将返回的失败结果尝试落为 `Failed`，已由页面状态机防止覆盖用户暂停/取消；新增真实 Worker + Room instrumentation 回归源码，仅编译不执行。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；设备执行归 S2-07D。
 - **S2-07C19 下载页状态原子转换 — DONE（设备回归待执行）。** 原仓库先读页状态、后无条件更新，暂停/取消可在两步之间发生并被旧 Worker 覆盖。新增失败先行的并发插入回归；Room `UPDATE` 现要求旧状态仍匹配并返回受影响行数，冲突时拒绝转换。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；真实 Room 并发设备回归归 S2-07D。
+- **S2-07C20 WorkManager 重试恢复 — DONE（设备回归待执行）。** 同一 WorkSpec 重试沿用 ID，旧恢复因排除相同 ID 的 Running 页而永不重排；不同 ID 的新 Worker 若见旧任务心跳尚新也可能空队列成功退出。现每次 attempt 恢复同 ID 遗留页，旧 ID 心跳未过期时让 WorkManager 重试。相同 ID/新心跳回归先失败。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；设备恢复场景归 S2-07D。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

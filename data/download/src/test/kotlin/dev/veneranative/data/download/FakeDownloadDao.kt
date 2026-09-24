@@ -160,7 +160,7 @@ internal class FakeDownloadDao : DownloadDao {
 
     private fun zombiePages(workerId: String, staleBefore: Long): List<DownloadPageEntity> {
         val dead = tasks.value
-            .filter { it.workerId != null && it.workerId != workerId && it.heartbeatAt < staleBefore }
+            .filter { it.workerId == workerId || (it.workerId != null && it.heartbeatAt < staleBefore) }
             .map { it.taskId }
             .toSet()
         return pages.value.filter { it.state == DownloadPageState.Running.name && it.taskId in dead }

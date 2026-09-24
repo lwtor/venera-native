@@ -62,15 +62,15 @@ class DownloadRecoveryTest {
     }
 
     @Test
-    fun `this worker's own running pages are left alone`() = runTest {
+    fun `a retried worker requeues pages left running by its previous attempt`() = runTest {
         val dao = FakeDownloadDao()
-        dao.tasks.value = listOf(taskEntity(chapter, workerId = "live-worker", heartbeatAt = 0L))
+        dao.tasks.value = listOf(taskEntity(chapter, workerId = "live-worker", heartbeatAt = 590_000L))
         dao.pages.value = listOf(pageEntity(chapter.taskId(), 0, DownloadPageState.Running))
 
         val report = recovery(dao).recover("live-worker")
 
-        assertEquals(0, report.requeuedZombies)
-        assertEquals(DownloadPageState.Running, dao.pages.value.single().pageState())
+        assertEquals(1, report.requeuedZombies)
+        assertEquals(DownloadPageState.Queued, dao.pages.value.single().pageState())
     }
 
     @Test

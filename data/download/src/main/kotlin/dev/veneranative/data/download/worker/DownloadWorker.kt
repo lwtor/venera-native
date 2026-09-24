@@ -54,7 +54,14 @@ class DownloadWorker(
         while (!isStopped) {
             environment.heartbeat(workerId)
             val pages = repository.queuedPages(BATCH_SIZE)
-            if (pages.isEmpty()) break
+            if (pages.isEmpty()) {
+                // A previous worker may still own a fresh Running page. Keep the WorkSpec alive
+                // until its heartbeat is stale, then the next attempt's recovery can reclaim it.
+                if (repository.observeTasks().first().any { it.state == DownloadChapterState.Running }) {
+                    return Result.retry()
+                }
+                break
+            }
 
             // Claiming is what turns "this page is waiting" into "this worker is doing it"; a page
             // that cannot be claimed was paused or cancelled underneath us and must not be fetched.

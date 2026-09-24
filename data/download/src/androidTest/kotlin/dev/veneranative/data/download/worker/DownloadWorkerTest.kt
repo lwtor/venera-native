@@ -21,6 +21,7 @@ import dev.veneranative.core.model.SourcePage
 import dev.veneranative.data.download.DownloadEnvironment
 import dev.veneranative.data.download.PageByteSource
 import dev.veneranative.data.download.PageFetchRequest
+import dev.veneranative.data.download.taskId
 import java.io.File
 import java.io.OutputStream
 import kotlinx.coroutines.runBlocking
@@ -153,6 +154,24 @@ class DownloadWorkerTest {
 
         assertTrue(result is ListenableWorker.Result.Success)
         assertTrue(repository.pagesOf(chapter()).single().state.name == "Failed")
+    }
+
+    @Test
+    fun aFreshPageOwnedByAnotherWorkerKeepsTheWorkPending() = runBlocking {
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = listOf(SourcePage(index = 0, imageRef = "https://example.test/0.png")),
+        )
+        repository.markRunning(chapter(), 0)
+        val dao = database.downloadDao()
+        val task = dao.task(chapter().taskId())!!
+        dao.upsertTask(task.copy(workerId = "previous-worker", heartbeatAt = System.currentTimeMillis()))
+
+        val result = TestListenableWorkerBuilder<DownloadWorker>(context).build().doWork()
+
+        assertTrue(result is ListenableWorker.Result.Retry)
     }
 
     private fun chapter(): ChapterRef = ChapterRef.Remote(
