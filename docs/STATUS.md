@@ -15,6 +15,10 @@
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
 | 工作基线 | AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20（AGP 内置）、JDK 17、SDK 37、minSdk 26、KSP 2.3.12、Coil 3.6.3、QuickJS 1.0.15、Room 2.8.5 |
 
+### 已纳入后续计划：首页体验对齐原 Venera
+
+用户要求首页设计与原项目更接近。该需求已加入 `docs/IMPLEMENTATION_PLAN.md` 的 **S4-08**，状态为 TODO，依赖 Stage 2 集成验收与 Stage 3 分类/排行/聚合搜索（S3-01），不改变当前唯一执行任务 S2-07C。交付前先记录原首页的信息架构与交互依据，再按 Android 原生方式实现接近的布局层级和视觉语言；验收覆盖首页数据分区、加载/空/失败状态及截图/设备检查。项目仍不承诺逐像素复刻 Flutter 页面。
+
 ## 质量整改（2026-09-22）
 
 审查基线 `cbfb8ea`，发现及切片见 `docs/reviews/stage-01-remediation.md`。下方历史 DONE 是当时记录，不覆盖本次重新打开的验收。
