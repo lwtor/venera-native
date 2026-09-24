@@ -85,3 +85,11 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 - **S2-07C22，已修复：归档刷新误用目录扫描与取消吞没。** 原 `refresh` 对 Archive 调 `SafTreeAccess.read`，失败或空树会删除索引；导入归档的宽泛异常捕获也会把协程取消变成 `Unavailable`。现按 kind 分支刷新，并在兜底捕获前重新抛出取消。新增 Room/协程设备回归源码；验证：`:data:local:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS，设备运行待 S2-07D。
 - **S2-07C23，已修复：清理来源后 HTTP 仍在执行。** `clearSource` 原先仅清除后续调用使用的客户端与 Cookie，已启动请求继续执行，清理并发期间还可能注册旧调用。现登记并取消活动 Call，使用来源代际拒绝清理竞态中的旧调用。阻塞请求回归先超时，修复后返回 `Cancelled`；验证：`:source:network:testDebugUnitTest :app:assembleDebug` — PASS。
 - **S2-07C24，已修复：详情返回路径丢失。** 从 Explore/Search/Library 打开详情后，旧 `onBack` 固定回 Home；从 Reader 回详情也无列表来源可用。现根导航保存并恢复详情入口，详情返回原列表。JVM 回归覆盖三个入口及 Reader 回返；验证：`:core:navigation:testDebugUnitTest :app:assembleDebug` — PASS，页面设备闭环仍归 S2-07D。
+
+## 2026-09-25 总回归与结论
+
+完成 C14–C24 后，使用 JDK 17 执行 `sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug :app:assembleRelease`：`BUILD SUCCESSFUL`；61 份 JVM 测试报告共 439 项、0 失败，Debug/Release 构建及 Release Lint Vital 通过。执行 `git diff --check`。上述证明本地可运行回归通过，不能替代新增 AndroidTest 的真实执行。
+
+代码审查覆盖根导航、详情/书架/探索/搜索/阅读器状态、下载队列/Worker/Room 恢复、SAF 目录及归档导入、图片缓存、来源引擎与网络会话。已发现的可复现缺陷按 C14–C24 独立修复并提交；当前未发现另一个可由本地测试复现的 Stage 2 阻断项，但不能据此声称全 App 功能、页面逻辑或设计达到 90%。该对照需要 S3-00 冻结上游基线，再按 S4-09 的三个独立维度验收。
+
+仍未解除的门禁：WorkManager 2.12.0 testing 工件在当前镜像缺失，导致完整 `lintDebug` 的两项版本提示；新增 Worker、Room、本地归档 instrumentation 只完成源码编译；页面下载、离线阅读、SAF、长章节和低 API 闭环尚未在设备执行。逐项步骤、预期和证据要求见 [Stage 2 真机验证清单](stage-02-device-checklist.md)。用户确认前不得执行设备项；Stage 2 继续 `IN_PROGRESS`。
