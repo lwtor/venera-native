@@ -129,6 +129,32 @@ class DownloadWorkerTest {
         assertTrue("completed page must have an intact file", DownloadEnvironment.get(context).layout().absoluteOf(page.relativePath!!).isFile)
     }
 
+    @Test
+    fun anUnexpectedPageExceptionIsRecordedAsFailed() = runBlocking {
+        DownloadEnvironment.install(
+            DownloadEnvironment(
+                filesRoot = root,
+                pageSource = object : PageByteSource {
+                    override suspend fun fetch(request: PageFetchRequest, sink: OutputStream): Long? {
+                        throw IllegalStateException("broken page source")
+                    }
+                },
+                database = { database },
+            ),
+        )
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = listOf(SourcePage(index = 0, imageRef = "https://example.test/0.png")),
+        )
+
+        val result = TestListenableWorkerBuilder<DownloadWorker>(context).build().doWork()
+
+        assertTrue(result is ListenableWorker.Result.Success)
+        assertTrue(repository.pagesOf(chapter()).single().state.name == "Failed")
+    }
+
     private fun chapter(): ChapterRef = ChapterRef.Remote(
         ChapterKey(
             comicKey = ComicKey(SourceId("demo"), RemoteComicId("comic-1")),

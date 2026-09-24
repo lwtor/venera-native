@@ -63,9 +63,16 @@ class DownloadWorker(
 
             val byKey = claimed.associateBy { page -> keyOf(page) }
             try {
-                queue.run(claimed.map { page -> page.toQueuePage() }) { target ->
+                val results = queue.run(claimed.map { page -> page.toQueuePage() }) { target ->
                     val page = byKey[keyOf(target)] ?: return@run null
                     fetchPage(repository, downloader, page)
+                }
+                // fetchPage records expected failures itself. The queue also converts unexpected
+                // exceptions into errors; those leave the page Running unless settled here.
+                results.forEach { result ->
+                    val error = result.error ?: return@forEach
+                    val page = byKey[keyOf(result.page)] ?: return@forEach
+                    repository.markFailed(page.chapter, page.index, error)
                 }
             } finally {
                 // An explicit stop is an interruption, not a failed download. Restore every page

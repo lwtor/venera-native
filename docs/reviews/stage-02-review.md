@@ -78,3 +78,4 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 - **S2-07C15，已修复：过期任务认领顺序。** 旧实现仅认领无所有者/同 ID 的任务，使过期 Worker 的任务无法由新 Worker 更新心跳；清单收养也发生在认领之后。回归先复现旧任务与新收养任务均未认领，再改为先重排旧 Running 页、验证文件/收养清单，最后认领过期和无所有者任务。验证：`:data:download:testDebugUnitTest :app:assembleDebug` — PASS。真实 Room SQL 的设备复验等待 S2-07D。
 - **S2-07C16，已修复：无路径成功页被漏检。** 数据库中 `Succeeded` 页的 `relativePath` 为 null 时，旧恢复逻辑直接跳过，致使损坏记录无法重试；新增回归先复现失败，现与文件缺失一样重排入队。验证：`:data:download:testDebugUnitTest :app:assembleDebug` — PASS。
 - **S2-07C17，已修复：混合目录丢失章节。** 根目录有图片（包括仅有封面）时旧扫描完全忽略章节子目录。新增两项失败先行回归，现合并根目录有效图片章与自然排序的子目录章。验证：`:data:local:testDebugUnitTest :app:assembleDebug` — PASS；真实 SAF 设备验证等待 S2-07D。
+- **S2-07C18，已修复：Queue 异常结果未落库。** 页面执行抛出非取消异常时 Queue 返回 `PageRunResult(error)`，原 Worker 未消费该结果，页保持 `Running` 且 Worker 返回成功。现对失败结果调用受状态机保护的 `markFailed`；新增真实 Worker + Room 回归源码并通过编译，设备运行等待 S2-07D，不能记作已通过。

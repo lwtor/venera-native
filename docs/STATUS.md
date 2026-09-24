@@ -153,6 +153,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C15 过期下载任务所有权恢复 — DONE。** 原恢复只认领无所有者或同 ID 任务，已过期的旧 Worker 任务即使 Running 页被重排，也仍由旧 ID 持有，当前 Worker 心跳不会更新。新增先重排后认领过期/新收养任务；2 项回归在修复前失败、修复后通过。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。未运行 Room 设备测试，保留 S2-07D。
 - **S2-07C16 无路径的已完成下载页恢复 — DONE。** 已完成页若缺少文件路径，旧恢复流程直接跳过，永久保持错误的成功状态。新增先失败的回归测试，恢复现将该页重排入队。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；设备执行仍归 S2-07D。
 - **S2-07C17 混合目录章节扫描 — DONE。** 根目录含图片或封面时原扫描会忽略全部章节子目录；现根图片独立成章，子目录继续按自然顺序成章，只有封面则不制造空章。2 项回归先失败。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:local:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；SAF 实际权限与导入流程等待 S2-07D。
+- **S2-07C18 下载队列意外异常落库 — DONE（设备回归待执行）。** Queue 会把页面任务抛出的非取消异常转为错误结果，但 Worker 原先忽略结果，使页面滞留 `Running`。现 Worker 将返回的失败结果尝试落为 `Failed`，已由页面状态机防止覆盖用户暂停/取消；新增真实 Worker + Room instrumentation 回归源码，仅编译不执行。验证：`sh gradlew --offline --no-daemon --max-workers=2 :data:download:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS（JDK 17）；设备执行归 S2-07D。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
