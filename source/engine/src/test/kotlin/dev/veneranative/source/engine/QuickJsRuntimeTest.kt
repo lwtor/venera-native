@@ -15,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
@@ -304,6 +305,7 @@ class QuickJsRuntimeTest {
                 ),
             )
 
+            val startedAt = System.nanoTime()
             val result =
                 runtime.invoke(
                     SourceCall.InvokeFunction(
@@ -313,9 +315,67 @@ class QuickJsRuntimeTest {
                         timeoutMillis = 2_000,
                     ),
                 )
+            val elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000L
 
             val error = (result as SourceResult.Failure).error
             assertTrue("expected Timeout, got $error", error is SourceRuntimeError.Timeout)
+            assertTrue(
+                "interrupting a busy JavaScript evaluation should finish promptly (took ${elapsedMillis}ms)",
+                elapsedMillis < 2_800,
+            )
+            assertSourceUsableAfterInterrupt(runtime, sourceId)
+        }
+    }
+
+    @Test(timeout = ENGINE_TEST_TIMEOUT_MILLIS)
+    fun `cancelling an in-engine call interrupts evaluation`() = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val host = RecordingHostApi { request ->
+            entered.complete(Unit)
+            respondWithBody(request.requestId, 200, "{}")
+        }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    spin = {
+                      load: async function () {
+                        await fetch("https://example.com/before-spin");
+                        while (true) { }
+                      }
+                    };
+                    add(left, right) { return { sum: left + right }; }
+                    """.trimIndent(),
+                ),
+            )
+            val pending = async {
+                runtime.invoke(
+                    SourceCall.InvokeFunction(
+                        callId = "spin-cancel",
+                        sourceId = sourceId,
+                        functionName = "spin.load",
+                        timeoutMillis = 30_000,
+                    ),
+                )
+            }
+
+            entered.await()
+            // Let the resolved host call return into JavaScript before cancelling the CPU-bound loop.
+            delay(100)
+            val cancellationStartedAt = System.nanoTime()
+            runtime.cancel("spin-cancel")
+            val result = withTimeoutOrNull(FOLLOW_UP_WAIT_MILLIS) { pending.await() }
+            val cancellationElapsedMillis =
+                (System.nanoTime() - cancellationStartedAt) / 1_000_000L
+
+            assertTrue("the in-engine cancellation should return promptly", result != null)
+            assertTrue(
+                "in-engine cancellation should not exhaust the interrupt grace period " +
+                    "(took ${cancellationElapsedMillis}ms)",
+                cancellationElapsedMillis < 800,
+            )
+            val error = (result as SourceResult.Failure).error
+            assertTrue("expected Cancelled, got $error", error is SourceRuntimeError.Cancelled)
             assertSourceUsableAfterInterrupt(runtime, sourceId)
         }
     }
@@ -545,12 +605,7 @@ class QuickJsRuntimeTest {
         return (result as SourceResult.Success).json
     }
 
-    /**
-     * The pinned binding cannot interrupt a script that is spinning inside the engine, so a timeout
-     * leaves that engine unusable. The runtime must therefore rebuild it: this asserts the source
-     * still answers after a timeout, which is the behaviour the runtime promises instead of
-     * pretending the interrupted script is fine.
-     */
+    /** A timed-out source stays installed and can answer again after its interrupted engine rebuilds. */
     private suspend fun assertSourceUsableAfterInterrupt(runtime: QuickJsRuntime, sourceId: SourceId) {
         val followUp =
             withTimeoutOrNull(FOLLOW_UP_WAIT_MILLIS) {

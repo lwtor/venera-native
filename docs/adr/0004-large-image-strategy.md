@@ -203,6 +203,6 @@ decodedBytes = width * height * 4           （ARGB_8888）
 
 S2-07C12 将 AGP 升至 9.3.1（要求 Gradle 9.5.0），采用 AGP 内置 KGP 2.4.20 与 Compose Compiler 插件 2.4.20，并将 KSP 升至 2.3.12。KGP 官方兼容表涵盖 Gradle 9.5 与 AGP 9.3.1；升级后实测 Compose、Room/KSP 生成及 Android 模块编译均通过。
 
-因此，§7.2 中 Coil 3.4.0 / KSP 2.3.10 的版本选择及其“当前工具链无法读取 Kotlin 2.4 metadata”结论是历史记录，不再代表当前状态。Coil 更新为 3.6.3，`quickjs-kt` 更新为 1.0.15；图像模块和来源引擎 JVM 测试均通过，来源引擎 instrumentation 源码编译及 Debug/Release 构建通过。QuickJS 1.0.15 提供正在运行的求值中断 API，但项目当前的 timeout 路径尚未将取消传给独立 evaluation job，因此运行时死循环能否停止仍是待单独验证的实现任务，不因升级本身视为解决。版本兼容判断参考 [Kotlin Gradle 配置兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)、[Kotlin 2.4.20 发布说明](https://kotlinlang.org/docs/whatsnew2420.html)、[AGP 9.3 发布说明](https://developer.android.com/build/releases/agp-9-3-0-release-notes) 与 [KSP releases](https://github.com/google/ksp/releases)。
+因此，§7.2 中 Coil 3.4.0 / KSP 2.3.10 的版本选择及其“当前工具链无法读取 Kotlin 2.4 metadata”结论是历史记录，不再代表当前状态。Coil 更新为 3.6.3，`quickjs-kt` 更新为 1.0.15；图像模块和来源引擎 JVM 测试均通过，来源引擎 instrumentation 源码编译及 Debug/Release 构建通过。QuickJS 1.0.15 提供正在运行的求值中断 API；S2-07C13 已将 timeout/cancel 传递到独立 evaluation job，并通过死循环回归确认停止和引擎重建。版本兼容判断参考 [Kotlin Gradle 配置兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)、[Kotlin 2.4.20 发布说明](https://kotlinlang.org/docs/whatsnew2420.html)、[AGP 9.3 发布说明](https://developer.android.com/build/releases/agp-9-3-0-release-notes) 与 [KSP releases](https://github.com/google/ksp/releases)。
 
 WorkManager 2.12.0 的 `work-testing` 工件在当前镜像缺失，与工具链升级无关，仍保留 runtime/testing 2.11.2；这是 Stage 2 Lint 门禁的未解项，记录在 `docs/STATUS.md`。

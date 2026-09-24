@@ -127,7 +127,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 
 - **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
 - **S2-07B 下载用户流程 — DONE。** 详情 ViewModel 读取章节页并写入持久下载仓库；成功后由 Route 通知装配层启动唯一 WorkManager。书架 Downloads tab 展示页数进度并可暂停、继续、重试、移除；ViewModel 测试覆盖详情到队列的数据与下载列表控制委派。验证：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
-- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-25 审查记录见 `docs/reviews/stage-02-review.md`。Kotlin/Android 工具链已升至 AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20、KSP 2.3.12；Coil 3.6.3 和 QuickJS 1.0.15 在新工具链下通过来源引擎 JVM 测试、AndroidTest 源码编译及 Debug 构建；但 1.0.15 的求值中断 API 尚未接入运行时，死循环脚本实际停止能力仍未验证，作为下一小任务处理。全仓 JVM 测试 429/429 通过，Debug、Release 与 Release Lint Vital 通过。完整 `lintDebug` 仍有 WorkManager runtime/testing 两项版本提示，WorkManager 2.12.0 测试工件在 Aliyun 镜像不可用，继续配对使用 2.11.2。Xiaomi 25128PNA1C / API 36 数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过；当前无设备连接，书架导航 instrumentation 仅编译、页面闭环未执行，Stage 2 不得标为 DONE。
+- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-25 审查记录见 `docs/reviews/stage-02-review.md`。Kotlin/Android 工具链已升至 AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20、KSP 2.3.12；Coil 3.6.3 和 QuickJS 1.0.15 在新工具链下通过来源引擎 JVM 测试、AndroidTest 源码编译及 Debug 构建；C13 已将实际 evaluation job 的取消接入 timeout/cancel 清理路径，并通过死循环回归。全仓 JVM 测试 429/429 通过，Debug、Release 与 Release Lint Vital 通过。完整 `lintDebug` 仍有 WorkManager runtime/testing 两项版本提示，WorkManager 2.12.0 测试工件在 Aliyun 镜像不可用，继续配对使用 2.11.2。Xiaomi 25128PNA1C / API 36 数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过；当前无设备连接，书架导航 instrumentation 仅编译、页面闭环未执行，Stage 2 不得标为 DONE。
 - **页面设备闭环仍未完成。** 当前 Debug APK 能正常启动到首页，未见启动崩溃。MIUI 拒绝 `adb shell input tap`（缺少 `INJECT_EVENTS`），因此尚未操作详情下载、Library Downloads 暂停/继续/移除、SAF 目录/归档导入阅读、飞行模式翻页及进度恢复。没有尝试修改设备安全设置；需使用允许 UI 自动化的设备连接方式完成这些流程。
 - **S2-07C2 下载通知 lint 修复 — DONE。** 2026-09-24 移除 `minSdk=26` 下永不可达的 API O 低版本提前返回。验证：`:data:download:lintDebug :app:assembleDebug` — PASS。
 - **S2-07C3 详情入口 Compose lint 修复 — DONE。** 全仓 `lintDebug` 后续发现 `DetailsRoute` 的 `modifier` 没有位于首个可选参数位置。将其移到必需回调之后、其他默认参数之前。验证：`:feature:details:lintDebug :app:assembleDebug` — PASS。全仓 Lint 仍需继续运行和复查。
@@ -139,6 +139,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C9 QuickJS 1.0.15 更新 — DONE（由 C12 工具链升级解除）。** KGP 升至 2.4.20 后，`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` 通过，依赖升至 1.0.15。
 - **S2-07C10 书架导航 instrumentation smoke test — DONE（仅编译）。** 新增设备测试覆盖首页打开 Library、切换 Downloads/Local tab 和空态/导入入口显示；`:app:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。未在设备执行，不能视作页面闭环验收；本轮 Android Studio 无连接设备，先前 MIUI 也拒绝测试 APK 安装。
 - **S2-07C11 Coil 3.6.3 更新 — DONE（由 C12 工具链升级解除）。** KGP 2.4.20 下，`:core:image:testDebugUnitTest :app:assembleDebug` 通过，依赖升至 3.6.3.
+- **S2-07C12 Kotlin/Android 工具链协调升级 — DONE。** AGP 9.3.1、Gradle 9.5.0、KGP/Compose Compiler 2.4.20、KSP 2.3.12；Coil 3.6.3、QuickJS 1.0.15 相关测试及全仓 429 JVM 测试通过，Debug/Release 与 Release Lint Vital 通过。`lintDebug` 只剩 WorkManager runtime/testing 两项提示。
+- **S2-07C13 QuickJS 求值中断接入 — DONE。** timeout 与 `SourceScriptRuntime.cancel()` 取消实际 evaluation `Deferred`，有界等待最多 1 秒后丢弃运行时。真实 `while (true)` 测试：2 秒 timeout 在 2.02 秒返回，重建后调用成功；显式取消在 0.12 秒返回 `Cancelled`，重建后调用成功。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
@@ -1058,11 +1060,11 @@ AGP 9.2.1 / JDK 17 / compileSdk 37，adb 连接的设备或模拟器（API ≥ 2
 | 前后台切换、进程回收、API 26 可用性 | 未验证 | Stage 1 集成 Runtime 时补测 |
 | WebView 引擎在参考设备上无法提供异步 Host API | 已定案转向自有引擎；JVM spike 已证明 JS→宿主异步可用（ADR-0008 §8） | 剩余判据（取消/超时映射、二进制、ABI 与体积）在引擎实现阶段完成 |
 | 图片缓存键不解析响应的 `Vary` | 明确接受的已知限制，键只覆盖请求侧允许列表 | 发现真实源依赖 `Vary` 导致复用错误时，回来改 `ComicImageCacheKey`，不要改调用方 |
-| KSP 与 AGP 9 内置 Kotlin 的共存 | 曾因 KSP 通过 `kotlin.sourceSets` 注册生成目录而失败（google/ksp#2729）；已用 KSP 2.3.10 解决，KGP 仍为内置的 2.2.10，未加任何 flag | 升级 AGP/KGP 时重新冒烟 `:core:database` |
-| 引擎绑定为社区项目（Apache-2.0） | 已升至 1.0.15 并通过来源引擎 JVM 回归；新中断 API 尚未接入 `QuickJsRuntime` 的 timeout/cancellation 路径 | 单独接通 evaluation cancellation 并用死循环测试确认结束，见后续 S2-07C13 |
+| KSP 与 AGP 9 内置 Kotlin 的共存 | KSP 2.3.12 + KGP 2.4.20；Room/KSP 生成、数据库 Debug 编译及 AndroidTest 源码编译通过 | 升级 AGP/KGP/KSP 时重新冒烟 `:core:database` |
+| 引擎绑定为社区项目（Apache-2.0） | 已升至 1.0.15；timeout 与显式 cancellation 已接入实际 evaluation 并通过死循环回归，超时 2.02 秒返回、取消 0.12 秒返回，之后可重建并响应 | 绑定升级时重跑 `QuickJsRuntimeTest` 死循环回归 |
 | 真实源依赖全局 `fetch`，而现有 Host API 只有 `Network.*` | 已解决：兼容层提供 `fetch`（含 `ok`/`status`/`json()`/`text()`）与 `Network.*` | 若在真实源上发现 `fetch` 语义缺口，按 ADR-0008 §9 的规则补实现并加测试 |
 | 来源 id 冲突（上游存在两个源共用 `copy_manga`） | 已决策：`sourceId` 取脚本自报的 `key`，同 id 的第二次安装**替换**第一次，不共存 | 若产品上需要共存，必须先改 `SourceId` 语义并同步 `ComicKey` |
-| **绑定无法中断引擎内的死循环脚本** | 已实测（ADR-0008 §10）：挂起型取消可用，计算型不可中断；超时后靠丢弃并重建引擎保证源仍可用 | 死循环脚本会占一个 CPU 核直到引擎被丢弃；升级绑定（需工具链 Kotlin 2.4）或自行编译 QuickJS 才能根治；在此之前不得把"超时"当作"脚本已停止" |
+| QuickJS 1.0.15 evaluation cancellation | S2-07C13 已将 `Deferred` 求值取消接入 QuickJS interrupt hook；死循环 timeout 与显式 cancel 均通过，超时/取消后来源可重建并响应 | 绑定升级若改变取消语义，必须重跑 `QuickJsRuntimeTest` 死循环回归 |
 | 兼容层有意不提供的全局（`URL`、`URLSearchParams`、`TextEncoder`/`TextDecoder`、`atob`/`btoa`、`setTimeout`、`crypto`、`structuredClone`、`Intl`） | 按真实源实测（0 次使用）决定，避免自写实现静默误解析 | 遇到需要它们的源时补实现 + 测试，并更新 ADR-0008 §9 |
 | `Network.*` 的非 GET/POST 方法、二进制请求体 | Host API 目前只放行 `http.request` 的 GET/POST，且请求体是文本 | 需要时扩展 `http.request`；二进制需增加字节通道 |
 | `APP.version` 仍是占位值 `"0"` | `APP.locale` 已按设备区域传入，`version` 未接 | 与 `minAppVersion` 校验一起在协议适配层接入 |

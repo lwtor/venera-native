@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
@@ -26,7 +27,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONTokener
@@ -38,13 +41,15 @@ import org.json.JSONTokener
  * close instead of a restart. Calls for the same source are serialized because a source has a single
  * global object; calls for different sources run in parallel.
  *
- * **Interruption is best effort, and that is a measured property of the pinned binding**
- * (ADR-0008 §10): a script suspended on a host call is cancelled cleanly, but a script spinning
- * inside the engine cannot be stopped from Kotlin. Two consequences shape this class:
+ * Evaluation runs in the session's own scope so call timeout/cancellation can explicitly cancel
+ * the actual deferred evaluation. quickjs-kt 1.0.15 propagates that cancellation to QuickJS's
+ * interrupt hook; after interruption the engine is still discarded and rebuilt before reuse.
+ * Cancellation is bounded so a binding/native failure cannot hold the caller indefinitely.
+ * Two consequences shape this class:
  *
- * - an evaluation runs in the session's own scope, never as a child of the caller. A child of the
- *   caller would make `coroutineScope` wait for an uninterruptible script, turning a timeout into a
- *   hang, and an `async` child failure would bypass the error mapping below;
+ * - an evaluation runs in the session's own scope, never as a child of the caller, so deferred
+ *   failures stay inside the error mapping below and cancellation is routed through one cleanup
+ *   path;
  * - after a timeout or a cancellation the engine is treated as dirty and rebuilt on the next call,
  *   the same way the WebView runtime drops an isolate it terminated.
  */
@@ -164,12 +169,12 @@ class QuickJsRuntime(
                     try {
                         withTimeout(typedCall.timeoutMillis) { evaluation.await() }
                     } catch (_: TimeoutCancellationException) {
-                        session.discardEngine()
+                        session.interruptAndDiscard(evaluation)
                         return typedCall.failure(
                             SourceRuntimeError.Timeout(typedCall.timeoutMillis),
                         )
                     } catch (cancellation: CancellationException) {
-                        session.discardEngine()
+                        session.interruptAndDiscard(evaluation)
                         if (activeCall.cancelled.get()) {
                             return typedCall.failure(SourceRuntimeError.Cancelled())
                         }
@@ -298,9 +303,8 @@ class QuickJsRuntime(
     /**
      * One installed source: its engine, its script, and the scope its evaluations run in.
      *
-     * The engine is nullable because a timeout or a cancellation leaves an engine that may still be
-     * running the script that caused it; such an engine is dropped and rebuilt on the next call
-     * rather than reused, which is the only safe move when it cannot be interrupted.
+     * The engine is nullable because an interrupted or cancelled evaluation leaves an engine that
+     * must be dropped and rebuilt before the next call rather than reused.
      */
     private inner class LoadedSource(
         private val source: SourcePackage,
@@ -413,6 +417,20 @@ class QuickJsRuntime(
             engineRef.getAndSet(null)?.let(::closeDetached)
         }
 
+        /**
+         * Cancel the actual evaluation job, not just the caller waiting for it. The binding uses
+         * coroutine cancellation to interrupt JavaScript execution. Wait briefly for native
+         * evaluation to unwind before closing the engine; if it does not, close remains detached so
+         * a broken native interrupt cannot block the caller forever.
+         */
+        suspend fun interruptAndDiscard(evaluation: Deferred<String>) {
+            withContext(NonCancellable) {
+                evaluation.cancel()
+                withTimeoutOrNull(EVALUATION_INTERRUPT_GRACE_MILLIS) { evaluation.join() }
+                discardEngine()
+            }
+        }
+
         fun discard() {
             scope.cancel()
             engineRef.getAndSet(null)?.let(::closeDetached)
@@ -421,8 +439,8 @@ class QuickJsRuntime(
         override fun close() = discard()
 
         /**
-         * Closing an engine that may still be running an uninterruptible script can block, so it
-         * never happens on a caller's thread.
+         * Closing an engine that may still be running native code can block, so it never happens
+         * on a caller's thread.
          */
         private fun closeDetached(engine: QuickJs) {
             Thread {
@@ -467,6 +485,7 @@ class QuickJsRuntime(
         const val DEFAULT_MAX_RESULT_BYTES = 1_048_576
         const val MAX_CALL_TIMEOUT_MILLIS = 120_000L
         const val MAX_ERROR_DETAIL_LENGTH = 512
+        const val EVALUATION_INTERRUPT_GRACE_MILLIS = 1_000L
         const val KEY_FIELD = "key"
         const val DEFAULT_APP_LOCALE = "en"
         const val DEFAULT_APP_VERSION = "0"

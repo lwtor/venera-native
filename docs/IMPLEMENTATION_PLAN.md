@@ -474,7 +474,8 @@ S2-07 当前切片与验收：
 - **S2-07C9 — QuickJS 1.0.15 更新：DONE（C12 解锁）。** KGP 2.4.20 下 `:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` 通过。
 - **S2-07C10 — 书架导航 instrumentation smoke test：DONE（仅编译）。** 覆盖首页打开 Library、切换 Downloads/Local tab 与主要空态/导入入口显示；`:app:compileDebugAndroidTestKotlin :app:assembleDebug` 通过。没有设备运行证据，不替代 Stage 2 手动闭环。
 - **S2-07C11 — Coil 3.6.3 更新：DONE（C12 解锁）。** KGP 2.4.20 下 `:core:image:testDebugUnitTest :app:assembleDebug` 通过。
-- **S2-07C12 — Kotlin/Android 构建工具链协调升级：DONE。** AGP 9.3.1、Gradle 9.5.0、AGP 内置 KGP/Compose Compiler 2.4.20、KSP 2.3.12；同时升级 Coil 3.6.3 / QuickJS 1.0.15。429 项 JVM 测试及图像/来源引擎回归、下载与数据库 AndroidTest 源码编译、Debug/Release 构建和 Release Lint Vital 均通过。全仓 `lintDebug` 仍由 WorkManager runtime/testing 两条更新提示失败。QuickJS 1.0.15 的求值中断 API 尚未接入运行时，停止死循环的行为需单独实现并验收。版本兼容依据与细节见 Stage 2 审查及 ADR-0004 §7.5。
+- **S2-07C12 — Kotlin/Android 构建工具链协调升级：DONE。** AGP 9.3.1、Gradle 9.5.0、AGP 内置 KGP/Compose Compiler 2.4.20、KSP 2.3.12；同时升级 Coil 3.6.3 / QuickJS 1.0.15。429 项 JVM 测试及图像/来源引擎回归、下载与数据库 AndroidTest 源码编译、Debug/Release 构建和 Release Lint Vital 均通过。全仓 `lintDebug` 仍由 WorkManager runtime/testing 两条更新提示失败。QuickJS 求值取消现已由 C13 接入并以死循环 timeout/cancel 回归验证。版本兼容依据与细节见 Stage 2 审查及 ADR-0004 §7.5。
+- **S2-07C13 — QuickJS evaluation cancellation：DONE。** timeout 与 `SourceScriptRuntime.cancel()` 取消实际 evaluation `Deferred`，最多有界等待 1 秒后丢弃引擎；死循环 timeout 返回 `Timeout`、显式取消返回 `Cancelled`，两种路径后的同源重调用都成功。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 ## 7. Stage 3：来源扩展能力
 

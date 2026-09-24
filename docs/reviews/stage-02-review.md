@@ -46,7 +46,7 @@ WorkManager 2.12.0 亦已列入同一 AndroidX stable 清单，但更新后 `:da
 
 C12（2026-09-25）将 AGP/Gradle/KGP/Compose Compiler/KSP 升至 9.3.1 / 9.5.0 / 2.4.20 / 2.4.20 / 2.3.12，并更新 Coil 3.6.3、QuickJS 1.0.15。此前分别阻塞 Coil、QuickJS 的 Kotlin 2.4 metadata 限制已解除。更新后图像和来源引擎 JVM 测试通过，来源引擎与应用 AndroidTest 源码编译通过，Debug/Release 构建及 Release Lint Vital 通过；429 项全仓 JVM 测试全部通过。Release APK 内四种 ABI 的 QuickJS `libquickjs.so` ELF LOAD alignment 均为 16 KB。工具链版本依据：[Kotlin/KGP 兼容表](https://kotlinlang.org/docs/gradle-configure-project.html)、[Kotlin 2.4.20 发布说明](https://kotlinlang.org/docs/whatsnew2420.html)、[AGP 9.3 发布说明](https://developer.android.com/build/releases/agp-9-3-0-release-notes)、[KSP releases](https://github.com/google/ksp/releases)。
 
-完整 `lintDebug` 当前剩余 2 项，均是 WorkManager runtime/testing 2.12.0 更新提示；testing AAR 在配置的 Aliyun 镜像不存在，C6 重试后仍未解除。Coil 与 QuickJS 相关提示已清零。另，QuickJS 1.0.15 虽提供求值中断接口，但仓库超时路径仍只取消等待并丢弃引擎，未将取消传递到实际 evaluation job；不能推断死循环脚本会停止，需单独实现并回归。
+完整 `lintDebug` 当前剩余 2 项，均是 WorkManager runtime/testing 2.12.0 更新提示；testing AAR 在配置的 Aliyun 镜像不存在，C6 重试后仍未解除。Coil 与 QuickJS 相关提示已清零。另，C13 已修复 QuickJS 超时路径只取消等待者的问题：实际 evaluation `Deferred` 被取消并最多等待 1 秒，真实死循环 timeout（2.02 秒返回）、显式取消（0.12 秒返回）及之后同源重调用均通过。验证：`:source:engine:testDebugUnitTest :source:engine:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。
 
 命令（JDK 17，离线）：
 
