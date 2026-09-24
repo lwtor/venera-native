@@ -14,7 +14,7 @@ kotlinxSerialization = "1.11.0"
 quickjs = "1.0.5"
 # Test-only: android.jar ships org.json stubs, so unit tests that touch the runtime's JSON
 # boundaries need a real implementation on the classpath.
-json = "20231013"
+json = "20260814"
 lifecycle = "2.11.0"
 paging = "3.5.1"
 navigation3 = "1.2.0"
