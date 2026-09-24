@@ -462,10 +462,11 @@ S2-07 当前切片与验收：
 
 - **S2-07A — 统一章节身份与本地阅读：DONE。** `AppRoute.Reader` / `PageProvider` / Reader 使用 `ChapterRef`；SAF 目录与归档章节都可选入现有 Reader；进度写入 `@local` 历史命名空间。验收：远端旧路由 round-trip 兼容、本地路由 round-trip、本地页不调用来源、历史恢复命中同一 local chapter。
 - **S2-07B — 下载用户流程：DONE。** 详情可排入章节下载并启动唯一 WorkManager；Library Downloads 显示页进度并提供暂停、继续、重试、移除。验收：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` 通过。
-- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。全仓 429 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；重新运行 `lintDebug` 已发现并修正下载通知 `ObsoleteSdkInt` 与详情页 `ModifierParameter` 两个代码问题，目前依赖新鲜度检查仍未运行到；设备用户闭环未执行。继续处理 Lint 并完成设备闭环，才可重新审查 Stage 退出；不得把未通过写成 DONE。
+- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。全仓 429 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；重新运行 `lintDebug` 已修复下载通知 `ObsoleteSdkInt`、详情页及书架页面 `ModifierParameter` 共四处代码问题，完整 Lint 门禁仍未通过，尚待继续暴露剩余项；设备用户闭环未执行。继续处理 Lint 并完成设备闭环，才可重新审查 Stage 退出；不得把未通过写成 DONE。
 - **S2-07C1 — Room migration 真机断言：DONE。** 真机运行暴露表名断言将 `room_master_table` 误作应用 schema；仅过滤该 Room 内部表后，`:core:database:connectedDebugAndroidTest` 25 项通过。`:data:download:connectedDebugAndroidTest` 同设备 4 项通过。修复与证据记入 Stage 2 审查记录。
 - **S2-07C2 — 删除无效通知 API 兼容分支：DONE。** `:data:download:lintDebug` 首次暴露 `ObsoleteSdkInt`：项目 minSdk 为 26，而下载通知 channel 要求 API 26，低于 O 的检查不可达。移除该无效分支后，`:data:download:lintDebug :app:assembleDebug` 均通过。
 - **S2-07C3 — 修正详情入口 Modifier 参数顺序：DONE。** 全仓 `lintDebug` 随后暴露 `feature/details/DetailsRoute.kt` 的 `ModifierParameter`：默认参数 `modifier` 之前还有另一个默认参数。把 `modifier` 移至必需回调之后、其他默认参数之前；`:feature:details:lintDebug :app:assembleDebug` 通过。
+- **S2-07C4 — 修正书架页面 Modifier 参数顺序：DONE。** 全仓 `lintDebug` 后续暴露 `LibraryRoute` 与 `LibraryScreen` 两处 `ModifierParameter`。均将 `modifier` 移到必需参数之后及其余默认参数之前；`:feature:library:lintDebug :app:assembleDebug` 通过。
 
 ## 7. Stage 3：来源扩展能力
 

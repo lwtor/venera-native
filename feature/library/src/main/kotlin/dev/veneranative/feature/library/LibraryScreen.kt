@@ -50,9 +50,9 @@ internal fun LibraryScreen(
     state: LibraryUiState,
     onAction: (LibraryAction) -> Unit,
     onOpenComic: (ComicKey) -> Unit,
-    onOpenLocalChapter: (LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenLocalChapter: (LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
 ) {
     val selectedFolder = state.folders.firstOrNull { it.id == state.selectedFolderId }
 

@@ -19,15 +19,15 @@ import dev.veneranative.data.download.DownloadRepository
 @Composable
 fun LibraryRoute(
     collection: CollectionRepository,
+    onOpenComic: (ComicKey) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     localRepository: LocalComicRepository? = null,
     downloads: DownloadRepository? = null,
     onRequestLocalImport: ((String) -> Unit) -> Unit = {},
     onRequestArchiveImport: ((String) -> Unit) -> Unit = {},
-    onOpenComic: (ComicKey) -> Unit,
     onOpenLocalChapter: (dev.veneranative.core.model.LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
     onScheduleDownloads: () -> Unit = {},
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection, localRepository, downloads) }
     val state by viewModel.state.collectAsStateWithLifecycle()
