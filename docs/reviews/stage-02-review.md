@@ -76,3 +76,4 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 
 - **S2-07C14，已修复：书架继续/重试的 Worker 启动顺序。** 原 Route 在 ViewModel 异步调用 `resume`/`retryFailed` 后立刻启动 Worker，数据库尚未变为 Queued 时 Worker 可看到空队列并成功退出。改为仓库操作返回后更新调度版本，再由 Route 启动；悬挂仓库操作的 JVM 回归证明写入前不会发出调度信号。验证：`:feature:library:testDebugUnitTest :app:assembleDebug` — PASS。设备下载闭环仍未执行。
 - **S2-07C15，已修复：过期任务认领顺序。** 旧实现仅认领无所有者/同 ID 的任务，使过期 Worker 的任务无法由新 Worker 更新心跳；清单收养也发生在认领之后。回归先复现旧任务与新收养任务均未认领，再改为先重排旧 Running 页、验证文件/收养清单，最后认领过期和无所有者任务。验证：`:data:download:testDebugUnitTest :app:assembleDebug` — PASS。真实 Room SQL 的设备复验等待 S2-07D。
+- **S2-07C16，已修复：无路径成功页被漏检。** 数据库中 `Succeeded` 页的 `relativePath` 为 null 时，旧恢复逻辑直接跳过，致使损坏记录无法重试；新增回归先复现失败，现与文件缺失一样重排入队。验证：`:data:download:testDebugUnitTest :app:assembleDebug` — PASS。

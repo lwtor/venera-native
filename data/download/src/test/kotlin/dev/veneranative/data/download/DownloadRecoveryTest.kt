@@ -109,6 +109,18 @@ class DownloadRecoveryTest {
     }
 
     @Test
+    fun `a completed page without a file path is queued again`() = runTest {
+        val dao = FakeDownloadDao()
+        dao.tasks.value = listOf(taskEntity(chapter))
+        dao.pages.value = listOf(pageEntity(chapter.taskId(), 0, DownloadPageState.Succeeded, relativePath = null, bytes = 24))
+
+        val report = recovery(dao).recover("live-worker")
+
+        assertEquals(1, report.repairedFiles)
+        assertEquals(DownloadPageState.Queued, dao.pages.value.single().pageState())
+    }
+
+    @Test
     fun `a page whose file is short is queued again`() = runTest {
         writePage(0, pngBytes(8, 12).copyOf(10))
         val dao = FakeDownloadDao()

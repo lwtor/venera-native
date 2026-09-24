@@ -78,9 +78,8 @@ class DownloadRecovery(
     private suspend fun verifyFiles(): Int {
         var repaired = 0
         for (page in dao.succeededPages()) {
-            val path = page.relativePath ?: continue
-            val file = layout.absoluteOf(path)
-            if (!file.isFile || file.length() != page.bytes || page.bytes == 0L) {
+            val file = page.relativePath?.let(layout::absoluteOf)
+            if (file == null || !file.isFile || file.length() != page.bytes || page.bytes == 0L) {
                 dao.requeuePage(page.taskId, page.pageIndex, FILE_MISSING_ERROR.toColumn())
                 repaired++
             }
