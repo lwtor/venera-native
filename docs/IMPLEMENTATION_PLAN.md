@@ -462,8 +462,9 @@ S2-07 当前切片与验收：
 
 - **S2-07A — 统一章节身份与本地阅读：DONE。** `AppRoute.Reader` / `PageProvider` / Reader 使用 `ChapterRef`；SAF 目录与归档章节都可选入现有 Reader；进度写入 `@local` 历史命名空间。验收：远端旧路由 round-trip 兼容、本地路由 round-trip、本地页不调用来源、历史恢复命中同一 local chapter。
 - **S2-07B — 下载用户流程：DONE。** 详情可排入章节下载并启动唯一 WorkManager；Library Downloads 显示页进度并提供暂停、继续、重试、移除。验收：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` 通过。
-- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。全仓 429 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；完整 `lintDebug` 被 13 条依赖版本新鲜度错误拦截，设备用户闭环未执行。逐项处理兼容性并通过完整 Lint、完成设备闭环或如实记录外部阻塞后，才可重新审查 Stage 退出；不得把未通过写成 DONE。
+- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。全仓 429 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；完整 `lintDebug` 复跑先暴露下载通知中一个 `minSdk 26` 下永不成立的 API 低版本分支，依赖新鲜度检查尚未运行到；设备用户闭环未执行。修正该问题后继续逐项处理 Lint 并完成设备闭环，才可重新审查 Stage 退出；不得把未通过写成 DONE。
 - **S2-07C1 — Room migration 真机断言：DONE。** 真机运行暴露表名断言将 `room_master_table` 误作应用 schema；仅过滤该 Room 内部表后，`:core:database:connectedDebugAndroidTest` 25 项通过。`:data:download:connectedDebugAndroidTest` 同设备 4 项通过。修复与证据记入 Stage 2 审查记录。
+- **S2-07C2 — 删除无效通知 API 兼容分支：DONE。** `:data:download:lintDebug` 首次暴露 `ObsoleteSdkInt`：项目 minSdk 为 26，而下载通知 channel 要求 API 26，低于 O 的检查不可达。移除该无效分支后，`:data:download:lintDebug :app:assembleDebug` 均通过。
 
 ## 7. Stage 3：来源扩展能力
 

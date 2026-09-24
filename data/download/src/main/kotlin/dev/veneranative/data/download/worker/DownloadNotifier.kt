@@ -22,7 +22,6 @@ class DownloadNotifier(
 
     /** Creating an existing channel is a no-op, so this is safe to call before every update. */
     fun ensureChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val channel = NotificationChannel(
             DownloadNotificationText.CHANNEL_ID,
             DownloadNotificationText.channelName(),
