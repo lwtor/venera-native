@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-09-25 |
 | 当前阶段 | Stage 2：增量能力 |
-| 当前任务 | S2-07C Stage 2 质量复验 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；当前唯一执行任务 S2-07C |
+| 当前任务 | S2-07D 真机用户闭环 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C 因 WorkManager 依赖镜像受阻；当前唯一执行任务 S2-07D |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -17,7 +17,7 @@
 
 ### 最终产品目标：全 App 对齐原 Venera
 
-用户明确最终目标是整个 App 与原 Venera 在功能、页面逻辑、设计三个维度分别达到至少 90% 相似度/覆盖度。已写入 `docs/PROJECT_PLAN.md` 产品目标；**S3-00** 负责冻结上游基线与逐项适用范围、权重和证据，**S4-08** 负责首页专项，**S4-09** 负责全 App 最终复核与差距收敛（均 TODO）。三个维度分别计算且各自达到 ≥90%，不得用平均分抵消短板。此长期目标不改变当前唯一执行任务 S2-07C，也不代表当前实现已达标。
+用户明确最终目标是整个 App 与原 Venera 在功能、页面逻辑、设计三个维度分别达到至少 90% 相似度/覆盖度。已写入 `docs/PROJECT_PLAN.md` 产品目标；**S3-00** 负责冻结上游基线与逐项适用范围、权重和证据，**S4-08** 负责首页专项，**S4-09** 负责全 App 最终复核与差距收敛（均 TODO）。三个维度分别计算且各自达到 ≥90%，不得用平均分抵消短板。此长期目标不改变当前唯一执行任务 S2-07D，也不代表当前实现已达标。
 
 ### PL-01 全局计划复核 — DONE
 
@@ -135,7 +135,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 
 - **S2-07A 统一章节身份与本地阅读 — DONE（待 Stage 门禁）。** Reader route / `PageProvider` 使用 `ChapterRef`，目录和 ZIP/7z 页面走本地 provider 与缓存，远端仍走原下载优先 provider；本地进度使用 `@local` 键空间复用 Room 历史。新增 ADR-0011、远端旧路由兼容测试、本地提供器与历史恢复测试。
 - **S2-07B 下载用户流程 — DONE。** 详情 ViewModel 读取章节页并写入持久下载仓库；成功后由 Route 通知装配层启动唯一 WorkManager。书架 Downloads tab 展示页数进度并可暂停、继续、重试、移除；ViewModel 测试覆盖详情到队列的数据与下载列表控制委派。验证：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — PASS。
-- **S2-07C Stage 2 质量复验 — IN_PROGRESS。** 2026-09-25 审查记录见 `docs/reviews/stage-02-review.md`。Kotlin/Android 工具链已升至 AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20、KSP 2.3.12；Coil 3.6.3 和 QuickJS 1.0.15 在新工具链下通过来源引擎 JVM 测试、AndroidTest 源码编译及 Debug 构建；C13 已将实际 evaluation job 的取消接入 timeout/cancel 清理路径，并通过死循环回归。C14–C24 独立修复本轮审查发现；最新全仓 JVM 测试 **439/439** 通过，Debug、Release 与 Release Lint Vital 通过。完整 `lintDebug` 仍有 WorkManager runtime/testing 两项版本提示，WorkManager 2.12.0 测试工件在 Aliyun 镜像不可用，继续配对使用 2.11.2。Xiaomi 25128PNA1C / API 36 先前数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过；新增 instrumentation 仅编译、页面闭环未执行，Stage 2 不得标为 DONE。
+- **S2-07C Stage 2 质量复验 — BLOCKED（WorkManager 测试工件待镜像可用）。** 2026-09-25 审查记录见 `docs/reviews/stage-02-review.md`。Kotlin/Android 工具链已升至 AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20、KSP 2.3.12；Coil 3.6.3 和 QuickJS 1.0.15 在新工具链下通过来源引擎 JVM 测试、AndroidTest 源码编译及 Debug 构建；C13 已将实际 evaluation job 的取消接入 timeout/cancel 清理路径，并通过死循环回归。C14–C24 独立修复本轮审查发现；最新全仓 JVM 测试 **439/439** 通过，Debug、Release 与 Release Lint Vital 通过。完整 `lintDebug` 仍有 WorkManager runtime/testing 两项版本提示，WorkManager 2.12.0 测试工件在 Aliyun 镜像不可用，继续配对使用 2.11.2。Xiaomi 25128PNA1C / API 36 先前数据库 instrumentation 25 项及下载 Worker instrumentation 4 项通过；新增 instrumentation 仅编译、页面闭环未执行，Stage 2 不得标为 DONE。
 - **页面设备闭环仍未完成。** 当前 Debug APK 能正常启动到首页，未见启动崩溃。MIUI 拒绝 `adb shell input tap`（缺少 `INJECT_EVENTS`），因此尚未操作详情下载、Library Downloads 暂停/继续/移除、SAF 目录/归档导入阅读、飞行模式翻页及进度恢复。没有尝试修改设备安全设置；需使用允许 UI 自动化的设备连接方式完成这些流程。
 - **S2-07C2 下载通知 lint 修复 — DONE。** 2026-09-24 移除 `minSdk=26` 下永不可达的 API O 低版本提前返回。验证：`:data:download:lintDebug :app:assembleDebug` — PASS。
 - **S2-07C3 详情入口 Compose lint 修复 — DONE。** 全仓 `lintDebug` 后续发现 `DetailsRoute` 的 `modifier` 没有位于首个可选参数位置。将其移到必需回调之后、其他默认参数之前。验证：`:feature:details:lintDebug :app:assembleDebug` — PASS。全仓 Lint 仍需继续运行和复查。
@@ -161,6 +161,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C23 来源清理取消活动请求 — DONE。** 原 `clearSource` 只删除客户端/Cookie/计数映射，已开始的来源 HTTP 请求会继续执行。现清理时取消该来源全部活动 Call，并用代际检查拒绝清理期间注册的旧请求。阻塞请求回归先超时、修复后收到 `Cancelled`。验证：`sh gradlew --offline --no-daemon --max-workers=2 :source:network:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。
 - **S2-07C24 详情返回原列表 — DONE（页面设备复验待执行）。** 旧根导航从探索、搜索或书架打开详情后，详情返回一律跳首页。现保存打开详情的列表路由，阅读器返回详情后仍保留该来源；进程恢复也持久化此路由。导航回归覆盖三种入口与阅读器回返。验证：`sh gradlew --offline --no-daemon --max-workers=2 :core:navigation:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；页面返回路径归 S2-07D。
 - **S2-07C25 总回归与设备检查单 — DONE。** 审查结论及 D01–D07 的步骤/预期分别记录于 `docs/reviews/stage-02-review.md`、`docs/reviews/stage-02-device-checklist.md`；JDK 17 执行 `sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug :app:assembleRelease` — PASS（439 项 JVM 测试，0 失败；Debug/Release 构建及 Release Lint Vital 通过）。本小任务为审查文档切片，`git diff --check` 通过。设备项未执行，等待用户确认；Stage 2 继续 IN_PROGRESS。
+- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行，Xiaomi 25128PNA1C / API 36 已连接。当前 `:core:database:connectedDebugAndroidTest` 25/25、`:data:download:connectedDebugAndroidTest` 6/6 通过。归档设备测试先发现 JUnit 方法返回类型错误，修正后 `:data:local:connectedDebugAndroidTest` 2/2 通过；其余 D01–D07 页面闭环仍按检查单执行。S2-07C 暂由 WorkManager 2.12.0 测试工件镜像缺失阻塞，Stage 2 保持 IN_PROGRESS。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

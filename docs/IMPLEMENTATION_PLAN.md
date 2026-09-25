@@ -466,7 +466,7 @@ S2-07 当前切片与验收：
 
 - **S2-07A — 统一章节身份与本地阅读：DONE。** `AppRoute.Reader` / `PageProvider` / Reader 使用 `ChapterRef`；SAF 目录与归档章节都可选入现有 Reader；进度写入 `@local` 历史命名空间。验收：远端旧路由 round-trip 兼容、本地路由 round-trip、本地页不调用来源、历史恢复命中同一 local chapter。
 - **S2-07B — 下载用户流程：DONE。** 详情可排入章节下载并启动唯一 WorkManager；Library Downloads 显示页进度并提供暂停、继续、重试、移除。验收：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` 通过。
-- **S2-07C — Stage 2 质量复验：IN_PROGRESS。** 审查记录：`docs/reviews/stage-02-review.md`。C14–C24 修复本轮审查发现，C25 总回归 439 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；此前复验修复 4 处代码级 Lint 问题，并更新 Core、JavaScriptEngine、Navigation3、XZ、org.json。C12 已升级 AGP 9.3.1 / Gradle 9.5.0 / KGP 2.4.20 / KSP 2.3.12，并通过 Coil 3.6.3 与 QuickJS 1.0.15 相关回归；完整 Lint 只剩 WorkManager runtime/testing 两项版本提示（2.12.0 测试工件未同步到 Aliyun）。设备项由 S2-07D 记录并等待用户确认，不得把未执行的设备闭环写成通过或将 Stage 标为 DONE。
+- **S2-07C — Stage 2 质量复验：BLOCKED（WorkManager 测试工件待镜像可用）。** 审查记录：`docs/reviews/stage-02-review.md`。C14–C24 修复本轮审查发现，C25 总回归 439 项 JVM 测试、Debug/Release 构建和 Release Lint Vital 通过；此前复验修复 4 处代码级 Lint 问题，并更新 Core、JavaScriptEngine、Navigation3、XZ、org.json。C12 已升级 AGP 9.3.1 / Gradle 9.5.0 / KGP 2.4.20 / KSP 2.3.12，并通过 Coil 3.6.3 与 QuickJS 1.0.15 相关回归；完整 Lint 只剩 WorkManager runtime/testing 两项版本提示（2.12.0 测试工件未同步到 Aliyun）。设备项由 S2-07D 记录并等待用户确认，不得把未执行的设备闭环写成通过或将 Stage 标为 DONE。
 - **S2-07C1 — Room migration 真机断言：DONE。** 真机运行暴露表名断言将 `room_master_table` 误作应用 schema；仅过滤该 Room 内部表后，`:core:database:connectedDebugAndroidTest` 25 项通过。`:data:download:connectedDebugAndroidTest` 同设备 4 项通过。修复与证据记入 Stage 2 审查记录。
 - **S2-07C2 — 删除无效通知 API 兼容分支：DONE。** `:data:download:lintDebug` 首次暴露 `ObsoleteSdkInt`：项目 minSdk 为 26，而下载通知 channel 要求 API 26，低于 O 的检查不可达。移除该无效分支后，`:data:download:lintDebug :app:assembleDebug` 均通过。
 - **S2-07C3 — 修正详情入口 Modifier 参数顺序：DONE。** 全仓 `lintDebug` 随后暴露 `feature/details/DetailsRoute.kt` 的 `ModifierParameter`：默认参数 `modifier` 之前还有另一个默认参数。把 `modifier` 移至必需回调之后、其他默认参数之前；`:feature:details:lintDebug :app:assembleDebug` 通过。
@@ -492,7 +492,7 @@ S2-07 当前切片与验收：
 - **S2-07C23 — 来源清理取消活动 HTTP：DONE。** `clearSource` 取消该来源全部已注册 Call，并拒绝清理竞态中尚未注册的旧请求，避免禁用/删除后继续发出网络响应。阻塞请求 JVM 回归先超时，修复后通过；`:source:network:testDebugUnitTest :app:assembleDebug` 通过。
 - **S2-07C24 — 详情页返回原列表：DONE（设备复验待执行）。** 详情从探索、搜索、书架进入时记录入口；阅读器返回详情不覆盖入口，详情返回时回到原列表。导航 JVM 回归及 `:app:assembleDebug` 通过；页面实际路径归 S2-07D。
 - **S2-07C25 — 全仓回归与设备检查单：DONE。** 439 项 JVM 测试全部通过，Debug/Release 构建与 Release Lint Vital 通过；将 D01–D07 真机步骤、预期、证据要求存入 `docs/reviews/stage-02-device-checklist.md`，未执行设备操作。Stage 2 继续等待 S2-07D 与 WorkManager 依赖解除。
-- **S2-07D — 真机用户闭环：BLOCKED（待用户确认执行）。** 保留详情发起下载、暂停/继续/重试/移除、飞行模式离线阅读、SAF 目录/归档导入与刷新、进度恢复、长章节/长图手势和内存、低 API 兼容等待验证项；C18 的 Worker 意外异常、C20 的进程恢复、C22 的归档刷新/取消，以及 C15/C16/C19 的 Room 恢复/竞态回归也须执行。执行前记录设备型号/API、步骤和预期，不在本轮审查中安装 APK、运行 instrumentation 或操作真机。解除条件：用户确认可以进行真机验证并提供可操作设备。
+- **S2-07D — 真机用户闭环：IN_PROGRESS。** 用户已确认，Xiaomi 25128PNA1C / API 36 上数据库 25/25、下载 Worker 6/6、本地归档 2/2 项 instrumentation 通过；继续按 `docs/reviews/stage-02-device-checklist.md` 执行 D01–D07 页面闭环、进程恢复、长章节/长图和低 API（若有相应设备/模拟器）。每项记录真实结果，不能以模块 instrumentation 替代人工/页面闭环。
 
 ## 7. Stage 3：来源扩展能力
 

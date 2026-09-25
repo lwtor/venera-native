@@ -93,3 +93,7 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 代码审查覆盖根导航、详情/书架/探索/搜索/阅读器状态、下载队列/Worker/Room 恢复、SAF 目录及归档导入、图片缓存、来源引擎与网络会话。已发现的可复现缺陷按 C14–C24 独立修复并提交；当前未发现另一个可由本地测试复现的 Stage 2 阻断项，但不能据此声称全 App 功能、页面逻辑或设计达到 90%。该对照需要 S3-00 冻结上游基线，再按 S4-09 的三个独立维度验收。
 
 仍未解除的门禁：WorkManager 2.12.0 testing 工件在当前镜像缺失，导致完整 `lintDebug` 的两项版本提示；新增 Worker、Room、本地归档 instrumentation 只完成源码编译；页面下载、离线阅读、SAF、长章节和低 API 闭环尚未在设备执行。逐项步骤、预期和证据要求见 [Stage 2 真机验证清单](stage-02-device-checklist.md)。用户确认前不得执行设备项；Stage 2 继续 `IN_PROGRESS`。
+
+## 2026-09-25 真机续验
+
+用户已确认执行，设备 Xiaomi 25128PNA1C / API 36。`:core:database:connectedDebugAndroidTest` 25/25、`:data:download:connectedDebugAndroidTest` 6/6 通过。`:data:local:connectedDebugAndroidTest` 首次在 JUnit 初始化阶段失败，原因为 `cancellingArchiveImportPropagatesCancellation()` 隐式返回异常对象；为两个 `runBlocking` 测试显式返回 `Unit` 后重跑 2/2 通过。均使用 JDK 17、`--no-configuration-cache`，本轮连接设备测试首次需在线解析 AGP UTP 工件。页面闭环结果持续写入真机检查单，不能凭模块测试推断 D01–D07 通过。

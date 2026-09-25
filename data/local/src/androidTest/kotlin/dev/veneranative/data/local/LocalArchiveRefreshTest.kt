@@ -38,6 +38,7 @@ class LocalArchiveRefreshTest {
         } finally {
             database.close()
         }
+        Unit
     }
 
     @Test
@@ -58,6 +59,7 @@ class LocalArchiveRefreshTest {
         } finally {
             database.close()
         }
+        Unit
     }
 
     private fun archive(): ArchiveReader = object : ArchiveReader {
