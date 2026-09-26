@@ -17,3 +17,5 @@
 2026-09-25 已完成模块测试：`core:database` 25/25、`data:download` 6/6、`data:local` 2/2。首次离线连接测试缺少 UTP 工件，在线解析并关闭 configuration cache 后通过。`data:local` 首次运行发现 AndroidJUnit4 测试方法返回非 `Unit`，修复并复跑 2/2 通过。以上只覆盖模块 instrumentation，D01–D07 页面闭环尚未记为通过。
 
 2026-09-26：WorkManager 已配对升级至 2.12.0，相关 JVM 回归、测试源码编译及 Lint 通过。`adb devices -l` 再查为空；此前 6 项 Worker 设备测试运行于 2.11.2，升级后须复验，D01–D07 仍未通过。
+
+2026-09-26 API 34 模拟器 `DeviceTest_1`：下载 Worker instrumentation 在 WorkManager 2.12.0 上 6/6 通过。书架导航测试首次因漏点 Downloads 标签失败，补齐测试操作后 `:app:connectedDebugAndroidTest` 1/1 通过，覆盖首页→书架→Downloads/Local 空态及导入入口；尚不代表 D01–D07 完成。

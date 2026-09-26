@@ -161,6 +161,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07C23 来源清理取消活动请求 — DONE。** 原 `clearSource` 只删除客户端/Cookie/计数映射，已开始的来源 HTTP 请求会继续执行。现清理时取消该来源全部活动 Call，并用代际检查拒绝清理期间注册的旧请求。阻塞请求回归先超时、修复后收到 `Cancelled`。验证：`sh gradlew --offline --no-daemon --max-workers=2 :source:network:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）。
 - **S2-07C24 详情返回原列表 — DONE（页面设备复验待执行）。** 旧根导航从探索、搜索或书架打开详情后，详情返回一律跳首页。现保存打开详情的列表路由，阅读器返回详情后仍保留该来源；进程恢复也持久化此路由。导航回归覆盖三种入口与阅读器回返。验证：`sh gradlew --offline --no-daemon --max-workers=2 :core:navigation:testDebugUnitTest :app:assembleDebug` — PASS（JDK 17）；页面返回路径归 S2-07D。
 - **S2-07C25 总回归与设备检查单 — DONE。** 审查结论及 D01–D07 的步骤/预期分别记录于 `docs/reviews/stage-02-review.md`、`docs/reviews/stage-02-device-checklist.md`；JDK 17 执行 `sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug :app:assembleRelease` — PASS（439 项 JVM 测试，0 失败；Debug/Release 构建及 Release Lint Vital 通过）。本小任务为审查文档切片，`git diff --check` 通过。设备项未执行，等待用户确认；Stage 2 继续 IN_PROGRESS。
+- **S2-07D0 书架导航设备测试修正 — DONE。** API 34 模拟器首次运行 `:app:connectedDebugAndroidTest` 失败：测试从首页进入书架后直接断言 Downloads 空态，漏点 Downloads 标签；补充实际标签点击后重跑 1/1 通过。该失败是测试步骤错误，未见产品页面缺陷；验证：`:app:connectedDebugAndroidTest :app:assembleDebug` — PASS。
 - **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，WorkManager 2.11.2 基线的数据库 25/25、下载 Worker 6/6、本地归档 2/2 项 instrumentation 通过。2026-09-26 再查 `adb devices -l` 为空；2.12.0 升级后的 Worker 测试及 D01–D07 页面闭环仍待设备重新枚举。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。

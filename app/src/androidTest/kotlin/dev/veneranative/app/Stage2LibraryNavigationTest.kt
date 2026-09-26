@@ -16,6 +16,7 @@ class Stage2LibraryNavigationTest {
     @Test
     fun homeOpensDownloadsAndLocalLibraryTabs() {
         composeRule.onNodeWithText("Library").performClick()
+        composeRule.onNodeWithText("Downloads").performClick()
         composeRule.onNodeWithText("No downloads yet.").assertIsDisplayed()
 
         composeRule.onNodeWithText("Local").performClick()

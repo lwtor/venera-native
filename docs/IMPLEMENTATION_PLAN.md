@@ -492,6 +492,7 @@ S2-07 当前切片与验收：
 - **S2-07C23 — 来源清理取消活动 HTTP：DONE。** `clearSource` 取消该来源全部已注册 Call，并拒绝清理竞态中尚未注册的旧请求，避免禁用/删除后继续发出网络响应。阻塞请求 JVM 回归先超时，修复后通过；`:source:network:testDebugUnitTest :app:assembleDebug` 通过。
 - **S2-07C24 — 详情页返回原列表：DONE（设备复验待执行）。** 详情从探索、搜索、书架进入时记录入口；阅读器返回详情不覆盖入口，详情返回时回到原列表。导航 JVM 回归及 `:app:assembleDebug` 通过；页面实际路径归 S2-07D。
 - **S2-07C25 — 全仓回归与设备检查单：DONE。** 439 项 JVM 测试全部通过，Debug/Release 构建与 Release Lint Vital 通过；将 D01–D07 真机步骤、预期、证据要求存入 `docs/reviews/stage-02-device-checklist.md`，未执行设备操作。Stage 2 继续等待 S2-07D 与 WorkManager 依赖解除。
+- **S2-07D0 — 书架导航设备测试修正：DONE。** API 34 模拟器首次运行发现测试未切换 Downloads 标签即断言该标签空态；补全用户操作后 `:app:connectedDebugAndroidTest` 1/1 与 Debug 构建通过。
 - **S2-07D — 真机用户闭环：IN_PROGRESS。** 用户已确认，Xiaomi 25128PNA1C / API 36 上数据库 25/25、下载 Worker 6/6、本地归档 2/2 项 instrumentation 通过；继续按 `docs/reviews/stage-02-device-checklist.md` 执行 D01–D07 页面闭环、进程恢复、长章节/长图和低 API（若有相应设备/模拟器）。每项记录真实结果，不能以模块 instrumentation 替代人工/页面闭环。
 
 ## 7. Stage 3：来源扩展能力
