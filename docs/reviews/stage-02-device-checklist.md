@@ -21,3 +21,5 @@
 2026-09-26 API 34 模拟器 `DeviceTest_1`：下载 Worker instrumentation 在 WorkManager 2.12.0 上 6/6 通过。书架导航测试首次因漏点 Downloads 标签失败，补齐测试操作后 `:app:connectedDebugAndroidTest` 1/1 通过，覆盖首页→书架→Downloads/Local 空态及导入入口；尚不代表 D01–D07 完成。
 
 2026-09-26 API 34 fixture 首次页面试跑：系统文件选择器成功安装 `tools/test-sources/demo_comic_source.js`；Explore 显示 c1/c2，c1 详情列出 Chapter 1 的 Read/Download，进入 Reader 显示 1/3，但图片因 API 28+ 默认 HTTP 限制重试。S2-07D1 仅在 Debug 对 `127.0.0.1` 开放 HTTP 后，重装复测 Page 1/2 已显示，服务收到 JPEG/PNG GET 200；Release manifest 未包含例外。此证据仅覆盖 D01 前半段，不把逐级返回或其余项记为通过。
+
+2026-09-26 API 34 返回键复验：从 Reader 按系统返回曾直接退出应用；新增书架返回设备回归，修复前 Activity 退出且无 Compose 树。统一根导航返回目标后，书架手动系统键返回首页、`:app:connectedDebugAndroidTest` 2/2、导航 JVM 测试通过。Reader→详情→Explore 的完整手动路径仍待复测，D01 保持未通过。

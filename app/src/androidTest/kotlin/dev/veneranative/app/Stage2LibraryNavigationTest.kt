@@ -24,4 +24,16 @@ class Stage2LibraryNavigationTest {
         composeRule.onNodeWithText("Import CBZ / ZIP / 7z").assertIsDisplayed()
         composeRule.onNodeWithText("No local directories imported.").assertIsDisplayed()
     }
+
+    @Test
+    fun systemBackFromLibraryReturnsHome() {
+        composeRule.onNodeWithText("Library").performClick()
+        composeRule.onNodeWithText("Downloads").assertIsDisplayed()
+
+        composeRule.runOnUiThread {
+            composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        }
+
+        composeRule.onNodeWithText("Android-native foundation is ready").assertIsDisplayed()
+    }
 }

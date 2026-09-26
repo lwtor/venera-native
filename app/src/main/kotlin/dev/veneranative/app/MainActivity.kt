@@ -2,6 +2,7 @@ package dev.veneranative.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.navigation.AppRoute
+import dev.veneranative.core.navigation.backDestination
 import dev.veneranative.core.navigation.detailsOriginAfterNavigation
 import dev.veneranative.core.navigation.decodeAppRoute
 import dev.veneranative.core.navigation.encode
@@ -167,6 +169,10 @@ private fun AppNavHost(
     downloadRepository: DownloadRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
+    val backRoute = backDestination(route, detailsOrigin)
+    val onBack: () -> Unit = { onRouteChange(backRoute ?: AppRoute.Home) }
+    BackHandler(enabled = backRoute != null, onBack = onBack)
+
     var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
     var pendingLocalImport by remember { mutableStateOf<((String) -> Unit)?>(null) }
     var pendingArchiveImport by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -205,14 +211,14 @@ private fun AppNavHost(
                     onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
                     downloads = downloadRepository,
                     onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
-                    onBack = { onRouteChange(AppRoute.Home) },
+                    onBack = onBack,
                 )
             }
         }
 
         AppRoute.Sources -> SourcesRoute(
             repository = sourceRepository,
-            onBack = { onRouteChange(AppRoute.Home) },
+            onBack = onBack,
             onRequestScript = { consume ->
                 scriptSelection = consume
                 scriptPicker.launch(arrayOf("application/javascript", "text/javascript", "text/plain"))
@@ -222,13 +228,13 @@ private fun AppNavHost(
         is AppRoute.Explore -> ExploreRoute(
             catalog = catalog,
             onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
-            onBack = { onRouteChange(AppRoute.Home) },
+            onBack = onBack,
         )
 
         is AppRoute.Search -> SearchRoute(
             catalog = catalog,
             onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
-            onBack = { onRouteChange(AppRoute.Home) },
+            onBack = onBack,
         )
 
         is AppRoute.ComicDetails -> DetailsRoute(
@@ -238,7 +244,7 @@ private fun AppNavHost(
             downloads = downloadRepository,
             onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
-            onBack = { onRouteChange(detailsOrigin) },
+            onBack = onBack,
         )
 
         is AppRoute.Reader -> {
@@ -253,12 +259,7 @@ private fun AppNavHost(
                 }
                 ReaderRoute(
                     chapter = current.chapter, provider = provider,
-                    onBack = {
-                        when (val chapter = current.chapter) {
-                            is ChapterRef.Local -> onRouteChange(AppRoute.Library)
-                            is ChapterRef.Remote -> onRouteChange(AppRoute.ComicDetails(chapter.key.comicKey))
-                        }
-                    },
+                    onBack = onBack,
                     decoderFactory = decoderFactory, progress = session,
                     onExit = { appScope.launch { runCatching { tracker.flush() } } },
                 )
