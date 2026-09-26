@@ -1,4 +1,4 @@
-# Stage 2 真机验证清单（待用户确认）
+# Stage 2 真机验证清单（执行中）
 
 状态：**执行中**。用户已于 2026-09-25 确认。设备 Xiaomi 25128PNA1C，Android 16 / API 36，基线 `107de80`。执行时记录构建 commit、测试数据、时间、结果和日志/截图路径；失败项建立独立修复任务。
 
@@ -15,3 +15,5 @@
 使用最小化、自建且有授权的 fixture；不使用真实账号、商业站点或受版权保护内容。
 
 2026-09-25 已完成模块测试：`core:database` 25/25、`data:download` 6/6、`data:local` 2/2。首次离线连接测试缺少 UTP 工件，在线解析并关闭 configuration cache 后通过。`data:local` 首次运行发现 AndroidJUnit4 测试方法返回非 `Unit`，修复并复跑 2/2 通过。以上只覆盖模块 instrumentation，D01–D07 页面闭环尚未记为通过。
+
+2026-09-26：WorkManager 已配对升级至 2.12.0，相关 JVM 回归、测试源码编译及 Lint 通过。`adb devices -l` 再查为空；此前 6 项 Worker 设备测试运行于 2.11.2，升级后须复验，D01–D07 仍未通过。

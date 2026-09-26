@@ -18,7 +18,7 @@ paging = "3.5.1"
 navigation3 = "1.2.0"
 okhttp = "5.5.0"
 room = "2.8.5"
-workmanager = "2.11.2"
+workmanager = "2.12.0"
 documentfile = "1.1.0"
 # Apache-2.0. Only the SeekableByteChannel constructors are used: see docs/adr/0010.
 commonsCompress = "1.28.0"

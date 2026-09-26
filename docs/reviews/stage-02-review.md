@@ -13,11 +13,11 @@
 | 本地章节进入统一阅读器 | 自动化通过，设备未验 | S2-07A 的 `ChapterRef` 路由兼容、本地页读取隔离来源、本地历史恢复测试已通过；没有在设备逐项操作目录与归档章节。 |
 | 详情页排队及下载列表控制 | 相关 JVM 测试通过 | S2-07B：`:feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` 通过；覆盖详情排队、列表暂停/继续/重试/移除委派。 |
 | 离线下载章节读取 | 自动化通过，飞行模式未验 | `OfflineFirstPageProvider` 有完整下载命中与不完整下载回退测试；真实断网翻页未执行。 |
-| 全仓 JVM 单测 | 通过 | `testDebugUnitTest`：429 tests、0 failures、0 errors、0 skipped。 |
+| 全仓 JVM 单测 | 通过 | `testDebugUnitTest`：439 tests、0 failures、0 errors、0 skipped（2026-09-26）。 |
 | Debug APK | 通过 | `:app:assembleDebug`。 |
 | Release APK / Release Lint Vital | 通过 | `:app:assembleRelease` 含 `:app:lintVitalRelease` 成功；未签名构建。 |
-| 完整 Debug Lint | **失败（仅剩 2 项）** | 工具链与可兼容依赖更新后，完整 `lintDebug` 仅报告 WorkManager runtime/testing 2.12.0 提示；testing 工件当前无法从 Aliyun 镜像解析，版本保持配对的 2.11.2。未建立 baseline 或关闭检查。 |
-| 跨模块设备用户闭环 | **未验证** | 没有执行安装、详情下载、下载控制、本地导入/阅读、飞行模式阅读及恢复位置的人工脚本；不能由单测与构建替代。 |
+| 完整 Debug Lint | **通过（2026-09-26）** | Aliyun 镜像提供 `work-testing:2.12.0` 后配对升级 runtime/testing；全仓 `lintDebug` 通过。早期失败记录保留于下文。 |
+| 跨模块设备用户闭环 | **未验证** | 已安装并启动过 APK，但未执行详情下载、下载控制、本地导入/阅读、飞行模式阅读及恢复位置的页面闭环；不能由单测与构建替代。 |
 
 ## 真机补充复验（2026-09-24）
 
@@ -66,7 +66,7 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 
 ## 退出阻断项与解除条件
 
-1. 处理剩余 WorkManager runtime/testing 两条版本提示：须在 runtime/testing 配对更新可解析且完成 Worker 验证后使完整 `lintDebug` 成功；不能用 baseline 或静默抑制代替结论。
+1. **已解除（2026-09-26）：** WorkManager runtime/testing 配对升级至 2.12.0；下载 JVM 测试与 AndroidTest 编译、完整 `lintDebug` 通过。升级后的真实 Worker instrumentation 归 S2-07D。
 2. 在 Android API 26+ 设备或模拟器执行 `STATUS.md` 所列详情下载、暂停/继续、目录/归档阅读、飞行模式阅读及历史恢复闭环，并记录设备/API 与结果。本轮已验证 Xiaomi 25128PNA1C（API 36）的数据库与下载 Worker instrumentation，但 MIUI 拒绝 shell 输入事件，无法执行页面交互。新增书架导航 Compose instrumentation smoke test，`:app:compileDebugAndroidTestKotlin` 通过，但未在设备执行。本报告复查时 Android Studio Device Manager 与 ADB 均未发现连接设备；2026-09-25 在用户表示重新连接后再查，`adb devices -l` 仍返回空列表，UI 批次暂停。待设备实际枚举后使用正常授权的控制方式完成页面闭环，不通过修改安全设置绕过。
 3. 完成以上处理后重跑规定 Stage 门禁，再更新本报告、`STATUS.md` 和 `IMPLEMENTATION_PLAN.md`；通过后才将 Stage 2 标为 `DONE`。
 
@@ -97,3 +97,7 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 ## 2026-09-25 真机续验
 
 用户已确认执行，设备 Xiaomi 25128PNA1C / API 36。`:core:database:connectedDebugAndroidTest` 25/25、`:data:download:connectedDebugAndroidTest` 6/6 通过。`:data:local:connectedDebugAndroidTest` 首次在 JUnit 初始化阶段失败，原因为 `cancellingArchiveImportPropagatesCancellation()` 隐式返回异常对象；为两个 `runBlocking` 测试显式返回 `Unit` 后重跑 2/2 通过。均使用 JDK 17、`--no-configuration-cache`，本轮连接设备测试首次需在线解析 AGP UTP 工件。页面闭环结果持续写入真机检查单，不能凭模块测试推断 D01–D07 通过。
+
+## 2026-09-26 WorkManager 阻塞解除
+
+Aliyun 镜像现可解析 `androidx.work:work-testing:2.12.0`。runtime/testing 配对升级至 2.12.0 后，JDK 17 执行 `:data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug`、`lintDebug`、`testDebugUnitTest :app:assembleRelease` 均 `BUILD SUCCESSFUL`；61 份 JVM 报告 439 项、0 失败。未使用 Lint baseline 或忽略规则。S2-07C6 与 S2-07C 完成；2.12.0 Worker 的真实设备复验及 D01–D07 页面闭环仍未完成，Stage 2 保持 `IN_PROGRESS`。
