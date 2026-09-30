@@ -1,6 +1,7 @@
 package dev.veneranative.data.history
 
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.RemoteChapterId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -25,6 +26,11 @@ class ReadingProgressTracker(
     private var scheduled: Job? = null
     private val _writeFailed = MutableStateFlow(false)
     val writeFailed: StateFlow<Boolean> = _writeFailed
+
+    /** A new reader must see the latest in-memory page even while its throttled write is pending. */
+    fun pendingPage(comicKey: ComicKey, chapterId: RemoteChapterId): Int? = synchronized(lock) {
+        pending[comicKey]?.takeIf { it.chapterId == chapterId }?.pageIndex
+    }
 
     fun onPageChanged(entry: ReadingHistoryEntry) = synchronized(lock) {
         pending[entry.comicKey] = entry

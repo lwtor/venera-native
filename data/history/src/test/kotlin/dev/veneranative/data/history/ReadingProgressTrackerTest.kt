@@ -1,6 +1,9 @@
 package dev.veneranative.data.history
 
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.ChapterContent
+import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
@@ -191,6 +194,21 @@ class ReadingProgressTrackerTest {
         flush.await()
         assertEquals(listOf(1, 9), written)
         assertEquals(9, progressDao.rows.value.single().pageIndex)
+    }
+
+    @Test fun `reopening before the throttled write resumes the newest page`() = runTest {
+        repository.record(entry(1))
+        val tracker = tracker(this, throttleMillis = 10_000L)
+        val chapter = ChapterKey(entry(1).comicKey, RemoteChapterId("chapter-1"))
+        val session = ReaderProgressSession(chapter, repository, tracker, { 0L })
+        val content = ChapterContent("Chapter One", (0..2).map {
+            ComicPage(it, "page-$it", 100, 100)
+        })
+
+        session.record(content, 2)
+
+        assertEquals(2, session.resumePage())
+        assertEquals(1, progressDao.rows.value.single().pageIndex)
     }
 
     private fun tracker(

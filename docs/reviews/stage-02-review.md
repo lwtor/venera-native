@@ -101,3 +101,9 @@ sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assemble
 ## 2026-09-26 WorkManager 阻塞解除
 
 Aliyun 镜像现可解析 `androidx.work:work-testing:2.12.0`。runtime/testing 配对升级至 2.12.0 后，JDK 17 执行 `:data:download:testDebugUnitTest :data:download:compileDebugAndroidTestKotlin :app:assembleDebug`、`lintDebug`、`testDebugUnitTest :app:assembleRelease` 均 `BUILD SUCCESSFUL`；61 份 JVM 报告 439 项、0 失败。未使用 Lint baseline 或忽略规则。S2-07C6 与 S2-07C 完成；2.12.0 Worker 的真实设备复验及 D01–D07 页面闭环仍未完成，Stage 2 保持 `IN_PROGRESS`。
+
+## 2026-09-26–30 API 34 页面复验增补
+
+仓库自建漫画源通过系统文件选择器安装，Explore→详情→Reader 的页面流运行。D1 为 Debug 构建限定回环地址 HTTP 例外后，测试图片能从本地服务加载；Release 清单不含该例外。D2 发现系统返回键从 Reader 直接退出应用，统一系统与页面返回目标后，Reader→详情→Explore 手动路径通过，书架导航设备回归通过。下载的 3 页在网络约束满足后显示 3/3 Completed；飞行模式且图片服务关闭时，三页均可离线显示。D3 发现第 3 页退出重开倒退到第 2 页：历史节流期间只读旧数据库值，连续模式首帧又把短末页前面的长图误记为当前页。新增两层失败先行回归并修复；复测重开维持 3/3、SQLite 索引维持 2，用户反向滚动仍能更新页码。
+
+这些结果只覆盖清单所述部分路径。下载暂停/继续/重试/移除、损坏文件、SAF 导入与归档刷新、长章节、API 26 和 Xiaomi 真机页面操作仍无通过证据；Stage 2 保持 `IN_PROGRESS`。

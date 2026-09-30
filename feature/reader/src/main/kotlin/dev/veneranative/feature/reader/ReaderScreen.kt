@@ -212,8 +212,22 @@ private fun ContinuousPages(
             .coerceAtLeast(0),
     )
     LaunchedEffect(listState, items) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { index -> items.getOrNull(index)?.let { onAction(ReaderAction.PageShown(it.page.index)) } }
+        var userScrollStarted = false
+        snapshotFlow {
+            Triple(listState.firstVisibleItemIndex, listState.isScrollInProgress,
+                listState.layoutInfo.visibleItemsInfo.isNotEmpty())
+        }.collect { (first, scrolling, hasVisibleItems) ->
+            if (scrolling) userScrollStarted = true
+            // Layout may clamp the restored last page below a taller previous page. Only an
+            // actual user scroll may replace the progress restored by ReaderViewModel.
+            if (!userScrollStarted || !hasVisibleItems) return@collect
+            val page = if (!listState.canScrollForward && first > 0) {
+                items.lastOrNull()?.page?.index
+            } else {
+                items.getOrNull(first)?.page?.index
+            }
+            page?.let { onAction(ReaderAction.PageShown(it)) }
+        }
     }
     val contentWidthPx = items.maxOfOrNull { it.tile.displayWidthPx }?.toFloat() ?: viewport.widthPx.toFloat()
     val contentHeightPx = items.sumOf { it.tile.displayHeightPx }.toFloat()

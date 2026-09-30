@@ -28,8 +28,8 @@ class ReaderProgressSession(
     constructor(chapter: ChapterKey, repository: HistoryRepository, tracker: ReadingProgressTracker, clock: () -> Long) :
         this(ChapterRef.Remote(chapter), repository, tracker, clock)
 
-    override suspend fun resumePage(): Int = repository.progress(comicKey)
-        ?.takeIf { it.chapterId == chapterId }?.pageIndex ?: 0
+    override suspend fun resumePage(): Int = tracker.pendingPage(comicKey, chapterId)
+        ?: repository.progress(comicKey)?.takeIf { it.chapterId == chapterId }?.pageIndex ?: 0
 
     override fun record(content: ChapterContent, pageIndex: Int) {
         if (content.pages.isEmpty()) return

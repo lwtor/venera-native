@@ -90,4 +90,25 @@ class ReaderScreenTest {
 
         composeRule.onNodeWithText("0 / 0").assertIsDisplayed()
     }
+
+    @Test
+    fun restoringLastShortPageDoesNotReportPreviousPage() {
+        val shownPages = mutableListOf<Int>()
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "Last page",
+                    pages = pages,
+                    currentPageIndex = 2,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = { if (it is ReaderAction.PageShown) shownPages += it.index },
+                onBack = {},
+            )
+        }
+
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
+        assertTrue("initial layout must not overwrite the restored page", shownPages.none { it < 2 })
+    }
 }

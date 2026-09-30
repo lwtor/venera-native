@@ -23,3 +23,5 @@
 2026-09-26 API 34 fixture 首次页面试跑：系统文件选择器成功安装 `tools/test-sources/demo_comic_source.js`；Explore 显示 c1/c2，c1 详情列出 Chapter 1 的 Read/Download，进入 Reader 显示 1/3，但图片因 API 28+ 默认 HTTP 限制重试。S2-07D1 仅在 Debug 对 `127.0.0.1` 开放 HTTP 后，重装复测 Page 1/2 已显示，服务收到 JPEG/PNG GET 200；Release manifest 未包含例外。此证据仅覆盖 D01 前半段，不把逐级返回或其余项记为通过。
 
 2026-09-26 API 34 返回键复验：从 Reader 按系统返回曾直接退出应用；新增书架返回设备回归，修复前 Activity 退出且无 Compose 树。统一根导航返回目标后，书架手动系统键返回首页、`:app:connectedDebugAndroidTest` 2/2、导航 JVM 测试通过。Reader→详情→Explore 的完整手动路径仍待复测，D01 保持未通过。
+
+2026-09-26–30 API 34 离线续验：fixture 三页下载在模拟器网络满足 `VALIDATED` 后从 0/3 Queued 推进到 3/3 Completed；最初模拟器外网探测失败使 JobScheduler CONNECTIVITY 未满足，临时将其 captive portal 探测关闭并刷新 Wi‑Fi，仅改变模拟器测试环境。随后开启飞行模式并关闭本地图片服务，Reader 显示第 1、2、3 页，LTR 翻页正常。发现退出 3/3 后立即重开显示 2/3；SQLite 记录显示退出时索引 2、重开后被写成 1。S2-07D3 修复后，历史 JVM 与 Reader 设备回归通过；手动复测重开仍为 3/3、数据库仍为索引 2，反向滚动更新为 2/3。D02 的暂停/继续/失败重试/移除、D04 的损坏文件和进程死亡、D05–D07 仍未完整通过。
