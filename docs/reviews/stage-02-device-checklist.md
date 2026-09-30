@@ -29,3 +29,5 @@
 2026-09-30 API 34 模拟器后续 D02 试跑：受控失败来源的三页任务首次在第 3 页返回 HTTP 503 后显示 `2/3 Partial`，点击 Retry 后实际完成 `3/3 Completed`。点击 Remove 后，Room 的该章节任务行消失，下载目录仅余另一来源已完成章节的三页及清单。暂停/继续尚未通过，故 D02 仍未完成。
 
 2026-09-30 小米真机在基线 `87a314c` 重新枚举为 `6857c5aa`。WorkManager 2.12.0 上执行 `ANDROID_SERIAL=6857c5aa sh gradlew --no-configuration-cache :data:download:connectedDebugAndroidTest :app:connectedDebugAndroidTest`；下载 Worker 6/6、0 失败（`data/download/build/outputs/androidTest-results/connected/debug/TEST-25128PNA1C - 16-_data_download-.xml`）。App 导航测试启动后手机前台切换到其他应用，长时间未完成，主动中断本轮 Gradle（退出 130）；这两项不能记为通过，需在设备可保持测试界面前台时重跑。D01–D07 页面闭环仍未全部通过。
+
+2026-09-30 API 34 模拟器 D01 逐项试跑，基线 `a30d806`：使用已安装的仓库自建来源及三页图片，探索 `Demo Comic c1` → 详情 → 阅读器，经页面 Back 返回详情、系统 Back 返回探索，再返回首页；搜索关键词 `Demo` 得到 `Demo Comic search-1`，进入详情和阅读器后经系统 Back 返回详情、页面 Back 返回原搜索结果，关键词和结果保留；将 `Demo Comic c1` 加入书架，从 Favorites 进入详情和阅读器后，经页面 Back 返回详情、系统 Back 返回书架，收藏条目仍在。阅读器显示 `1 / 3` 且无 Retry；本地 fixture 服务记录图片 GET 200。测试通过 `adb shell input` 和 `uiautomator dump` 逐步核对页面文字；只覆盖模拟器。随后查询真机 `adb -s 6857c5aa` 返回 `device not found`，D01 真机复验未执行，D01 暂不标记完整通过；按用户要求，完成 D01 前不开始 D02。
