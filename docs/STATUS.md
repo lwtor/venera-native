@@ -9,7 +9,7 @@
 | 最后更新 | 2026-09-30 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D，设备暂未被 ADB 枚举 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D，设备已重新枚举，页面闭环仍未完成 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -165,7 +165,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D1 Debug fixture 回环图片访问 — DONE。** API 34 模拟器安装仓库内 demo 来源后，探索→详情→阅读器初次显示 `Retry page 1`，本地 fixture 服务未收到 GET。仅在 Debug manifest 中为 `127.0.0.1` 配置 HTTP 例外；Release merged manifest 无该配置。重装后阅读器显示 Page 1/2，服务收到图片 GET 200。验证：`:app:assembleDebug :app:assembleRelease` — PASS；D01 完整返回路径及 D02–D07 尚待继续。
 - **S2-07D2 系统返回键导航 — DONE。** API 34 模拟器在 Reader 按系统返回曾直接退出 App；书架返回回归在修复前复现为 Compose 树消失。根导航现使用同一类型化返回目标处理页面 Back 与系统返回，保留详情入口；导航 JVM 测试覆盖首页、列表、详情、远端/本地阅读器。设备测试等待书架实际显示后调用返回分发器，2/2 通过；手动 `adb shell input keyevent 4` 从书架返回首页通过。验证：`:core:navigation:testDebugUnitTest :app:connectedDebugAndroidTest :app:assembleDebug` — PASS。阅读器完整回返路径仍须 D01 复测。
 - **S2-07D3 离线阅读进度立即重开 — DONE。** API 34 模拟器在飞行模式、fixture HTTP 服务已停止时，已下载三页均可显示；第 3 页退出后立即重开原倒退到第 2 页，数据库查询确认重开首帧把已保存索引 2 覆写为 1。新增失败先行的历史待写回归和 Reader 短尾页设备回归；现在会话优先读取待写页，连续模式只有用户实际滚动后才更新页码。验证：`:data:history:testDebugUnitTest :feature:reader:connectedDebugAndroidTest :app:assembleDebug` — PASS（Reader 7 项执行、2 项专项探测 SKIPPED）；模拟器手动重开维持 3/3，数据库仍为索引 2，反向滚动更新到 2/3。D04 的损坏文件识别和进程死亡恢复仍待测。
-- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，WorkManager 2.11.2 基线的数据库 25/25、下载 Worker 6/6、本地归档 2/2 项 instrumentation 通过。2026-09-26 再查 `adb devices -l` 为空；2.12.0 升级后的 Worker 测试及 D01–D07 页面闭环仍待设备重新枚举。
+- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 设备重新枚举，WorkManager 2.12.0 的下载 Worker 6/6 再次通过。App 导航测试期间手机前台切换到其他应用，本轮测试主动中断，未记为通过。API 34 模拟器完成三页下载、离线翻页与重开进度、受控失败重试及删除文件/数据库清理；暂停/继续、损坏文件、SAF、长章节、API 26 等 D01–D07 剩余页面闭环仍待验证。具体证据见 `docs/reviews/stage-02-device-checklist.md`。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 

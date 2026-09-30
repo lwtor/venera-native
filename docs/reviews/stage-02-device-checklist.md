@@ -1,6 +1,6 @@
 # Stage 2 真机验证清单（执行中）
 
-状态：**执行中**。用户已于 2026-09-25 确认。设备 Xiaomi 25128PNA1C，Android 16 / API 36，基线 `107de80`。执行时记录构建 commit、测试数据、时间、结果和日志/截图路径；失败项建立独立修复任务。
+状态：**执行中**。用户已于 2026-09-25 确认。设备 Xiaomi 25128PNA1C，Android 16 / API 36；每次执行以当时的 Git HEAD 为基线。执行时记录构建 commit、测试数据、时间、结果和日志/截图路径；失败项建立独立修复任务。
 
 | ID | 步骤 | 预期 |
 | --- | --- | --- |
@@ -25,3 +25,7 @@
 2026-09-26 API 34 返回键复验：从 Reader 按系统返回曾直接退出应用；新增书架返回设备回归，修复前 Activity 退出且无 Compose 树。统一根导航返回目标后，书架手动系统键返回首页、`:app:connectedDebugAndroidTest` 2/2、导航 JVM 测试通过。Reader→详情→Explore 的完整手动路径仍待复测，D01 保持未通过。
 
 2026-09-26–30 API 34 离线续验：fixture 三页下载在模拟器网络满足 `VALIDATED` 后从 0/3 Queued 推进到 3/3 Completed；最初模拟器外网探测失败使 JobScheduler CONNECTIVITY 未满足，临时将其 captive portal 探测关闭并刷新 Wi‑Fi，仅改变模拟器测试环境。随后开启飞行模式并关闭本地图片服务，Reader 显示第 1、2、3 页，LTR 翻页正常。发现退出 3/3 后立即重开显示 2/3；SQLite 记录显示退出时索引 2、重开后被写成 1。S2-07D3 修复后，历史 JVM 与 Reader 设备回归通过；手动复测重开仍为 3/3、数据库仍为索引 2，反向滚动更新为 2/3。D02 的暂停/继续/失败重试/移除、D04 的损坏文件和进程死亡、D05–D07 仍未完整通过。
+
+2026-09-30 API 34 模拟器后续 D02 试跑：受控失败来源的三页任务首次在第 3 页返回 HTTP 503 后显示 `2/3 Partial`，点击 Retry 后实际完成 `3/3 Completed`。点击 Remove 后，Room 的该章节任务行消失，下载目录仅余另一来源已完成章节的三页及清单。暂停/继续尚未通过，故 D02 仍未完成。
+
+2026-09-30 小米真机在基线 `87a314c` 重新枚举为 `6857c5aa`。WorkManager 2.12.0 上执行 `ANDROID_SERIAL=6857c5aa sh gradlew --no-configuration-cache :data:download:connectedDebugAndroidTest :app:connectedDebugAndroidTest`；下载 Worker 6/6、0 失败（`data/download/build/outputs/androidTest-results/connected/debug/TEST-25128PNA1C - 16-_data_download-.xml`）。App 导航测试启动后手机前台切换到其他应用，长时间未完成，主动中断本轮 Gradle（退出 130）；这两项不能记为通过，需在设备可保持测试界面前台时重跑。D01–D07 页面闭环仍未全部通过。
