@@ -5,6 +5,8 @@ plugins {
 android {
     namespace = "dev.veneranative.app"
 
+    sourceSets.getByName("androidTest").assets.directories.add(rootProject.file("tools/test-sources").path)
+
     defaultConfig {
         applicationId = "dev.veneranative"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
