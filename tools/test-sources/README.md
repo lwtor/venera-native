@@ -12,3 +12,9 @@ contract as production sources and only references generated repository fixtures
 Stopping the HTTP server while a new page is requested must show the page retry state. This is the
 offline check; detail data is intentionally local script data, so stopping the server does not make
 the details call fail.
+
+For D02 download controls, serve the same generated images with
+`python3 tools/test-sources/download_fixture_server.py` and install
+`download_control_source.js`. Its Slow comic delays each image by eight seconds so Pause can be
+observed before completion. Its Retry comic returns HTTP 503 for the third page's first three
+requests, then HTTP 200 after a user-triggered Retry. Restart the server to reset that counter.
