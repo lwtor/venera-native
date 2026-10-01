@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-01 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01 模拟器路径通过，真机自动化被小米后台 Activity 启动限制阻断，D01 仍未通过；D02–D07 未开始本轮逐项验收 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01 真机 1/1 通过，当前唯一下一检查项 D02；D03–D07 未开始本轮逐项验收 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -168,7 +168,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D4 D01 来源导航设备回归 — DONE（D01 真机复验仍待执行）。** 新增 App AndroidTest，复用仓库 demo 来源并清理测试新增数据，自动验证探索、搜索、书架三条详情→阅读器→逐级返回路径和第一页图片。API 34 模拟器运行 1/1 通过，`:app:assembleDebug` 通过；真机当时不在 ADB 列表，未声称 D01 全部完成。详见设备检查单。
 - **S2-07D5 D01 测试停滞定位 — DONE（D01 真机复验仍待执行）。** 2026-10-01 小米真机已连接且用户允许占用前台约 3–5 分钟。基线 `77238a8` 的 D01 单项 instrumentation 启动后超过 3 分钟无页面结果，前台为系统桌面；按时间约定主动中断，Gradle 退出 130，UTP 结果标记 driver canceled，不能按 XML 的零失败字段误判为通过。新增测试阶段日志，对来源仓库初始化、安装和清理设置 20 秒上限，避免同类停滞无定位信息；验证 `:app:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。未发现应用崩溃证据，具体停滞点仍待下一轮真机日志确认。
 - **S2-07D6 小米测试启动限制诊断 — DONE（D01 真机复验仍待执行）。** 基线 `6bf9337` 第二次运行 D01 时，测试方法 started 后第一条阶段日志仍未出现；真机 logcat 于 12:10:08 明确记录 `MIUILOG- Permission Denied Activity`、`Abort background activity starts from 10403`，Activity 启动结果码 102。显式 `am start` 可显示 App，但该次 Intent 缺少测试框架等待的 MAIN/LAUNCHER 标识，`ActivityScenario` 明确忽略了其生命周期事件。ADB `input keyevent` 另被设备以缺少 `INJECT_EVENTS` 拒绝。第二轮约 4 分钟后主动中断并释放前台，没有页面断言或应用崩溃证据；下一次试跑改用与 `ActivityScenario` 匹配的 shell 启动 Intent，不能将当前真机结果记为通过。
-- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 再次通过。API 34 模拟器完成三页下载、离线翻页与重开进度、受控失败重试及删除文件/数据库清理；D01 探索、搜索、书架三条入口的详情/阅读器/逐级返回路径已在模拟器手动及自动化复验通过。2026-10-01 两次真机 D01 试跑都未到达页面断言，已查明小米系统阻断 instrumentation 后台拉起 Activity；用户允许的前台窗口结束后均主动中断。下一次先用匹配测试框架的前台启动 Intent 解除该限制，再完成 D01；按用户要求暂不开始 D02。暂停/继续、损坏文件、SAF、长章节、API 26 等仍待后续逐项验收。具体证据见 `docs/reviews/stage-02-device-checklist.md`。
+- **S2-07D7 D01 真机导航闭环 — DONE。** 2026-10-01 基线 `641e46d`，在 Xiaomi 25128PNA1C / API 36 上运行 D01 单项 App instrumentation；小米系统阻断测试进程后台启动 Activity 后，用 shell 发送与 `ActivityScenario` 一致的 MAIN/LAUNCHER Intent 将其拉到前台。测试进入探索、搜索、书架三条详情→阅读器→逐级返回路径，日志记录三个阶段和清理完成；UTP 结果 1/1 通过、0 失败/错误/跳过，Gradle 退出 0，本地 fixture 图片请求 HTTP 200。测试服务和 ADB reverse 已清理。此项只证明 D01，不能替代 D02–D07。
+- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 再次通过。API 34 模拟器完成三页下载、离线翻页与重开进度、受控失败重试及删除文件/数据库清理。D01 探索、搜索、书架三条入口的详情/阅读器/逐级返回路径已在模拟器和 2026-10-01 真机 1/1 复验通过。按用户要求逐项处理，当前唯一下一检查项是 D02：三页下载的通知、暂停、继续、失败重试及移除闭环。损坏文件、进程恢复、SAF、长章节、API 26 等属于 D03–D07，尚待后续逐项验收。具体证据见 `docs/reviews/stage-02-device-checklist.md`。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
