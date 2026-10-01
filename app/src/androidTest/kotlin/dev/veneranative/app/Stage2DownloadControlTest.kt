@@ -4,10 +4,8 @@ import android.app.NotificationManager
 import android.util.Log
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onChildAt
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
@@ -27,6 +25,7 @@ import dev.veneranative.data.download.worker.DownloadNotificationText
 import dev.veneranative.data.source.InstallOutcome
 import java.io.File
 import java.util.UUID
+import kotlin.math.abs
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -193,8 +192,13 @@ class Stage2DownloadControlTest {
     }
 
     private fun taskAction(title: String, action: String) {
-        composeRule.onNodeWithText(title).onParent().onParent().onChildAt(1)
-            .assertTextEquals(action).performClick()
+        val titleY = composeRule.onNodeWithText(title).fetchSemanticsNode().boundsInRoot.center.y
+        val actionNodes = composeRule.onAllNodes(hasText(action) and hasClickAction())
+        val candidates = actionNodes.fetchSemanticsNodes()
+        val targetIndex = candidates.indices.minByOrNull { index ->
+            abs(candidates[index].boundsInRoot.center.y - titleY)
+        } ?: error("No clickable '$action' control is visible for '$title'")
+        actionNodes[targetIndex].performClick()
     }
 
     private fun selectFixtureSourceIfOffered() {

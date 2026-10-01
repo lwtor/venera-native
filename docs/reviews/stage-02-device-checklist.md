@@ -47,3 +47,5 @@
 2026-10-01 D02 慢速流程测试准备：`Stage2DownloadControlTest.slowChapterCanPauseResumeAndRemove` 已加入 App AndroidTest 并通过测试源码编译与 Debug 构建。此时仅有测试实现，没有设备执行结果；失败重试尚待下一切片，D02 保持未完成。
 
 2026-10-01 D02 失败重试测试准备完成：`failedChapterCanRetryFromDownloads` 以每次唯一测试来源 ID 隔离 `/retry/` 失败计数，断言初始 2/3 Partial 与页级失败，再从 Downloads 点击 Retry 并断言 3/3 Completed 和离线完整性。AndroidTest 编译与 Debug 构建通过；尚无设备执行结果，不计作 D02 通过。
+
+2026-10-01 小米 D02 首次设备试跑，基线 `f0b3c08`：直接 instrumentation 启动两项用例，按已验证的 MAIN/LAUNCHER Intent 将 App 拉到前台。失败重试用例实际下载两页并得到 2/3 Partial、一个 Failed 页（三次 503），随后两项用例均在 `taskAction` 选错 Compose 节点处失败：选中了 Downloads tab 而非 Retry/Pause 按钮。没有触发重试、暂停或移除，因此不能据此判断这些产品操作失败。测试 helper 已修正为按唯一章节标题邻近的按钮垂直坐标定位，AndroidTest 编译和 Debug 构建通过；修正版小米复跑待执行。测试 App 与 APK 保留安装，fixture 服务和 ADB reverse 已停止/清理。
