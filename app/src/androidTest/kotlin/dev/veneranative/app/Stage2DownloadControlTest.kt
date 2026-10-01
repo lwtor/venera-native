@@ -1,14 +1,19 @@
 package dev.veneranative.app
 
 import android.app.NotificationManager
+import android.provider.Settings
 import android.util.Log
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onParent
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.veneranative.core.model.ChapterKey
@@ -83,6 +88,81 @@ class Stage2DownloadControlTest {
                 }
             }
             File(activity.cacheDir, "$D03_SOURCE_ID.js").delete()
+        }
+    }
+
+    @Test
+    fun offlineChapterDisplaysImagesAndRestoresProgressInAirplaneMode() {
+        val activity = composeRule.activity
+        val graph = ViewModelProvider(activity)[AppGraph::class.java]
+        val repository = runBlocking { withTimeout(20_000) { graph.download.filterNotNull().first() } }
+        val sourceId = SourceId("stage2_d04_${UUID.randomUUID().toString().replace("-", "")}")
+        val comicKey = ComicKey(sourceId, RemoteComicId("slow"))
+        val chapter = ChapterRef.Remote(ChapterKey(comicKey, RemoteChapterId("ch1")))
+        val script = File(activity.cacheDir, "${sourceId.value}.js")
+
+        try {
+            InstrumentationRegistry.getInstrumentation().context.assets.open("download_control_source.js").use { input ->
+                val fixture = input.bufferedReader().readText()
+                script.writeText(fixture.replace(
+                    "this.key = \"download_control_source\";",
+                    "this.key = \"${sourceId.value}\";",
+                ))
+            }
+            assertTrue(runBlocking {
+                withTimeout(20_000) { graph.sourceRepository.install(script.absolutePath) }
+            } is InstallOutcome.Success)
+
+            click("Explore")
+            waitFor("D02 Slow Comic")
+            selectFixtureSourceIfOffered()
+            click("D02 Slow Comic")
+            waitFor("D02 Slow Chapter")
+            click("Add to shelf")
+            click("Download")
+            waitFor("Chapter queued for download.")
+            waitForTask(repository, chapter, 20_000) { it.pageCount == 3 }
+
+            click("Back")
+            click("Back")
+            click("Library")
+            click("Downloads")
+            waitForTask(repository, chapter, 120_000) { it.state == DownloadChapterState.Completed }
+            assertTrue(runBlocking { repository.isCompleteOffline(chapter) })
+
+            click("Favorites")
+            click("D02 Slow Comic")
+            waitFor("D02 Slow Chapter")
+            Log.i(TAG, "D04_AIRPLANE_READY chapter=$chapter")
+            composeRule.waitUntil(timeoutMillis = 120_000) {
+                Settings.Global.getInt(activity.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
+            }
+
+            click("Read")
+            waitForReaderPage(1)
+            composeRule.onAllNodesWithContentDescription("Page 1")[0].performTouchInput { swipeUp() }
+            waitFor("2 / 3")
+            waitForReaderPage(2)
+            click("Back")
+            runBlocking { graph.progressTracker.get()?.flush() }
+
+            click("Read")
+            waitFor("2 / 3")
+            waitForReaderPage(2)
+            composeRule.onAllNodesWithContentDescription("Page 2")[0].performTouchInput { swipeUp() }
+            waitFor("3 / 3")
+            waitForReaderPage(3)
+            Log.i(TAG, "D04_OFFLINE_REOPEN_PASS chapter=$chapter")
+        } finally {
+            runBlocking {
+                withTimeout(20_000) {
+                    repository.cancel(chapter)
+                    graph.collection.filterNotNull().first().remove(dev.veneranative.core.model.ComicRef.Remote(comicKey))
+                    graph.history.filterNotNull().first().remove(comicKey)
+                    graph.sourceRepository.uninstall(sourceId)
+                }
+            }
+            script.delete()
         }
     }
 
@@ -283,6 +363,14 @@ class Stage2DownloadControlTest {
         composeRule.waitUntil(timeoutMillis = 20_000) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    private fun waitForReaderPage(number: Int) {
+        val label = "Page $number"
+        composeRule.waitUntil(timeoutMillis = 20_000) {
+            composeRule.onAllNodesWithContentDescription(label).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onAllNodesWithContentDescription(label)[0].assertIsDisplayed()
     }
 
     private fun waitForTask(
