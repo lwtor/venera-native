@@ -498,7 +498,8 @@ S2-07 当前切片与验收：
 - **S2-07D3 — 离线阅读短尾页与立即重开进度：DONE。** API 34 模拟器关闭 fixture 服务并开飞行模式后，3/3 页能从下载文件显示；修复重开时连续模式首帧把末页写回前一页，以及节流期间读取旧数据库页码。历史 JVM、Reader 设备回归与 Debug 编译通过；同设备手动重开维持 3/3 且反向滚动仍更新页码。
 - **S2-07D4 — D01 来源导航设备回归：DONE（D01 真机复验待执行）。** App AndroidTest 复用仓库 demo 来源，在真实 App 图中覆盖探索、搜索、书架三条详情/阅读器/返回路径，断言第一页图片加载，清理新增测试数据。API 34 模拟器 1/1 通过，Debug 构建通过；小米真机未被 ADB 枚举，D01 不据此标为完整通过。
 - **S2-07D5 — D01 真机测试停滞定位：DONE（D01 真机复验待执行）。** 2026-10-01 小米真机上 D01 单项 instrumentation 启动，但约 4 分钟没有页面结果，测试前台返回系统桌面；主动中断后 UTP 标记 driver canceled。测试现记录阶段日志，且对来源仓库初始化、安装和清理使用 20 秒上限，下一轮可区分初始化停滞与页面等待。`:app:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；尚未取得真机通过证据。
-- **S2-07D — 真机用户闭环：IN_PROGRESS。** 用户已确认，Xiaomi 25128PNA1C / API 36 上数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 复验通过。API 34 模拟器受控失败重试、移除与离线阅读已取得部分页面证据；D01 的探索、搜索、书架三条详情→阅读器→逐级返回路径已在模拟器手动及自动化复验通过。2026-10-01 真机 D01 试跑停滞后主动中断，已增加测试诊断，但 D01 尚未完整通过；依用户要求逐项处理，先完成 D01 再进入 D02。继续按 `docs/reviews/stage-02-device-checklist.md` 执行后续进程恢复、长章节/长图和低 API 验收。每项记录真实结果，不能以模块 instrumentation 替代人工/页面闭环。
+- **S2-07D6 — 小米后台 Activity 启动限制诊断：DONE（D01 真机复验待执行）。** 第二轮真机日志证实 MIUI 拒绝 instrumentation 从后台启动 `MainActivity`，结果码 102；测试方法虽已开始，但尚未进入第一条测试语句。一次显式 shell 启动缺少 MAIN/LAUNCHER 标识，被 `ActivityScenario` 忽略；设备另拒绝 shell `input keyevent` 的 `INJECT_EVENTS`。下一轮使用与测试启动 Intent 一致的 shell 前台启动方式复验；本诊断为纯文档结论，`git diff --check` 通过，D01 未通过。
+- **S2-07D — 真机用户闭环：IN_PROGRESS。** 用户已确认，Xiaomi 25128PNA1C / API 36 上数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 复验通过。API 34 模拟器受控失败重试、移除与离线阅读已取得部分页面证据；D01 的探索、搜索、书架三条详情→阅读器→逐级返回路径已在模拟器手动及自动化复验通过。2026-10-01 两次真机 D01 试跑因小米系统拦截测试 Activity 后台启动而主动中断，未取得页面结果；依用户要求逐项处理，先完成 D01 再进入 D02。继续按 `docs/reviews/stage-02-device-checklist.md` 执行后续进程恢复、长章节/长图和低 API 验收。每项记录真实结果，不能以模块 instrumentation 替代人工/页面闭环。
 
 ## 7. Stage 3：来源扩展能力
 
