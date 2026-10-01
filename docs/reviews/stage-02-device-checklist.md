@@ -2,6 +2,8 @@
 
 状态：**执行中**。用户已于 2026-09-25 确认。设备 Xiaomi 25128PNA1C，Android 16 / API 36；每次执行以当时的 Git HEAD 为基线。执行时记录构建 commit、测试数据、时间、结果和日志/截图路径；失败项建立独立修复任务。
 
+用户 2026-10-01 补充真机约定：App 安装后保留，不要在每次测试后卸载或清除数据。上一轮 `:app:connectedDebugAndroidTest` 结束后，`pm path dev.veneranative` 与 `pm path dev.veneranative.test` 均为空；后续在该真机上不再运行 Gradle connected test。先构建 `:app:assembleDebug :app:packageDebugAndroidTest`，查询两个包是否已安装，仅需更新时用 `adb install -r` 覆盖 APK，再用 `adb shell am instrument -w -r -e class <测试类> dev.veneranative.test/androidx.test.runner.AndroidJUnitRunner` 执行。保留安装和应用数据；若测试用例会写入 fixture 数据，仍由用例自行清理测试数据。真机上的 MIUI 会阻断 instrumentation 后台拉起 Activity，必要时在测试 started 后使用与 `ActivityScenario` 一致的 MAIN/LAUNCHER Intent 从 shell 拉起。每次记录直接 instrumentation 的实际输出；不能沿用此前 UTP 结果文件作为新运行证据。
+
 | ID | 步骤 | 预期 |
 | --- | --- | --- |
 | D01 | 使用仓库内 fixture 来源打开探索/搜索/书架中的漫画详情，再打开阅读器并逐级返回 | 阅读器返回详情；详情返回原入口列表；系统返回键与页面返回按钮行为一致，页面状态不出现空白或崩溃 |
