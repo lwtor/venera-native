@@ -1,5 +1,6 @@
 package dev.veneranative.app
 
+import android.util.Log
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -23,6 +24,7 @@ import java.util.UUID
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -33,11 +35,15 @@ class Stage2FixtureNavigationTest {
 
     @Test
     fun exploreSearchAndShelfReturnToTheirOwnOrigins() {
+        Log.i(TAG, "Activity rule completed; obtaining app graph")
         val activity = composeRule.activity
         val graph = ViewModelProvider(activity)[AppGraph::class.java]
         val sourceId = SourceId("stage2_d01_${UUID.randomUUID().toString().replace("-", "")}")
         val comicRef = ComicRef.Remote(ComicKey(sourceId, RemoteComicId("c1")))
-        val collection = runBlocking { graph.collection.filterNotNull().first() }
+        Log.i(TAG, "Waiting for collection repository")
+        val collection = runBlocking {
+            withTimeout(20_000) { graph.collection.filterNotNull().first() }
+        }
         val script = File(activity.cacheDir, "stage2_d01_source.js")
         InstrumentationRegistry.getInstrumentation().context.assets.open("demo_comic_source.js").use { input ->
             val fixture = input.bufferedReader().readText()
@@ -50,8 +56,12 @@ class Stage2FixtureNavigationTest {
         }
 
         try {
-            assertTrue(runBlocking { graph.sourceRepository.install(script.absolutePath) } is InstallOutcome.Success)
+            Log.i(TAG, "Installing fixture source")
+            assertTrue(runBlocking {
+                withTimeout(20_000) { graph.sourceRepository.install(script.absolutePath) }
+            } is InstallOutcome.Success)
 
+            Log.i(TAG, "Checking Explore path")
             click("Explore")
             waitFor("Demo Comic c1")
             // With several installed sources, the fixture appears as a source chip.
@@ -68,6 +78,7 @@ class Stage2FixtureNavigationTest {
             systemBack()
             waitFor("Android-native foundation is ready")
 
+            Log.i(TAG, "Checking Search path")
             click("Search")
             waitFor("Keyword")
             selectFixtureSourceIfOffered()
@@ -85,6 +96,7 @@ class Stage2FixtureNavigationTest {
             systemBack()
             waitFor("Android-native foundation is ready")
 
+            Log.i(TAG, "Checking Library path")
             click("Library")
             click("Favorites")
             click("Demo Comic c1")
@@ -99,15 +111,21 @@ class Stage2FixtureNavigationTest {
             systemBack()
             waitFor("Android-native foundation is ready")
         } finally {
-            runBlocking {
-                graph.progressTracker.get()?.flush()
-                val history = graph.history.filterNotNull().first()
-                history.remove(comicRef.key)
-                history.remove(ComicKey(sourceId, RemoteComicId("search-1")))
-                collection.remove(comicRef)
-                graph.sourceRepository.uninstall(sourceId)
+            Log.i(TAG, "Cleaning fixture data")
+            try {
+                runBlocking {
+                    withTimeout(20_000) {
+                        graph.progressTracker.get()?.flush()
+                        val history = graph.history.filterNotNull().first()
+                        history.remove(comicRef.key)
+                        history.remove(ComicKey(sourceId, RemoteComicId("search-1")))
+                        collection.remove(comicRef)
+                        graph.sourceRepository.uninstall(sourceId)
+                    }
+                }
+            } finally {
+                script.delete()
             }
-            script.delete()
         }
     }
 
@@ -141,5 +159,9 @@ class Stage2FixtureNavigationTest {
 
     private fun systemBack() {
         composeRule.runOnUiThread { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+    }
+
+    private companion object {
+        const val TAG = "Stage2FixtureNavigation"
     }
 }
