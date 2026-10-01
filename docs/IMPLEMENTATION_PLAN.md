@@ -505,6 +505,7 @@ S2-07 当前切片与验收：
 - **S2-07D10 — D02 慢速下载页面测试：DONE（设备执行待验收）。** App AndroidTest 编译通过，覆盖独立测试源的详情入队、书架 Downloads 暂停/继续、完成离线检查、移除后的数据库与文件清理，以及通知启用时的活动通知。章节显示名唯一化以定位测试任务；`:app:compileDebugAndroidTestKotlin :app:assembleDebug` 通过。下一切片补失败重试测试，之后执行 D02 真机闭环；当前未声明 D02 通过。
 - **S2-07D11 — D02 失败重试页面测试：DONE（设备执行待验收）。** App AndroidTest 覆盖 fixture 失败后的 Partial/2 of 3 与页级 Failed 状态，再经书架 Retry 触发 Worker 并验收 Completed、3/3 与离线完整性。失败请求按每次测试来源 ID 独立计数，保证测试可重复。`:app:compileDebugAndroidTestKotlin :app:assembleDebug`、Node 检查、Python AST 解析和 `git diff --check` 均通过。尚未设备执行，D02 不据此标为通过。
 - **S2-07D12 — D02 测试按钮定位修正：DONE（真机复验待执行）。** 首次小米两项用例选择到 Downloads tab 节点，失败重试场景已验证初始 2/3 Partial 和页级 Failed，但未点击 Retry；测试 helper 改为按章节标题和按钮垂直位置定位操作。`:app:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；修正版尚待小米真机复跑，不据此标记 D02 通过。
+- **S2-07D13 — D02 暂停用例等待窗口修正：DONE（真机复验待执行）。** 首轮修正版真机复跑中，失败重试用例通过；暂停用例的 8 秒慢页在回到 Downloads 并点击 Pause 前完成，未能稳定覆盖“运行页完成后队列页保持暂停”。fixture 延时增至 35 秒，Paused 等待延至 60 秒，单独复跑慢速用例以减少前台占用。AndroidTest 编译及 D02 真机结果待记录；D02 仍未完成。
 - **S2-07D — 真机用户闭环：IN_PROGRESS。** 用户已确认，Xiaomi 25128PNA1C / API 36 上数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 复验通过。API 34 模拟器受控失败重试、移除与离线阅读已取得部分页面证据；D01 探索、搜索、书架三条详情→阅读器→逐级返回路径已在模拟器和 2026-10-01 真机 1/1 通过。依用户要求逐项处理，当前唯一下一检查项 D02：三页下载的通知、暂停、继续、失败重试及移除；完成后再进入 D03。后续继续按 `docs/reviews/stage-02-device-checklist.md` 执行进程恢复、长章节/长图和低 API 验收。每项记录真实结果，不能以模块 instrumentation 替代人工/页面闭环。
 
 ## 7. Stage 3：来源扩展能力

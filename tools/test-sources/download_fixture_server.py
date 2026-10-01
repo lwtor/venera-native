@@ -1,7 +1,8 @@
 """Loopback-only image server for D02 download state checks.
 
-Generate the repository test images first. /slow/ waits eight seconds before returning an
-image; /retry/ returns 503 for its first three GETs, then serves the image on the next GET.
+Generate the repository test images first. /slow/ waits 35 seconds before returning an
+image, leaving time to pause queued pages while in-flight requests finish; /retry/ returns
+503 for its first three GETs, then serves the image on the next GET.
 The failure counter resets when this process restarts.
 """
 
@@ -33,7 +34,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if mode == "slow":
-            sleep(8)
+            sleep(35)
         elif mode == "retry":
             run_id = parse_qs(urlsplit(self.path).query).get("run", ["default"])[0]
             with retry_lock:

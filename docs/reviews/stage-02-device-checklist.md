@@ -49,3 +49,5 @@
 2026-10-01 D02 失败重试测试准备完成：`failedChapterCanRetryFromDownloads` 以每次唯一测试来源 ID 隔离 `/retry/` 失败计数，断言初始 2/3 Partial 与页级失败，再从 Downloads 点击 Retry 并断言 3/3 Completed 和离线完整性。AndroidTest 编译与 Debug 构建通过；尚无设备执行结果，不计作 D02 通过。
 
 2026-10-01 小米 D02 首次设备试跑，基线 `f0b3c08`：直接 instrumentation 启动两项用例，按已验证的 MAIN/LAUNCHER Intent 将 App 拉到前台。失败重试用例实际下载两页并得到 2/3 Partial、一个 Failed 页（三次 503），随后两项用例均在 `taskAction` 选错 Compose 节点处失败：选中了 Downloads tab 而非 Retry/Pause 按钮。没有触发重试、暂停或移除，因此不能据此判断这些产品操作失败。测试 helper 已修正为按唯一章节标题邻近的按钮垂直坐标定位，AndroidTest 编译和 Debug 构建通过；修正版小米复跑待执行。测试 App 与 APK 保留安装，fixture 服务和 ADB reverse 已停止/清理。
+
+2026-10-01 小米 D02 修正版设备试跑，基线 `c14eac0`：分项执行中 `failedChapterCanRetryFromDownloads` 通过（本地服务器记录第三页前三次 HTTP 503，用户触发 Retry 后 HTTP 200，任务达到 3/3 Completed）；`slowChapterCanPauseResumeAndRemove` 未通过，等待 `Paused` 超时。三张慢页均已返回 HTTP 200，说明 8 秒夹具在到达稳定暂停状态前结束，不能判为产品 Pause 缺陷；也没有据此声称暂停/继续/移除闭环已通过。测试 helper 和 App 留装，服务与 ADB reverse 已清理。S2-07D13 将每页延迟提高到 35 秒、Paused 等待上限提高到 60 秒，并单独复跑慢速用例。

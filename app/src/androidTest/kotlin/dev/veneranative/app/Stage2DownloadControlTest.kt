@@ -90,7 +90,7 @@ class Stage2DownloadControlTest {
 
             Log.i(TAG, "Pausing slow chapter")
             taskAction("D02 Slow Chapter", "Pause")
-            val paused = waitForTask(repository, chapter, 20_000) { it.state == DownloadChapterState.Paused }
+            val paused = waitForTask(repository, chapter, 60_000) { it.state == DownloadChapterState.Paused }
             assertTrue(paused.completedPages < 3)
             assertEquals(3, runBlocking { repository.pagesOf(chapter) }.size)
 
