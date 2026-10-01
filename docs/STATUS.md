@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-01 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01 真机 1/1 通过，当前唯一下一检查项 D02；D03–D07 未开始本轮逐项验收 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01、D02 真机均已通过，当前唯一下一检查项 D03；D04–D07 未开始本轮逐项验收 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -175,9 +175,10 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D11 D02 失败重试页面测试 — DONE（设备执行待 D02 验收）。** App AndroidTest 覆盖三页下载由 fixture 制造一页失败、检查 `Partial` / 2/3 与页级 Failed 状态，再从书架点击 Retry 并验收 Completed / 3/3 及离线完整性；测试源按唯一来源 ID 隔离失败计数，重复运行可复现。验证：`:app:compileDebugAndroidTestKotlin :app:assembleDebug`、`node --check tools/test-sources/download_control_source.js`、Python AST 解析和 `git diff --check` — PASS。页面测试尚未在设备执行；D02 仍未通过。
 - **S2-07D12 D02 测试按钮定位修正 — DONE（真机复验待执行）。** 首次小米 D02 AndroidTest 的两项用例都定位到 Downloads tab 而不是任务行按钮；失败重试用例已到达并断言 2/3 Partial 与 Failed 页，未触发 Retry。测试 helper 现按唯一章节标题与可点击按钮的垂直位置匹配 Pause/Resume/Retry/Remove。验证：`:app:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS。该测试修正尚未在真机复跑，D02 仍未通过。
 - **S2-07D13 D02 暂停用例等待窗口修正 — DONE（真机复验待执行）。** 小米修正版试跑的失败重试用例通过；慢速用例中 8 秒页面在暂停动作稳定生效前已完成，未观察到 Paused。将慢速 fixture 改为每页 35 秒，并将 Paused 状态等待上限改为 60 秒；AndroidTest 编译与单独慢速用例复验待本轮执行。D02 尚未通过。
-- **S2-07D14 下载队列等待页面可暂停 — DONE（真机复验待执行）。** 小米真机再次复现暂停超时。根因是 Worker 抢先将整批页面标为 Running，而每来源实际只有两个并发槽位；排队等待中的第三页因此也不能被暂停。现在在页面拿到槽位后才原子认领，已暂停页不会发出下载请求。新增真实 Room/WorkManager 回归覆盖两页阻塞时暂停第三页、放行已开始页、恢复并完成剩余页。Worker/App AndroidTest 编译、两个 AndroidTest APK 打包、Debug 构建和 `git diff --check` 通过；D02 真机复验仍待执行，Stage 2 状态不变。
-- **S2-07D15 D02 fixture 读取超时兼容 — IN_PROGRESS。** 小米真机本轮已通过暂停状态并触发 Resume，新 WorkManager 已排入；恢复后未在 120 秒内完成。服务日志显示页面请求重复，fixture 的 35 秒延迟超过 `AppHttpClientFactory` 默认 30 秒读取超时，下载器重试造成闭环无法结束。fixture 已改为 20 秒；待重新打包并复跑 D02 后记录结果。D02 仍未完成。
-- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 再次通过。API 34 模拟器完成三页下载、离线翻页与重开进度、受控失败重试及删除文件/数据库清理。D01 探索、搜索、书架三条入口的详情/阅读器/逐级返回路径已在模拟器和 2026-10-01 真机 1/1 复验通过。按用户要求逐项处理，当前唯一下一检查项是 D02：三页下载的通知、暂停、继续、失败重试及移除闭环。损坏文件、进程恢复、SAF、长章节、API 26 等属于 D03–D07，尚待后续逐项验收。具体证据见 `docs/reviews/stage-02-device-checklist.md`。
+- **S2-07D14 下载队列等待页面可暂停 — DONE（真机复验通过）。** 小米真机再次复现暂停超时。根因是 Worker 抢先将整批页面标为 Running，而每来源实际只有两个并发槽位；排队等待中的第三页因此也不能被暂停。现在在页面拿到槽位后才原子认领，已暂停页不会发出下载请求。新增真实 Room/WorkManager 回归覆盖两页阻塞时暂停第三页、放行已开始页、恢复并完成剩余页。Worker/App AndroidTest 编译、两个 AndroidTest APK 打包、Debug 构建和 `git diff --check` 通过；D02 真机复验仍待执行，Stage 2 状态不变。
+- **S2-07D15 D02 fixture 读取超时兼容 — DONE。** 小米真机本轮已通过暂停状态并触发 Resume，新 WorkManager 已排入；恢复后未在 120 秒内完成。服务日志显示页面请求重复，fixture 的 35 秒延迟超过 `AppHttpClientFactory` 默认 30 秒读取超时，下载器重试造成闭环无法结束。fixture 已改为 20 秒；20 秒 fixture 下 D02 真机闭环通过，详见 S2-07D16。
+- **S2-07D16 D02 小米真机闭环 — DONE。** Xiaomi 25128PNA1C / API 36，App 与 AndroidTest 以 `adb install -r` 覆盖安装并保留用户数据；POST_NOTIFICATIONS 已由用户开启。暂停/继续用例 1/1 通过（57.53 秒）：活动通知可见，三页 Downloads 暂停后恢复到 3/3 Completed，离线完整性通过，Remove 后 Room 任务行和章节目录消失。失败重试用例 1/1 通过（16.291 秒）：2/3 Partial 与 Failed 页经 Retry 达到 3/3 Completed 并验证离线完整性。fixture 正常三页 HTTP 200，失败页三次 503 后重试 HTTP 200。App 和数据保留；fixture 服务及 ADB reverse 已清理。
+- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 再次通过。API 34 模拟器完成三页下载、离线翻页与重开进度、受控失败重试及删除文件/数据库清理。D01 探索、搜索、书架三条入口的详情/阅读器/逐级返回路径已在模拟器和 2026-10-01 真机 1/1 复验通过。D01 导航和 D02 三页下载闭环均已在小米真机通过；当前唯一下一检查项为 D03。损坏文件、进程恢复、SAF、长章节、API 26 等属于 D03–D07，尚待后续逐项验收。具体证据见 `docs/reviews/stage-02-device-checklist.md`。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
