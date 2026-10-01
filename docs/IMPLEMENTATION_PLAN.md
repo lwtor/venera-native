@@ -515,7 +515,7 @@ S2-07 当前切片与验收：
 - **S2-07D20 — 并发取消迟到页面清理：DONE。** 小米 Xiaomi 25128PNA1C / API 36 的 `DownloadWorkerTest` 发现并复现取消章节后在途页面仍会落成孤儿文件。Worker 现在检查成功页能否写入现存 Room 记录；取消已删记录时清理迟到页面文件。`:data:download:assembleDebugAndroidTest :app:assembleDebug` 构建通过，直接真机执行 11/11、0 失败/跳过，取消竞态测试通过。D03 全部验收项满足，Stage 2 继续由 D04 开始。
 - **S2-07D21 — 截断下载页检测与恢复：DONE。** 小米 25128PNA1C / API 36 新增 Room/WorkManager instrumentation：成功页文件被截断后，`isCompleteOffline` 返回 false，`recover` 将页重新排队，Worker 重新下载后恢复离线完整性。`:data:download:assembleDebugAndroidTest :app:assembleDebug` 构建成功，直接真机运行 `DownloadWorkerTest` 12/12、0 失败/跳过。D04 的 Reader 飞行模式与退出重开进度闭环仍待执行。
 - **S2-07D22 D04 飞行模式离线阅读与进度恢复 — DONE。** Xiaomi 25128PNA1C / API 36。新增 App AndroidTest 完成三页下载、加入书架、导航回章节；等待主机切飞行模式并停止 fixture 后，Reader 显示已下载页面、由第 1 页翻至第 2 页；退出后重开恢复第 2 页，再离线翻到第 3 页。fixture 与 ADB reverse 清理，飞行模式恢复关闭，测试来源/收藏/历史/下载均由测试清理。构建 `:app:assembleDebugAndroidTest :app:assembleDebug` 通过；小米直接 instrumentation 1/1、0 失败/跳过。与 D21 截断页检测结合，D04 全部验收项通过。
-- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 复验通过。D01–D04 真机闭环通过；当前唯一下一检查项为 D05，随后依次验收 D06–D07。Stage 2 保持 IN_PROGRESS，不以模块 instrumentation 代替页面闭环。
+- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 复验通过。D01–D04 真机闭环通过。D05 的真实 SAF 目录导入已验证自然章节排序；ZIP 选择因 MIUI FileExplorer 阻止 instrumentation 输入注入而待验，D05 仍为当前唯一下一检查项，随后依次验收 D06–D07。Stage 2 保持 IN_PROGRESS，不以模块 instrumentation 代替页面闭环。
 
 ## 7. Stage 3：来源扩展能力
 
