@@ -19,13 +19,19 @@ import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
 import dev.veneranative.data.download.DownloadEnvironment
+import dev.veneranative.data.download.DownloadPageState
 import dev.veneranative.data.download.PageByteSource
 import dev.veneranative.data.download.PageFetchRequest
 import dev.veneranative.data.download.taskId
 import java.io.File
 import java.io.OutputStream
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -131,6 +137,44 @@ class DownloadWorkerTest {
     }
 
     @Test
+    fun pausingAQueuedBatchLeavesPagesWaitingForAConcurrencySlotPaused() = runBlocking {
+        val gatedSource = GatedPageSource()
+        DownloadEnvironment.install(
+            DownloadEnvironment(filesRoot = root, pageSource = gatedSource, database = { database }),
+        )
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = (0..2).map { SourcePage(index = it, imageRef = "https://example.test/$it.png") },
+        )
+
+        val worker = TestListenableWorkerBuilder<DownloadWorker>(context).build()
+        val run = async { worker.doWork() }
+        try {
+            withTimeout(10_000) {
+                gatedSource.started.receive()
+                gatedSource.started.receive()
+            }
+            repository.pause(chapter())
+            val pausedPages = repository.pagesOf(chapter())
+            assertEquals(2, pausedPages.count { it.state == DownloadPageState.Running })
+            assertEquals(1, pausedPages.count { it.state == DownloadPageState.Paused })
+
+            gatedSource.release.complete(Unit)
+            assertTrue(run.await() is ListenableWorker.Result.Success)
+            assertEquals(DownloadPageState.Paused, repository.pagesOf(chapter()).single { it.index == 2 }.state)
+
+            repository.resume(chapter())
+            val resumed = TestListenableWorkerBuilder<DownloadWorker>(context).build().doWork()
+            assertTrue(resumed is ListenableWorker.Result.Success)
+            assertTrue(repository.pagesOf(chapter()).all { it.state == DownloadPageState.Succeeded })
+        } finally {
+            gatedSource.release.complete(Unit)
+        }
+    }
+
+    @Test
     fun anUnexpectedPageExceptionIsRecordedAsFailed() = runBlocking {
         DownloadEnvironment.install(
             DownloadEnvironment(
@@ -195,5 +239,17 @@ class DownloadWorkerTest {
             0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
             0, 0, 0, 8, 0, 0, 0, 12,
         )
+    }
+
+    private class GatedPageSource : PageByteSource {
+        val started = Channel<Unit>(capacity = 2)
+        val release = CompletableDeferred<Unit>()
+        private val delegate = StubPageSource()
+
+        override suspend fun fetch(request: PageFetchRequest, sink: OutputStream): Long {
+            started.send(Unit)
+            release.await()
+            return delegate.fetch(request, sink)
+        }
     }
 }

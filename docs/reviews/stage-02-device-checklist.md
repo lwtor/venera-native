@@ -51,3 +51,5 @@
 2026-10-01 小米 D02 首次设备试跑，基线 `f0b3c08`：直接 instrumentation 启动两项用例，按已验证的 MAIN/LAUNCHER Intent 将 App 拉到前台。失败重试用例实际下载两页并得到 2/3 Partial、一个 Failed 页（三次 503），随后两项用例均在 `taskAction` 选错 Compose 节点处失败：选中了 Downloads tab 而非 Retry/Pause 按钮。没有触发重试、暂停或移除，因此不能据此判断这些产品操作失败。测试 helper 已修正为按唯一章节标题邻近的按钮垂直坐标定位，AndroidTest 编译和 Debug 构建通过；修正版小米复跑待执行。测试 App 与 APK 保留安装，fixture 服务和 ADB reverse 已停止/清理。
 
 2026-10-01 小米 D02 修正版设备试跑，基线 `c14eac0`：分项执行中 `failedChapterCanRetryFromDownloads` 通过（本地服务器记录第三页前三次 HTTP 503，用户触发 Retry 后 HTTP 200，任务达到 3/3 Completed）；`slowChapterCanPauseResumeAndRemove` 未通过，等待 `Paused` 超时。三张慢页均已返回 HTTP 200，说明 8 秒夹具在到达稳定暂停状态前结束，不能判为产品 Pause 缺陷；也没有据此声称暂停/继续/移除闭环已通过。测试 helper 和 App 留装，服务与 ADB reverse 已清理。S2-07D13 将每页延迟提高到 35 秒、Paused 等待上限提高到 60 秒，并单独复跑慢速用例。
+
+2026-10-01 小米 D02 慢速流程第二次修正版复验，基线 `37a28f2`：将 fixture 延时改为 35 秒并将等待上限改为 60 秒后，仍在等待章节 `Paused` 状态时超时。服务记录页面按两个并发槽位连续下载；检查 Worker 后确认其先把整批页面标为 Running，再交给限流队列，导致尚未拿到槽位的第三页不可暂停。没有把失败归因于设备网络或 UI 点击。S2-07D14 已将原子 `markRunning` 移入并发槽位内，并新增真实 Room/WorkManager 阻塞回归；修复后的设备复验待执行。测试 App 和应用数据保留，ADB reverse 和本地服务已清理。

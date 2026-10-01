@@ -65,13 +65,13 @@ class DownloadWorker(
 
             // Claiming is what turns "this page is waiting" into "this worker is doing it"; a page
             // that cannot be claimed was paused or cancelled underneath us and must not be fetched.
-            val claimed = pages.filter { repository.markRunning(it.chapter, it.index) }
-            if (claimed.isEmpty()) break
-
-            val byKey = claimed.associateBy { page -> keyOf(page) }
+            val byKey = pages.associateBy { page -> keyOf(page) }
             try {
-                val results = queue.run(claimed.map { page -> page.toQueuePage() }) { target ->
+                val results = queue.run(pages.map { page -> page.toQueuePage() }) { target ->
                     val page = byKey[keyOf(target)] ?: return@run null
+                    // Claim at the moment a concurrency slot opens. Claiming the whole batch before
+                    // queueing it makes waiting pages look Running, so Pause cannot stop them.
+                    if (!repository.markRunning(page.chapter, page.index)) return@run null
                     fetchPage(repository, downloader, page)
                 }
                 // fetchPage records expected failures itself. The queue also converts unexpected
@@ -85,7 +85,7 @@ class DownloadWorker(
                 // An explicit stop is an interruption, not a failed download. Restore every page
                 // claimed by this batch but not already completed while cancellation is suppressed.
                 if (isStopped) withContext(NonCancellable) {
-                    claimed.forEach { page -> repository.markPaused(page.chapter, page.index) }
+                    pages.forEach { page -> repository.markPaused(page.chapter, page.index) }
                 }
             }
 
