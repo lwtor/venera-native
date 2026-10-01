@@ -275,6 +275,28 @@ class DownloadWorkerTest {
     }
 
     @Test
+    fun aTruncatedSucceededPageIsDetectedAndRedownloaded() = runBlocking {
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = listOf(SourcePage(index = 0, imageRef = "https://example.test/0.png")),
+        )
+        assertTrue(TestListenableWorkerBuilder<DownloadWorker>(context).build().doWork() is ListenableWorker.Result.Success)
+        val page = repository.pagesOf(chapter()).single()
+        val file = DownloadEnvironment.get(context).layout().absoluteOf(page.relativePath!!)
+        file.writeBytes(byteArrayOf(0x00))
+
+        assertTrue("a truncated file must not count as complete offline", !repository.isCompleteOffline(chapter()))
+        val report = repository.recover("replacement-worker")
+        assertEquals(1, report.repairedFiles)
+        assertEquals(DownloadPageState.Queued, repository.pagesOf(chapter()).single().state)
+
+        assertTrue(TestListenableWorkerBuilder<DownloadWorker>(context).build().doWork() is ListenableWorker.Result.Success)
+        assertTrue(repository.isCompleteOffline(chapter()))
+    }
+
+    @Test
     fun cancelingAChapterWhilePagesAreInFlightLeavesNoFiles() = runBlocking {
         val gatedSource = GatedPageSource()
         DownloadEnvironment.install(
