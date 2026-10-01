@@ -274,6 +274,37 @@ class DownloadWorkerTest {
         assertEquals(DownloadPageState.Queued, repository.pagesOf(chapter()).single().state)
     }
 
+    @Test
+    fun cancelingAChapterWhilePagesAreInFlightLeavesNoFiles() = runBlocking {
+        val gatedSource = GatedPageSource()
+        DownloadEnvironment.install(
+            DownloadEnvironment(filesRoot = root, pageSource = gatedSource, database = { database }),
+        )
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = (0..2).map { SourcePage(index = it, imageRef = "https://example.test/$it.png") },
+        )
+
+        val worker = TestListenableWorkerBuilder<DownloadWorker>(context).build()
+        val run = async { worker.doWork() }
+        try {
+            withTimeout(10_000) {
+                gatedSource.started.receive()
+                gatedSource.started.receive()
+            }
+            repository.cancel(chapter())
+            gatedSource.release.complete(Unit)
+
+            assertTrue(run.await() is ListenableWorker.Result.Success)
+            assertTrue(repository.pagesOf(chapter()).isEmpty())
+            assertTrue("cancelled in-flight requests must not leave orphan files", DownloadEnvironment.get(context).layout().pageFiles().isEmpty())
+        } finally {
+            gatedSource.release.complete(Unit)
+        }
+    }
+
     private fun chapter(): ChapterRef = ChapterRef.Remote(
         ChapterKey(
             comicKey = ComicKey(SourceId("demo"), RemoteComicId("comic-1")),

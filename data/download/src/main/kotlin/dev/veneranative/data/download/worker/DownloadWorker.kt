@@ -72,7 +72,7 @@ class DownloadWorker(
                     // Claim at the moment a concurrency slot opens. Claiming the whole batch before
                     // queueing it makes waiting pages look Running, so Pause cannot stop them.
                     if (!repository.markRunning(page.chapter, page.index)) return@run null
-                    fetchPage(repository, downloader, page)
+                    fetchPage(environment, repository, downloader, page)
                 }
                 // fetchPage records expected failures itself. The queue also converts unexpected
                 // exceptions into errors; those leave the page Running unless settled here.
@@ -109,6 +109,7 @@ class DownloadWorker(
      * offer a retry, which is more useful than a row that pretends nothing happened.
      */
     private suspend fun fetchPage(
+        environment: DownloadEnvironment,
         repository: DownloadRepository,
         downloader: PageDownloader,
         page: DownloadPage,
@@ -125,7 +126,16 @@ class DownloadWorker(
         while (true) {
             when (val result = downloader.download(target)) {
                 is PageDownloadResult.Succeeded -> {
-                    repository.markSucceeded(page.chapter, page.index, result.relativePath, result.bytes)
+                    val recorded = repository.markSucceeded(
+                        page.chapter,
+                        page.index,
+                        result.relativePath,
+                        result.bytes,
+                    )
+                    // The user can remove a chapter while its request is in flight. Cancellation
+                    // deletes the directory and Room row first; a late atomic rename must not leave
+                    // an orphan page behind after that removal.
+                    if (!recorded) environment.layout().absoluteOf(result.relativePath).delete()
                     return null
                 }
 
