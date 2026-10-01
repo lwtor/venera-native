@@ -45,3 +45,5 @@
 2026-10-01 D02 测试数据准备：新增 `tools/test-sources/download_control_source.js` 和 `download_fixture_server.py`。Slow comic 的三页各延迟 8 秒，以留出暂停窗口；Retry comic 的第三页先返回三次 503，再返回图片，供手动 Retry 验证。Node/Python 语法检查通过；本地 HTTP 实测四次状态为 503/503/503/200，慢速页为 200、8.00 秒。尚未运行 App 页面或真机 D02，不得据此标为完成。
 
 2026-10-01 D02 慢速流程测试准备：`Stage2DownloadControlTest.slowChapterCanPauseResumeAndRemove` 已加入 App AndroidTest 并通过测试源码编译与 Debug 构建。此时仅有测试实现，没有设备执行结果；失败重试尚待下一切片，D02 保持未完成。
+
+2026-10-01 D02 失败重试测试准备完成：`failedChapterCanRetryFromDownloads` 以每次唯一测试来源 ID 隔离 `/retry/` 失败计数，断言初始 2/3 Partial 与页级失败，再从 Downloads 点击 Retry 并断言 3/3 Completed 和离线完整性。AndroidTest 编译与 Debug 构建通过；尚无设备执行结果，不计作 D02 通过。

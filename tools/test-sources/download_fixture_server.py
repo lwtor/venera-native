@@ -11,7 +11,7 @@ from mimetypes import guess_type
 from pathlib import Path
 from threading import Lock
 from time import sleep
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 
 IMAGE_ROOT = Path(__file__).resolve().parents[1] / "test-images" / "out"
@@ -35,9 +35,11 @@ class Handler(BaseHTTPRequestHandler):
         if mode == "slow":
             sleep(8)
         elif mode == "retry":
+            run_id = parse_qs(urlsplit(self.path).query).get("run", ["default"])[0]
             with retry_lock:
-                retry_counts[name] += 1
-                attempt = retry_counts[name]
+                retry_key = (run_id, name)
+                retry_counts[retry_key] += 1
+                attempt = retry_counts[retry_key]
             if attempt <= 3:
                 self.send_error(503, "Fixture-controlled failure")
                 return

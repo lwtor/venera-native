@@ -34,7 +34,7 @@ class DownloadControlSource extends ComicSource {
       ] : [
         this.url + "/page_normal_1080x1440.jpg",
         this.url + "/page_long_1080x6000.png",
-        this.url + "/retry/page_wide_1920x1080.png"
+        this.url + "/retry/page_wide_1920x1080.png?run=" + encodeURIComponent(this.key)
       ] })
     };
   }
