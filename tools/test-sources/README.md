@@ -15,6 +15,6 @@ the details call fail.
 
 For D02 download controls, serve the same generated images with
 `python3 tools/test-sources/download_fixture_server.py` and install
-`download_control_source.js`. Its Slow comic delays each image by 35 seconds so queued pages can
+`download_control_source.js`. Its Slow comic delays each image by 20 seconds so queued pages can
 be paused while in-flight requests finish. Its Retry comic returns HTTP 503 for the third page's first three
 requests, then HTTP 200 after a user-triggered Retry. Restart the server to reset that counter.

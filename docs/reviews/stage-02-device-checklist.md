@@ -53,3 +53,5 @@
 2026-10-01 小米 D02 修正版设备试跑，基线 `c14eac0`：分项执行中 `failedChapterCanRetryFromDownloads` 通过（本地服务器记录第三页前三次 HTTP 503，用户触发 Retry 后 HTTP 200，任务达到 3/3 Completed）；`slowChapterCanPauseResumeAndRemove` 未通过，等待 `Paused` 超时。三张慢页均已返回 HTTP 200，说明 8 秒夹具在到达稳定暂停状态前结束，不能判为产品 Pause 缺陷；也没有据此声称暂停/继续/移除闭环已通过。测试 helper 和 App 留装，服务与 ADB reverse 已清理。S2-07D13 将每页延迟提高到 35 秒、Paused 等待上限提高到 60 秒，并单独复跑慢速用例。
 
 2026-10-01 小米 D02 慢速流程第二次修正版复验，基线 `37a28f2`：将 fixture 延时改为 35 秒并将等待上限改为 60 秒后，仍在等待章节 `Paused` 状态时超时。服务记录页面按两个并发槽位连续下载；检查 Worker 后确认其先把整批页面标为 Running，再交给限流队列，导致尚未拿到槽位的第三页不可暂停。没有把失败归因于设备网络或 UI 点击。S2-07D14 已将原子 `markRunning` 移入并发槽位内，并新增真实 Room/WorkManager 阻塞回归；修复后的设备复验待执行。测试 App 和应用数据保留，ADB reverse 和本地服务已清理。
+
+2026-10-01 小米 D02 暂停修复复验，基线 `baf31d5`：App UI 到达 Paused，点击 Resume 后日志证明一个新的 `DownloadWorker` WorkSpec 已启动，但章节 120 秒内没有达到 Completed。回环服务日志有同一慢页的重复请求。核对 `AppHttpClientFactory` 后确认读取超时为 30 秒，而 fixture 等待 35 秒；请求在返回前超时并触发下载重试。现将 fixture 等待降至 20 秒，下一轮验证暂停窗口和恢复完成；通知权限仍关闭，因此设备不显示应用通知，通知可见性单独记录为未验收。测试 App 和数据保留，服务与 ADB reverse 已清理。
