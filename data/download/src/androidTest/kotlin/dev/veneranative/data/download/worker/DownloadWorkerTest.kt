@@ -218,6 +218,62 @@ class DownloadWorkerTest {
         assertTrue(result is ListenableWorker.Result.Retry)
     }
 
+    @Test
+    fun theSameWorkerIdRequeuesPagesLeftByItsPreviousAttempt() = runBlocking {
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = listOf(SourcePage(index = 0, imageRef = "https://example.test/0.png")),
+        )
+        repository.markRunning(chapter(), 0)
+        val dao = database.downloadDao()
+        val task = dao.task(chapter().taskId())!!
+        dao.upsertTask(task.copy(workerId = "same-worker", heartbeatAt = System.currentTimeMillis()))
+
+        val report = repository.recover("same-worker")
+
+        assertEquals(1, report.requeuedZombies)
+        assertEquals(DownloadPageState.Queued, repository.pagesOf(chapter()).single().state)
+    }
+
+    @Test
+    fun aStaleDifferentWorkerIdRequeuesPagesLeftByTheDeadWorker() = runBlocking {
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = listOf(SourcePage(index = 0, imageRef = "https://example.test/0.png")),
+        )
+        repository.markRunning(chapter(), 0)
+        val dao = database.downloadDao()
+        val task = dao.task(chapter().taskId())!!
+        dao.upsertTask(task.copy(workerId = "dead-worker", heartbeatAt = 0L))
+
+        val report = repository.recover("replacement-worker")
+
+        assertEquals(1, report.requeuedZombies)
+        assertEquals(DownloadPageState.Queued, repository.pagesOf(chapter()).single().state)
+    }
+
+    @Test
+    fun aSucceededPageWithoutAPathIsRequeuedByRoomRecovery() = runBlocking {
+        val repository = DownloadEnvironment.get(context).repository()
+        repository.enqueue(
+            chapter = chapter(),
+            title = "Chapter 1",
+            pages = listOf(SourcePage(index = 0, imageRef = "https://example.test/0.png")),
+        )
+        val dao = database.downloadDao()
+        val page = dao.pages(chapter().taskId()).single()
+        dao.upsertPages(listOf(page.copy(state = DownloadPageState.Succeeded.name, relativePath = null, bytes = 24L)))
+
+        val report = repository.recover("replacement-worker")
+
+        assertEquals(1, report.repairedFiles)
+        assertEquals(DownloadPageState.Queued, repository.pagesOf(chapter()).single().state)
+    }
+
     private fun chapter(): ChapterRef = ChapterRef.Remote(
         ChapterKey(
             comicKey = ComicKey(SourceId("demo"), RemoteComicId("comic-1")),
