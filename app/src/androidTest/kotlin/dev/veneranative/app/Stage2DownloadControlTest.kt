@@ -41,6 +41,52 @@ class Stage2DownloadControlTest {
     @get:Rule val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test
+    fun enqueueSlowChapterForProcessRestart() {
+        val target = prepareD03Target()
+        click("Explore")
+        waitFor("D02 Slow Comic")
+        selectFixtureSourceIfOffered()
+        click("D02 Slow Comic")
+        waitFor("D02 Slow Chapter")
+        click("Download")
+        waitFor("Chapter queued for download.")
+        val graph = ViewModelProvider(composeRule.activity)[AppGraph::class.java]
+        val repository = runBlocking { withTimeout(20_000) { graph.download.filterNotNull().first() } }
+        waitForTask(repository, target.chapter, 20_000) { it.state == DownloadChapterState.Running }
+        Log.i(TAG, "D03_PROCESS_RESTART_READY chapter=${target.chapter}")
+    }
+
+    @Test
+    fun runningChapterCompletesAfterAppProcessRestart() {
+        val activity = composeRule.activity
+        val graph = ViewModelProvider(activity)[AppGraph::class.java]
+        val repository = runBlocking { withTimeout(20_000) { graph.download.filterNotNull().first() } }
+        val sourceId = SourceId(D03_SOURCE_ID)
+        val chapter = ChapterRef.Remote(
+            ChapterKey(ComicKey(sourceId, RemoteComicId("slow")), RemoteChapterId("ch1")),
+        )
+
+        try {
+            val completed = runBlocking {
+                withTimeout(120_000) {
+                    repository.observeTask(chapter).first { it?.state == DownloadChapterState.Completed }!!
+                }
+            }
+            assertEquals(3, completed.completedPages)
+            assertTrue(runBlocking { repository.isCompleteOffline(chapter) })
+            assertTrue(runBlocking { repository.pagesOf(chapter) }.all { it.state == DownloadPageState.Succeeded })
+        } finally {
+            runBlocking {
+                withTimeout(20_000) {
+                    repository.cancel(chapter)
+                    graph.sourceRepository.uninstall(sourceId)
+                }
+            }
+            File(activity.cacheDir, "$D03_SOURCE_ID.js").delete()
+        }
+    }
+
+    @Test
     fun slowChapterCanPauseResumeAndRemove() {
         val activity = composeRule.activity
         val graph = ViewModelProvider(activity)[AppGraph::class.java]
@@ -206,6 +252,33 @@ class Stage2DownloadControlTest {
         if (chips.fetchSemanticsNodes().isNotEmpty()) chips[0].performClick()
     }
 
+    private fun prepareD03Target(): D03Target {
+        val activity = composeRule.activity
+        val graph = ViewModelProvider(activity)[AppGraph::class.java]
+        val sourceId = SourceId(D03_SOURCE_ID)
+        val chapter = ChapterRef.Remote(
+            ChapterKey(ComicKey(sourceId, RemoteComicId("slow")), RemoteChapterId("ch1")),
+        )
+        val script = File(activity.cacheDir, "$D03_SOURCE_ID.js")
+        runBlocking {
+            withTimeout(20_000) {
+                graph.download.filterNotNull().first().cancel(chapter)
+                graph.sourceRepository.uninstall(sourceId)
+            }
+        }
+        InstrumentationRegistry.getInstrumentation().context.assets.open("download_control_source.js").use { input ->
+            val fixture = input.bufferedReader().readText()
+            script.writeText(fixture.replace(
+                "this.key = \"download_control_source\";",
+                "this.key = \"$D03_SOURCE_ID\";",
+            ))
+        }
+        assertTrue(runBlocking {
+            withTimeout(20_000) { graph.sourceRepository.install(script.absolutePath) }
+        } is InstallOutcome.Success)
+        return D03Target(chapter)
+    }
+
     private fun waitFor(text: String) {
         composeRule.waitUntil(timeoutMillis = 20_000) {
             composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
@@ -226,5 +299,8 @@ class Stage2DownloadControlTest {
 
     private companion object {
         const val TAG = "Stage2DownloadControl"
+        const val D03_SOURCE_ID = "stage2_d03_process"
     }
+
+    private data class D03Target(val chapter: ChapterRef)
 }

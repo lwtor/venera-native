@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-01 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01、D02 真机均已通过，当前唯一下一检查项 D03；D04–D07 未开始本轮逐项验收 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01–D03 真机均已通过，当前唯一下一检查项 D04；D05–D07 未开始本轮逐项验收 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -180,7 +180,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D16 D02 小米真机闭环 — DONE。** Xiaomi 25128PNA1C / API 36，App 与 AndroidTest 以 `adb install -r` 覆盖安装并保留用户数据；POST_NOTIFICATIONS 已由用户开启。暂停/继续用例 1/1 通过（57.53 秒）：活动通知可见，三页 Downloads 暂停后恢复到 3/3 Completed，离线完整性通过，Remove 后 Room 任务行和章节目录消失。失败重试用例 1/1 通过（16.291 秒）：2/3 Partial 与 Failed 页经 Retry 达到 3/3 Completed 并验证离线完整性。fixture 正常三页 HTTP 200，失败页三次 503 后重试 HTTP 200。App 和数据保留；fixture 服务及 ADB reverse 已清理。
 - **S2-07D17 D03 Worker/Room 真机 instrumentation — DONE（D03 整体验收仍进行中）。** 基线 `ffe63a3`，Xiaomi 25128PNA1C / API 36。JDK 17 下 `:data:download:assembleDebugAndroidTest :app:assembleDebug :app:packageDebugAndroidTest` 构建通过；直接运行 `DownloadWorkerTest` 7/7，0 失败/跳过，覆盖空队列、意外页异常落 Failed、停止 Worker 不落文件、前台通知通道、下载完整性、并发槽位暂停后恢复，以及其他新鲜 Worker 仍持有任务时保持待处理。未运行 `connectedDebugAndroidTest`，只安装独立模块测试 APK；App 与其用户数据未卸载或清理。真实 App 进程终止/重启、相同 Worker ID 恢复、无文件路径成功页和并发取消仍未覆盖，D03 不得据此标为完成。
 - **S2-07D18 D03 Room 恢复边界真机回归 — DONE（D03 整体验收仍进行中）。** 基线 `018cb25`，Xiaomi 25128PNA1C / API 36；在已通过的 7 项 Worker instrumentation 上增加同 Worker ID 重试、过期的不同 Worker ID 恢复、Succeeded 页无 `relativePath` 重排三个真实 Room 用例。`:data:download:assembleDebugAndroidTest :app:assembleDebug` 构建通过，直接重跑 `DownloadWorkerTest` 10/10、0 失败/跳过。App 与数据未卸载或清理；真实 App 进程死亡后的 WorkManager 恢复和并发取消仍待验收。
-- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上，数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 再次通过。API 34 模拟器完成三页下载、离线翻页与重开进度、受控失败重试及删除文件/数据库清理。D01 探索、搜索、书架三条入口的详情/阅读器/逐级返回路径已在模拟器和 2026-10-01 真机 1/1 复验通过。D03 Worker/Room instrumentation 10/10 已通过，但真实 App 进程终止/重启恢复与并发取消仍未完成。当前唯一下一检查项仍为 D03；SAF、长章节、API 26 属于 D04–D07，尚待验收。
+- **S2-07D19 D03 App 进程恢复真机验证 — DONE（D03 并发取消仍待验收）。** 基线 `b768785`，Xiaomi 25128PNA1C / API 36。新增两阶段 App instrumentation：第一阶段在三页慢速章节进入 Running 后发出就绪标记；设备上明确杀掉 App 与测试进程，再以 MAIN/LAUNCHER 启动 App；第二阶段断言 WorkManager 重启 Worker 后三页全部完成、离线完整性通过，并清理测试来源。真实进程死亡/重启闭环通过；App 与用户数据保留。
+- **S2-07D 真机用户闭环 — IN_PROGRESS。** 用户已于 2026-09-25 确认执行。Xiaomi 25128PNA1C / API 36 上数据库 25/25、本地归档 2/2 项 instrumentation 曾通过；2026-09-30 WorkManager 2.12.0 的下载 Worker 6/6 复验通过。D01、D02 真机闭环通过，D03 的 Room 恢复边界 10/10 与明确杀进程后的 WorkManager 恢复均已通过。下一检查项为 D03 并发取消回归，之后按序执行 D04–D07。Stage 2 保持 IN_PROGRESS，不以模块 instrumentation 代替页面闭环。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
