@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01–D05 真机验收通过（D05 真机覆盖 ZIP，7z 由模块 fixture 覆盖）；D06–D07 尚待逐项验收 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01–D05 真机验收通过（D05 真机覆盖 ZIP，7z 由模块 fixture 覆盖）；D06 IN_PROGRESS（257 MiB 压力回归已编译，等待真机执行）；D07 TODO |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -186,6 +186,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D22 D04 飞行模式离线阅读与进度恢复 — DONE。** Xiaomi 25128PNA1C / API 36。新增 App AndroidTest 完成三页下载、加入书架、导航回章节；等待主机切飞行模式并停止 fixture 后，Reader 显示已下载页面、由第 1 页翻至第 2 页；退出后重开恢复第 2 页，再离线翻到第 3 页。fixture 与 ADB reverse 清理，飞行模式恢复关闭，测试来源/收藏/历史/下载均由测试清理。构建 `:app:assembleDebugAndroidTest :app:assembleDebug` 通过；小米直接 instrumentation 1/1、0 失败/跳过。与 D21 截断页检测结合，D04 全部验收项通过。
 - **S2-07D23 D05 SAF ZIP 选取与归档读取 — DONE。** 2026-10-01 Xiaomi 25128PNA1C / API 36 上，用户通过 Venera 的归档选择器选中合成 `VeneraD05Archive.zip`；设备授予持久读取权。SAF 目录导入 Room 断言覆盖根章节、Chapter 2、Chapter 10 自然排序、根页与封面排除。
 - **S2-07D24 D05 归档标题、刷新与进程重启复验 — DONE。** 发现 SAF URI 编码路径被误用作标题；改为优先采用 DocumentProvider display name，并添加回归。`LocalArchiveRefreshTest` 小米直接 instrumentation `OK (3 tests)`。App `:app:assembleDebug` 成功后以 `adb install -r` 覆盖安装并保留数据；通过 App UID 对合成 ZIP 执行 repository refresh，检查 Room 标题 `VeneraD05Archive`、`Archive` 类型、1 章、2 页，并用 `LocalFirstPageProvider` 实际物化第一页。强停 App 后重复检查仍成功，证明归档记录、SAF 授权和页读取跨进程保留。D05 真机覆盖 ZIP，7z 由模块 fixture 覆盖；picker 取消/权限拒绝未单独在设备演练。诊断用 Debug provider 已从源码移除并随后重装干净 Debug APK。App 与数据保留；`gradle.properties` 用户修改不属于本任务且保留。D05 通过；下一项 D06，Stage 2 继续 IN_PROGRESS。
+- **S2-07D25 D06 长章节缓存压力回归准备 — DONE（真机执行待完成）。** 新增 `LocalLongChapterTest`：257 个 1 MiB 本地页；章节索引时断言无文件物化，顺序读取超过 256 MiB 后断言首屏被缓存淘汰、回访重新读取成功且总缓存仍有界。`:data:local:assembleDebugAndroidTest` 编译成功，`git diff --check` 通过。测试准备执行期间小米从 ADB 断开；未安装测试 APK或运行压力测试。D06 继续 IN_PROGRESS，不据源码编译标记设备通过。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
