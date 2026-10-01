@@ -16,7 +16,12 @@ data class LocalPage(
     val uri: String, val name: String, val sizeBytes: Long,
     val rootUri: String = "", val kind: LocalKind = LocalKind.Directory,
 )
-fun interface LocalArchiveAccess { fun open(uri: String): ArchiveReader }
+fun interface LocalArchiveAccess {
+    fun open(uri: String): ArchiveReader
+
+    /** Provider display name, used for labels instead of the encoded content-URI path. */
+    fun displayName(uri: String): String? = null
+}
 data class SafGrant(val uri: String, val kind: LocalKind, val grantedAtEpochMillis: Long)
 sealed interface LocalImportResult {
     data class Imported(val comic: LocalComic, val pageCount: Int) : LocalImportResult

@@ -18,6 +18,32 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LocalArchiveRefreshTest {
     @Test
+    fun importingAnArchiveUsesProviderDisplayName() = runBlocking {
+        val database = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(), VeneraDatabase::class.java,
+        ).build()
+        try {
+            val repository = DefaultLocalComicRepository(database, object : SafTreeAccess {
+                override fun take(uri: String) = Unit
+                override fun release(uri: String) = Unit
+                override fun read(uri: String): TreeNode? = null
+            }, archiveAccess = object : LocalArchiveAccess {
+                override fun open(uri: String) = archive()
+                override fun displayName(uri: String) = "VeneraD05Archive.zip"
+            })
+
+            val imported = repository.importArchive(
+                "content://com.android.fileexplorer.documents/document/primary%3A%2Fstorage%2Femulated%2F0%2FDownload%2FVeneraD05%2FVeneraD05Archive.zip",
+            ) as LocalImportResult.Imported
+
+            assertEquals("VeneraD05Archive", imported.comic.title)
+        } finally {
+            database.close()
+        }
+        Unit
+    }
+
+    @Test
     fun refreshingAnArchiveKeepsItsIndexedPages() = runBlocking {
         val database = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(), VeneraDatabase::class.java,

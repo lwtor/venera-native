@@ -85,7 +85,10 @@ class DefaultLocalComicRepository(
         val comicId = LocalDirectoryScanner.stableId(uri)
         val existing = dao.comic(comicId)
         val chapterId = LocalDirectoryScanner.stableId("$uri#chapter")
-        val comic = LocalComicEntity(comicId, uri.substringAfterLast('/').substringBeforeLast('.').ifBlank { "Local archive" },
+        val archiveName = access.displayName(uri)
+            ?: android.net.Uri.parse(uri).lastPathSegment.orEmpty().substringAfterLast('/')
+        val title = archiveName.substringBeforeLast('.', archiveName).ifBlank { "Local archive" }
+        val comic = LocalComicEntity(comicId, title,
             LocalKind.Archive.name, uri, cover?.name, 1, existing?.addedAt ?: clock())
         database.withTransaction {
             dao.upsertGrant(LocalGrantEntity(uri, "archive", existing?.addedAt ?: clock()))
