@@ -25,7 +25,7 @@ class DownloadControlSource extends ComicSource {
         title: title(id),
         description: "Repository-owned download verification fixture.",
         cover: this.url + "/page_normal_1080x1440.jpg",
-        chapters: { ch1: "Chapter 1" }
+        chapters: { ch1: id === "slow" ? "D02 Slow Chapter" : "D02 Retry Chapter" }
       }),
       loadEp: async (id) => ({ images: id === "slow" ? [
         this.url + "/slow/page_normal_1080x1440.jpg",
