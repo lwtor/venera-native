@@ -46,5 +46,10 @@ interface PageImageDecoder : Closeable {
 
     suspend fun decode(request: PageDecodeRequest): DecodedPageImage
 
+    /** Decode an image ahead of display so the owning bounded cache can serve the later draw. */
+    suspend fun predecode(request: PageDecodeRequest) {
+        decode(request)
+    }
+
     override fun close() = Unit
 }

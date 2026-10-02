@@ -27,6 +27,14 @@ import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.image.decode.PageImageDecoder
+import dev.veneranative.core.image.tiling.DecodeStrategy
+import dev.veneranative.core.image.tiling.DecodedPageImage
+import dev.veneranative.core.image.tiling.PageDecodeRequest
+import dev.veneranative.core.image.tiling.PageRegion
+import dev.veneranative.core.image.tiling.PageTile
+import dev.veneranative.core.image.tiling.PageViewport
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -98,6 +106,39 @@ class ReaderScreenTest {
         composeRule.onNodeWithText("从右到左").performClick()
 
         assertEquals(ReadingDirection.RightToLeft, requested)
+    }
+
+    @Test
+    fun predecodesOnlyTheImmediatePagesAroundTheCurrentPage() {
+        val warmedPaths = mutableListOf<String>()
+        val decoder = object : PageImageDecoder {
+            override val strategy = DecodeStrategy.Region
+            override fun plan(page: ComicPage, viewport: PageViewport, zoom: Float, continuous: Boolean) = listOf(
+                PageTile(PageRegion(0, 0, page.widthPx, page.heightPx), viewport.widthPx, viewport.heightPx),
+            )
+            override suspend fun decode(request: PageDecodeRequest): DecodedPageImage = awaitCancellation()
+            override suspend fun predecode(request: PageDecodeRequest) {
+                warmedPaths += request.path
+            }
+        }
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    pages = pages,
+                    currentPageIndex = 1,
+                    direction = ReadingDirection.LeftToRight,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+                decoderFactory = { decoder },
+            )
+        }
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { warmedPaths.size == 2 }
+        assertTrue(warmedPaths.contains("test://0"))
+        assertTrue(warmedPaths.contains("test://2"))
+        assertTrue("the visible page is decoded by its normal tile", "test://1" !in warmedPaths)
     }
 
     @Test

@@ -17,4 +17,8 @@ class PipelinePageImageDecoder(
             ?: throw IOException("Page unavailable")
         return lease.use { delegate.decode(request.copy(path = it.file.absolutePath)) }
     }
+
+    override suspend fun predecode(request: PageDecodeRequest) {
+        decode(request)
+    }
 }

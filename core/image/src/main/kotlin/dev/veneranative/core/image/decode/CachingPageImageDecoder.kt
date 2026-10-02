@@ -30,6 +30,10 @@ class CachingPageImageDecoder(
         return delegate.decode(request).also { cache.put(key, it.bitmap) }
     }
 
+    override suspend fun predecode(request: PageDecodeRequest) {
+        decode(request)
+    }
+
     private fun cacheKey(request: PageDecodeRequest): String = buildString {
         append(request.path)
         append('#')

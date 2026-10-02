@@ -555,6 +555,7 @@ S3-00 小任务：
 | S3-00G | 阅读器从首页续读时按实际进入路由返回；覆盖首页、详情和书架入口 | DONE（导航 JVM 回归及 `:app:assembleDebug` 通过；真机页面路径未在本次执行） |
 | S3-00H | 修复阅读器图片白屏/过小问题，验证纵向连续与横向分页的真实图片尺寸和布局 | DONE（修复 WebP VP8 有损帧头的尺寸解析偏移；小米真机首页续读在纵向/横向、采样/区域解码下均通过可视像素验收） |
 | S3-00I | 修复退出后重复进入阅读器偶发的章节加载失败及无效重试；覆盖源调用取消/重试路径 | DONE（同源调用忙碌状态有界重试；引擎、章节提供器和阅读器单测通过） |
+| S3-00J | 减少横向阅读翻页等待：围绕当前页对前后各一页预解码首个显示 tile，复用有界图片缓存；离开邻近窗口时取消过远预取；增加 Reader Compose 回归 | DONE（`:feature:reader:compileDebugAndroidTestKotlin :feature:reader:assembleDebugAndroidTest :app:assembleDebug` 均通过；Xiaomi 上启动 `predecodesOnlyTheImmediatePagesAroundTheCurrentPage` 后约 40 秒未返回测试结果，未记为设备通过；实机翻页耗时仍待用户观察） |
 
 ## 8. Stage 4：同步、体验与发布
 

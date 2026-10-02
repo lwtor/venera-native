@@ -57,6 +57,11 @@ import dev.veneranative.core.image.tiling.PageTile
 import dev.veneranative.core.image.tiling.PageTiling
 import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.model.PageSizeState
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
 
 
@@ -281,6 +286,44 @@ private fun SinglePagePager(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .collect { onAction(ReaderAction.PageShown(it)) }
+    }
+    LaunchedEffect(pagerState, state.pages, viewport, decoder) {
+        if (decoder == null) return@LaunchedEffect
+        val warmJobs = mutableMapOf<Int, Job>()
+        snapshotFlow { pagerState.currentPage }
+            .distinctUntilChanged()
+            .collect { currentPage ->
+                val candidates = listOf(currentPage - 1, currentPage + 1)
+                    .filter { it in state.pages.indices && state.pages[it].sizeState == PageSizeState.Ready }
+                    .toSet()
+                (warmJobs.keys - candidates).forEach { index ->
+                    warmJobs.remove(index)?.cancel()
+                }
+                candidates.forEach { index ->
+                    if (warmJobs[index]?.isActive == true) return@forEach
+                    warmJobs[index] = launch {
+                        val page = state.pages[index]
+                        try {
+                            val tile = decoder.plan(page, viewport, zoom = 1f, continuous = true).firstOrNull()
+                                ?: return@launch
+                            decoder.predecode(
+                                PageDecodeRequest(
+                                    path = page.imageRef,
+                                    sourceId = page.sourceId,
+                                    targetWidthPx = tile.displayWidthPx,
+                                    targetHeightPx = tile.displayHeightPx,
+                                    region = tile.region,
+                                    fitWidthOnly = tile.fitWidthOnly,
+                                ),
+                            )
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // The page's visible tile owns its normal retry and error state.
+                        }
+                    }
+                }
+            }
     }
     HorizontalPager(
         state = pagerState,
