@@ -54,12 +54,12 @@ object ImageSizeHeaderParser {
         }
     }
 
-    /** Lossy WebP: after the frame tag the canvas size is two 14-bit little endian fields. */
+    /** Lossy WebP: the key-frame tag and start code precede two 14-bit little-endian dimensions. */
     private fun parseVp8(bytes: ByteArray): ImageSize? {
         if (bytes.size < WEBP_CHUNK_HEADER_SIZE + 10) return null
         val offset = WEBP_CHUNK_HEADER_SIZE
-        val widthPx = bytes.readInt16LittleEndian(offset + 3) and VP8_DIMENSION_MASK
-        val heightPx = bytes.readInt16LittleEndian(offset + 5) and VP8_DIMENSION_MASK
+        val widthPx = bytes.readInt16LittleEndian(offset + 6) and VP8_DIMENSION_MASK
+        val heightPx = bytes.readInt16LittleEndian(offset + 8) and VP8_DIMENSION_MASK
         return sizeOrNull(widthPx, heightPx)
     }
 

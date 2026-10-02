@@ -25,7 +25,7 @@ class ImageSizeHeaderParserTest {
 
     @Test
     fun parsesLossyWebp() {
-        assertEquals(ImageSize(300, 400), ImageSizeHeaderParser.parse(vp8(widthPx = 300, heightPx = 400)))
+        assertEquals(ImageSize(666, 992), ImageSizeHeaderParser.parse(vp8(widthPx = 666, heightPx = 992)))
     }
 
     @Test
@@ -93,10 +93,14 @@ class ImageSizeHeaderParserTest {
 
     private fun vp8(widthPx: Int, heightPx: Int): ByteArray {
         val chunk = ByteArray(10)
-        chunk[3] = (widthPx and 0x3FFF).toByte()
-        chunk[4] = ((widthPx shr 8) and 0x3F).toByte()
-        chunk[5] = (heightPx and 0x3FFF).toByte()
-        chunk[6] = ((heightPx shr 8) and 0x3F).toByte()
+        // A lossy VP8 key-frame starts with a 3-byte tag and this 3-byte start code before size.
+        chunk[3] = 0x9D.toByte()
+        chunk[4] = 0x01
+        chunk[5] = 0x2A
+        chunk[6] = (widthPx and 0x3FFF).toByte()
+        chunk[7] = ((widthPx shr 8) and 0x3F).toByte()
+        chunk[8] = (heightPx and 0x3FFF).toByte()
+        chunk[9] = ((heightPx shr 8) and 0x3F).toByte()
         return riffChunk("VP8 ", chunk)
     }
 

@@ -2,7 +2,6 @@ package dev.veneranative.app
 
 import android.util.Log
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
@@ -25,11 +24,7 @@ import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 import dev.veneranative.feature.details.DetailsScreen
 import dev.veneranative.feature.details.DetailsStatus
 import dev.veneranative.feature.details.DetailsUiState
-import dev.veneranative.feature.reader.ReaderScreen
-import dev.veneranative.feature.reader.ReaderAction
-import dev.veneranative.feature.reader.ReadingDirection
-import dev.veneranative.feature.reader.ReaderStatus
-import dev.veneranative.feature.reader.ReaderUiState
+import dev.veneranative.feature.reader.ReaderRoute
 import dev.veneranative.source.api.SearchRequest
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -98,41 +93,25 @@ class CopyMangaWorkflowTest {
             }
             composeRule.onNodeWithText("阅读").assertIsDisplayed()
 
-            val chapterContent = withTimeout(240_000) {
-                val chapter = detail.chapters.firstOrNull()
-                    ?: error("CopyManga detail returned no chapter to read.")
-                Log.i(TAG, "Loading first real chapter ${chapter.title}")
-                val content = graph.provider.loadChapter(ChapterRef.Remote(chapter.key))
-                val page = content.pages.firstOrNull()
-                    ?: error("CopyManga chapter returned no page references.")
-                val resolved = graph.provider.resolve(page)
-                check(resolved.widthPx > 0 && resolved.heightPx > 0) {
-                    "CopyManga first page dimensions could not be resolved."
-                }
-                content.copy(pages = listOf(resolved))
-            }
-            val readerState = mutableStateOf(
-                ReaderUiState(
-                    chapterTitle = chapterContent.title,
-                    pages = chapterContent.pages,
-                    status = ReaderStatus.Ready,
-                ),
-            )
+            val chapter = detail.chapters.firstOrNull()
+                ?: error("CopyManga detail returned no chapter to read.")
+            Log.i(TAG, "Opening real chapter ${chapter.title} through ReaderRoute")
             composeRule.activity.setContent {
-                ReaderScreen(
-                    state = readerState.value,
-                    onAction = { action ->
-                        if (action is ReaderAction.ChangeDirection) {
-                            readerState.value = readerState.value.copy(direction = action.direction)
-                        }
-                    },
+                ReaderRoute(
+                    chapter = ChapterRef.Remote(chapter.key),
+                    provider = graph.provider,
                     onBack = {},
                     decoderFactory = graph.decoderFactory,
                 )
             }
-            composeRule.waitUntil(60_000) {
-                composeRule.onAllNodesWithContentDescription("第 1 页").fetchSemanticsNodes().isNotEmpty()
+            composeRule.waitUntil(120_000) {
+                composeRule.onAllNodesWithContentDescription("第 1 页").fetchSemanticsNodes().isNotEmpty() ||
+                    composeRule.onAllNodesWithText("无法加载此章节").fetchSemanticsNodes().isNotEmpty()
             }
+            assertTrue(
+                "ReaderRoute failed to resolve or decode the real first page",
+                composeRule.onAllNodesWithContentDescription("第 1 页").fetchSemanticsNodes().isNotEmpty(),
+            )
             val readerImage = composeRule.onNodeWithContentDescription("第 1 页")
             readerImage.assertIsDisplayed()
             val pixels = readerImage.captureToImage().toPixelMap()
@@ -146,7 +125,7 @@ class CopyMangaWorkflowTest {
             Log.i(TAG, "CopyManga first page rendered ${pixels.width}x${pixels.height} with non-white pixels")
 
             composeRule.onNodeWithText("从左到右").performClick()
-            composeRule.waitUntil(10_000) { readerState.value.direction == ReadingDirection.LeftToRight }
+            composeRule.waitForIdle()
             val pagedImage = composeRule.onNodeWithContentDescription("第 1 页")
             pagedImage.assertIsDisplayed()
             val pagedPixels = pagedImage.captureToImage().toPixelMap()
