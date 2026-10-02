@@ -1,12 +1,12 @@
 # Stage 2 退出门禁复核（2026-10-02）
 
-结论：**未通过；Stage 2 保持 `IN_PROGRESS`。** 本次复核确认 D01–D06 已有真机闭环证据，新增复验了 Xiaomi API 36 的前台下载通知运行流程；但计划要求的 API 26 闭环仍无可用运行环境，且 SAF 目录导入未在低版本实际完成。不得以 API 30/36 证据替代 API 26，也不得推进 Stage 3。
+结论：**通过；Stage 2 标记 `DONE`。** 先前阻断的 API 26 环境已准备完成，来源调用、真实 SAF 目录授权、Reader 加载和运行期下载通知闭环均在 API 26 实测通过。Stage 2 退出门禁复跑也通过；D01–D07 已具备与范围相符的跨模块验收证据。可推进 S3-00。
 
 ## 基线与复核范围
 
-- 代码基线：`49569a2`（D06 Reader 手势回归）；本次 D27、D28 后续提交只更新测试状态文档。
+- 代码基线：当前 HEAD `0990eba`（D07 API 26 设备证据）；产品代码最后修改在此前审查和局部修复提交中，本次没有产品代码变更。
 - 复核依据：`docs/reviews/stage-02-review.md` 中 C1–C25 的代码质量审查与整改记录、`docs/reviews/stage-02-device-checklist.md` 的设备证据，以及当前 Android Manifest、Worker 前台通知测试和 D01/D02 App instrumentation。
-- 本次未更改产品代码。D28 在 Xiaomi 25128PNA1C / API 36 上运行下载通知与暂停/继续/移除闭环；测试服务和 reverse 已清理，App 与测试 APK 保留。
+- 本次未更改产品代码。D28 在 Xiaomi 25128PNA1C / API 36 上运行下载通知与暂停/继续/移除闭环；D30 在 API 26 完成最低版本用户闭环。两个设备上的测试服务和 reverse 均已清理，App 与测试 APK 保留。
 
 ## 验收矩阵
 
@@ -19,20 +19,22 @@
 | D04 飞行模式离线阅读与进度恢复 | 通过 | Xiaomi API 36 设备清单记载断网三页阅读及退出重开位置恢复通过。 |
 | D05 SAF 目录与归档 | 通过（限定范围） | 目录导入 Room 断言和合成 ZIP 导入/刷新/重开有证据；真机归档格式覆盖 ZIP，7z 仅模块 fixture，取消/权限丢失未在设备 UI 演练。 |
 | D06 长章节、缓存淘汰、Reader 手势 | 通过 | Xiaomi API 36 长章节压力 instrumentation 与 Reader 横向前进/返回、纵向长图滚动各 `OK (1 test)`。 |
-| D07 API 26 最低版本闭环 | **未完成/阻断** | API 36 `DownloadWorkerTest#theForegroundPromiseUsesARealChannel` 验证通知 channel 与 `dataSync` 类型；D28 真机验证活动通知及下载控制；API 30 的两项导航/书架入口测试通过。但 API 26 镜像安装停在 `Preparing`，没有镜像文件；低版本实际 SAF 目录导入和通知尚无证据。 |
+| D07 API 26 最低版本闭环 | 通过 | AOSP ARM64 API 26 模拟器上，fixture 来源脚本及 Explore/Search/Library→Reader 返回测试 1/1；DocumentsUI SAF picker 实际授权生成的目录，App 显示导入成功，Reader 页面显示为 1/2 且 Page 1 图像节点正常；下载通知 instrumentation `OK (1 test)`，运行期通知可见，Pause/Resume 达到 3/3，Remove 后数据库和文件清理一致。另有 Xiaomi API 36 的通知与控制闭环以及 API 34+ `dataSync` 类型断言。 |
 
 ## 本次验证与发现
 
 - Xiaomi API 36：`DownloadWorkerTest#theForegroundPromiseUsesARealChannel` — `OK (1 test)`；`Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` — `OK (1 test)`。
-- 隔离 API 30 ARM64 模拟器：`Stage2FixtureNavigationTest#exploreSearchAndShelfReturnToTheirOwnOrigins` 与 `Stage2LibraryNavigationTest#homeOpensDownloadsAndLocalLibraryTabs` — 各 `OK (1 test)`。
-- 下载 fixture 的三页响应均为 HTTP 200；测试结束已移除 `tcp:8765` reverse 并停止服务。Xiaomi `dev.veneranative` 与 App AndroidTest 包仍安装；未卸载 App 或清除数据。
-- 本次复核未发现新的产品代码缺陷。当前阻断是 API 26 测试镜像无法取得，不能推断为应用低版本兼容性故障或通过。
-- 本次只涉及验证记录，无产品代码变更；执行 `git diff --check`。未重复 Stage 2 已通过的全仓构建/测试门禁。
+- AOSP ARM64 API 26 模拟器：`Stage2FixtureNavigationTest#exploreSearchAndShelfReturnToTheirOwnOrigins` 与 `Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` — 各 `OK (1 test)`；另通过 DocumentsUI 实际导入合成 SAF 目录并在 Reader 打开第一页。
+- Xiaomi API 36：`DownloadWorkerTest#theForegroundPromiseUsesARealChannel` 与 `Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` — 各 `OK (1 test)`。隔离 API 30 ARM64 的来源导航与书架入口测试亦各 `OK (1 test)`。
+- 最终 Stage 2 门禁（JDK 17）：`sh gradlew --offline --no-daemon --max-workers=2 testDebugUnitTest :app:assembleDebug :app:assembleRelease` — `BUILD SUCCESSFUL`；62 份 JVM 报告合计 442 项，0 失败、0 错误、0 跳过；Debug/Release 构建及 Release Lint Vital 通过。`git diff --check` 通过。
+- API 26 fixture 三页请求全部 HTTP 200；测试后移除 `tcp:8765` reverse 并停止服务。API 26 和 Xiaomi 的 App/AndroidTest APK 均保留安装；没有卸载或清除用户数据。
+- 本次复核未发现新的产品代码缺陷。通知在下载期间由 Android `NotificationManager.activeNotifications` 实测可见，结束后系统通知抽屉无 Venera 卡片；另有 `dumpsys notification` 保留状态记录但 WorkManager 已记录 `Removing Notification` 的观察，未发现用户可见的完成后残留。
+- 复核涉及测试设备与文档，没有产品代码变更。
 
 ## 剩余阻断和风险
 
-1. 准备可启动的 API 26 设备/模拟器；当前 SDK 元数据能列出 Google APIs ARM64 包，但安装无下载产物，重试仍停在 `Preparing`。
-2. 在 API 26 完成冷启动、仓库 fixture 来源调用、真实 SAF 目录选择并核对导入章节/页面、进入 Reader、下载并验证通知的完整闭环。
-3. D07 通过后重跑计划要求的 Stage 2 退出门禁并复核本报告；只有门禁满足后才能将 Stage 2 标记 `DONE`。
+1. D05 真实设备格式覆盖 ZIP；7z/CB7 由仓库归档 fixture 覆盖，实际设备导入未重复每种压缩格式。该范围不阻断 S2-05/S2-06 已有的导入和解析验收。
+2. SAF picker 的用户取消与持久权限丢失没有单独在设备 UI 演练；底层导入、归档刷新/取消和权限持久化路径有对应模块回归。后续如调整 SAF 生命周期，再补设备场景。
+3. API 26 验证使用 AOSP 模拟器，不代表各 OEM 的文件选择器和通知呈现完全一致；Xiaomi API 36 另有实机闭环证据。下载期间通知经 NotificationManager 验证可见，系统抽屉与 dumpsys 完成后状态的差异已如上记录，未发现用户可见残留。
 
-API 26 和低版本 SAF/通知风险尚未被用户接受为延期项，故不视为完成。后续任务从 S2-07D 的 API 26 环境与闭环继续。
+上述为覆盖范围与平台差异风险，不属于 Stage 2 必需闭环的未完成验收项；没有将未测项目写成已通过。Stage 2 退出门禁满足，下一任务为 S3-00。

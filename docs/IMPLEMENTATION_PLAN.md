@@ -460,7 +460,7 @@ Stage 1 使用仓库内测试源作为端到端基线，不以真实商业站点
 | S2-04 | 离线阅读整合 | 下载内容脱离来源仍可阅读 | S2-02 | DONE |
 | S2-05 | SAF 本地目录导入 | 权限持久化、自然排序、封面识别 | S1-07 | DONE |
 | S2-06 | CBZ/ZIP 与 7z 系列 | 索引缓存、ArchiveEntry 页面、错误恢复 | S2-05 | DONE |
-| S2-07 | Stage 2 集成验收 | 从详情发起并控制下载；飞行模式下书架、下载、本地目录、阅读和进度闭环 | S2-01 至 S2-06 | IN_PROGRESS |
+| S2-07 | Stage 2 集成验收 | 从详情发起并控制下载；飞行模式下书架、下载、本地目录、阅读和进度闭环 | S2-01 至 S2-06 | DONE |
 
 S2-07 当前切片与验收：
 
@@ -522,7 +522,8 @@ S2-07 当前切片与验收：
 - **S2-07D27 D07 API 34+ 通知类型与 API 30 导航复验：DONE（API 26 闭环待完成）。** Xiaomi API 36 的通知 channel / `dataSync` 类型 instrumentation 通过；API 30 ARM64 模拟器的来源脚本、Reader 导航及书架入口各 1/1 通过。API 26 系统镜像和真实 SAF 目录导入仍待验证。
 - **S2-07D28 D07 Xiaomi API 36 下载通知运行闭环：DONE（API 26 闭环待完成）。** Xiaomi 25128PNA1C / API 36 上 `Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` `OK (1 test)`、62.712 秒；通知可见、三页暂停/继续后完成、移除后数据库与文件清理一致。App 及数据保留，fixture 和 ADB reverse 已清理。
 - **S2-07D29 Stage 2 退出质量复核：DONE（当时门禁未通过）。** 复核记录见 `docs/reviews/stage-02-exit-review-2026-10-02.md`；当时 API 26 环境、实际 SAF 目录导入和低版本通知闭环缺少证据，故 Stage 2 保持 IN_PROGRESS。
-- **S2-07D30 D07 API 26 最低版本闭环：DONE（Stage 2 退出复核待执行）。** AOSP API 26 ARM64 模拟器上，来源脚本/探索搜索书架至 Reader 返回测试 `OK (1 test)`；系统 SAF picker 实际授权合成 `Download/VeneraD07Dir`，App 显示 `Folder imported.`，Reader 加载两张 fixture 图且状态 `1 / 2`。`Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` `OK (1 test)`、41.933 秒，验证活动通知、暂停/继续至 3/3 与移除清理；fixture 请求全部 HTTP 200。API 26 App 与测试包保留安装，未清数据；fixture 服务与 reverse 已清理。纯验证/文档切片执行 `git diff --check`。
+- **S2-07D30 D07 API 26 最低版本闭环：DONE（Stage 2 退出复核待执行）。** AOSP API 26 ARM64 模拟器上，来源脚本/探索搜索书架至 Reader 返回测试 `OK (1 test)`；系统 SAF picker 实际授权合成 `Download/VeneraD07Dir`，App 显示 `Folder imported.`，Reader 显示 `1 / 2` 且 Page 1 图像节点正常（目录包含两张生成 fixture 图）。`Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` `OK (1 test)`、41.933 秒，验证活动通知、暂停/继续至 3/3 与移除清理；fixture 请求全部 HTTP 200。API 26 App 与测试包保留安装，未清数据；fixture 服务与 reverse 已清理。纯验证/文档切片执行 `git diff --check`。
+- **S2-07D31 Stage 2 退出质量复核：DONE。** 更新 [Stage 2 退出审查](reviews/stage-02-exit-review-2026-10-02.md)：D01–D07 验收矩阵通过，API 26 最低版本闭环补齐，JDK 17 下最终 `testDebugUnitTest :app:assembleDebug :app:assembleRelease` 通过（442 项 JVM 测试，0 失败，Debug/Release 及 Release Lint Vital 成功）。未发现新增代码缺陷；将未逐项设备演练的 7z/CB7 格式与 SAF 取消/权限丢失场景如实保留为非阻断范围风险。Stage 2 标记 DONE；下一项 S3-00。
 
 ## 7. Stage 3：来源扩展能力
 
