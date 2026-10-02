@@ -519,6 +519,10 @@ S2-07 当前切片与验收：
 - **S2-07D24 D05 归档标题、刷新与进程重启复验：DONE。** 修复 SAF 编码 URI 被用作归档标题的问题，改为使用 DocumentProvider display name，并添加 Android regression。`:data:local:assembleDebugAndroidTest :app:assembleDebug` 成功；Xiaomi 25128PNA1C / API 36 直接运行 `LocalArchiveRefreshTest` 为 `OK (3 tests)`。保留数据覆盖安装后，归档刷新得到标题 `VeneraD05Archive`、类型 `Archive`、1 章、2 页；`LocalFirstPageProvider` 实际读取第一页。强停 App 进程再验仍成功，证明记录和持久 SAF 授权可恢复。D05 实机格式覆盖 ZIP，7z 有模块 fixture；设备 UI 未单独演练 picker 取消/权限拒绝。App 与数据保留；下一项 D06。
 - **S2-07D25 D06 长章节缓存压力回归准备：DONE（真机执行待完成）。** 新增 `LocalLongChapterTest`：257 个 1 MiB 本地页；验证章节索引不物化文件、超过 256 MiB 后缓存淘汰首屏、回访时重新读取且缓存保持有界。`:data:local:assembleDebugAndroidTest` 编译成功。测试尚未在设备运行；真机断开，D06 继续 IN_PROGRESS。
 - **S2-07D26 D06 小米长章节与 Reader 手势验收：DONE。** Xiaomi 25128PNA1C / API 36。`LocalLongChapterTest` 直接真机 `OK (1 test)`、1.417 秒，覆盖 257 MiB 懒索引、256 MiB 缓存淘汰及回访重读；`ReaderScreenTest#longChapterCanAdvanceReturnAndScrollTallPages` `OK (1 test)`、18.651 秒，覆盖 LTR 前进/返回和切换纵向后长图滚动。D06 全部验收通过，下一项 D07。
+- **S2-07D27 D07 API 34+ 通知类型与 API 30 导航复验：DONE（API 26 闭环待完成）。** Xiaomi API 36 的通知 channel / `dataSync` 类型 instrumentation 通过；API 30 ARM64 模拟器的来源脚本、Reader 导航及书架入口各 1/1 通过。API 26 系统镜像和真实 SAF 目录导入仍待验证。
+- **S2-07D28 D07 Xiaomi API 36 下载通知运行闭环：DONE（API 26 闭环待完成）。** Xiaomi 25128PNA1C / API 36 上 `Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` `OK (1 test)`、62.712 秒；通知可见、三页暂停/继续后完成、移除后数据库与文件清理一致。App 及数据保留，fixture 和 ADB reverse 已清理。
+- **S2-07D29 Stage 2 退出质量复核：DONE（当时门禁未通过）。** 复核记录见 `docs/reviews/stage-02-exit-review-2026-10-02.md`；当时 API 26 环境、实际 SAF 目录导入和低版本通知闭环缺少证据，故 Stage 2 保持 IN_PROGRESS。
+- **S2-07D30 D07 API 26 最低版本闭环：DONE（Stage 2 退出复核待执行）。** AOSP API 26 ARM64 模拟器上，来源脚本/探索搜索书架至 Reader 返回测试 `OK (1 test)`；系统 SAF picker 实际授权合成 `Download/VeneraD07Dir`，App 显示 `Folder imported.`，Reader 加载两张 fixture 图且状态 `1 / 2`。`Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` `OK (1 test)`、41.933 秒，验证活动通知、暂停/继续至 3/3 与移除清理；fixture 请求全部 HTTP 200。API 26 App 与测试包保留安装，未清数据；fixture 服务与 reverse 已清理。纯验证/文档切片执行 `git diff --check`。
 
 ## 7. Stage 3：来源扩展能力
 

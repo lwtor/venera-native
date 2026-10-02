@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01–D06 真机验收通过；D07 IN_PROGRESS：API 34+ 前台服务类型及通知运行闭环在 Xiaomi API 36 通过，API 30 补充导航通过；API 26 尚待可用镜像 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；D01–D07 验收项已有证据；当前唯一执行任务 S2-07D31 Stage 2 退出质量复核；Stage 2 在该复核提交前保持 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -194,6 +194,7 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D28 D07 Xiaomi 前台下载通知闭环复验 — DONE（D07 整体仍 IN_PROGRESS）。** 小米重新连接后确认 `dev.veneranative`、App instrumentation、下载与本地模块 instrumentation 均仍安装，ADB reverse 初始为空。通知权限已授予；运行 `Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` 直接 instrumentation `OK (1 test)`、62.712 秒，测试断言运行中的下载通知可见，三页章节 Pause→Resume 后完成 3/3，Remove 后数据库任务及下载文件清理一致；fixture 的三页 GET 均 HTTP 200。测试结束移除临时 `tcp:8765` reverse 并停止 fixture 服务；复查 App 与 App AndroidTest APK 仍安装，用户数据未卸载/清理。API 26 兼容性和该版本的 SAF 实际目录导入仍待完成。
 
 - **S2-07D29 Stage 2 退出质量复核 — DONE（退出门禁未通过）。** 按 `AGENTS.md` 阶段审查规则复核 C1–C25 历史代码审查、D01–D06 已记录设备闭环及 D07 最新证据；本次未发现新增代码缺陷，D07 API 26 环境、低版本真实 SAF 导入与通知闭环仍未验证。完整基线、矩阵、发现、命令和剩余风险见 `docs/reviews/stage-02-exit-review-2026-10-02.md`。Stage 2 保持 IN_PROGRESS，不推进 Stage 3；本切片仅文档，`git diff --check` 通过。
+- **S2-07D30 D07 API 26 最低版本闭环 — DONE（Stage 2 退出复核待执行）。** 隔离 AOSP API 26 ARM64 模拟器 `emulator-5554`，系统版本确认 `ro.build.version.sdk=26`。`Stage2FixtureNavigationTest#exploreSearchAndShelfReturnToTheirOwnOrigins` 1/1 通过（来源脚本调用、探索/搜索/书架导航、Reader 首页与返回）；实际通过 SAF 系统 picker 授权 `Download/VeneraD07Dir`，App 提示 `Folder imported.`，进入 Reader 后显示 `VeneraD07Dir`、`1 / 2`，加载两个生成的 JPG/PNG fixture 页面。`Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` 直接 instrumentation `OK (1 test)`、41.933 秒，验证下载运行通知在 `NotificationManager.activeNotifications` 可见、Pause/Resume 后 3/3 完成，Remove 后 Room 与文件清理。fixture 三页均 HTTP 200；测试后停止服务、移除 `tcp:8765` reverse，确认 API 26 App 与 AndroidTest 包仍安装；未卸载或清除数据。执行 `git diff --check`；无产品代码修改。完整证据见 Stage 2 device checklist。本子项通过，下一项 S2-07D31 Stage 2 退出质量复核。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
