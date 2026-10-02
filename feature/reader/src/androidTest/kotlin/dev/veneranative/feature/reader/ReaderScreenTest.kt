@@ -1,9 +1,16 @@
 package dev.veneranative.feature.reader
 
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeLeft
+import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeUp
 import dev.veneranative.core.model.ComicPage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -110,5 +117,56 @@ class ReaderScreenTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("3 / 3").assertIsDisplayed()
         assertTrue("initial layout must not overwrite the restored page", shownPages.none { it < 2 })
+    }
+
+    @Test
+    fun longChapterCanAdvanceReturnAndScrollTallPages() {
+        val state = mutableStateOf(ReaderUiState(
+            chapterTitle = "Synthetic long chapter",
+            pages = List(3) { index ->
+                ComicPage(index = index, imageRef = "test://long/$index", widthPx = 1080, heightPx = 12_000)
+            },
+            direction = ReadingDirection.LeftToRight,
+            status = ReaderStatus.Ready,
+        ))
+        composeRule.setContent {
+            ReaderScreen(
+                state = state.value,
+                onAction = { action ->
+                    state.value = when (action) {
+                        is ReaderAction.PageShown -> state.value.copy(currentPageIndex = action.index)
+                        is ReaderAction.ChangeDirection -> state.value.copy(direction = action.direction)
+                        else -> state.value
+                    }
+                },
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        assertEquals(1, state.value.currentPageIndex)
+        composeRule.onRoot().performTouchInput { swipeLeft() }
+        composeRule.waitForIdle()
+        assertEquals(2, state.value.currentPageIndex)
+
+        repeat(2) {
+            composeRule.onRoot().performTouchInput { swipeRight() }
+            composeRule.waitForIdle()
+        }
+        assertEquals(0, state.value.currentPageIndex)
+
+        composeRule.onNodeWithText("Vertical").performClick()
+        composeRule.waitForIdle()
+        assertEquals(ReadingDirection.Vertical, state.value.direction)
+        val verticalList = composeRule.onNode(hasScrollAction())
+        repeat(20) {
+            if (state.value.currentPageIndex == 0) {
+                verticalList.performTouchInput { swipeUp() }
+                composeRule.waitForIdle()
+            }
+        }
+        assertTrue("a tall local page should respond to vertical scroll gestures", state.value.currentPageIndex > 0)
     }
 }
