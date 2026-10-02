@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00H 阅读器图片白屏/尺寸修复 |
-| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H IN_PROGRESS（横向长页缩小已修复，纵向白屏原因尚待设备复现）；S3-00I 阅读器重复进入时源调用恢复 DONE（相关 JVM 单测通过）；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H 阅读器图片白屏/尺寸修复 DONE（小米真机拷贝漫画真实第一页在纵向及横向均通过像素与显示宽度断言）；S3-00I 阅读器重复进入时源调用恢复 DONE（相关 JVM 单测通过）；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -39,7 +39,7 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 
 **S3-00G DONE：修复首页续读的阅读器返回目标。** 之前 Reader 的返回目标总是按章节类型回到详情/书架，首页“接着阅读”直接打开 Reader 时因此多退一层。根导航现在保存打开 Reader 前的路由，并将其用于工具栏与系统返回；新增 Home、Details、Library 三种 Reader 来源的 JVM 回归。JDK 17 验证：`:core:navigation:testDebugUnitTest :app:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机导航未在本次执行。
 
-**S3-00H IN_PROGRESS：修复横向分页长图过小并继续查纵向白屏。** 原分页模式用 `containScale` 把整张长页塞进视口高度，超长漫画会缩成窄条；现在每页通过受限分块解码按屏幕宽度显示，并在该页内部纵向滚动，水平方向仍由 Pager 翻页。扩展 `ReaderScreenTest#longChapterCanAdvanceReturnAndScrollTallPages`，覆盖分页页内纵向滚动与左右翻页；新增真实 PNG 的区域解码像素回归，以及 App 主 Activity 中默认纵向阅读器渲染回归。2026-10-02 Xiaomi 25128PNA1C / API 36：`LargeImageProbeTest#generatedPngDecodesToExpectedPixelsWithTheContinuousPlan` 真机 1/1；`ReaderVerticalRenderingTest#verticalReaderDisplaysPixelsDecodedFromARealImageFile` 的本地文件版真机 1/1，像素断言通过。随后将 App 回归加强为带 `sourceId` 的图片管线租约路径，测试源码编译通过，但设备在重跑前断开，因此该加强版未执行。合成 PNG 能通过区域解码与 Compose 纵向显示，尚未复现用户报告的真实漫画页白屏，也没有定位源站图片/具体章节层面的根因；S3-00H 继续 IN_PROGRESS。验证：JDK 17 `:core:image:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试均通过 ADB `install -r` 保留安装与数据，没有卸载或清理 App。
+**S3-00H DONE：阅读器纵向白屏与横向显示尺寸已在真实来源页面闭环验证。** 横向分页原先将整张长图按高度 contain 到一屏，超长图缩成窄条；现按屏幕宽度分块解码，每页在内部纵向滚动，左右方向仍负责翻页。2026-10-02 Xiaomi 25128PNA1C / API 36：`LargeImageProbeTest#generatedPngDecodesToExpectedPixelsWithTheContinuousPlan` 和 `ReaderVerticalRenderingTest#verticalReaderDisplaysPixelsDecodedFromARealImageFile` 均直接真机 1/1。进一步扩展 `CopyMangaWorkflowTest#installFromCatalogAndSearchRealCopyMangaResults`，从真实目录安装拷贝漫画源、搜索《海贼王 艾斯》、读取 `第01话` 第一页并通过生产 `SourcePageProvider`、认证图片缓存/租约、区域解码器与 Compose 阅读器显示；页尺寸为 1200×2068，默认纵向与切换横向分页后均有非白像素，横向图片显示宽度不少于阅读区域宽度的 75%；最终设备测试 1/1（20.095 秒）。期间修正该 AndroidTest 对已创建 Compose Activity 重复调用 `composeRule.setContent` 的测试入口错误，改为在 `MainActivity` 上设内容后复测通过。验证：JDK 17 `:core:image:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。覆盖安装使用 ADB `install -r`，App 及数据保留，没有卸载或清理。该实测确认当前 CopyManga 真实样本的两种阅读方向均正常；没有额外声称所有漫画源或所有章节逐页实测。
 
 **S3-00I DONE：缓解阅读器快速重进时的同源调用竞争。** Reader 退出会取消正在进行的漫画源调用；若用户立即重进，QuickJS 对同源并行调用的保护会返回忙碌错误，此前章节加载将其直接显示为永久失败。运行时现将该情况建模为可重试的 `SourceRuntimeError.Busy`，`SourcePageProvider` 最多短暂等待重试两次；持续忙碌仍会走可见失败/手动重试路径。新增引擎错误类型断言和页提供器“忙碌后成功”回归。JDK 17 验证：`:source:engine:testDebugUnitTest :data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。ADB 本次未枚举到设备，未运行仪器 UI；同源忙碌重试已有自动化 JVM 覆盖。
 

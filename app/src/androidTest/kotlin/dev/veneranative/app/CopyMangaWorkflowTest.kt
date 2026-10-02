@@ -1,21 +1,35 @@
 package dev.veneranative.app
 
 import android.util.Log
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.paging.PagingSource
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.source.InstallOutcome
 import dev.veneranative.data.source.SourceCatalogResult
 import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 import dev.veneranative.feature.details.DetailsScreen
 import dev.veneranative.feature.details.DetailsStatus
 import dev.veneranative.feature.details.DetailsUiState
+import dev.veneranative.feature.reader.ReaderScreen
+import dev.veneranative.feature.reader.ReaderAction
+import dev.veneranative.feature.reader.ReadingDirection
+import dev.veneranative.feature.reader.ReaderStatus
+import dev.veneranative.feature.reader.ReaderUiState
 import dev.veneranative.source.api.SearchRequest
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -69,7 +83,7 @@ class CopyMangaWorkflowTest {
 
             // Render the production detail screen with the actual parsed source response. This
             // keeps the real-network assertion independent of the activity's previously saved route.
-            composeRule.setContent {
+            composeRule.activity.setContent {
                 DetailsScreen(
                     state = DetailsUiState(status = DetailsStatus.Ready, detail = detail, sourceName = "拷贝漫画"),
                     onAction = {},
@@ -83,6 +97,72 @@ class CopyMangaWorkflowTest {
                 composeRule.onAllNodesWithText("阅读").fetchSemanticsNodes().isNotEmpty()
             }
             composeRule.onNodeWithText("阅读").assertIsDisplayed()
+
+            val chapterContent = withTimeout(240_000) {
+                val chapter = detail.chapters.firstOrNull()
+                    ?: error("CopyManga detail returned no chapter to read.")
+                Log.i(TAG, "Loading first real chapter ${chapter.title}")
+                val content = graph.provider.loadChapter(ChapterRef.Remote(chapter.key))
+                val page = content.pages.firstOrNull()
+                    ?: error("CopyManga chapter returned no page references.")
+                val resolved = graph.provider.resolve(page)
+                check(resolved.widthPx > 0 && resolved.heightPx > 0) {
+                    "CopyManga first page dimensions could not be resolved."
+                }
+                content.copy(pages = listOf(resolved))
+            }
+            val readerState = mutableStateOf(
+                ReaderUiState(
+                    chapterTitle = chapterContent.title,
+                    pages = chapterContent.pages,
+                    status = ReaderStatus.Ready,
+                ),
+            )
+            composeRule.activity.setContent {
+                ReaderScreen(
+                    state = readerState.value,
+                    onAction = { action ->
+                        if (action is ReaderAction.ChangeDirection) {
+                            readerState.value = readerState.value.copy(direction = action.direction)
+                        }
+                    },
+                    onBack = {},
+                    decoderFactory = graph.decoderFactory,
+                )
+            }
+            composeRule.waitUntil(60_000) {
+                composeRule.onAllNodesWithContentDescription("第 1 页").fetchSemanticsNodes().isNotEmpty()
+            }
+            val readerImage = composeRule.onNodeWithContentDescription("第 1 页")
+            readerImage.assertIsDisplayed()
+            val pixels = readerImage.captureToImage().toPixelMap()
+            val nonWhitePixelCount = (0 until pixels.height).sumOf { y ->
+                (0 until pixels.width).count { x ->
+                    val pixel = pixels[x, y]
+                    pixel.red < 0.94f || pixel.green < 0.94f || pixel.blue < 0.94f
+                }
+            }
+            assertTrue("Expected decoded CopyManga page pixels, but image rendered all white", nonWhitePixelCount > 0)
+            Log.i(TAG, "CopyManga first page rendered ${pixels.width}x${pixels.height} with non-white pixels")
+
+            composeRule.onNodeWithText("从左到右").performClick()
+            composeRule.waitUntil(10_000) { readerState.value.direction == ReadingDirection.LeftToRight }
+            val pagedImage = composeRule.onNodeWithContentDescription("第 1 页")
+            pagedImage.assertIsDisplayed()
+            val pagedPixels = pagedImage.captureToImage().toPixelMap()
+            val readerWidth = composeRule.onRoot().captureToImage().width
+            assertTrue(
+                "Horizontal page should use most of the reader width (${pagedPixels.width}px vs ${readerWidth}px)",
+                pagedPixels.width >= readerWidth * 0.75f,
+            )
+            val pagedNonWhitePixelCount = (0 until pagedPixels.height).sumOf { y ->
+                (0 until pagedPixels.width).count { x ->
+                    val pixel = pagedPixels[x, y]
+                    pixel.red < 0.94f || pixel.green < 0.94f || pixel.blue < 0.94f
+                }
+            }
+            assertTrue("Expected decoded CopyManga page pixels after switching to horizontal paging", pagedNonWhitePixelCount > 0)
+            Log.i(TAG, "CopyManga first page remained visible in horizontal paging ${pagedPixels.width}x${pagedPixels.height}")
         }
     }
 
