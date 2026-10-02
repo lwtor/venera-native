@@ -8,8 +8,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.image.decode.PageImageDecoder
 import dev.veneranative.core.image.tiling.DecodeStrategy
 import dev.veneranative.core.model.ChapterRef
-import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.PageProvider
+import dev.veneranative.core.model.ReaderProgress
 
 
 /**
@@ -24,13 +24,13 @@ fun ReaderRoute(
     chapter: ChapterRef,
     provider: PageProvider,
     onBack: () -> Unit,
-    onOpenChapter: (ChapterKey) -> Unit = {},
     modifier: Modifier = Modifier,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
     /** Where to open a resumed chapter; ignored when it falls outside the loaded pages. */
     startPageIndex: Int = 0,
     /** Throttled persistence seam; null keeps the reader read-only, which is what previews want. */
-    progress: dev.veneranative.core.model.ReaderProgress? = null,
+    progress: ReaderProgress? = null,
+    progressFactory: ((ChapterRef) -> ReaderProgress?)? = null,
     onExit: () -> Unit = {},
 ) {
     val owner = androidx.compose.runtime.remember(chapter) {
@@ -44,18 +44,13 @@ fun ReaderRoute(
     }
     val viewModel: ReaderViewModel = viewModel(viewModelStoreOwner = owner) {
         ReaderViewModel(chapter, provider, startPageIndex = startPageIndex, progress = progress,
-            prefetchRadius = if (chapter is ChapterRef.Local) 0 else 2)
+            prefetchRadius = if (chapter is ChapterRef.Local) 0 else 2,
+            progressFactory = progressFactory ?: { target -> progress.takeIf { target == chapter } })
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     ReaderScreen(
         state = state,
-        onAction = { action ->
-            if (action == ReaderAction.OpenNextChapter) {
-                state.nextChapter?.key?.let(onOpenChapter)
-            } else {
-                viewModel.onAction(action)
-            }
-        },
+        onAction = viewModel::onAction,
         onBack = onBack,
         modifier = modifier,
         decoderFactory = decoderFactory,

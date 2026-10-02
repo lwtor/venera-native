@@ -149,7 +149,7 @@ class ReaderScreenTest {
     }
 
     @Test
-    fun offersNextChapterWhenTheReaderReachesTheEnd() {
+    fun requestsNextChapterAppendWhenTheReaderReachesTheEnd() {
         val nextChapter = Chapter(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("chapter-2")),
             title = "Chapter 2",
@@ -165,7 +165,7 @@ class ReaderScreenTest {
                     nextChapter = nextChapter,
                     status = ReaderStatus.Ready,
                 ),
-                onAction = { if (it == ReaderAction.OpenNextChapter) openedNext = true },
+                onAction = { if (it == ReaderAction.LoadNextChapter) openedNext = true },
                 onBack = {},
             )
         }
@@ -194,7 +194,7 @@ class ReaderScreenTest {
         composeRule.setContent {
             ReaderScreen(
                 state = state.value,
-                onAction = { if (it == ReaderAction.OpenNextChapter) openedNext = true },
+                onAction = { if (it == ReaderAction.LoadNextChapter) openedNext = true },
                 onBack = {},
             )
         }

@@ -278,8 +278,13 @@ private fun AppNavHost(
                 ReaderRoute(
                     chapter = current.chapter, provider = provider,
                     onBack = onBack,
-                    onOpenChapter = { next -> onRouteChange(AppRoute.Reader(ChapterRef.Remote(next))) },
                     decoderFactory = decoderFactory, progress = session,
+                    progressFactory = { target ->
+                        if (target == current.chapter) session
+                        else dev.veneranative.data.history.ReaderProgressSession(
+                            target, historyRepository, tracker, { System.currentTimeMillis() },
+                        )
+                    },
                     onExit = { appScope.launch { runCatching { tracker.flush() } } },
                 )
             }

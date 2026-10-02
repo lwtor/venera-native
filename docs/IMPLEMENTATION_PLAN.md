@@ -557,10 +557,11 @@ S3-00 小任务：
 | S3-00I | 修复退出后重复进入阅读器偶发的章节加载失败及无效重试；覆盖源调用取消/重试路径 | DONE（同源调用忙碌状态有界重试；引擎、章节提供器和阅读器单测通过） |
 | S3-00J | 减少横向阅读翻页等待：围绕当前页对前后各一页预解码首个显示 tile，复用有界图片缓存；离开邻近窗口时取消过远预取；增加 Reader Compose 回归 | DONE（`:feature:reader:compileDebugAndroidTestKotlin :feature:reader:assembleDebugAndroidTest :app:assembleDebug` 均通过；Xiaomi 上启动 `predecodesOnlyTheImmediatePagesAroundTheCurrentPage` 后约 40 秒未返回测试结果，未记为设备通过；实机翻页耗时仍待用户观察） |
 | S3-00K | 阅读器性能补强：纵向与分页均在滚动停稳后预解码邻页，远端页数据预取扩至前后两页，快速滑动取消过时解码 | DONE（`:data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；未做设备耗时对比） |
-| S3-00L | 阅读到章节末尾后自动衔接来源顺序中的下一话；首页续读也可用 | DONE（原实现曾加入 8 秒等待，已由 S3-00M 改为末页立即切换） |
-| S3-00M | 修复漫画源调用并发时详情/章节被标记失败；同源请求排队，阅读期间预载下一话与首张图片，末页无倒计时直接切换 | DONE（QuickJS 会话排队回归、预载缓存复用回归、阅读器立即切章 UI 回归及相关编译通过；未操作用户前台做真机复现） |
+| S3-00L | 阅读到章节末尾后自动衔接来源顺序中的下一话；首页续读也可用 | DONE（后续由 S3-00O 将路由跳转改为同一阅读画布追加） |
+| S3-00M | 修复漫画源调用并发时详情/章节被标记失败；同源请求排队，阅读期间预载下一话与首张图片 | DONE（QuickJS 会话排队回归、预载缓存复用回归及相关编译通过；末页路由跳转已由 S3-00O 替换为同画布追加） |
 | S3-00N | 修复竖屏末页状态由 Pending 更新为 Ready 后，末页监听仍持有旧状态而不触发下一话；补回归用例 | DONE（`:feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；设备执行被 auto-review 拦截，因为 UTP 可能卸载用户 App/测试 APK） |
 | S3-00P | 修复来源脚本并发 HTTP 请求超过每源上限时立即失败；改为有界并发排队，并记录脱敏错误分类以便定位持续加载故障 | DONE（来源网络并发排队回归和调用层单测通过；错误日志仅含来源 ID、固定成员名和错误类型） |
+| S3-00O | 下一话作为页段追加进当前 Reader 状态，竖向长画布连续下滑、横向分页连续翻页；保留分话阅读进度；章节/详情临时加载失败可重试且不能伪装成系列结尾 | DONE（data/comic、source/network、source/core、feature/reader JVM 测试及 Android 测试源码编译通过；app debug 构建通过；未做设备 UI 测试） |
 
 ## 8. Stage 4：同步、体验与发布
 

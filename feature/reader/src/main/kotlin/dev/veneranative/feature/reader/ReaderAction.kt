@@ -6,5 +6,6 @@ sealed interface ReaderAction {
     data object Retry : ReaderAction
     data class PageShown(val index: Int) : ReaderAction
     data class ChangeDirection(val direction: ReadingDirection) : ReaderAction
-    data object OpenNextChapter : ReaderAction
+    data object LoadNextChapter : ReaderAction
+    data object RetryNextChapter : ReaderAction
 }

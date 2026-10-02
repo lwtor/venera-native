@@ -90,9 +90,12 @@ fun ReaderScreen(
     DisposableEffect(decoder) {
         onDispose { decoder?.close() }
     }
-    LaunchedEffect(chapterEndReached, state.nextChapter) {
-        if (chapterEndReached && state.nextChapter != null) {
-            onAction(ReaderAction.OpenNextChapter)
+    LaunchedEffect(state.pages.size) {
+        chapterEndReached = false
+    }
+    LaunchedEffect(chapterEndReached) {
+        if (chapterEndReached) {
+            onAction(ReaderAction.LoadNextChapter)
         }
     }
 
@@ -121,12 +124,32 @@ fun ReaderScreen(
         },
         bottomBar = {
             if (state.status == ReaderStatus.Ready) {
-                ReaderControls(
-                    direction = state.direction,
-                    strategy = if (decoderFactory == null) null else strategy,
-                    onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
-                    onStrategyChange = { strategy = it },
-                )
+                Column {
+                    if (state.isLoadingNextChapter) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            Text("正在无缝载入下一话…", modifier = Modifier.padding(start = 8.dp))
+                        }
+                    } else if (state.nextChapterLoadFailed) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("下一话载入失败")
+                            TextButton(onClick = { onAction(ReaderAction.RetryNextChapter) }) { Text("重试") }
+                        }
+                    }
+                    ReaderControls(
+                        direction = state.direction,
+                        strategy = if (decoderFactory == null) null else strategy,
+                        onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
+                        onStrategyChange = { strategy = it },
+                    )
+                }
             }
         },
     ) { contentPadding ->

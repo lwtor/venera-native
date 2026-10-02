@@ -6,6 +6,7 @@ import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
@@ -85,6 +86,60 @@ class ReaderViewModelTest {
 
         assertEquals(next, viewModel.state.value.nextChapter)
         assertEquals(listOf(ChapterRef.Remote(next.key)), prefetchedChapters)
+    }
+
+    @Test
+    fun `next chapter pages append to the current reader canvas`() = runTest(dispatcher) {
+        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
+                if (chapter == ChapterRef.Remote(chapterKey)) {
+                    ChapterContent("Chapter 1", listOf(ComicPage(0, "page-1", 100, 100)), nextChapter = next)
+                } else {
+                    ChapterContent("Chapter 2", listOf(ComicPage(0, "page-2", 100, 100)))
+                }
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+
+        viewModel.onAction(ReaderAction.LoadNextChapter)
+        advanceUntilIdle()
+
+        assertEquals(listOf("page-1", "page-2"), viewModel.state.value.pages.map { it.imageRef })
+        assertEquals(listOf(0, 1), viewModel.state.value.pages.map { it.index })
+        assertEquals(0, viewModel.state.value.currentPageIndex)
+        assertEquals("Chapter 1", viewModel.state.value.chapterTitle)
+        assertEquals(null, viewModel.state.value.nextChapter)
+    }
+
+    @Test
+    fun `failed next chapter remains on the same canvas and retry appends it`() = runTest(dispatcher) {
+        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        var nextAttempts = 0
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
+                if (chapter == ChapterRef.Remote(chapterKey)) {
+                    ChapterContent("Chapter 1", listOf(ComicPage(0, "page-1", 100, 100)), nextChapter = next)
+                } else {
+                    nextAttempts++
+                    if (nextAttempts == 1) throw java.io.IOException("temporary source failure")
+                    ChapterContent("Chapter 2", listOf(ComicPage(0, "page-2", 100, 100)))
+                }
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+
+        viewModel.onAction(ReaderAction.LoadNextChapter)
+        advanceUntilIdle()
+        assertEquals(true, viewModel.state.value.nextChapterLoadFailed)
+        assertEquals(listOf("page-1"), viewModel.state.value.pages.map { it.imageRef })
+
+        viewModel.onAction(ReaderAction.RetryNextChapter)
+        advanceUntilIdle()
+
+        assertEquals(false, viewModel.state.value.nextChapterLoadFailed)
+        assertEquals(listOf("page-1", "page-2"), viewModel.state.value.pages.map { it.imageRef })
+        assertEquals("Chapter 1", viewModel.state.value.chapterTitle)
     }
 
     @Test

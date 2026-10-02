@@ -27,6 +27,8 @@ data class ReaderUiState(
     val pages: List<ComicPage> = emptyList(),
     val currentPageIndex: Int = 0,
     val nextChapter: Chapter? = null,
+    val isLoadingNextChapter: Boolean = false,
+    val nextChapterLoadFailed: Boolean = false,
     val direction: ReadingDirection = ReadingDirection.Vertical,
     val status: ReaderStatus = ReaderStatus.Loading,
 ) {

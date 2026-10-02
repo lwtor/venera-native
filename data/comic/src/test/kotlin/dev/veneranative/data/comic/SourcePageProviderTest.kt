@@ -13,6 +13,7 @@ import dev.veneranative.core.model.PageImageSizer
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceCapabilities
+import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
 import dev.veneranative.source.api.ExploreRequest
@@ -107,7 +108,7 @@ class SourcePageProviderTest {
     @Test
     fun `the chapter title comes from the caller, not from the source response`() = runTest {
         val provider = SourcePageProvider(
-            catalog = FakeCatalog(pages = emptyList()),
+            catalog = FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))),
             sizer = FixedSizer(),
             chapterTitle = { key -> "Chapter ${key.remoteId.value}" },
         )
@@ -122,7 +123,7 @@ class SourcePageProviderTest {
             title = "Chapter 2",
             index = 1,
         )
-        val catalog = object : ComicCatalog by FakeCatalog() {
+        val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
             override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
                 SourceOutcome.Success(
                     ComicDetail(
@@ -211,6 +212,49 @@ class SourcePageProviderTest {
         assertEquals(references.single().imageRef, content.pages.single().imageRef)
     }
 
+    @Test
+    fun `transient detail failure is retried so next chapter metadata is not silently lost`() = runTest {
+        val next = Chapter(chapter.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        var detailAttempts = 0
+        val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
+            override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
+                detailAttempts++
+                return if (detailAttempts == 1) {
+                    SourceOutcome.Failure(SourceRuntimeError.Timeout(5_000))
+                } else {
+                    SourceOutcome.Success(ComicDetail(
+                        comic = Comic(comicKey, "Comic"),
+                        chapters = listOf(Chapter(chapter, "Chapter 1", 0), next),
+                    ))
+                }
+            }
+        }
+        val provider = SourcePageProvider(catalog, FixedSizer(), waitBeforeBusyRetry = {})
+
+        val content = provider.loadChapter(chapter)
+
+        assertEquals(2, detailAttempts)
+        assertEquals(next, content.nextChapter)
+    }
+
+    @Test
+    fun `detail source failure is surfaced for reader retry instead of looking like series end`() = runTest {
+        val failure = SourceRuntimeError.Timeout(5_000)
+        var detailAttempts = 0
+        val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
+            override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
+                detailAttempts++
+                return SourceOutcome.Failure(failure)
+            }
+        }
+        val provider = SourcePageProvider(catalog, FixedSizer(), waitBeforeBusyRetry = {})
+
+        val thrown = runCatching { provider.loadChapter(chapter) }.exceptionOrNull()
+
+        assertEquals(MAX_RETRIES + 1, detailAttempts)
+        assertEquals(failure, (thrown as? SourceLoadException)?.error)
+    }
+
     /** Only the sizes it was given; every other reference is "could not be resolved". */
     private class FixedSizer(
         vararg known: Pair<String, ImageSize>,
@@ -234,7 +278,7 @@ class SourcePageProviderTest {
             SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(sourceId))
 
         override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
-            SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(comicKey.sourceId))
+            SourceOutcome.Failure(SourceRuntimeError.UnsupportedCapability(SourceCapability.DETAIL))
 
         override suspend fun enabledSource(sourceId: SourceId): InstalledSource? = null
 
@@ -246,5 +290,9 @@ class SourcePageProviderTest {
 
         override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
             error?.let { failure -> SourceOutcome.Failure(failure) } ?: SourceOutcome.Success(pages)
+    }
+
+    private companion object {
+        const val MAX_RETRIES = 2
     }
 }
