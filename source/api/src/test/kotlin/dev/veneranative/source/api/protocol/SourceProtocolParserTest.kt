@@ -8,6 +8,7 @@ import dev.veneranative.core.model.PageCursor
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -86,8 +87,38 @@ class SourceProtocolParserTest {
         )
         assertEquals(listOf(0, 1, 2), detail.chapters.map { it.index })
         assertEquals(listOf("Action", "Someone"), detail.comic.tags)
+        assertEquals(
+            linkedMapOf("Tags" to listOf("Action"), "Authors" to listOf("Someone")),
+            detail.tagGroups,
+        )
         assertEquals("d", detail.description)
         assertEquals(comicKey, detail.comic.key)
+    }
+
+    @Test
+    fun `detail keeps display metadata and supports scalar tag arrays`() {
+        val payload = """
+            {"title":"T","tags":["Action","Fantasy"],"uploader":"Team A",
+             "uploadTime":"2024-01-02","updateTime":"2024-03-04","stars":4.5,
+             "likesCount":123,"commentCount":9,"subId":"private-source-id"}
+        """.trimIndent()
+
+        val detail = SourceProtocolParser.parseComicDetail(comicKey, payload)
+
+        requireNotNull(detail)
+        assertEquals(mapOf("Tags" to listOf("Action", "Fantasy")), detail.tagGroups)
+        assertEquals(
+            linkedMapOf(
+                "Uploader" to "Team A",
+                "Uploaded" to "2024-01-02",
+                "Updated" to "2024-03-04",
+                "Rating" to "4.5",
+                "Likes" to "123",
+                "Comments" to "9",
+            ),
+            detail.metadata,
+        )
+        assertFalse(detail.metadata.containsKey("subId"))
     }
 
     @Test

@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00B2 上游源码对照审查 |
-| 当前任务状态 | Stage 0 / Stage 1 / Stage 2 DONE；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED；用户指定提前执行的启动页和首页首版 S4-08A / S4-08B 已 DONE，S4-08 整体仍 IN_PROGRESS，未宣称 S3-00/S3-01 前置条件已满足 |
+| 当前任务状态 | S3-00E 拷贝漫画详情内容闭环 DONE（真实详情 UI 真机验收未完成）；当前唯一可执行后续任务 S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED；Stage 0 / Stage 1 / Stage 2 DONE；用户指定提前执行的启动页和首页首版 S4-08A / S4-08B 已 DONE，S4-08 整体仍 IN_PROGRESS，未宣称 S3-00/S3-01 前置条件已满足 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -17,7 +17,7 @@
 
 ### 最终产品目标：全 App 对齐原 Venera
 
-用户明确最终目标是整个 App 与原 Venera 在功能、页面逻辑、设计三个维度分别达到至少 90% 相似度/覆盖度。已写入 `docs/PROJECT_PLAN.md` 产品目标；**S3-00** 正在冻结上游基线与逐项适用范围、权重和证据，**S4-08** 负责首页专项，**S4-09** 负责全 App 最终复核与差距收敛（均 TODO）。三个维度分别计算且各自达到 ≥90%，不得用平均分抵消短板。Stage 2 已完成；当前唯一工程任务为 S3-00，初始覆盖度不能误读为达标。Compose 重做以读取上游页面、导航和状态源码为依据；截图是实现后的视觉验收证据，不是读取源码或启动实现的前置条件。
+用户明确最终目标是整个 App 与原 Venera 在功能、页面逻辑、设计三个维度分别达到至少 90% 相似度/覆盖度。已写入 `docs/PROJECT_PLAN.md` 产品目标；**S3-00** 正在冻结上游基线与逐项适用范围、权重和证据，**S4-08** 负责首页专项，**S4-09** 负责全 App 最终复核与差距收敛（均 TODO）。三个维度分别计算且各自达到 ≥90%，不得用平均分抵消短板。Stage 2 已完成；S3-00B2 当前因无法访问上游 GitHub 源码而阻塞，初始覆盖度不能误读为达标。Compose 重做以读取上游页面、导航和状态源码为依据；截图是实现后的视觉验收证据，不是读取源码或启动实现的前置条件。
 
 ### PL-01 全局计划复核 — DONE
 
@@ -32,6 +32,8 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 用户指定先补上游来源目录展示和远程安装。**S3-00C DONE**：依据上游 `venera/doc/comic_source.md` 与 `venera-configs/index.json`，Native 现在默认读取公开 jsDelivr `index.json`，解析现用 `fileName` 及兼容的 `filename` / `url`，在来源页展示条目并支持直接下载 HTTPS 脚本、安装、刷新；本地 SAF 安装路径保留。目录 JSON 限 1 MiB、源脚本限 2 MiB，重用应用共享 OkHttp 客户端，拒绝明文 HTTP。新增解析器与 ViewModel 测试源码。验证：JDK 17 `:data:source:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check` — PASS。
 
 **S3-00D DONE：拷贝漫画真实源流程打通。** QuickJS Host 兼容层补上来源脚本实际使用的 Base64、同步 HMAC-SHA256、hex 与 `randomInt`；来源运行时设置更新后能读回新的标量值。安装阶段的初始化请求可能用于发现可选 API/搜索地址；若这类初始化失败，保留脚本声明的默认配置并允许安装，安装后的网络调用仍正常返回错误。上游 `init()` 的异常目前按最佳努力初始化处理，未单独区分网络与脚本错误，属于已知诊断限制。新增引擎回归测试及 `CopyMangaWorkflowTest`。验证：JDK 17 `:source:engine:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`:app:assembleDebugAndroidTest` — BUILD SUCCESSFUL；小米 Xiaomi 25128PNA1C / API 36 直接运行 `CopyMangaWorkflowTest`，`OK (1 test)`：从在线目录找到并安装官方拷贝漫画 1.4.2，使用真实源搜索“海贼王”，解析到非空结果并在 Compose 搜索页面显示漫画。来源已留在应用中启用，未卸载应用或清除数据。设备上可选的 `www.copy20.com` 地址探测失败，但默认 API 地址可完成签名搜索；不能据此声称已验证所有拷贝漫画功能。S3-00B2 的 GitHub 源码访问阻塞仍未解除；S3-00C 的设备验证缺口由本项补齐一条真实源路径，不代表全部来源都已兼容。
+
+**S3-00E DONE：详情模型与页面内容完善。** `ComicDetail` 保留有序标签分组和展示用标量元数据；协议解析器将来源 JS `Map` 标签映射成分组，保留简介、章节、缩略图并筛选作者、上传/更新时间、评分、点赞/评论数；QuickJS 结果序列化现在递归保留嵌套 `Map` 顺序，修复 CopyManga 章节被 JSON 序列化成空对象的问题。Compose 详情页展示元数据卡、分组标签、预览图、带标题的简介及章节数/分组标题。新增解析与引擎回归测试，以及使用真实来源搜索/详情并渲染生产详情组件的 Android 测试。验证：JDK 17 `:source:engine:testDebugUnitTest :source:api:testDebugUnitTest :feature:details:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机两次尝试均在 Compose 首页入口选择处失败，未到详情渲染断言；已修正测试使其不依赖活动已保存路由，编译通过但本次没有再运行前台测试，因此**真实详情 UI 的设备验收仍待执行，不计为通过**。本机 `gradle.properties` 变更属于用户既有修改，未纳入本任务。
 
 ### S4-08A Android 启动页 — DONE
 

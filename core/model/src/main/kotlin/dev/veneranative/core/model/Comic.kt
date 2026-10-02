@@ -27,6 +27,9 @@ data class ComicDetail(
     val comic: Comic,
     val description: String? = null,
     val chapters: List<Chapter> = emptyList(),
+    /** Detail tag categories in the order and grouping declared by the source. */
+    val tagGroups: Map<String, List<String>> = emptyMap(),
+    /** User-facing scalar facts such as uploader, rating, and update time. */
     val metadata: Map<String, String> = emptyMap(),
     /** Cover images when the source exposes more than one; empty means "use [Comic.coverUrl]". */
     val thumbnails: List<String> = emptyList(),

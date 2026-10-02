@@ -55,11 +55,21 @@ internal object SourceInvocationScript {
               if (!Array.isArray(args)) {
                 throw new Error("Source function arguments must be a JSON array.");
               }
+              function serializeSourceValue(value) {
+                return JSON.stringify({ value: value === undefined ? null : value }, function(_key, entry) {
+                  if (!(entry instanceof Map)) return entry;
+                  const object = Object.create(null);
+                  entry.forEach(function(mapValue, mapKey) {
+                    object[String(mapKey)] = mapValue;
+                  });
+                  return object;
+                });
+              }
               const previousInvocationId = globalThis.__veneraInvocationId;
               globalThis.__veneraInvocationId = $quotedInvocationId;
               return Promise.resolve(fn.apply(target, args))
                 .then(function(value) {
-                  return JSON.stringify({ value: value === undefined ? null : value });
+                  return serializeSourceValue(value);
                 })
                 .finally(function() {
                   if (previousInvocationId === undefined) {

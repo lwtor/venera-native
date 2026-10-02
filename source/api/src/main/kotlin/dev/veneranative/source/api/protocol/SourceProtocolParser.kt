@@ -59,6 +59,7 @@ object SourceProtocolParser {
     fun parseComicDetail(comicKey: ComicKey, payload: String): ComicDetail? {
         val root = payload.objectOrNull() ?: return null
         val title = root["title"].stringOrNull() ?: return null
+        val tagGroups = root["tags"].tagGroups()
         return ComicDetail(
             // The requested key wins over the response: identity must stay consistent even when a
             // source omits `id` or echoes a different one.
@@ -67,12 +68,14 @@ object SourceProtocolParser {
                 title = title,
                 subtitle = root["subtitle"].stringOrNull() ?: root["subTitle"].stringOrNull(),
                 coverUrl = root["cover"].stringOrNull(),
-                tags = root["tags"].flattenedTags(),
+                tags = tagGroups.values.flatten(),
                 maxPage = root["maxPage"].intOrNull(),
                 language = root["language"].stringOrNull(),
             ),
             description = root["description"].stringOrNull(),
             chapters = parseChapters(comicKey, root["chapters"]),
+            tagGroups = tagGroups,
+            metadata = root.detailMetadata(),
             thumbnails = root["thumbnails"].stringList(),
         )
     }
@@ -204,6 +207,34 @@ object SourceProtocolParser {
 
     private fun JsonElement?.stringList(): List<String> =
         arrayOrNull().orEmpty().mapNotNull { it.stringOrNull() }
+
+    /** List results carry a flat tag array; detail results may carry a map of named tag groups. */
+    private fun JsonElement?.tagGroups(): Map<String, List<String>> = when (this) {
+        is JsonArray -> mapNotNull { it.stringOrNull() }.takeIf { it.isNotEmpty() }?.let { mapOf("Tags" to it) }.orEmpty()
+        is JsonObject -> entries.mapNotNull { (name, values) ->
+            values.stringList().takeIf { it.isNotEmpty() }?.let { name to it }
+        }.toMap()
+        else -> emptyMap()
+    }
+
+    /** Only stable, scalar presentation fields are exposed; opaque source objects stay out of UI. */
+    private fun JsonObject.detailMetadata(): Map<String, String> = buildMap {
+        listOf(
+            "uploader" to "Uploader",
+            "uploadTime" to "Uploaded",
+            "updateTime" to "Updated",
+            "stars" to "Rating",
+            "likesCount" to "Likes",
+            "commentCount" to "Comments",
+        ).forEach { (field, label) ->
+            this@detailMetadata[field].displayScalar()?.let { put(label, it) }
+        }
+    }
+
+    private fun JsonElement?.displayScalar(): String? =
+        (this as? JsonPrimitive)?.takeUnless { it.isString && it.content.isBlank() }
+            ?.contentOrNull
+            ?.takeUnless { it == "null" }
 
     /** List results carry a flat tag array; detail results carry a map of tag groups. */
     private fun JsonElement?.flattenedTags(): List<String> = when (this) {

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -115,19 +117,33 @@ private fun Content(
     onOpenChapter: (ChapterKey) -> Unit,
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag(DETAILS_CONTENT_TAG),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item { Header(state = state, onAction = onAction) }
         state.downloadMessage?.let { message -> item { Text(message, style = MaterialTheme.typography.bodyMedium) } }
 
+        state.detail?.metadata?.takeIf { it.isNotEmpty() }?.let { metadata ->
+            item { DetailFacts(metadata) }
+        }
+
+        state.detail?.let { detail ->
+            val groups = detail.tagGroups.ifEmpty {
+                detail.comic.tags.takeIf { it.isNotEmpty() }?.let { mapOf("Tags" to it) }.orEmpty()
+            }
+            if (groups.isNotEmpty()) item { DetailTagGroups(groups) }
+            if (detail.thumbnails.isNotEmpty()) {
+                item { DetailThumbnails(title = detail.comic.title, urls = detail.thumbnails, sourceId = detail.comic.key.sourceId) }
+            }
+        }
+
         state.detail?.description?.takeIf { it.isNotBlank() }?.let { description ->
             item {
-                Text(
-                    text = description,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Description", style = MaterialTheme.typography.titleMedium)
+                    Text(text = description, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
 
@@ -141,7 +157,12 @@ private fun Content(
             return@LazyColumn
         }
 
-        item { ChapterControls(state = state, onAction = onAction) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Chapters (${state.detail?.chapters?.size ?: 0})", style = MaterialTheme.typography.titleMedium)
+                ChapterControls(state = state, onAction = onAction)
+            }
+        }
 
         val withHeaders = state.groupsTheList
         var previousGroup: String? = null
@@ -191,24 +212,58 @@ private fun Header(
                 )
             }
 
-            if (comic.tags.isNotEmpty()) {
-                Text(
-                    text = comic.tags.joinToString(" · "),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            state.detail?.metadata?.forEach { (key, value) ->
-                Text(
-                    text = "$key: $value",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
             if (state.hasShelf) {
                 ShelfControl(state = state, onAction = onAction)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailFacts(metadata: Map<String, String>) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            metadata.forEach { (label, value) ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(value, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailTagGroups(groups: Map<String, List<String>>) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            groups.forEach { (name, values) ->
+                if (values.isNotEmpty()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(name, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(values.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailThumbnails(title: String, urls: List<String>, sourceId: SourceId) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Previews", style = MaterialTheme.typography.titleMedium)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            itemsIndexed(urls) { index, url ->
+                Card(modifier = Modifier.size(width = 96.dp, height = 144.dp)) {
+                    ComicImage(
+                        request = ComicImageRequest(url = url, sourceId = sourceId, variant = "$DETAIL_THUMBNAIL_VARIANT-$index"),
+                        contentDescription = "$title preview ${index + 1}",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop,
+                        placeholder = { CoverTitle(title = title) },
+                    )
+                }
             }
         }
     }
@@ -399,6 +454,8 @@ private fun ChapterOrder.label(): String = when (this) {
 }
 
 internal const val DETAILS_LOADING_TAG = "details-loading"
+internal const val DETAILS_CONTENT_TAG = "details-content"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val COVER_VARIANT = "cover"
+private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"

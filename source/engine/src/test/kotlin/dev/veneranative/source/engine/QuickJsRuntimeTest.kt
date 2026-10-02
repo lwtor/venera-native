@@ -230,6 +230,35 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `source result serialization preserves nested Maps as ordered objects`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    comic = {
+                      loadInfo() {
+                        return {
+                          title: "T",
+                          chapters: new Map([
+                            ["Volume 2", new Map([["ch2", "Chapter 2"], ["ch1", "Chapter 1"]])],
+                            ["Volume 1", new Map([["ch0", "Chapter 0"]])]
+                          ])
+                        };
+                      }
+                    };
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "comic.loadInfo", "[\"comic-id\"]"))
+            val chapters = result.getJSONObject("chapters")
+            assertEquals(listOf("Volume 2", "Volume 1"), chapters.keys().asSequence().toList())
+            assertEquals(listOf("ch2", "ch1"), chapters.getJSONObject("Volume 2").keys().asSequence().toList())
+            assertEquals("Chapter 0", chapters.getJSONObject("Volume 1").getString("ch0"))
+        }
+    }
+
+    @Test
     fun `copy manga signing helpers match the upstream sha256 hmac contract`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
