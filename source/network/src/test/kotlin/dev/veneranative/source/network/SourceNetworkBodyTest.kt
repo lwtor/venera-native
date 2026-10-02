@@ -67,4 +67,36 @@ class SourceNetworkBodyTest {
         val result = withTimeout(2_000) { request.await() }
         assertEquals(SourceNetworkError.Cancelled, (result as SourceHttpResult.Failure).error)
     }
+
+    @Test fun requestsBeyondThePerSourceLimitWaitForAnAvailablePermit() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse.Builder().body("first").build())
+            server.enqueue(MockResponse.Builder().body("second").build())
+            val firstStarted = CountDownLatch(1)
+            val releaseFirst = CountDownLatch(1)
+            val client = OkHttpClient.Builder().addInterceptor { chain ->
+                if (chain.request().url.encodedPath == "/first") {
+                    firstStarted.countDown()
+                    check(releaseFirst.await(2, TimeUnit.SECONDS))
+                }
+                chain.proceed(chain.request())
+            }.build()
+            val executor = SourceNetworkExecutor(baseClient = client, maxConcurrentPerSource = 1)
+            val source = SourceId("serial-source")
+            val first = async(Dispatchers.IO) {
+                executor.execute(source, SourceHttpRequest(server.url("/first").toString(), SourceHttpRequest.Method.GET))
+            }
+            assertTrue(firstStarted.await(2, TimeUnit.SECONDS))
+            val second = async(Dispatchers.IO) {
+                executor.execute(source, SourceHttpRequest(server.url("/second").toString(), SourceHttpRequest.Method.GET))
+            }
+            yield()
+            assertFalse("the next request must queue instead of fail", second.isCompleted)
+            releaseFirst.countDown()
+
+            assertEquals("first", ((first.await() as SourceHttpResult.Success).response.body))
+            assertEquals("second", ((second.await() as SourceHttpResult.Success).response.body))
+        }
+    }
 }

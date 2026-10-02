@@ -6,9 +6,10 @@ import dev.veneranative.core.network.NetworkFailure
 import dev.veneranative.core.network.NetworkFailureMapper
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -23,9 +24,10 @@ class SourceNetworkExecutor(
     private val cookieJars: PerSourceCookieJarRegistry = PerSourceCookieJarRegistry(),
     private val maxConcurrentPerSource: Int = DEFAULT_MAX_CONCURRENT_PER_SOURCE,
     private val maxResponseBytes: Long = DEFAULT_MAX_RESPONSE_BYTES,
+    private val onRequestFailure: (SourceId, String) -> Unit = { _, _ -> },
 ) {
     private val clients = ConcurrentHashMap<SourceId, OkHttpClient>()
-    private val activeCounts = ConcurrentHashMap<SourceId, AtomicInteger>()
+    private val sourcePermits = ConcurrentHashMap<SourceId, Semaphore>()
     private val activeCalls = mutableMapOf<SourceId, MutableSet<Call>>()
     private val epochs = mutableMapOf<SourceId, Long>()
 
@@ -36,12 +38,8 @@ class SourceNetworkExecutor(
 
     suspend fun execute(sourceId: SourceId, request: SourceHttpRequest): SourceHttpResult {
         val epoch = synchronized(activeCalls) { epochs[sourceId] ?: 0L }
-        val counter = activeCounts.computeIfAbsent(sourceId) { AtomicInteger() }
-        if (!tryAcquire(counter)) {
-            return SourceHttpResult.Failure(SourceNetworkError.ConcurrencyLimit)
-        }
-
-        return try {
+        val permits = sourcePermits.computeIfAbsent(sourceId) { Semaphore(maxConcurrentPerSource) }
+        return permits.withPermit {
             val call =
                 try {
                     clientFor(sourceId).newCall(request.toOkHttpRequest())
@@ -59,7 +57,7 @@ class SourceNetworkExecutor(
                 call.cancel()
                 return SourceHttpResult.Failure(SourceNetworkError.Cancelled)
             }
-            try {
+            val result = try {
                 executeCall(call)
             } finally {
                 synchronized(activeCalls) {
@@ -67,8 +65,12 @@ class SourceNetworkExecutor(
                     if (activeCalls[sourceId]?.isEmpty() == true) activeCalls.remove(sourceId)
                 }
             }
-        } finally {
-            counter.decrementAndGet()
+            if (result is SourceHttpResult.Failure && result.error !is SourceNetworkError.Cancelled) {
+                runCatching {
+                    onRequestFailure(sourceId, result.error.javaClass.simpleName.ifBlank { "SourceNetworkError" })
+                }
+            }
+            result
         }
     }
 
@@ -77,7 +79,7 @@ class SourceNetworkExecutor(
             epochs[sourceId] = (epochs[sourceId] ?: 0L) + 1L
             clients.remove(sourceId)
             cookieJars.clear(sourceId)
-            activeCounts.remove(sourceId)
+            sourcePermits.remove(sourceId)
             activeCalls.remove(sourceId)?.toList().orEmpty()
         }
         calls.forEach(Call::cancel)
@@ -89,14 +91,6 @@ class SourceNetworkExecutor(
                 .cookieJar(cookieJars.forSource(sourceId))
                 .build()
         }
-
-    private fun tryAcquire(counter: AtomicInteger): Boolean {
-        while (true) {
-            val current = counter.get()
-            if (current >= maxConcurrentPerSource) return false
-            if (counter.compareAndSet(current, current + 1)) return true
-        }
-    }
 
     private suspend fun executeCall(call: Call): SourceHttpResult =
         suspendCancellableCoroutine { continuation ->

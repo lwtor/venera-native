@@ -50,6 +50,7 @@ import kotlinx.serialization.json.JsonPrimitive
 class EngineSourceCore(
     private val runtime: SourceScriptRuntime,
     private val timeoutMillis: Long = SourceCall.DEFAULT_TIMEOUT_MILLIS,
+    private val onCallFailure: (SourceId, String, String) -> Unit = { _, _, _ -> },
 ) : SourceCore {
 
     private val sequence = AtomicLong(0)
@@ -270,6 +271,15 @@ class EngineSourceCore(
 
             is SourceResult.Failure -> {
                 // A source that is not loaded may have been reinstalled since it was described.
+                if (result.error !is SourceRuntimeError.Cancelled) {
+                    runCatching {
+                        onCallFailure(
+                            sourceId,
+                            call.member,
+                            result.error.javaClass.simpleName.ifBlank { "SourceRuntimeError" },
+                        )
+                    }
+                }
                 SourceOutcome.Failure(result.error)
             }
         }

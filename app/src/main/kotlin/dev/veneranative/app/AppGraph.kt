@@ -98,7 +98,13 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val imageCache = PageImageCache(64L * 1024 * 1024)
     private val httpClient = host.httpClient
     private val cookieJars = host.cookieJars
-    private val network = SourceNetworkExecutor(baseClient = httpClient, cookieJars = cookieJars)
+    private val network = SourceNetworkExecutor(
+        baseClient = httpClient,
+        cookieJars = cookieJars,
+        onRequestFailure = { source, error ->
+            android.util.Log.w("VeneraSource", "Network request failed: source=${source.value} error=$error")
+        },
+    )
     private val authProvider = host.authProvider
     private val diskCache = host.diskCache
     private val imagePipeline = host.imagePipeline
@@ -114,7 +120,12 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         onSourceChanged = { network.clearSource(it) },
     )
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
-    val catalog = DefaultComicCatalog(sourceRepository, EngineSourceCore(runtime))
+    val catalog = DefaultComicCatalog(
+        sourceRepository,
+        EngineSourceCore(runtime, onCallFailure = { source, member, error ->
+            android.util.Log.w("VeneraSource", "Source call failed: source=${source.value} member=$member error=$error")
+        }),
+    )
     private val sourcePageProvider: PageProvider = SourcePageProvider(
         catalog, CoilPageImageSizer(imagePipeline), prefetchScope = scope,
     )
