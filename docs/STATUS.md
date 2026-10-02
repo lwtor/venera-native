@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00B2 上游源码对照审查 |
-| 当前任务状态 | S3-00E 拷贝漫画详情内容闭环 DONE（真实详情 UI 真机验收未完成）；当前唯一可执行后续任务 S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED；Stage 0 / Stage 1 / Stage 2 DONE；用户指定提前执行的启动页和首页首版 S4-08A / S4-08B 已 DONE，S4-08 整体仍 IN_PROGRESS，未宣称 S3-00/S3-01 前置条件已满足 |
+| 当前任务 | S4-04A 全 App 简体中文支持 |
+| 当前任务状态 | S3-00F 阅读器图片比例修复 DONE（Xiaomi 实机像素断言 1/1 通过）；S4-04A 为用户指定的提前任务，IN_PROGRESS；S3-00B2 仍因执行环境无法访问 GitHub 源码而 BLOCKED；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -34,6 +34,8 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00D DONE：拷贝漫画真实源流程打通。** QuickJS Host 兼容层补上来源脚本实际使用的 Base64、同步 HMAC-SHA256、hex 与 `randomInt`；来源运行时设置更新后能读回新的标量值。安装阶段的初始化请求可能用于发现可选 API/搜索地址；若这类初始化失败，保留脚本声明的默认配置并允许安装，安装后的网络调用仍正常返回错误。上游 `init()` 的异常目前按最佳努力初始化处理，未单独区分网络与脚本错误，属于已知诊断限制。新增引擎回归测试及 `CopyMangaWorkflowTest`。验证：JDK 17 `:source:engine:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`:app:assembleDebugAndroidTest` — BUILD SUCCESSFUL；小米 Xiaomi 25128PNA1C / API 36 直接运行 `CopyMangaWorkflowTest`，`OK (1 test)`：从在线目录找到并安装官方拷贝漫画 1.4.2，使用真实源搜索“海贼王”，解析到非空结果并在 Compose 搜索页面显示漫画。来源已留在应用中启用，未卸载应用或清除数据。设备上可选的 `www.copy20.com` 地址探测失败，但默认 API 地址可完成签名搜索；不能据此声称已验证所有拷贝漫画功能。S3-00B2 的 GitHub 源码访问阻塞仍未解除；S3-00C 的设备验证缺口由本项补齐一条真实源路径，不代表全部来源都已兼容。
 
 **S3-00E DONE：详情模型与页面内容完善。** `ComicDetail` 保留有序标签分组和展示用标量元数据；协议解析器将来源 JS `Map` 标签映射成分组，保留简介、章节、缩略图并筛选作者、上传/更新时间、评分、点赞/评论数；QuickJS 结果序列化现在递归保留嵌套 `Map` 顺序，修复 CopyManga 章节被 JSON 序列化成空对象的问题。Compose 详情页展示元数据卡、分组标签、预览图、带标题的简介及章节数/分组标题。新增解析与引擎回归测试，以及使用真实来源搜索/详情并渲染生产详情组件的 Android 测试。验证：JDK 17 `:source:engine:testDebugUnitTest :source:api:testDebugUnitTest :feature:details:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机两次尝试均在 Compose 首页入口选择处失败，未到详情渲染断言；已修正测试使其不依赖活动已保存路由，编译通过但本次没有再运行前台测试，因此**真实详情 UI 的设备验收仍待执行，不计为通过**。本机 `gradle.properties` 变更属于用户既有修改，未纳入本任务。
+
+**S3-00F DONE：修复阅读器页面图片拉伸。** 解码后 bitmap 不再用 `ContentScale.FillBounds` 强制拉满显示 tile，改为 `ContentScale.Fit` 以保持长宽比。新增像素级 Compose 回归：在小米 Xiaomi 25128PNA1C / API 36 上用窄长红色页面验证 tile 内留白区仍为蓝色、页面像素居中；`ReaderScreenTest#decodedPageImageKeepsItsAspectRatioInsideTheTileBounds` — `OK (1 test)`。验证构建：JDK 17 `:feature:reader:compileDebugAndroidTestKotlin :feature:reader:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。MIUI 阻止测试 Activity 自动到前台，本次通过 ADB 显式启动测试 Activity 后运行通过；没有卸载主 App 或清理用户数据。
 
 ### S4-08A Android 启动页 — DONE
 

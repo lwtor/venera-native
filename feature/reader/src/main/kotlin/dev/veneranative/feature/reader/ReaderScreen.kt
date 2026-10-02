@@ -429,14 +429,27 @@ private fun PageTile(
                 style = MaterialTheme.typography.bodyMedium,
             )
 
-            is PageImageState.Decoded -> Image(
+            is PageImageState.Decoded -> FittedPageImage(
                 bitmap = current.image.bitmap.asImageBitmap(),
                 contentDescription = "Page ${item.page.index + 1}",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.FillBounds,
             )
         }
     }
+}
+
+@Composable
+internal fun FittedPageImage(
+    bitmap: androidx.compose.ui.graphics.ImageBitmap,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    Image(
+        bitmap = bitmap,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Fit,
+    )
 }
 
 @Composable

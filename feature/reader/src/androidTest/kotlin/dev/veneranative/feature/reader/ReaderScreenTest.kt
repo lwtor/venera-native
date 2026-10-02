@@ -1,16 +1,31 @@
 package dev.veneranative.feature.reader
 
+import android.graphics.Bitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import dev.veneranative.core.model.ComicPage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -96,6 +111,22 @@ class ReaderScreenTest {
         }
 
         composeRule.onNodeWithText("0 / 0").assertIsDisplayed()
+    }
+
+    @Test
+    fun decodedPageImageKeepsItsAspectRatioInsideTheTileBounds() {
+        val page = Bitmap.createBitmap(10, 20, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.Red.toArgb())
+        }.asImageBitmap()
+        composeRule.setContent {
+            Box(Modifier.size(100.dp).background(Color.Blue).testTag("page-tile")) {
+                FittedPageImage(page, contentDescription = "test page", modifier = Modifier.fillMaxSize())
+            }
+        }
+
+        val pixels = composeRule.onNodeWithTag("page-tile").captureToImage().toPixelMap()
+        assertEquals("letterboxed area should remain visible", Color.Blue, pixels[pixels.width / 10, pixels.height / 2])
+        assertEquals("page pixels should stay centered and visible", Color.Red, pixels[pixels.width / 2, pixels.height / 2])
     }
 
     @Test
