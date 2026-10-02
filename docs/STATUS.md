@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 2：增量能力 |
 | 当前任务 | S2-07D 真机用户闭环 |
-| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01–D06 真机验收通过；D07 为下一项，尚未开始 |
+| 当前任务状态 | Stage 0 / Stage 1 DONE；S2-01–S2-06、S2-07A、S2-07B DONE；S2-07C DONE；当前唯一执行任务 S2-07D；D01–D06 真机验收通过；D07 IN_PROGRESS：API 34+ 前台服务类型在 Xiaomi API 36 通过，API 30 补充闭环部分通过；API 26 尚待可用镜像 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -188,6 +188,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 - **S2-07D24 D05 归档标题、刷新与进程重启复验 — DONE。** 发现 SAF URI 编码路径被误用作标题；改为优先采用 DocumentProvider display name，并添加回归。`LocalArchiveRefreshTest` 小米直接 instrumentation `OK (3 tests)`。App `:app:assembleDebug` 成功后以 `adb install -r` 覆盖安装并保留数据；通过 App UID 对合成 ZIP 执行 repository refresh，检查 Room 标题 `VeneraD05Archive`、`Archive` 类型、1 章、2 页，并用 `LocalFirstPageProvider` 实际物化第一页。强停 App 后重复检查仍成功，证明归档记录、SAF 授权和页读取跨进程保留。D05 真机覆盖 ZIP，7z 由模块 fixture 覆盖；picker 取消/权限拒绝未单独在设备演练。诊断用 Debug provider 已从源码移除并随后重装干净 Debug APK。App 与数据保留；`gradle.properties` 用户修改不属于本任务且保留。D05 通过；下一项 D06，Stage 2 继续 IN_PROGRESS。
 - **S2-07D25 D06 长章节缓存压力回归准备 — DONE（真机执行待完成）。** 新增 `LocalLongChapterTest`：257 个 1 MiB 本地页；章节索引时断言无文件物化，顺序读取超过 256 MiB 后断言首屏被缓存淘汰、回访重新读取成功且总缓存仍有界。`:data:local:assembleDebugAndroidTest` 编译成功，`git diff --check` 通过。测试准备执行期间小米从 ADB 断开；未安装测试 APK或运行压力测试。D06 继续 IN_PROGRESS，不据源码编译标记设备通过。
 - **S2-07D26 D06 小米长章节与 Reader 手势验收 — DONE。** Xiaomi 25128PNA1C / API 36 上直接运行 `LocalLongChapterTest`，`OK (1 test)`、1.417 秒：257 个 1 MiB 页面在章节加载时零物化；超过 256 MiB 后首页缓存被淘汰，回访触发第二次来源读取且缓存总量不超限。修正 MIUI 后台 Activity 启动限制后，`ReaderScreenTest#longChapterCanAdvanceReturnAndScrollTallPages` `OK (1 test)`、18.651 秒：LTR 前进两页、退回 1/3、切换 Vertical 并对 12,000 px 长页上滑至后续页。两项均为设备直接 instrumentation；App 用户数据不动。D06 全部验收通过；下一项 D07。
+
+- **S2-07D27 D07 兼容性检查阶段结果 — IN_PROGRESS。** Xiaomi 25128PNA1C / API 36 直接运行 `DownloadWorkerTest#theForegroundPromiseUsesARealChannel`，`OK (1 test)`，覆盖下载通知 channel 与 Android 14+ `FOREGROUND_SERVICE_TYPE_DATA_SYNC`。为补充低版本证据，在隔离 API 30 ARM64 模拟器运行 `Stage2FixtureNavigationTest#exploreSearchAndShelfReturnToTheirOwnOrigins` 和 `Stage2LibraryNavigationTest#homeOpensDownloadsAndLocalLibraryTabs`，各 `OK (1 test)`；前者覆盖 App 启动、fixture 来源脚本调用、探索/搜索/书架进入 Reader 和返回，后者覆盖 Downloads/Local 入口及目录导入按钮。SAF 目录选择器已打开，但目录选择与实际导入未完成，故不记为目录导入通过；API 30 也不能代替计划要求的 API 26。API 26 ARM64 镜像可由 SDK 元数据列出，但 `sdkmanager` 安装停在 `Preparing` 且未产生系统镜像文件；尝试已中断。D07 保持 IN_PROGRESS，待 API 26 镜像可用后完成低版本启动、来源、目录导入、阅读和通知闭环；API 34+ 类型检查已有通过证据。测试期间未卸载 App 或清理用户数据；关闭临时 emulator 后小米从 ADB 消失，最终 `pm path` 与 reverse 状态复查未完成；临时 emulator 与 fixture 服务已停止。
 
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
