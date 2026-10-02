@@ -7,9 +7,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 最后更新 | 2026-10-02 |
-| 当前阶段 | Stage 3：来源扩展能力 |
-| 当前任务 | S3-00 Venera 对照基线 |
-| 当前任务状态 | Stage 0 / Stage 1 / Stage 2 DONE；Stage 2 的 D01–D07 验收和退出质量复核完成；S3-00 正在建立上游对照基线 |
+| 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；按用户要求提前做首页首屏） |
+| 当前任务 | S4-08B 首页视觉与现有数据首版 |
+| 当前任务状态 | Stage 0 / Stage 1 / Stage 2 DONE；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED；用户指定提前执行 S4-08 的首页/启动页小任务，S4-08A DONE、S4-08B IN_PROGRESS，未宣称 S3-00/S3-01 前置条件已满足 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -27,7 +27,13 @@
 
 2026-10-02 冻结上游比较对象为 [`venera-app/venera` 归档仓库 `master@a0eba91`](https://github.com/venera-app/venera/tree/a0eba91)，并记录最新正式发行版为 [`v1.6.3`](https://github.com/venera-app/venera/releases/tag/v1.6.3)（`17a8cc1`）。对照矩阵、权重、初始得分、代码证据与版权边界见 [`docs/reviews/venera-comparison-baseline-2026-10-02.md`](reviews/venera-comparison-baseline-2026-10-02.md)。
 
-S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与许可证边界；提交为 `9f83025`。S3-00B1 找到 F-Droid 页面列出的 7 张上游手机截图引用并登记；其图片内容与 `a0eba91` 的版本关联尚未核验。初步盘点确认当前入口仍为基础占位首页；来源、探索、单源搜索、详情、阅读、收藏/下载/本地库已有实现。分类/排行/聚合搜索、账号和源交互能力、追更/历史等页面及正式设置尚有缺口。功能和流程分数只累计有实现与验收证据的整项；视觉比较目前没有成对截图核验，记为未核验 0/100，不代表视觉覆盖为 0% 或已达到任何门槛。S3-00B2 改为上游页面、导航、主题/状态源码与本地 Compose 实现的逐项对照；截图采集与视觉复评移至对应页面实现验收，尤其 S4-08 和 S4-09，不再阻断 S3-00/S3-01。当前执行环境无法连接 `github.com`，已登记为上游源码读取限制；恢复源码访问后继续完成 B2。具体矩阵与范围见审查记录。
+S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与许可证边界；提交为 `9f83025`。S3-00B1 找到 F-Droid 页面列出的 7 张上游手机截图引用并登记；其图片内容与 `a0eba91` 的版本关联尚未核验。初步盘点确认原首页还是基础占位页；来源、探索、单源搜索、详情、阅读、收藏/下载/本地库已有实现。分类/排行/聚合搜索、账号和源交互能力、追更/历史等页面及正式设置尚有缺口。功能和流程分数只累计有实现与验收证据的整项；视觉比较目前没有成对截图核验，记为未核验 0/100，不代表视觉覆盖为 0% 或已达到任何门槛。S3-00B2 改为上游页面、导航、主题/状态源码与本地 Compose 实现的逐项对照；截图采集与视觉复评移至对应页面实现验收，不再阻断 S3-00/S3-01。由于本机执行环境无法解析 `github.com`，S3-00B2 标为 BLOCKED，解除条件是恢复上游 GitHub 源码访问。根据用户当前要求，先提前完成 S4-08A 启动页并执行 S4-08B 首页首版；这只是 S4-08 的局部切片，不表示 Stage 3 或完整 S4-08 已完成。
+
+### S4-08A Android 启动页 — DONE
+
+- 使用 AndroidX SplashScreen 兼容 API；Android 12+ 使用系统启动界面，旧版使用兼容主题。启动图标复用本项目现有矢量图标，背景随系统明暗主题切换，不额外延长启动等待。
+- 验证：`JAVA_HOME=/Users/lwtor/Library/Java/JavaVirtualMachines/corretto-17.0.9/Contents/Home sh gradlew :app:assembleDebug` — BUILD SUCCESSFUL。Android 官方说明要求启动 Activity 使用 SplashScreen theme 并在 `super.onCreate()` 前调用 `installSplashScreen()`；见[官方迁移说明](https://developer.android.com/develop/ui/views/launch/splash-screen/migrate?hl=en)。
+- 此切片不覆盖设备启动动画的人工验收；首页首版为下一个唯一执行任务 S4-08B。
 
 本任务为文档审查与基线冻结，不涉及编译或真机操作；验收命令：`git diff --check`。
 
