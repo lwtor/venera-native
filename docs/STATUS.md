@@ -7,9 +7,9 @@
 | 项目 | 当前值 |
 | --- | --- |
 | 最后更新 | 2026-10-02 |
-| 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；按用户要求提前做首页首屏） |
-| 当前任务 | S4-08B 首页视觉与现有数据首版 |
-| 当前任务状态 | Stage 0 / Stage 1 / Stage 2 DONE；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED；用户指定提前执行 S4-08 的首页/启动页小任务，S4-08A DONE、S4-08B IN_PROGRESS，未宣称 S3-00/S3-01 前置条件已满足 |
+| 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
+| 当前任务 | S3-00B2 上游源码对照审查 |
+| 当前任务状态 | Stage 0 / Stage 1 / Stage 2 DONE；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED；用户指定提前执行的启动页和首页首版 S4-08A / S4-08B 已 DONE，S4-08 整体仍 IN_PROGRESS，未宣称 S3-00/S3-01 前置条件已满足 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -27,15 +27,24 @@
 
 2026-10-02 冻结上游比较对象为 [`venera-app/venera` 归档仓库 `master@a0eba91`](https://github.com/venera-app/venera/tree/a0eba91)，并记录最新正式发行版为 [`v1.6.3`](https://github.com/venera-app/venera/releases/tag/v1.6.3)（`17a8cc1`）。对照矩阵、权重、初始得分、代码证据与版权边界见 [`docs/reviews/venera-comparison-baseline-2026-10-02.md`](reviews/venera-comparison-baseline-2026-10-02.md)。
 
-S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与许可证边界；提交为 `9f83025`。S3-00B1 找到 F-Droid 页面列出的 7 张上游手机截图引用并登记；其图片内容与 `a0eba91` 的版本关联尚未核验。初步盘点确认原首页还是基础占位页；来源、探索、单源搜索、详情、阅读、收藏/下载/本地库已有实现。分类/排行/聚合搜索、账号和源交互能力、追更/历史等页面及正式设置尚有缺口。功能和流程分数只累计有实现与验收证据的整项；视觉比较目前没有成对截图核验，记为未核验 0/100，不代表视觉覆盖为 0% 或已达到任何门槛。S3-00B2 改为上游页面、导航、主题/状态源码与本地 Compose 实现的逐项对照；截图采集与视觉复评移至对应页面实现验收，不再阻断 S3-00/S3-01。由于本机执行环境无法解析 `github.com`，S3-00B2 标为 BLOCKED，解除条件是恢复上游 GitHub 源码访问。根据用户当前要求，先提前完成 S4-08A 启动页并执行 S4-08B 首页首版；这只是 S4-08 的局部切片，不表示 Stage 3 或完整 S4-08 已完成。
+S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与许可证边界；提交为 `9f83025`。S3-00B1 找到 F-Droid 页面列出的 7 张上游手机截图引用并登记；其图片内容与 `a0eba91` 的版本关联尚未核验。早期盘点时本地首页仍是基础占位页，现已按用户要求提前交付 S4-08A 启动页和 S4-08B 首页首版。来源、探索、单源搜索、详情、阅读、收藏/下载/本地库已有实现；分类/排行/聚合搜索、账号和源交互能力、追更/独立历史页面及正式设置尚有缺口。功能和流程分数只累计有实现与验收证据的整项；视觉比较目前没有成对截图核验，记为未核验 0/100，不代表视觉覆盖为 0% 或已达到任何门槛。S3-00B2 改为上游页面、导航、主题/状态源码与本地 Compose 实现的逐项对照；截图采集与视觉复评移至对应页面实现验收，不再阻断 S3-00/S3-01。由于本机执行环境无法解析 `github.com`，S3-00B2 标为 BLOCKED，解除条件是恢复上游 GitHub 源码访问。S4-08C 完整首页对齐仍待上游源码核验与后续验收；启动页/首页首版不表示 Stage 3 或完整 S4-08 已完成。
 
 ### S4-08A Android 启动页 — DONE
 
+- Commit：`d47da12` (`feat(startup): add native splash screen experience`)，已 push 到 `origin/main`。
 - 使用 AndroidX SplashScreen 兼容 API；Android 12+ 使用系统启动界面，旧版使用兼容主题。启动图标复用本项目现有矢量图标，背景随系统明暗主题切换，不额外延长启动等待。
 - 验证：`JAVA_HOME=/Users/lwtor/Library/Java/JavaVirtualMachines/corretto-17.0.9/Contents/Home sh gradlew :app:assembleDebug` — BUILD SUCCESSFUL。Android 官方说明要求启动 Activity 使用 SplashScreen theme 并在 `super.onCreate()` 前调用 `installSplashScreen()`；见[官方迁移说明](https://developer.android.com/develop/ui/views/launch/splash-screen/migrate?hl=en)。
-- 此切片不覆盖设备启动动画的人工验收；首页首版为下一个唯一执行任务 S4-08B。
+- 启动页按 Android 官方兼容方式接入；设备上未单独捕获转场帧。首页首版记录见 S4-08B。
 
-本任务为文档审查与基线冻结，不涉及编译或真机操作；验收命令：`git diff --check`。
+### S4-08B 首页首版 — DONE（完整 S4-08 仍未完成）
+
+- 将占位按钮首页替换为 Compose 漫画首页：品牌头部、搜索入口、探索主卡、接着阅读、收藏更新、本地漫画及底部导航。
+- 首页订阅 Room 阅读历史、收藏和本地漫画真实数据；空态按真实库状态显示，没有虚构漫画。继续阅读会保留章节身份，既能打开远端章节，也能恢复 `@local` 命名空间里的本地章节。
+- 真机：在已连接的 Xiaomi 设备上用 `adb install -r` 覆盖更新并启动，保留原应用及数据；已查看首屏，当前有一条本地阅读记录，能够呈现在首页。MIUI 拒绝 shell 手势注入（缺少 `INJECT_EVENTS`），因此滚动到底部和首页点击导航未做设备验收，不记为已验证。临时截图 `/tmp/venera-home-preview-final.png` 仅用于本次目视检查，未放入仓库（画面包含用户自己的阅读记录）。
+- 验证：`:feature:home:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；回归覆盖仓库 Flow 更新和本地/远端续读身份映射。`git diff --check` — PASS。
+- 该首版先按现有产品计划和本地设计系统实现。由于上游 GitHub 源码访问仍受 DNS 限制，不能声称已经逐屏复刻 Venera；后续 S4-08C 仍需源码对照、完整信息结构与视觉验收。
+
+S3-00 基线冻结本身是文档审查；首页/启动页首版的编译与真机查看结果分别记录在 S4-08A / S4-08B。
 
 ## 质量整改（2026-09-22）
 
@@ -571,7 +580,7 @@ instrumentation 与实机验证本轮未执行（按用户决定不做实机测�
   Reader / Library），路由经 `encode()` / `decodeAppRoute()` 存进 `rememberSaveable`；还没有返回栈。
 - 书架与收藏已落地：`:data:collection` + `:feature:library`，Room v2 的 `favorite_folder` /
   `favorite_entry` 是唯一事实来源；首页「书架」入口进书架，详情页的收藏开关负责加入与移出。
-- `:feature:home` 只是占位 UI，不包含 ViewModel 或真实数据。
+- `:feature:home` 已从按钮占位改为首页首版：ViewModel 合并真实阅读历史、收藏和本地漫画 Flow；续读路由保留远端或本地章节身份。完整 Venera 对照、其余首页状态和视觉验收仍在 S4-08C。
 - 来源链路已可用：安装 / 启停 / 卸载（`:feature:sources` + `:data:source`）、探索与搜索
   （`:feature:explore` / `:feature:search` + `:data:comic` + Paging 3，仅向前分页）、详情与章节
   （`:feature:details`）。

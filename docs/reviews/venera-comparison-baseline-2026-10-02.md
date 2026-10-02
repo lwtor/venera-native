@@ -35,7 +35,7 @@
 | F05 | 跨来源聚合搜索 | 6 | MISSING | 目前只有选择单一来源的搜索流程；没有并发聚合及单源错误隔离 UI。S3-01。 |
 | F06 | 漫画详情、信息展示和章节选择 | 8 | PASS | `feature/details`；已有章节和收藏入口。标签/评论/评分等额外能力不由此项覆盖。 |
 | F07 | 网络漫画阅读及章节页面加载 | 9 | PASS | `feature/reader`、`data/comic`、`core/image`；阶段测试包含 fixture 阅读与 Reader 行为验收。 |
-| F08 | 用户可访问的阅读历史、续读与进度恢复 | 7 | PARTIAL | `data/history` 持久化与进度恢复已有实现/测试，但 `HomeScreen` 的 `onOpenReader` 在 `MainActivity` 装配为空；当前无原版式最近阅读/历史页面入口。 |
+| F08 | 用户可访问的阅读历史、续读与进度恢复 | 7 | PARTIAL | S4-08B 已在首页显示最近阅读并把远端/`@local` 历史分别映射回正确章节身份；Flow 与映射有测试，Xiaomi 首屏显示了现有本地阅读记录。MIUI 阻止 shell 手势注入，续读点击和精确进度恢复尚无设备证据；也没有独立的完整历史页面。 |
 | F09 | 本地收藏夹、分组、排序与管理 | 6 | PASS | `feature/library`、`data/collection`、Room；Stage 2 书架验收通过。 |
 | F10 | 远端收藏/追更及来源同步 | 5 | MISSING | 当前收藏为本地书架；无远端收藏一致性和跟更交互。S3-05 / S4 后续对照。 |
 | F11 | 下载队列控制、状态、离线读取 | 7 | PASS | `feature/library` 下载 tab、`data/download`；D07 实机通知/暂停/继续/移除通过，离线优先 provider 有测试。飞行模式整链仍未在设备实测。 |
@@ -64,12 +64,12 @@
 
 ## 4. 设计与视觉矩阵（当前：0 / 100 已核验证据）
 
-以下都是适用项。`UNVERIFIED` 不表示确认视觉质量为零，只表示没有当前版/上游版成对截图可核查。当前代码可见：首页明确为 Android foundation 提示 + 五个居中按钮，与原版成熟主页存在明显信息架构差距；其余页面只对源码结构做过盘点，不能替代像素/布局证据。
+以下都是适用项。`UNVERIFIED` 不表示确认视觉质量为零，只表示没有当前版/上游版成对截图可核查。S4-08B 已把本地首页从基础占位改成包含搜索、探索、续读、收藏更新、本地书架和底部导航的 Compose 首版；仍未完成固定上游源码逐项对照，不能把单张本地设备截图当成视觉相似度证据。
 
 | ID | 页面/组件视觉核验项 | 权重 | 状态 | 当前源码证据 / 需补证据 |
 | --- | --- | ---: | --- | --- |
-| V01 | 首页信息层级、最近阅读/更新/探索内容 | 18 | UNVERIFIED（已知大差距） | `feature/home/HomeScreen.kt` 是占位文案与按钮；需上游和 Android 同状态截图。 |
-| V02 | 主导航、首页到来源/探索/书架的层级 | 10 | UNVERIFIED | `MainActivity.kt` / `AppRoute.kt`；没有可比较截图，当前首页以动作按钮导航。 |
+| V01 | 首页信息层级、最近阅读/更新/探索内容 | 18 | UNVERIFIED（仍需源码对照） | S4-08B 已改为 Compose 首页（品牌/搜索/探索主卡/续读/收藏更新/本地漫画/发现区）；Xiaomi 首屏已目视检查，但未取得上游同页面截图，且完整原版信息结构仍待上游源码核对。 |
+| V02 | 主导航、首页到来源/探索/书架的层级 | 10 | UNVERIFIED | `MainActivity.kt` / `AppRoute.kt`；首页有底部探索/书架/来源导航，当前没有可比较的上游同状态证据，点击在设备上也未验证。 |
 | V03 | 来源列表、安装与来源操作菜单 | 8 | UNVERIFIED | `feature/sources/SourcesScreen.kt`；需列表、空态、菜单和安装流截图。 |
 | V04 | 探索页、来源筛选、分组漫画卡片 | 9 | UNVERIFIED | `feature/explore/ExploreScreen.kt`；需首屏、滚动、空/错/载入截图。 |
 | V05 | 搜索输入、筛选栏、结果密度与聚合状态 | 8 | UNVERIFIED | `feature/search/SearchScreen.kt`；上游聚合入口与本地单源模式不等价。 |
@@ -84,7 +84,7 @@
 
 | 页面组 | 上游代码入口（固定 commit） | 本地实现入口 | 当前截图状态 |
 | --- | --- | --- | --- |
-| Home / 主导航 | [`home_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/home_page.dart)、[`main_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/main_page.dart) | `feature/home/HomeScreen.kt`、`app/MainActivity.kt`、`core/navigation/AppRoute.kt` | 7 个截图链接已列出，图片内容及页面映射待核对；本地 screenshot missing |
+| Home / 主导航 | [`home_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/home_page.dart)、[`main_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/main_page.dart) | `feature/home/HomeScreen.kt`、`app/MainActivity.kt`、`core/navigation/AppRoute.kt` | 上游 7 个截图链接及页面映射待核对；S4-08B Xiaomi 首屏已临时目视检查（临时图未入库），没有成对上游图；滚动/点击未验收 |
 | Source / Explore | [`comic_source_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/comic_source_page.dart)、[`explore_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/explore_page.dart) | `feature/sources/SourcesScreen.kt`、`feature/explore/ExploreScreen.kt` | 截图内容/页面映射待核对；本地 screenshot missing |
 | Search / categories / ranking | [`search_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/search_page.dart)、[`aggregated_search_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/aggregated_search_page.dart)、[`categories_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/categories_page.dart)、[`ranking_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/ranking_page.dart) | `feature/search/SearchScreen.kt`、`feature/explore/ExploreScreen.kt`；分类/排行无入口 | 截图内容/页面映射待核对；本地 screenshot missing / 页面差距 |
 | Details / Reader | [`comic_details_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/comic_details_page.dart)、[`reader/`](https://github.com/venera-app/venera/tree/a0eba91/lib/pages/reader) | `feature/details/DetailsScreen.kt`、`feature/reader/ReaderScreen.kt` | 截图内容/页面映射待核对；本地 screenshot missing |
@@ -96,13 +96,13 @@
 ## 6. 初步结论、许可证边界和行动项
 
 - 当前已证据覆盖：功能 `60/100`、流程 `66/100`、视觉 `0/100 已核验`。这是保守的验收证据分数；尤其视觉值只代表暂无截图证据，不代表对当前视觉质量作出 0% 的判断。
-- 已发现可直接列为差距：主页仍为技术占位页；分类/排行/聚合搜索缺失；历史和续读没有可访问 UI；远端收藏/追更、账号登录、评论/评分、完整设置页缺失。Stage 3/4 任务须映射到上述矩阵项，不能只新增底层接口后把对应项标 PASS。
-- 已实现但缺闭环证据：下载完成后断网端到端阅读；阅读历史 UI 的精确续读；所有页面在真实设备上的成对视觉比较。
+- 已发现可直接列为差距：首页目前是首版，尚未按固定上游源码完成结构/视觉对照；分类/排行/聚合搜索缺失；独立历史页面和首页续读的设备闭环未验收；远端收藏/追更、账号登录、评论/评分、完整设置页缺失。Stage 3/4 任务须映射到上述矩阵项，不能只新增底层接口后把对应项标 PASS。
+- 已实现但缺闭环证据：下载完成后断网端到端阅读；首页续读点击及精确位置的设备恢复、独立历史页面；所有页面在真实设备上的成对视觉比较。
 - 退出前行动：确认并固定归档提交完整 SHA；逐文件审查上游页面、导航、主题与状态源码并对照本地 Compose；把矩阵 ID 绑定到后续 Stage 3/4 每个功能任务。当前执行环境 `git ls-remote https://github.com/venera-app/venera.git a0eba91` 因 DNS 无法解析 `github.com` 失败，网页工具读取固定提交源码也返回 Cache miss；这是源码审查的真实外部限制，不应以截图替代源码读取。恢复上游源码访问后完成此项。截图的页面映射/版本关联核验及本地成对截图移入对应页面实现验收和 S4-09，不再阻断 S3-00/S3-01。
 - 上游仓库标明 **GPL-3.0**；许可证文本：[LICENSE](https://github.com/venera-app/venera/blob/a0eba91/LICENSE)。本项目只把上游用作行为/界面对照，不复制 Dart/Kotlin 代码、翻译文本、图标、品牌素材、截图或漫画内容。复用/派生上游代码或视觉资产前，必须另行做 GPL 义务、商标与素材授权评估并记录来源；Venera Native 保持非官方关系，不暗示官方背书。
 
 ## 7. 本次验证
 
-- 只读源码与计划审查；没有改产品代码、安装 App 或操作真机。
-- 编译：不适用（文档任务）。
-- 提交前要求：`git diff --check`。
+- S3-00 基线矩阵建立本身为文档审查；随后用户要求提前实现首页/启动页首版。当前首页实现验证：`:feature:home:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。
+- Xiaomi 设备通过 `adb install -r` 更新安装并检查首页首屏；本地最近阅读显示正确。MIUI 阻止 `adb shell input swipe`，滚动和点击操作未实机验收；临时截图未入库。
+- 上游固定提交源码读取仍受环境 DNS 失败限制；视觉成对截图与原版逐屏对照仍未验证。

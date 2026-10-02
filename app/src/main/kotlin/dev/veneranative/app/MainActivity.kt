@@ -63,6 +63,7 @@ import dev.veneranative.data.source.SourcePackageStore
 import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
 import dev.veneranative.feature.home.HomeRoute
+import dev.veneranative.feature.home.toChapterRef
 import dev.veneranative.feature.library.LibraryRoute
 import dev.veneranative.feature.reader.ReaderRoute
 import dev.veneranative.feature.reader.ReaderViewModel
@@ -192,7 +193,12 @@ private fun AppNavHost(
     }
     when (val current = route) {
         AppRoute.Home -> HomeRoute(
-            onOpenReader = { },
+            history = historyRepository,
+            collection = collectionRepository,
+            localRepository = localRepository,
+            onResumeReading = { entry ->
+                onRouteChange(AppRoute.Reader(entry.toChapterRef()))
+            },
             onOpenSources = { onRouteChange(AppRoute.Sources) },
             onOpenExplore = { onRouteChange(AppRoute.Explore(null)) },
             onOpenSearch = { onRouteChange(AppRoute.Search(null)) },
