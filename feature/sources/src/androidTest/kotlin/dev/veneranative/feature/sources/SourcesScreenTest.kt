@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.data.source.SourceCatalogEntry
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -50,7 +51,7 @@ class SourcesScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("No sources installed yet.").assertIsDisplayed()
+        composeRule.onNodeWithText("No sources installed yet. Choose a source above or install a local script.").assertIsDisplayed()
     }
 
     @Test
@@ -104,6 +105,30 @@ class SourcesScreenTest {
         }
 
         composeRule.onNodeWithText("Install").assertIsNotEnabled()
+    }
+
+    @Test
+    fun `catalog entry is visible and install dispatches its resolved script URL`() {
+        val actions = mutableListOf<SourcesAction>()
+        val entry = SourceCatalogEntry("MangaDex", "manga_dex", "1.2.0", "Public source", "https://cdn.example/manga_dex.js")
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(
+                        status = SourcesStatus.Ready,
+                        catalogStatus = CatalogStatus.Ready,
+                        catalogEntries = listOf(entry),
+                    ),
+                    onAction = { actions += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("MangaDex").assertIsDisplayed()
+        composeRule.onNodeWithTag(CATALOG_INSTALL_TAG).performClick()
+
+        assertEquals(listOf(SourcesAction.InstallCatalogEntry(entry)), actions)
     }
 
     private companion object {

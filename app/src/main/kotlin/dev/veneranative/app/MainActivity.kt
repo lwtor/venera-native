@@ -121,6 +121,7 @@ private fun App(
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
     val sourceRepository = graph.sourceRepository
+    val sourceCatalogRepository = graph.sourceCatalogRepository
     val provider = graph.provider
     val decoderFactory = graph.decoderFactory
     val imageLoader = graph.imageLoader
@@ -142,6 +143,7 @@ private fun App(
             detailsOrigin = detailsOrigin,
             catalog = catalog,
             sourceRepository = sourceRepository,
+            sourceCatalogRepository = sourceCatalogRepository,
             provider = provider,
             decoderFactory = decoderFactory,
             appScope = appScope,
@@ -162,6 +164,7 @@ private fun AppNavHost(
     detailsOrigin: AppRoute,
     catalog: DefaultComicCatalog,
     sourceRepository: DefaultSourceRepository,
+    sourceCatalogRepository: dev.veneranative.data.source.SourceCatalogRepository,
     provider: PageProvider,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)?,
     appScope: CoroutineScope,
@@ -226,6 +229,7 @@ private fun AppNavHost(
 
         AppRoute.Sources -> SourcesRoute(
             repository = sourceRepository,
+            catalogRepository = sourceCatalogRepository,
             onBack = onBack,
             onRequestScript = { consume ->
                 scriptSelection = consume

@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.data.source.SourceRepository
+import dev.veneranative.data.source.SourceCatalogRepository
 
 /**
  * Entry point of the sources screen: owns the ViewModel, collects state, forwards actions.
@@ -15,11 +16,12 @@ import dev.veneranative.data.source.SourceRepository
 @Composable
 fun SourcesRoute(
     repository: SourceRepository,
+    catalogRepository: SourceCatalogRepository,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onRequestScript: (((String) -> Unit) -> Unit) = {},
 ) {
-    val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository) }
+    val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     SourcesScreen(
         state = state,

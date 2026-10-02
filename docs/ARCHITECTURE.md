@@ -38,7 +38,7 @@ immutable UiState
 | `:app` | MainActivity、应用 Theme、根装配 | Feature、Core、实现模块 |
 | `:core:model` | 稳定领域 ID 与跨层模型（包括远端/本地 `ChapterRef`） | 尽量只依赖 Kotlin |
 | `:core:archive` | ZIP/CBZ、7z/CB7 只读访问接口与 Commons Compress 适配 | Commons Compress、XZ、Android Framework |
-| `:data:source` | 来源包的安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:source:api` |
+| `:data:source` | 上游来源目录的获取与解析、来源包远程/本地安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:core:network`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
 | `:core:image` | 漫画图片管线：`ComicImageRequest` 与稳定缓存键、自建 Fetcher（走 `:core:network` 的共享 OkHttp）、Coil 磁盘缓存、图片头部尺寸解析、封面渲染的 `ComicImage`，以及从 `:feature:reader` 迁来的页面解码与分块 | `:core:model`、`:core:network`、Coil 3.6.3、Compose |
 | `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |

@@ -6,6 +6,8 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.source.InstallOutcome
 import dev.veneranative.data.source.SourceInstallError
 import dev.veneranative.data.source.SourceRepository
+import dev.veneranative.data.source.SourceCatalogRepository
+import dev.veneranative.data.source.SourceCatalogResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +23,7 @@ import kotlinx.coroutines.launch
  */
 class SourcesViewModel(
     private val repository: SourceRepository,
+    private val catalogRepository: SourceCatalogRepository? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SourcesUiState())
@@ -28,6 +31,7 @@ class SourcesViewModel(
 
     init {
         refresh()
+        if (catalogRepository != null) refreshCatalog()
     }
 
     fun onAction(action: SourcesAction) {
@@ -44,6 +48,29 @@ class SourcesViewModel(
             SourcesAction.Retry -> refresh()
 
             SourcesAction.DismissMessage -> _state.update { it.copy(message = null) }
+
+            is SourcesAction.CatalogLocationChanged -> _state.update { it.copy(catalogLocation = action.value) }
+
+            SourcesAction.RefreshCatalog -> refreshCatalog()
+
+            is SourcesAction.InstallCatalogEntry -> install(action.entry.scriptUrl)
+        }
+    }
+
+    private fun refreshCatalog() {
+        val source = catalogRepository ?: return
+        val location = _state.value.catalogLocation.trim()
+        if (location.isEmpty() || _state.value.catalogStatus == CatalogStatus.Loading) return
+        _state.update { it.copy(catalogStatus = CatalogStatus.Loading) }
+        viewModelScope.launch {
+            when (val result = source.load(location)) {
+                is SourceCatalogResult.Success -> _state.update {
+                    it.copy(catalogEntries = result.entries, catalogStatus = CatalogStatus.Ready)
+                }
+                is SourceCatalogResult.Failure -> _state.update {
+                    it.copy(catalogStatus = CatalogStatus.Failed)
+                }
+            }
         }
     }
 
@@ -64,6 +91,10 @@ class SourcesViewModel(
 
     private fun install() {
         val location = _state.value.installLocation.trim()
+        install(location)
+    }
+
+    private fun install(location: String) {
         if (location.isEmpty() || _state.value.installing) return
 
         _state.update { it.copy(installing = true, message = null) }
@@ -76,7 +107,7 @@ class SourcesViewModel(
                         installing = false,
                         sources = sources,
                         status = SourcesStatus.Ready,
-                        installLocation = "",
+                        installLocation = if (current.installLocation.trim() == location) "" else current.installLocation,
                         message = "${outcome.installed.name} installed.",
                     )
 

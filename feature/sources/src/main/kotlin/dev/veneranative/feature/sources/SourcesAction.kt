@@ -1,6 +1,7 @@
 package dev.veneranative.feature.sources
 
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.data.source.SourceCatalogEntry
 
 /** Intents of the sources screen. */
 sealed interface SourcesAction {
@@ -15,4 +16,10 @@ sealed interface SourcesAction {
     data object Retry : SourcesAction
 
     data object DismissMessage : SourcesAction
+
+    data class CatalogLocationChanged(val value: String) : SourcesAction
+
+    data object RefreshCatalog : SourcesAction
+
+    data class InstallCatalogEntry(val entry: SourceCatalogEntry) : SourcesAction
 }

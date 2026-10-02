@@ -1,7 +1,6 @@
 package dev.veneranative.feature.sources
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -38,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.data.source.SourceCatalogEntry
 
 /**
  * Stateless sources screen: renders [state] and sends [onAction].
@@ -74,60 +74,56 @@ fun SourcesScreen(
             state.message?.let { message ->
                 MessageRow(message = message, onDismiss = { onAction(SourcesAction.DismissMessage) })
             }
-
-            when (state.status) {
-                SourcesStatus.Loading -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(modifier = Modifier.testTag(LOADING_TAG))
-                }
-
-                SourcesStatus.Failed -> Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Text(
-                            text = state.message ?: "The source list could not be read.",
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                        Button(onClick = { onAction(SourcesAction.Retry) }) { Text("Retry") }
+            CatalogHeader(state = state, onAction = onAction)
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                when (state.catalogStatus) {
+                    CatalogStatus.Idle -> item { Text("Source catalog is not configured.") }
+                    CatalogStatus.Loading -> item {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.testTag(CATALOG_LOADING_TAG))
+                            Text("Loading source catalog…")
+                        }
                     }
-                }
-
-                SourcesStatus.Ready -> if (state.isEmpty) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                text = "No sources installed yet.",
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            Text(
-                                text = "Install a comic source by entering its file path above.",
-                                style = MaterialTheme.typography.bodyMedium,
+                    CatalogStatus.Failed -> item {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("Could not load the catalog. Check the URL or network and retry.", modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onAction(SourcesAction.RefreshCatalog) }) { Text("Retry") }
+                        }
+                    }
+                    CatalogStatus.Ready -> if (state.catalogEntries.isEmpty()) {
+                        item { Text("No usable sources in this catalog.") }
+                    } else {
+                        items(state.catalogEntries, key = { it.scriptUrl }) { entry ->
+                            CatalogSourceRow(
+                                entry = entry,
+                                installed = entry.key?.let { key -> state.sources.any { it.sourceId.value == key } } == true,
+                                installing = state.installing,
+                                onInstall = { onAction(SourcesAction.InstallCatalogEntry(entry)) },
                             )
                         }
                     }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(state.sources, key = { it.sourceId.value }) { source ->
+                }
+                item { Text("Installed sources", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp)) }
+                when (state.status) {
+                    SourcesStatus.Loading -> item { CircularProgressIndicator(modifier = Modifier.testTag(LOADING_TAG)) }
+                    SourcesStatus.Failed -> item {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Installed sources could not be read.", modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onAction(SourcesAction.Retry) }) { Text("Retry") }
+                        }
+                    }
+                    SourcesStatus.Ready -> if (state.isEmpty) {
+                        item { Text("No sources installed yet. Choose a source above or install a local script.") }
+                    } else {
+                        items(state.sources, key = { "installed-${it.sourceId.value}" }) { source ->
                             SourceRow(
                                 source = source,
                                 busy = source.sourceId in state.busySourceIds,
-                                onEnabledChange = { enabled ->
-                                    onAction(SourcesAction.SetEnabled(source.sourceId, enabled))
-                                },
+                                onEnabledChange = { enabled -> onAction(SourcesAction.SetEnabled(source.sourceId, enabled)) },
                                 onUninstall = { pendingUninstall = source },
                             )
                         }
@@ -156,6 +152,68 @@ fun SourcesScreen(
                 TextButton(onClick = { pendingUninstall = null }) { Text("Cancel") }
             },
         )
+    }
+}
+
+@Composable
+private fun CatalogHeader(state: SourcesUiState, onAction: (SourcesAction) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text("Venera source catalog", style = MaterialTheme.typography.titleMedium)
+        OutlinedTextField(
+            value = state.catalogLocation,
+            onValueChange = { onAction(SourcesAction.CatalogLocationChanged(it)) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Catalog JSON URL") },
+            singleLine = true,
+            enabled = state.catalogStatus != CatalogStatus.Loading,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                when (state.catalogStatus) {
+                    CatalogStatus.Idle -> "Catalog not loaded"
+                    CatalogStatus.Loading -> "Fetching source list…"
+                    CatalogStatus.Ready -> "${state.catalogEntries.size} sources available"
+                    CatalogStatus.Failed -> "Catalog unavailable"
+                },
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            TextButton(
+                onClick = { onAction(SourcesAction.RefreshCatalog) },
+                enabled = state.catalogStatus != CatalogStatus.Loading && state.catalogLocation.isNotBlank(),
+            ) { Text("Refresh") }
+        }
+    }
+}
+
+@Composable
+private fun CatalogSourceRow(
+    entry: SourceCatalogEntry,
+    installed: Boolean,
+    installing: Boolean,
+    onInstall: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(entry.name, style = MaterialTheme.typography.titleMedium)
+                entry.version?.let { Text("Version $it", style = MaterialTheme.typography.bodySmall) }
+                entry.description?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            }
+            TextButton(
+                onClick = onInstall,
+                modifier = Modifier.testTag(CATALOG_INSTALL_TAG),
+                enabled = !installing && !installed,
+            ) {
+                Text(if (installed) "Installed" else if (installing) "Installing…" else "Install")
+            }
+        }
     }
 }
 
@@ -265,6 +323,8 @@ private fun MessageRow(
 }
 
 internal const val LOADING_TAG = "sources-loading"
+internal const val CATALOG_LOADING_TAG = "source-catalog-loading"
+internal const val CATALOG_INSTALL_TAG = "source-catalog-install"
 
 @Preview(showBackground = true)
 @Composable

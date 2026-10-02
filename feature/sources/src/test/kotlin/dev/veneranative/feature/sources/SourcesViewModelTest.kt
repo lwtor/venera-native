@@ -5,6 +5,9 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.source.InstallOutcome
 import dev.veneranative.data.source.SourceInstallError
 import dev.veneranative.data.source.SourceRepository
+import dev.veneranative.data.source.SourceCatalogEntry
+import dev.veneranative.data.source.SourceCatalogRepository
+import dev.veneranative.data.source.SourceCatalogResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -162,6 +165,25 @@ class SourcesViewModelTest {
         assertNull(viewModel.state.value.message)
     }
 
+    @Test
+    fun `catalog entries load and install by their resolved script URL`() = runTest(dispatcher) {
+        val entry = SourceCatalogEntry("MangaDex", "manga_dex", "1.2.0", null, "https://cdn.example/manga_dex.js")
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(entry)))
+        repository.outcome = InstallOutcome.Success(source("manga_dex", "MangaDex"))
+        val viewModel = SourcesViewModel(repository, catalog)
+        advanceUntilIdle()
+
+        assertEquals(CatalogStatus.Ready, viewModel.state.value.catalogStatus)
+        assertEquals(listOf(entry), viewModel.state.value.catalogEntries)
+        assertEquals(listOf(viewModel.state.value.catalogLocation), catalog.locations)
+
+        viewModel.onAction(SourcesAction.InstallCatalogEntry(entry))
+        advanceUntilIdle()
+
+        assertEquals(listOf(entry.scriptUrl), repository.installLocations)
+        assertEquals("MangaDex installed.", viewModel.state.value.message)
+    }
+
     private fun source(id: String, name: String = "Source $id", enabled: Boolean = true) = InstalledSource(
         sourceId = SourceId(id),
         name = name,
@@ -200,6 +222,16 @@ class SourcesViewModelTest {
             val exists = sources.any { it.sourceId == sourceId }
             sources = sources.filterNot { it.sourceId == sourceId }
             return exists
+        }
+    }
+
+    private class FakeSourceCatalogRepository(
+        private val result: SourceCatalogResult,
+    ) : SourceCatalogRepository {
+        val locations = mutableListOf<String>()
+        override suspend fun load(location: String): SourceCatalogResult {
+            locations += location
+            return result
         }
     }
 }

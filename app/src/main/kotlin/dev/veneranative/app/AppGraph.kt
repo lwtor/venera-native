@@ -60,6 +60,7 @@ import dev.veneranative.data.local.LocalPageMaterializer
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
+import dev.veneranative.data.source.HttpSourceCatalogRepository
 import dev.veneranative.data.source.SourcePackageStore
 import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
@@ -109,9 +110,10 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         SourcePackageStore(File(getApplication<android.app.Application>().filesDir, "sources")),
         runtime,
         QuickJsMetadataReader(),
-        AndroidSourceScriptFetcher(getApplication()),
+        AndroidSourceScriptFetcher(getApplication(), httpClient),
         onSourceChanged = { network.clearSource(it) },
     )
+    val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
     val catalog = DefaultComicCatalog(sourceRepository, EngineSourceCore(runtime))
     private val sourcePageProvider: PageProvider = SourcePageProvider(catalog, CoilPageImageSizer(imagePipeline))
     private val offlineProvider: PageProvider = OfflineFirstPageProvider(

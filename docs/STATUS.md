@@ -29,6 +29,8 @@
 
 S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与许可证边界；提交为 `9f83025`。S3-00B1 找到 F-Droid 页面列出的 7 张上游手机截图引用并登记；其图片内容与 `a0eba91` 的版本关联尚未核验。早期盘点时本地首页仍是基础占位页，现已按用户要求提前交付 S4-08A 启动页和 S4-08B 首页首版。来源、探索、单源搜索、详情、阅读、收藏/下载/本地库已有实现；分类/排行/聚合搜索、账号和源交互能力、追更/独立历史页面及正式设置尚有缺口。功能和流程分数只累计有实现与验收证据的整项；视觉比较目前没有成对截图核验，记为未核验 0/100，不代表视觉覆盖为 0% 或已达到任何门槛。S3-00B2 改为上游页面、导航、主题/状态源码与本地 Compose 实现的逐项对照；截图采集与视觉复评移至对应页面实现验收，不再阻断 S3-00/S3-01。由于本机执行环境无法解析 `github.com`，S3-00B2 标为 BLOCKED，解除条件是恢复上游 GitHub 源码访问。S4-08C 完整首页对齐仍待上游源码核验与后续验收；启动页/首页首版不表示 Stage 3 或完整 S4-08 已完成。
 
+用户指定先补上游来源目录展示和远程安装。**S3-00C DONE**：依据上游 `venera/doc/comic_source.md` 与 `venera-configs/index.json`，Native 现在默认读取公开 jsDelivr `index.json`，解析现用 `fileName` 及兼容的 `filename` / `url`，在来源页展示条目并支持直接下载 HTTPS 脚本、安装、刷新；本地 SAF 安装路径保留。目录 JSON 限 1 MiB、源脚本限 2 MiB，重用应用共享 OkHttp 客户端，拒绝明文 HTTP。新增解析器与 ViewModel 测试源码。验证：JDK 17 `:data:source:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check` — PASS。测试源码仅编译，未运行真实网络源、真机联网或安装后页面验收；上游实时源的可访问性与脚本兼容性仍需在设备上逐源验证。S3-00B2 的外部阻塞和下一任务不变。
+
 ### S4-08A Android 启动页 — DONE
 
 - Commit：`d47da12` (`feat(startup): add native splash screen experience`)，已 push 到 `origin/main`。

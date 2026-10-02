@@ -2,6 +2,8 @@ package dev.veneranative.feature.sources
 
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.data.source.SourceCatalogEntry
+import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 
 /** Everything the sources screen needs to render, including its own empty state. */
 data class SourcesUiState(
@@ -14,11 +16,16 @@ data class SourcesUiState(
     val installing: Boolean = false,
     /** Sources with a pending enable/disable or uninstall. */
     val busySourceIds: Set<SourceId> = emptySet(),
+    val catalogEntries: List<SourceCatalogEntry> = emptyList(),
+    val catalogStatus: CatalogStatus = CatalogStatus.Idle,
+    val catalogLocation: String = defaultVeneraSourceCatalogUrl(),
 ) {
     val isEmpty: Boolean get() = status == SourcesStatus.Ready && sources.isEmpty()
 
     val canInstall: Boolean get() = installLocation.isNotBlank() && !installing
 }
+
+enum class CatalogStatus { Idle, Loading, Ready, Failed }
 
 enum class SourcesStatus {
     Loading,
