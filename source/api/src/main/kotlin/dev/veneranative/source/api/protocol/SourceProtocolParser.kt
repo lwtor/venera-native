@@ -3,6 +3,7 @@ package dev.veneranative.source.api.protocol
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
+import dev.veneranative.core.model.ComicComment
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.ExploreKind
@@ -77,8 +78,30 @@ object SourceProtocolParser {
             tagGroups = tagGroups,
             metadata = root.detailMetadata(),
             thumbnails = root["thumbnails"].stringList(),
+            recommendations = parseComics(comicKey.sourceId, root["recommend"]),
+            comments = parseComments(root["comments"]),
+            sourceUrl = root["url"].stringOrNull(),
+            sourceSubId = root["subId"].stringOrNull(),
         )
     }
+
+    private fun parseComments(element: JsonElement?): List<ComicComment> =
+        element.arrayOrNull().orEmpty().mapNotNull { item ->
+            val comment = item.objectOrNull() ?: return@mapNotNull null
+            val userName = comment["userName"].stringOrNull() ?: return@mapNotNull null
+            val content = comment["content"].stringOrNull() ?: return@mapNotNull null
+            ComicComment(
+                userName = userName,
+                content = content,
+                id = comment["id"].stringOrNull(),
+                avatarUrl = comment["avatar"].stringOrNull(),
+                time = comment["time"].stringOrNull(),
+                replyCount = comment["replyCount"].intOrNull(),
+                score = comment["score"].doubleOrNull(),
+                isLiked = comment["isLiked"].booleanOrNull(),
+                voteStatus = comment["voteStatus"].intOrNull(),
+            )
+        }
 
     /**
      * Chapters come in two shapes. The flat one maps chapter id to title; the grouped one maps a
@@ -204,6 +227,10 @@ object SourceProtocolParser {
         (this as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotEmpty() }
 
     private fun JsonElement?.intOrNull(): Int? = (this as? JsonPrimitive)?.contentOrNull?.toIntOrNull()
+
+    private fun JsonElement?.doubleOrNull(): Double? = (this as? JsonPrimitive)?.contentOrNull?.toDoubleOrNull()
+
+    private fun JsonElement?.booleanOrNull(): Boolean? = (this as? JsonPrimitive)?.contentOrNull?.toBooleanStrictOrNull()
 
     private fun JsonElement?.stringList(): List<String> =
         arrayOrNull().orEmpty().mapNotNull { it.stringOrNull() }

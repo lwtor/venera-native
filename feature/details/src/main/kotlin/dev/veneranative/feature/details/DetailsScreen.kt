@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,9 @@ import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.Comic
+import dev.veneranative.core.model.ComicComment
+import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.SourceId
 
 
@@ -68,6 +72,7 @@ fun DetailsScreen(
     onOpenChapter: (ChapterKey) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenComic: (ComicKey) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -134,6 +139,7 @@ fun DetailsScreen(
                     state = state,
                     onAction = onAction,
                     onOpenChapter = onOpenChapter,
+                    onOpenComic = onOpenComic,
                 )
             }
         }
@@ -145,6 +151,7 @@ private fun Content(
     state: DetailsUiState,
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (ChapterKey) -> Unit,
+    onOpenComic: (ComicKey) -> Unit,
 ) {
     val listState = rememberLazyListState()
     LazyColumn(
@@ -176,6 +183,10 @@ private fun Content(
             if (groups.isNotEmpty()) item { Section { DetailTagGroups(groups) } }
             if (detail.thumbnails.isNotEmpty()) {
                 item { Section { DetailThumbnails(title = detail.comic.title, urls = detail.thumbnails, sourceId = detail.comic.key.sourceId) } }
+            }
+            detail.sourceUrl?.takeIf { it.isHttpUrl() }?.let { url -> item { SourcePageButton(url = url) } }
+            if (detail.recommendations.isNotEmpty()) {
+                item { Section { DetailRecommendations(detail.recommendations, onOpenComic) } }
             }
         }
 
@@ -254,6 +265,9 @@ private fun Content(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+        state.detail?.comments?.takeIf { it.isNotEmpty() }?.let { comments ->
+            item { Section { DetailComments(comments, state.detail.comic.key.sourceId) } }
         }
     }
 }
@@ -360,6 +374,86 @@ private fun DetailThumbnails(title: String, urls: List<String>, sourceId: Source
             }
         }
     }
+}
+
+@Composable
+private fun DetailRecommendations(comics: List<Comic>, onOpenComic: (ComicKey) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("相关推荐", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            itemsIndexed(comics, key = { index, comic -> "${comic.key.sourceId.value.length}:${comic.key.sourceId.value}:${comic.key.remoteId.value}:$index" }) { _, comic ->
+                Card(
+                    modifier = Modifier.width(126.dp).clickable { onOpenComic(comic.key) },
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Column {
+                        Box(modifier = Modifier.fillMaxWidth().height(154.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                            comic.coverUrl?.let { coverUrl ->
+                                ComicImage(
+                                    request = ComicImageRequest(url = coverUrl, sourceId = comic.key.sourceId, variant = DETAIL_RECOMMENDATION_VARIANT),
+                                    contentDescription = comic.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                    placeholder = { CoverTitle(comic.title) },
+                                )
+                            } ?: CoverTitle(comic.title)
+                        }
+                        Text(
+                            comic.title,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailComments(comments: List<ComicComment>, sourceId: SourceId) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("评论（${comments.size}）", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        comments.forEach { comment ->
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        comment.avatarUrl?.let { avatar ->
+                            Surface(modifier = Modifier.size(32.dp), shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                ComicImage(
+                                    request = ComicImageRequest(url = avatar, sourceId = sourceId, variant = DETAIL_COMMENT_AVATAR_VARIANT),
+                                    contentDescription = null,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            }
+                        }
+                        Text(comment.userName, modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                        comment.time?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    Text(comment.content, style = MaterialTheme.typography.bodyMedium)
+                    val extras = listOfNotNull(
+                        comment.score?.let { "评分 $it" },
+                        comment.replyCount?.takeIf { it > 0 }?.let { "$it 条回复" },
+                    )
+                    if (extras.isNotEmpty()) {
+                        Text(extras.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourcePageButton(url: String) {
+    val uriHandler = LocalUriHandler.current
+    TextButton(
+        onClick = { runCatching { uriHandler.openUri(url) } },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+    ) { Text("在漫画源网页打开") }
 }
 
 @Composable
@@ -519,6 +613,8 @@ private fun String.toChineseMetadataLabel(): String = when (this) {
     else -> this
 }
 
+private fun String.isHttpUrl(): Boolean = startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true)
+
 internal const val DETAILS_LOADING_TAG = "details-loading"
 internal const val DETAILS_CONTENT_TAG = "details-content"
 internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
@@ -526,3 +622,5 @@ internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"
 private const val DETAIL_BACKDROP_VARIANT = "detail-backdrop"
+private const val DETAIL_RECOMMENDATION_VARIANT = "detail-recommendation"
+private const val DETAIL_COMMENT_AVATAR_VARIANT = "detail-comment-avatar"

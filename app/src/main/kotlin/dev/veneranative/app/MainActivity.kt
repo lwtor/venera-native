@@ -263,6 +263,7 @@ private fun AppNavHost(
             onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
             onBack = onBack,
+            onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
         )
 
         is AppRoute.Reader -> {

@@ -31,6 +31,7 @@ fun DetailsRoute(
     modifier: Modifier = Modifier,
     downloads: DownloadRepository? = null,
     onScheduleDownloads: () -> Unit = {},
+    onOpenComic: (ComicKey) -> Unit = {},
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads)
@@ -46,6 +47,7 @@ fun DetailsRoute(
         onOpenChapter = onOpenChapter,
         onBack = onBack,
         modifier = modifier,
+        onOpenComic = onOpenComic,
     )
 }
 

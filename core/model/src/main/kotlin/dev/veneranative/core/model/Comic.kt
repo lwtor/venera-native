@@ -33,4 +33,25 @@ data class ComicDetail(
     val metadata: Map<String, String> = emptyMap(),
     /** Cover images when the source exposes more than one; empty means "use [Comic.coverUrl]". */
     val thumbnails: List<String> = emptyList(),
+    /** Related works returned by the source as part of its detail payload. */
+    val recommendations: List<Comic> = emptyList(),
+    /** Read-only comments included in the detail payload. Mutating them needs source account APIs. */
+    val comments: List<ComicComment> = emptyList(),
+    /** Source-provided web page for this comic, when available. */
+    val sourceUrl: String? = null,
+    /** Opaque source reference used by optional account operations; never display this to users. */
+    val sourceSubId: String? = null,
+)
+
+/** A source-provided comment preview. Account-bound reply and vote operations are separate APIs. */
+data class ComicComment(
+    val userName: String,
+    val content: String,
+    val id: String? = null,
+    val avatarUrl: String? = null,
+    val time: String? = null,
+    val replyCount: Int? = null,
+    val score: Double? = null,
+    val isLiked: Boolean? = null,
+    val voteStatus: Int? = null,
 )

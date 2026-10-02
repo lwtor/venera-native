@@ -122,6 +122,37 @@ class SourceProtocolParserTest {
     }
 
     @Test
+    fun `detail parses recommendations comments and source url while ignoring malformed entries`() {
+        val payload = """
+            {"title":"T","url":"https://source.example/comic/c1",
+             "subId":"opaque-source-id",
+             "recommend":[{"id":"c2","title":"Related","cover":"https://img/c2"},{"id":"bad"}],
+             "comments":[
+               {"id":"comment-1","userName":"Reader","content":"Great story","avatar":"https://img/u1",
+                "time":"today","replyCount":2,"score":4.5,"isLiked":true,"voteStatus":1},
+               {"content":"missing user"},
+               {"userName":"Empty"}
+             ]}
+        """.trimIndent()
+
+        val detail = SourceProtocolParser.parseComicDetail(comicKey, payload)
+
+        requireNotNull(detail)
+        assertEquals("https://source.example/comic/c1", detail.sourceUrl)
+        assertEquals("opaque-source-id", detail.sourceSubId)
+        assertEquals(listOf("Related"), detail.recommendations.map { it.title })
+        assertEquals(sourceId, detail.recommendations.single().key.sourceId)
+        assertEquals(1, detail.comments.size)
+        assertEquals("Reader", detail.comments.single().userName)
+        assertEquals("comment-1", detail.comments.single().id)
+        assertEquals("Great story", detail.comments.single().content)
+        assertEquals(2, detail.comments.single().replyCount)
+        assertEquals(4.5, detail.comments.single().score!!, 0.001)
+        assertEquals(true, detail.comments.single().isLiked)
+        assertEquals(1, detail.comments.single().voteStatus)
+    }
+
+    @Test
     fun `flat chapters keep the source order`() {
         val payload = """{"title":"T","chapters":{"ch2":"Chapter 2","ch1":"Chapter 1"}}"""
 
