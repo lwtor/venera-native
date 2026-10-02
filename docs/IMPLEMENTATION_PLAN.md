@@ -623,3 +623,5 @@ S4-09 验收要求：
 - Q13 DONE：全量 Debug Lint、274 项 JVM 单测、Debug/Release 构建通过；修复门禁发现的 4 项 Lint 错误并形成最终审查记录。Stage 1 DONE；下一项 S2-01 TODO。
 
 - **S2-07D / D07 — IN_PROGRESS。** Xiaomi API 36 的 `dataSync` 类型断言和真实慢速下载通知/暂停/继续/移除闭环均已通过；API 30 ARM64 模拟器的来源脚本/Reader 导航与本地导入入口测试各 1/1 通过。API 26 镜像尚不可用，且 API 30 的 SAF 目录选择器未完成实际导入；不得将 D07 或 Stage 2 标为完成。后续仍需按 `docs/reviews/stage-02-device-checklist.md` 完成 API 26 的启动、来源调用、实际目录导入、阅读、下载通知闭环。
+
+- **Stage 2 退出复核（2026-10-02）— 未通过门禁。** 本轮复核未发现新的代码缺陷，但 D07 的 API 26 运行环境与闭环证据仍缺；完整验收矩阵及剩余风险见 `docs/reviews/stage-02-exit-review-2026-10-02.md`。Stage 2 继续 `IN_PROGRESS`。

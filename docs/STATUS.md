@@ -193,6 +193,8 @@ sh gradlew :data:download:testDebugUnitTest :core:model:testDebugUnitTest
 
 - **S2-07D28 D07 Xiaomi 前台下载通知闭环复验 — DONE（D07 整体仍 IN_PROGRESS）。** 小米重新连接后确认 `dev.veneranative`、App instrumentation、下载与本地模块 instrumentation 均仍安装，ADB reverse 初始为空。通知权限已授予；运行 `Stage2DownloadControlTest#slowChapterCanPauseResumeAndRemove` 直接 instrumentation `OK (1 test)`、62.712 秒，测试断言运行中的下载通知可见，三页章节 Pause→Resume 后完成 3/3，Remove 后数据库任务及下载文件清理一致；fixture 的三页 GET 均 HTTP 200。测试结束移除临时 `tcp:8765` reverse 并停止 fixture 服务；复查 App 与 App AndroidTest APK 仍安装，用户数据未卸载/清理。API 26 兼容性和该版本的 SAF 实际目录导入仍待完成。
 
+- **S2-07D29 Stage 2 退出质量复核 — DONE（退出门禁未通过）。** 按 `AGENTS.md` 阶段审查规则复核 C1–C25 历史代码审查、D01–D06 已记录设备闭环及 D07 最新证据；本次未发现新增代码缺陷，D07 API 26 环境、低版本真实 SAF 导入与通知闭环仍未验证。完整基线、矩阵、发现、命令和剩余风险见 `docs/reviews/stage-02-exit-review-2026-10-02.md`。Stage 2 保持 IN_PROGRESS，不推进 Stage 3；本切片仅文档，`git diff --check` 通过。
+
 既有 S2-02/S2-03 段落里的“没有 UI”是当时状态；本节是 S2-07 接入后的现状，不应据历史段落推断当前界面。
 
 ## 最近完成：S2-04 离线阅读整合 — DONE
