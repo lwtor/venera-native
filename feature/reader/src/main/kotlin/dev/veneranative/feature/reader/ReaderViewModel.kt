@@ -59,6 +59,7 @@ class ReaderViewModel(
             }
             is ReaderAction.PageShown -> showPage(action.index)
             is ReaderAction.ChangeDirection -> _state.update { it.copy(direction = action.direction) }
+            ReaderAction.OpenNextChapter -> Unit // The Route owns navigation and handles this action.
         }
     }
 
@@ -79,6 +80,7 @@ class ReaderViewModel(
                         chapterTitle = content.title,
                         pages = content.pages,
                         currentPageIndex = resumedIndex,
+                        nextChapter = content.nextChapter,
                         status = ReaderStatus.Ready,
                     )
                 }

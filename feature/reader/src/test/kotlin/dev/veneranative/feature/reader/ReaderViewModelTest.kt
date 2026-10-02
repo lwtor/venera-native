@@ -1,6 +1,7 @@
 package dev.veneranative.feature.reader
 
 import dev.veneranative.core.model.ChapterContent
+import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.PageProvider
@@ -68,6 +69,19 @@ class ReaderViewModelTest {
         assertEquals(5, state.pageCount)
         assertEquals(1, state.currentPageNumber)
         assertEquals(ReadingDirection.Vertical, state.direction)
+    }
+
+    @Test
+    fun `exposes the next chapter supplied with chapter content`() = runTest(dispatcher) {
+        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) =
+                ChapterContent("Chapter 1", FakePageProvider(1).loadChapter(chapter).pages, nextChapter = next)
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+
+        assertEquals(next, viewModel.state.value.nextChapter)
     }
 
     @Test

@@ -141,7 +141,7 @@ private fun App(
             route = route,
             onRouteChange = { next ->
                 detailsOrigin = detailsOriginAfterNavigation(route, next, detailsOrigin)
-                if (next is AppRoute.Reader) readerOrigin = route
+                if (next is AppRoute.Reader && route !is AppRoute.Reader) readerOrigin = route
                 route = next
             },
             detailsOrigin = detailsOrigin,
@@ -278,6 +278,7 @@ private fun AppNavHost(
                 ReaderRoute(
                     chapter = current.chapter, provider = provider,
                     onBack = onBack,
+                    onOpenChapter = { next -> onRouteChange(AppRoute.Reader(ChapterRef.Remote(next))) },
                     decoderFactory = decoderFactory, progress = session,
                     onExit = { appScope.launch { runCatching { tracker.flush() } } },
                 )

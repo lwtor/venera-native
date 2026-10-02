@@ -1,6 +1,7 @@
 package dev.veneranative.feature.reader
 
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.model.Chapter
 
 /** How pages are laid out and in which order they advance. */
 enum class ReadingDirection {
@@ -25,6 +26,7 @@ data class ReaderUiState(
     val chapterTitle: String = "",
     val pages: List<ComicPage> = emptyList(),
     val currentPageIndex: Int = 0,
+    val nextChapter: Chapter? = null,
     val direction: ReadingDirection = ReadingDirection.Vertical,
     val status: ReaderStatus = ReaderStatus.Loading,
 ) {

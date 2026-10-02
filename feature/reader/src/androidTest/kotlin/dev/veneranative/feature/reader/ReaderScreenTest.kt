@@ -27,6 +27,12 @@ import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.model.Chapter
+import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.core.model.RemoteComicId
+import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.image.decode.PageImageDecoder
 import dev.veneranative.core.image.tiling.DecodeStrategy
 import dev.veneranative.core.image.tiling.DecodedPageImage
@@ -139,6 +145,33 @@ class ReaderScreenTest {
         assertTrue(warmedPaths.contains("test://0"))
         assertTrue(warmedPaths.contains("test://2"))
         assertTrue("the visible page is decoded by its normal tile", "test://1" !in warmedPaths)
+    }
+
+    @Test
+    fun offersNextChapterWhenTheReaderReachesTheEnd() {
+        val nextChapter = Chapter(
+            ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("chapter-2")),
+            title = "Chapter 2",
+            index = 1,
+        )
+        var openedNext = false
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "Chapter 1",
+                    pages = listOf(ComicPage(0, "test://last", 1080, 300)),
+                    direction = ReadingDirection.LeftToRight,
+                    nextChapter = nextChapter,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = { if (it == ReaderAction.OpenNextChapter) openedNext = true },
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithText("立即进入").assertIsDisplayed().performClick()
+
+        assertTrue(openedNext)
     }
 
     @Test

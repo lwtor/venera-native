@@ -2,6 +2,7 @@ package dev.veneranative.data.comic
 
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -112,6 +113,27 @@ class SourcePageProviderTest {
         )
 
         assertEquals("Chapter chapter-1", provider.loadChapter(chapter).title)
+    }
+
+    @Test
+    fun `the next chapter follows the source declared order`() = runTest {
+        val next = Chapter(
+            key = chapter.copy(remoteId = RemoteChapterId("chapter-2")),
+            title = "Chapter 2",
+            index = 1,
+        )
+        val catalog = object : ComicCatalog by FakeCatalog() {
+            override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
+                SourceOutcome.Success(
+                    ComicDetail(
+                        comic = Comic(comicKey, "Comic"),
+                        chapters = listOf(Chapter(chapter, "Chapter 1", 0), next),
+                    ),
+                )
+        }
+        val content = SourcePageProvider(catalog, FixedSizer()).loadChapter(chapter)
+
+        assertEquals(next, content.nextChapter)
     }
 
     @Test

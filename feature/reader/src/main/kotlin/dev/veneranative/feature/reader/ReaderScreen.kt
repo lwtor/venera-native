@@ -58,9 +58,10 @@ import dev.veneranative.core.image.tiling.PageTiling
 import dev.veneranative.core.image.tiling.PageViewport
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageSizeState
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.roundToInt
 
@@ -82,11 +83,18 @@ fun ReaderScreen(
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
 ) {
     var strategy by rememberSaveable { mutableStateOf(DecodeStrategy.Region) }
+    var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
+    var autoAdvance by rememberSaveable(state.chapterTitle) { mutableStateOf(true) }
     val decoder: PageImageDecoder? = decoderFactory?.let { factory ->
         remember(factory, strategy) { factory(strategy) }
     }
     DisposableEffect(decoder) {
         onDispose { decoder?.close() }
+    }
+    LaunchedEffect(chapterEndReached, autoAdvance, state.nextChapter) {
+        if (!chapterEndReached || !autoAdvance || state.nextChapter == null) return@LaunchedEffect
+        delay(NEXT_CHAPTER_AUTO_ADVANCE_MILLIS)
+        onAction(ReaderAction.OpenNextChapter)
     }
 
     Scaffold(
@@ -114,12 +122,33 @@ fun ReaderScreen(
         },
         bottomBar = {
             if (state.status == ReaderStatus.Ready) {
-                ReaderControls(
-                    direction = state.direction,
-                    strategy = if (decoderFactory == null) null else strategy,
-                    onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
-                    onStrategyChange = { strategy = it },
-                )
+                Column {
+                    state.nextChapter?.takeIf { chapterEndReached }?.let { next ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = if (autoAdvance) "${NEXT_CHAPTER_AUTO_ADVANCE_MILLIS / 1_000L} 秒后进入下一话：${next.title}"
+                                else "本话已结束：${next.title}",
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            if (autoAdvance) {
+                                TextButton(onClick = { autoAdvance = false }) { Text("取消自动") }
+                            }
+                            TextButton(onClick = { onAction(ReaderAction.OpenNextChapter) }) { Text("立即进入") }
+                        }
+                    }
+                    ReaderControls(
+                        direction = state.direction,
+                        strategy = if (decoderFactory == null) null else strategy,
+                        onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
+                        onStrategyChange = { strategy = it },
+                    )
+                }
             }
         },
     ) { contentPadding ->
@@ -147,6 +176,7 @@ fun ReaderScreen(
                     state = state,
                     onAction = onAction,
                     decoder = decoder,
+                    onChapterEndChange = { chapterEndReached = it },
                 )
             }
         }
@@ -158,6 +188,7 @@ private fun PageContent(
     state: ReaderUiState,
     onAction: (ReaderAction) -> Unit,
     decoder: PageImageDecoder?,
+    onChapterEndChange: (Boolean) -> Unit,
 ) {
     if (state.pageCount == 0) {
         Text(
@@ -179,6 +210,7 @@ private fun PageContent(
                 state = state,
                 viewport = viewport,
                 decoder = decoder,
+                onChapterEndChange = onChapterEndChange,
                 onAction = onAction,
             )
 
@@ -188,6 +220,7 @@ private fun PageContent(
                 state = state,
                 viewport = viewport,
                 decoder = decoder,
+                onChapterEndChange = onChapterEndChange,
                 onAction = onAction,
             )
         }
@@ -200,6 +233,7 @@ private fun ContinuousPages(
     state: ReaderUiState,
     viewport: PageViewport,
     decoder: PageImageDecoder?,
+    onChapterEndChange: (Boolean) -> Unit,
     onAction: (ReaderAction) -> Unit,
 ) {
     val zoomState = rememberReaderZoomState()
@@ -233,8 +267,24 @@ private fun ContinuousPages(
             page?.let { onAction(ReaderAction.PageShown(it)) }
         }
     }
+    LaunchedEffect(listState, items.size) {
+        snapshotFlow {
+            val visibleLast = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            items.isNotEmpty() && listState.layoutInfo.totalItemsCount > 0 &&
+                visibleLast == items.lastIndex && !listState.canScrollForward && !zoomState.isZoomed &&
+                state.pages.lastOrNull()?.sizeState == PageSizeState.Ready
+        }.distinctUntilChanged().collect(onChapterEndChange)
+    }
     val contentWidthPx = items.maxOfOrNull { it.tile.displayWidthPx }?.toFloat() ?: viewport.widthPx.toFloat()
     val contentHeightPx = items.sumOf { it.tile.displayHeightPx }.toFloat()
+    LaunchedEffect(listState, items, viewport, decoder) {
+        if (decoder == null) return@LaunchedEffect
+        snapshotFlow { items.getOrNull(listState.firstVisibleItemIndex)?.page?.index }
+            .distinctUntilChanged()
+            .collectLatest { index ->
+                if (index != null) predecodeAdjacentPages(index, state.pages, viewport, decoder)
+            }
+    }
     val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
         zoomState.applyGesture(
             pan = pan,
@@ -277,6 +327,7 @@ private fun SinglePagePager(
     state: ReaderUiState,
     viewport: PageViewport,
     decoder: PageImageDecoder?,
+    onChapterEndChange: (Boolean) -> Unit,
     onAction: (ReaderAction) -> Unit,
 ) {
     val pagerState = rememberPagerState(
@@ -287,42 +338,13 @@ private fun SinglePagePager(
         snapshotFlow { pagerState.currentPage }
             .collect { onAction(ReaderAction.PageShown(it)) }
     }
+    LaunchedEffect(pagerState.currentPage) { onChapterEndChange(false) }
     LaunchedEffect(pagerState, state.pages, viewport, decoder) {
         if (decoder == null) return@LaunchedEffect
-        val warmJobs = mutableMapOf<Int, Job>()
         snapshotFlow { pagerState.currentPage }
             .distinctUntilChanged()
-            .collect { currentPage ->
-                val candidates = listOf(currentPage - 1, currentPage + 1)
-                    .filter { it in state.pages.indices && state.pages[it].sizeState == PageSizeState.Ready }
-                    .toSet()
-                (warmJobs.keys - candidates).forEach { index ->
-                    warmJobs.remove(index)?.cancel()
-                }
-                candidates.forEach { index ->
-                    if (warmJobs[index]?.isActive == true) return@forEach
-                    warmJobs[index] = launch {
-                        val page = state.pages[index]
-                        try {
-                            val tile = decoder.plan(page, viewport, zoom = 1f, continuous = true).firstOrNull()
-                                ?: return@launch
-                            decoder.predecode(
-                                PageDecodeRequest(
-                                    path = page.imageRef,
-                                    sourceId = page.sourceId,
-                                    targetWidthPx = tile.displayWidthPx,
-                                    targetHeightPx = tile.displayHeightPx,
-                                    region = tile.region,
-                                    fitWidthOnly = tile.fitWidthOnly,
-                                ),
-                            )
-                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                            throw cancelled
-                        } catch (_: Exception) {
-                            // The page's visible tile owns its normal retry and error state.
-                        }
-                    }
-                }
+            .collectLatest { currentPage ->
+                predecodeAdjacentPages(currentPage, state.pages, viewport, decoder)
             }
     }
     HorizontalPager(
@@ -334,8 +356,52 @@ private fun SinglePagePager(
             page = state.pages[index],
             viewport = viewport,
             decoder = decoder,
+            isLastChapterPage = index == state.pageCount - 1,
+            onChapterEndChange = { reached ->
+                if (index == pagerState.currentPage) onChapterEndChange(reached)
+            },
             onRetry = { onAction(ReaderAction.RetryPage(index)) },
         )
+    }
+}
+
+/**
+ * Wait for active scrolling/flinging to settle before using decode time on adjacent pages. Keeping
+ * the work inside collectLatest also cancels stale page decodes when the user moves on quickly.
+ */
+private suspend fun predecodeAdjacentPages(
+    currentPage: Int,
+    pages: List<ComicPage>,
+    viewport: PageViewport,
+    decoder: PageImageDecoder,
+) {
+    delay(PAGE_PREDECODE_IDLE_MILLIS)
+    coroutineScope {
+        listOf(currentPage - 1, currentPage + 1)
+            .filter { it in pages.indices && pages[it].sizeState == PageSizeState.Ready }
+            .forEach { index ->
+                launch {
+                    val page = pages[index]
+                    try {
+                        val tile = decoder.plan(page, viewport, zoom = 1f, continuous = true).firstOrNull()
+                            ?: return@launch
+                        decoder.predecode(
+                            PageDecodeRequest(
+                                path = page.imageRef,
+                                sourceId = page.sourceId,
+                                targetWidthPx = tile.displayWidthPx,
+                                targetHeightPx = tile.displayHeightPx,
+                                region = tile.region,
+                                fitWidthOnly = tile.fitWidthOnly,
+                            ),
+                        )
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // The page's visible tile owns its normal retry and error state.
+                    }
+                }
+            }
     }
 }
 
@@ -345,6 +411,8 @@ private fun PagedPage(
     page: ComicPage,
     viewport: PageViewport,
     decoder: PageImageDecoder?,
+    isLastChapterPage: Boolean,
+    onChapterEndChange: (Boolean) -> Unit,
     onRetry: () -> Unit = {},
 ) {
     val zoomState = rememberReaderZoomState()
@@ -353,6 +421,15 @@ private fun PagedPage(
             ?: listOf(placeholderTile(page, viewport, continuous = true))
     }
     val listState = rememberLazyListState()
+    LaunchedEffect(listState, tiles.size, isLastChapterPage) {
+        if (!isLastChapterPage) return@LaunchedEffect
+        snapshotFlow {
+            val visibleLast = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
+            tiles.isNotEmpty() && listState.layoutInfo.totalItemsCount > 0 &&
+                visibleLast == tiles.lastIndex && !listState.canScrollForward && !zoomState.isZoomed &&
+                page.sizeState == PageSizeState.Ready
+        }.distinctUntilChanged().collect(onChapterEndChange)
+    }
     val contentWidthPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.widthPx * zoomState.scale
     val contentHeightPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.heightPx * zoomState.scale
     val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
@@ -558,6 +635,9 @@ private fun placeholderTile(page: ComicPage, viewport: PageViewport, continuous:
         displayHeightPx = (page.heightPx * scale).roundToInt().coerceAtLeast(1),
     )
 }
+
+private const val PAGE_PREDECODE_IDLE_MILLIS = 350L
+private const val NEXT_CHAPTER_AUTO_ADVANCE_MILLIS = 8_000L
 
 private fun ReadingDirection.label(): String = when (this) {
     ReadingDirection.Vertical -> "竖向"

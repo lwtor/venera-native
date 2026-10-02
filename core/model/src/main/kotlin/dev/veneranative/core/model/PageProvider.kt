@@ -6,6 +6,8 @@ data class ChapterContent(
     val pages: List<ComicPage>,
     val comicTitle: String? = null,
     val coverUrl: String? = null,
+    /** Next chapter in the source's declared order, when available. */
+    val nextChapter: Chapter? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }

@@ -42,9 +42,11 @@ class SourcePageProvider(
                 dev.veneranative.core.model.PageSizeState.Pending)
         }
         val detail = (catalog.detail(key.comicKey) as? SourceOutcome.Success)?.value
+        val chapterIndex = detail?.chapters?.indexOfFirst { it.key == key } ?: -1
         return ChapterContent(
             title = detail?.chapters?.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
             pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
+            nextChapter = detail?.chapters?.getOrNull(chapterIndex + 1).takeIf { chapterIndex >= 0 },
         )
     }
 

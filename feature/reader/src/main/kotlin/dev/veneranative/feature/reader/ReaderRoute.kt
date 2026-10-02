@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.image.decode.PageImageDecoder
 import dev.veneranative.core.image.tiling.DecodeStrategy
 import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.PageProvider
 
 
@@ -23,6 +24,7 @@ fun ReaderRoute(
     chapter: ChapterRef,
     provider: PageProvider,
     onBack: () -> Unit,
+    onOpenChapter: (ChapterKey) -> Unit = {},
     modifier: Modifier = Modifier,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
     /** Where to open a resumed chapter; ignored when it falls outside the loaded pages. */
@@ -42,12 +44,18 @@ fun ReaderRoute(
     }
     val viewModel: ReaderViewModel = viewModel(viewModelStoreOwner = owner) {
         ReaderViewModel(chapter, provider, startPageIndex = startPageIndex, progress = progress,
-            prefetchRadius = if (chapter is ChapterRef.Local) 0 else 1)
+            prefetchRadius = if (chapter is ChapterRef.Local) 0 else 2)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     ReaderScreen(
         state = state,
-        onAction = viewModel::onAction,
+        onAction = { action ->
+            if (action == ReaderAction.OpenNextChapter) {
+                state.nextChapter?.key?.let(onOpenChapter)
+            } else {
+                viewModel.onAction(action)
+            }
+        },
         onBack = onBack,
         modifier = modifier,
         decoderFactory = decoderFactory,

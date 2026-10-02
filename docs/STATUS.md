@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00B2 上游 Venera 源码对照审查 |
-| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H 阅读器图片黑屏修复 DONE（修复 WebP VP8 尺寸偏移，真实首页续读在纵向/横向和两种解码策略下均绘出图片）；S3-00I 阅读器重复进入时源调用恢复 DONE（相关 JVM 单测通过）；当前唯一下一任务 S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H 阅读器图片黑屏修复 DONE（修复 WebP VP8 尺寸偏移，真实首页续读在纵向/横向和两种解码策略下均绘出图片）；S3-00I 阅读器重复进入时源调用恢复 DONE（相关 JVM 单测通过）；S3-00J 邻页首屏预解码 DONE（首次尝试未获真机用例结果）；S3-00K 停稳后邻页预解码与两页远端数据预取 DONE（设备耗时未测）；S3-00L 下一话自动衔接 DONE（设备实际翻章未测）；当前唯一下一任务 S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -44,6 +44,10 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00I DONE：缓解阅读器快速重进时的同源调用竞争。** Reader 退出会取消正在进行的漫画源调用；若用户立即重进，QuickJS 对同源并行调用的保护会返回忙碌错误，此前章节加载将其直接显示为永久失败。运行时现将该情况建模为可重试的 `SourceRuntimeError.Busy`，`SourcePageProvider` 最多短暂等待重试两次；持续忙碌仍会走可见失败/手动重试路径。新增引擎错误类型断言和页提供器“忙碌后成功”回归。JDK 17 验证：`:source:engine:testDebugUnitTest :data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。ADB 本次未枚举到设备，未运行仪器 UI；同源忙碌重试已有自动化 JVM 覆盖。
 
 **S3-00J DONE：为横向阅读增加邻页首屏预解码。** `PageImageDecoder.predecode()` 将提前解码纳入解码器契约；缓存与来源文件租约装饰器均经由自身 `decode()` 实现预解码，确保结果进入共享 64 MiB LRU，并在远程页解码期间维持缓存文件租约。横向分页仅预解码当前页前后紧邻页的第一个 tile；页码移动后取消已远离邻页范围的工作，章节长短不影响预取窗口。新增 Compose Android 回归用例，核对当前页前后页被预解码、当前页仍走正常显示路径。JDK 17 验证：`:feature:reader:compileDebugAndroidTestKotlin :feature:reader:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。已连接 Xiaomi 25128PNA1C 并安装 Reader 测试 APK，直接启动 `predecodesOnlyTheImmediatePagesAroundTheCurrentPage` 后约 40 秒无测试结果，停止等待；**该设备测试不计为通过，且本次未量到真实翻页耗时**。主 App 及数据未卸载/清理；性能效果需后续在正常阅读中确认。
+
+**S3-00K DONE：补强翻页流畅度。** 用户反馈 S3-00J 的小窗口预解码没有改善体感后，扩大实现范围：竖向连续滚动和横向分页都会在滚动/翻页停稳 350 ms 后再解码邻页，快速继续操作会取消旧任务，避免预取与当前页争用；远端页尺寸/原图缓存半径扩到当前页前后各两页，继续受窗口取消与磁盘缓存上限约束。JDK 17 验证：`:data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL。**真机耗时与掉帧没有测量，本改动尚无设备性能数据。**
+
+**S3-00L DONE：阅读器自动衔接下一话。** `ChapterContent` 现在保留来源目录原顺序中的下一章；Reader 从详情或首页续读均可使用。真正滚到本话最后一页/最后一个 tile 底部后，显示下一话提示，8 秒后自动进入，可取消自动跳转或立即进入；进入下一话时继续保留 Reader 的原始返回目标。无下一话的章节不显示提示，阅读失败页或缩放状态不会触发自动跳转。回归覆盖来源章节顺序和 Reader 下一章状态；Reader Compose 末页按钮测试源码编译通过。JDK 17 验证：同上构建命令 — BUILD SUCCESSFUL。**设备自动翻章流程尚未运行。**
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 
