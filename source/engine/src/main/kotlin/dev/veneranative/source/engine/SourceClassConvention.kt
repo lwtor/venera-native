@@ -101,7 +101,10 @@ internal object SourceClassConvention {
           globalThis.__veneraInvocationId = "source-install";
           try {
             if (typeof $INSTANCE.init === "function") {
-              await $INSTANCE.init();
+              // Initialization often refreshes optional hosts or search endpoints. Keep the
+              // installed source usable with its declared defaults when that setup is offline;
+              // individual calls can still surface their own errors and retry later.
+              try { await $INSTANCE.init(); } catch (_) {}
             }
           } finally {
             if (previousInvocationId === undefined) delete globalThis.__veneraInvocationId;

@@ -55,6 +55,12 @@ internal object SourceBaseScript {
                 if (declared && typeof declared === "object" && declared.default !== undefined) {
                   return declared.default;
                 }
+                // Some upstream sources replace a setting declaration at runtime (for example,
+                // CopyManga writes its current API host into `settings.base_url` during init).
+                // Preserve that live scalar value when `loadSetting` is read later.
+                if (typeof declared === "string" || typeof declared === "number" || typeof declared === "boolean") {
+                  return declared;
+                }
               }
               return null;
             }

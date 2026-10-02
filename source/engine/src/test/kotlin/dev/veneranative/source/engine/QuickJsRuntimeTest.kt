@@ -3,6 +3,7 @@ package dev.veneranative.source.engine
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.source.api.SourceCall
 import dev.veneranative.source.api.SourceHostApi
+import dev.veneranative.source.api.SourceHostError
 import dev.veneranative.source.api.SourceHostRequest
 import dev.veneranative.source.api.SourceHostResult
 import dev.veneranative.source.api.SourceInstallResult
@@ -119,6 +120,39 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `optional initializer network failure does not reject an install`() = runBlocking {
+        val host = object : SourceHostApi {
+            override fun isMethodAllowed(method: String) = method == "http.request"
+
+            override suspend fun invoke(request: SourceHostRequest): SourceHostResult =
+                SourceHostResult.Failure(
+                    requestId = request.requestId,
+                    error = SourceHostError(
+                        SourceHostError.Code.NETWORK_CONNECTION,
+                        "Network request failed.",
+                        retryable = true,
+                    ),
+                )
+        }
+
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    async init() {
+                      const response = await fetch("https://example.com/optional-discovery");
+                      this.initialized = response.status === 0;
+                    }
+                    isInitialized() { return this.initialized === true; }
+                    """.trimIndent(),
+                ),
+            )
+
+            assertEquals("true", runtime.invokeSuccess(sourceId, "isInitialized", "[]"))
+        }
+    }
+
+    @Test
     fun `the declared settings default answers loadSetting`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
@@ -135,6 +169,23 @@ class QuickJsRuntimeTest {
             val result = JSONObject(runtime.invokeSuccess(sourceId, "quality", "[]"))
 
             assertEquals("high", result.getString("value"))
+        }
+    }
+
+    @Test
+    fun `a source can replace a setting value during initialization`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    settings = { apiHost: { default: "api.example" } };
+                    init() { this.settings.apiHost = "api2.example"; }
+                    currentApiHost() { return this.loadSetting("apiHost"); }
+                    """.trimIndent(),
+                ),
+            )
+
+            assertEquals("\"api2.example\"", runtime.invokeSuccess(sourceId, "currentApiHost", "[]"))
         }
     }
 
@@ -175,6 +226,32 @@ class QuickJsRuntimeTest {
                 "keyword should reach the host: ${recordedUrls.single()}",
                 recordedUrls.single().contains("cats%20and%20dogs"),
             )
+        }
+    }
+
+    @Test
+    fun `copy manga signing helpers match the upstream sha256 hmac contract`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    sign() {
+                      var key = Convert.decodeBase64("a2V5");
+                      var message = Convert.encodeUtf8("The quick brown fox jumps over the lazy dog");
+                      return {
+                        signature: Convert.hmacString(key, message, "sha256"),
+                        roundTrip: Convert.decodeUtf8(Convert.decodeBase64(Convert.encodeBase64(message))),
+                        random: randomInt(4, 4)
+                      };
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "sign", "[]"))
+            assertEquals("f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8", result.getString("signature"))
+            assertEquals("The quick brown fox jumps over the lazy dog", result.getString("roundTrip"))
+            assertEquals(4, result.getInt("random"))
         }
     }
 

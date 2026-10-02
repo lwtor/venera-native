@@ -171,14 +171,160 @@ internal object QuickJsHostScript {
             return text;
           }
 
+          function bytesOf(input) {
+            if (input instanceof Uint8Array) return Array.prototype.slice.call(input);
+            if (input instanceof ArrayBuffer) return Array.prototype.slice.call(new Uint8Array(input));
+            if (ArrayBuffer.isView(input)) {
+              return Array.prototype.slice.call(new Uint8Array(input.buffer, input.byteOffset, input.byteLength));
+            }
+            throw new TypeError("Expected a byte array.");
+          }
+
+          var base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+          function decodeBase64(value) {
+            var text = String(value).replace(/\\s/g, "");
+            if (text.length % 4 === 1 || /[^A-Za-z0-9+/=]/.test(text)) {
+              throw new TypeError("Invalid base64 input.");
+            }
+            var output = [];
+            var accumulator = 0;
+            var bits = 0;
+            for (var index = 0; index < text.length; index += 1) {
+              var character = text.charAt(index);
+              if (character === "=") break;
+              accumulator = (accumulator << 6) | base64Alphabet.indexOf(character);
+              bits += 6;
+              if (bits >= 8) {
+                bits -= 8;
+                output.push((accumulator >> bits) & 0xff);
+              }
+            }
+            return new Uint8Array(output);
+          }
+
+          function encodeBase64(input) {
+            var bytes = bytesOf(input);
+            var result = "";
+            for (var index = 0; index < bytes.length; index += 3) {
+              var first = bytes[index];
+              var second = index + 1 < bytes.length ? bytes[index + 1] : 0;
+              var third = index + 2 < bytes.length ? bytes[index + 2] : 0;
+              var block = (first << 16) | (second << 8) | third;
+              result += base64Alphabet.charAt((block >>> 18) & 63);
+              result += base64Alphabet.charAt((block >>> 12) & 63);
+              result += index + 1 < bytes.length ? base64Alphabet.charAt((block >>> 6) & 63) : "=";
+              result += index + 2 < bytes.length ? base64Alphabet.charAt(block & 63) : "=";
+            }
+            return result;
+          }
+
+          // SHA-256 is kept in the JS compatibility layer so upstream's synchronous Convert.hmac
+          // contract stays synchronous and never exposes Java objects to a source.
+          var sha256Constants = [
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+          ];
+          function rotateRight(value, count) { return (value >>> count) | (value << (32 - count)); }
+          function sha256(input) {
+            var bytes = bytesOf(input).slice();
+            var bitLength = bytes.length * 8;
+            bytes.push(0x80);
+            while (bytes.length % 64 !== 56) bytes.push(0);
+            var high = Math.floor(bitLength / 0x100000000);
+            var low = bitLength >>> 0;
+            bytes.push((high >>> 24) & 255, (high >>> 16) & 255, (high >>> 8) & 255, high & 255,
+              (low >>> 24) & 255, (low >>> 16) & 255, (low >>> 8) & 255, low & 255);
+            var hash = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+            for (var offset = 0; offset < bytes.length; offset += 64) {
+              var words = new Array(64);
+              for (var word = 0; word < 16; word += 1) {
+                var at = offset + word * 4;
+                words[word] = ((bytes[at] << 24) | (bytes[at + 1] << 16) | (bytes[at + 2] << 8) | bytes[at + 3]) >>> 0;
+              }
+              for (var next = 16; next < 64; next += 1) {
+                var x = words[next - 15], y = words[next - 2];
+                var s0 = rotateRight(x, 7) ^ rotateRight(x, 18) ^ (x >>> 3);
+                var s1 = rotateRight(y, 17) ^ rotateRight(y, 19) ^ (y >>> 10);
+                words[next] = (words[next - 16] + s0 + words[next - 7] + s1) >>> 0;
+              }
+              var a = hash[0], b = hash[1], c = hash[2], d = hash[3];
+              var e = hash[4], f = hash[5], g = hash[6], h = hash[7];
+              for (var round = 0; round < 64; round += 1) {
+                var upper1 = rotateRight(e, 6) ^ rotateRight(e, 11) ^ rotateRight(e, 25);
+                var choice = (e & f) ^ (~e & g);
+                var temp1 = (h + upper1 + choice + sha256Constants[round] + words[round]) >>> 0;
+                var upper0 = rotateRight(a, 2) ^ rotateRight(a, 13) ^ rotateRight(a, 22);
+                var majority = (a & b) ^ (a & c) ^ (b & c);
+                var temp2 = (upper0 + majority) >>> 0;
+                h = g; g = f; f = e; e = (d + temp1) >>> 0;
+                d = c; c = b; b = a; a = (temp1 + temp2) >>> 0;
+              }
+              hash[0] = (hash[0] + a) >>> 0; hash[1] = (hash[1] + b) >>> 0;
+              hash[2] = (hash[2] + c) >>> 0; hash[3] = (hash[3] + d) >>> 0;
+              hash[4] = (hash[4] + e) >>> 0; hash[5] = (hash[5] + f) >>> 0;
+              hash[6] = (hash[6] + g) >>> 0; hash[7] = (hash[7] + h) >>> 0;
+            }
+            var output = new Uint8Array(32);
+            for (var part = 0; part < hash.length; part += 1) {
+              output[part * 4] = hash[part] >>> 24;
+              output[part * 4 + 1] = hash[part] >>> 16;
+              output[part * 4 + 2] = hash[part] >>> 8;
+              output[part * 4 + 3] = hash[part];
+            }
+            return output;
+          }
+          function hmacSha256(keyInput, valueInput) {
+            var key = bytesOf(keyInput);
+            var value = bytesOf(valueInput);
+            if (key.length > 64) key = bytesOf(sha256(key));
+            while (key.length < 64) key.push(0);
+            var inner = new Uint8Array(64 + value.length);
+            var outer = new Uint8Array(96);
+            for (var index = 0; index < 64; index += 1) {
+              inner[index] = key[index] ^ 0x36;
+              outer[index] = key[index] ^ 0x5c;
+            }
+            inner.set(value, 64);
+            outer.set(sha256(inner), 64);
+            return sha256(outer);
+          }
+          function hexEncode(input) {
+            return bytesOf(input).map(function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
+          }
+
           globalThis.Convert = Object.freeze({
             encodeUtf8: function (text) {
               return utf8Encode(String(text === undefined || text === null ? "" : text));
             },
             decodeUtf8: function (bytes) {
               return utf8Decode(bytes);
-            }
+            },
+            encodeBase64: encodeBase64,
+            decodeBase64: decodeBase64,
+            hmac: function (key, value, hash) {
+              if (String(hash).toLowerCase() !== "sha256") throw new TypeError("Unsupported HMAC algorithm.");
+              return hmacSha256(key, value).buffer;
+            },
+            hmacString: function (key, value, hash) {
+              return hexEncode(Convert.hmac(key, value, hash));
+            },
+            hexEncode: hexEncode
           });
+
+          globalThis.randomInt = function (min, max) {
+            min = Math.ceil(Number(min));
+            max = Math.floor(Number(max));
+            if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) {
+              throw new RangeError("Invalid random integer range.");
+            }
+            return min + Math.floor(Math.random() * (max - min + 1));
+          };
 
           function describe(value) {
             try {
@@ -286,12 +432,23 @@ internal object QuickJsHostScript {
                 hostFailure("Request URL must not be empty.", "INVALID_REQUEST", false)
               );
             }
+            // Source initializers may fire-and-forget optional endpoint discovery requests. A
+            // transient network outage during installation must not make an otherwise valid
+            // script impossible to add; return an unsuccessful response for those install-time
+            // requests. Requests made after installation retain the normal rejecting fetch/network
+            // semantics so product operations can report and retry genuine network failures.
+            var invocationId = globalThis.__veneraInvocationId;
             return callHost("http.request", {
               url: url,
               method: method,
               headers: headerObject(headers),
               body: bodyToText(body)
-            }).then(decodeResponse);
+            }).then(decodeResponse).catch(function (failure) {
+              if (invocationId === "source-install") {
+                return { status: 0, headers: {}, body: "" };
+              }
+              throw failure;
+            });
           }
 
           function headerLookup(raw) {
