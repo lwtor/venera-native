@@ -60,11 +60,11 @@ internal fun LibraryScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Library") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                title = { Text("书架") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
                 actions = {
                     TextButton(onClick = { onAction(LibraryAction.RefreshUpdates) }) {
-                        Text("Check updates")
+                        Text("检查更新")
                     }
                 },
             )
@@ -83,14 +83,14 @@ internal fun LibraryScreen(
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { onAction(LibraryAction.DismissMessage) }) { Text("OK") }
+                    TextButton(onClick = { onAction(LibraryAction.DismissMessage) }) { Text("确定") }
                 }
             }
 
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Favorites)) }) { Text("Favorites") }
-                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Downloads)) }) { Text("Downloads") }
-                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Local)) }) { Text("Local") }
+                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Favorites)) }) { Text("收藏") }
+                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Downloads)) }) { Text("下载") }
+                TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Local)) }) { Text("本地") }
             }
 
             if (state.tab == LibraryTab.Favorites) {
@@ -106,19 +106,19 @@ internal fun LibraryScreen(
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = { onAction(LibraryAction.EditFolder(null)) }) { Text("New folder") }
+                TextButton(onClick = { onAction(LibraryAction.EditFolder(null)) }) { Text("新建文件夹") }
                 TextButton(
                     enabled = selectedFolder != null,
                     onClick = {
                         selectedFolder?.let { onAction(LibraryAction.EditFolder(it.id)) }
                     },
-                ) { Text("Rename") }
+                ) { Text("重命名") }
                 TextButton(
                     enabled = selectedFolder?.removable == true,
                     onClick = {
                         selectedFolder?.let { onAction(LibraryAction.DeleteFolder(it.id)) }
                     },
-                ) { Text("Delete") }
+                ) { Text("删除") }
             }
 
             ShelfSortChips(
@@ -135,15 +135,15 @@ internal fun LibraryScreen(
                 LibraryStatus.Empty -> Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
-                ) { Text("Nothing on the shelf yet.") }
+                ) { Text("书架还是空的。") }
 
                 LibraryStatus.Failed -> Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
                 ) {
-                    Text(state.message ?: "The shelf could not be read.")
-                    Button(onClick = { onAction(LibraryAction.Retry) }) { Text("Try again") }
+                    Text("无法读取书架内容。")
+                    Button(onClick = { onAction(LibraryAction.Retry) }) { Text("重试") }
                 }
 
                 LibraryStatus.Ready -> FavoriteGrid(
@@ -158,45 +158,45 @@ internal fun LibraryScreen(
             }
             } else if (state.tab == LibraryTab.Local) {
                 Column(Modifier.fillMaxSize()) {
-                    Button(onClick = { onAction(LibraryAction.RequestLocalImport) }, modifier = Modifier.padding(16.dp)) { Text("Import directory") }
-                    Button(onClick = { onAction(LibraryAction.RequestArchiveImport) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Import CBZ / ZIP / 7z") }
-                    if (state.localComics.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No local directories imported.") }
+                    Button(onClick = { onAction(LibraryAction.RequestLocalImport) }, modifier = Modifier.padding(16.dp)) { Text("导入文件夹") }
+                    Button(onClick = { onAction(LibraryAction.RequestArchiveImport) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("导入 CBZ / ZIP / 7z") }
+                    if (state.localComics.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("尚未导入本地漫画。") }
                     else LazyColumn(Modifier.fillMaxSize()) {
                         items(state.localComics, key = { it.id.value }) { comic ->
                             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text(comic.title, style = MaterialTheme.typography.titleMedium)
-                                    Text("${comic.chapterCount} chapters", style = MaterialTheme.typography.bodySmall)
+                                    Text("${comic.chapterCount} 章", style = MaterialTheme.typography.bodySmall)
                                 }
-                                TextButton(onClick = { onAction(LibraryAction.RemoveLocalComic(comic.id)) }) { Text("Remove") }
+                                TextButton(onClick = { onAction(LibraryAction.RemoveLocalComic(comic.id)) }) { Text("移除") }
                             }
                             state.localChapters[comic.id].orEmpty().forEach { chapter ->
                                 TextButton(onClick = { onOpenLocalChapter(comic.id, chapter.id) }, modifier = Modifier.padding(start = 24.dp)) {
-                                    Text("Read ${chapter.title}")
+                                    Text("阅读 ${chapter.title}")
                                 }
                             }
                         }
                     }
                 }
             } else {
-                if (state.downloads.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No downloads yet.") }
+                if (state.downloads.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("暂无下载任务。") }
                 else LazyColumn(Modifier.fillMaxSize()) {
                     items(state.downloads, key = { it.chapter.toString() }) { task ->
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(task.title, style = MaterialTheme.typography.titleMedium)
-                                Text("${task.completedPages}/${task.pageCount} pages · ${task.state}", style = MaterialTheme.typography.bodySmall)
+                                Text("${task.completedPages}/${task.pageCount} 页 · ${task.state.localizedLabel()}", style = MaterialTheme.typography.bodySmall)
                             }
                             when (task.state) {
                                 dev.veneranative.data.download.DownloadChapterState.Queued,
-                                dev.veneranative.data.download.DownloadChapterState.Running -> TextButton(onClick = { onAction(LibraryAction.PauseDownload(task.chapter)) }) { Text("Pause") }
-                                dev.veneranative.data.download.DownloadChapterState.Paused -> TextButton(onClick = { onAction(LibraryAction.ResumeDownload(task.chapter)) }) { Text("Resume") }
+                                dev.veneranative.data.download.DownloadChapterState.Running -> TextButton(onClick = { onAction(LibraryAction.PauseDownload(task.chapter)) }) { Text("暂停") }
+                                dev.veneranative.data.download.DownloadChapterState.Paused -> TextButton(onClick = { onAction(LibraryAction.ResumeDownload(task.chapter)) }) { Text("继续") }
                                 dev.veneranative.data.download.DownloadChapterState.Partial,
-                                dev.veneranative.data.download.DownloadChapterState.Failed -> TextButton(onClick = { onAction(LibraryAction.RetryDownload(task.chapter)) }) { Text("Retry") }
+                                dev.veneranative.data.download.DownloadChapterState.Failed -> TextButton(onClick = { onAction(LibraryAction.RetryDownload(task.chapter)) }) { Text("重试") }
                                 dev.veneranative.data.download.DownloadChapterState.Completed,
                                 dev.veneranative.data.download.DownloadChapterState.Canceled -> Unit
                             }
-                            TextButton(onClick = { onAction(LibraryAction.CancelDownload(task.chapter)) }) { Text("Remove") }
+                            TextButton(onClick = { onAction(LibraryAction.CancelDownload(task.chapter)) }) { Text("移除") }
                         }
                     }
                 }
@@ -207,7 +207,7 @@ internal fun LibraryScreen(
     state.folderEditor?.let { editor ->
         AlertDialog(
             onDismissRequest = { onAction(LibraryAction.DismissFolderEditor) },
-            title = { Text(if (editor.folderId == null) "New folder" else "Rename folder") },
+            title = { Text(if (editor.folderId == null) "新建文件夹" else "重命名文件夹") },
             text = {
                 OutlinedTextField(
                     value = editor.draft,
@@ -216,10 +216,10 @@ internal fun LibraryScreen(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { onAction(LibraryAction.ConfirmFolderEditor) }) { Text("Save") }
+                TextButton(onClick = { onAction(LibraryAction.ConfirmFolderEditor) }) { Text("保存") }
             },
             dismissButton = {
-                TextButton(onClick = { onAction(LibraryAction.DismissFolderEditor) }) { Text("Cancel") }
+                TextButton(onClick = { onAction(LibraryAction.DismissFolderEditor) }) { Text("取消") }
             },
         )
     }
@@ -250,10 +250,20 @@ private fun ShelfSortChips(
 }
 
 private fun ShelfSort.label(): String = when (this) {
-    ShelfSort.AddedAt -> "Recently added"
-    ShelfSort.Title -> "Title"
-    ShelfSort.LastRead -> "Last read"
-    ShelfSort.Updated -> "Updated"
+    ShelfSort.AddedAt -> "最近添加"
+    ShelfSort.Title -> "标题"
+    ShelfSort.LastRead -> "最近阅读"
+    ShelfSort.Updated -> "最近更新"
+}
+
+private fun dev.veneranative.data.download.DownloadChapterState.localizedLabel(): String = when (this) {
+    dev.veneranative.data.download.DownloadChapterState.Queued -> "排队中"
+    dev.veneranative.data.download.DownloadChapterState.Running -> "下载中"
+    dev.veneranative.data.download.DownloadChapterState.Paused -> "已暂停"
+    dev.veneranative.data.download.DownloadChapterState.Partial -> "部分完成"
+    dev.veneranative.data.download.DownloadChapterState.Failed -> "失败"
+    dev.veneranative.data.download.DownloadChapterState.Completed -> "已完成"
+    dev.veneranative.data.download.DownloadChapterState.Canceled -> "已取消"
 }
 
 @Preview(showBackground = true)

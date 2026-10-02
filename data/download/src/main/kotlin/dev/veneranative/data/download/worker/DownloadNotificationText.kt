@@ -20,24 +20,24 @@ object DownloadNotificationText {
     /** Every action this notification can send; the receiver refuses anything else. */
     val actions: Set<String> = setOf(ACTION_PAUSE, ACTION_RESUME, ACTION_CANCEL)
 
-    fun channelName(): String = "Downloads"
+    fun channelName(): String = "漫画下载"
 
-    fun channelDescription(): String = "Progress of chapters being saved for offline reading"
+    fun channelDescription(): String = "显示正在保存以供离线阅读的章节进度"
 
     /** The headline: which chapter is being worked on, or that nothing has started yet. */
     fun title(progress: DownloadProgress): String =
-        if (progress.chapterTitle.isBlank()) IDLE_TITLE else "Downloading ${progress.chapterTitle}"
+        if (progress.chapterTitle.isBlank()) IDLE_TITLE else "正在下载：${progress.chapterTitle}"
 
     /** "3 / 20", or a plain sentence while the chapter's size is still unknown. */
     fun content(progress: DownloadProgress): String =
         if (progress.isUnresolved) UNRESOLVED_CONTENT else "${progress.completedPages} / ${progress.totalPages}"
 
-    fun actionPause(): String = "Pause"
+    fun actionPause(): String = "暂停"
 
-    fun actionResume(): String = "Resume"
+    fun actionResume(): String = "继续"
 
-    fun actionCancel(): String = "Cancel"
+    fun actionCancel(): String = "取消"
 
-    private const val IDLE_TITLE: String = "Preparing download"
-    private const val UNRESOLVED_CONTENT: String = "Starting"
+    private const val IDLE_TITLE: String = "正在准备下载"
+    private const val UNRESOLVED_CONTENT: String = "正在启动"
 }

@@ -94,7 +94,7 @@ class ExploreViewModel(
                     _state.update {
                         it.copy(
                             status = ExploreStatus.Failed,
-                            message = "The source list could not be read.",
+                            message = "无法读取漫画源列表。",
                         )
                     }
                 }
@@ -132,7 +132,7 @@ class ExploreViewModel(
                 it.copy(
                     pages = pages,
                     selectedPageKey = selected?.key,
-                    message = if (pages.isEmpty()) "This source declares no explore pages." else null,
+                    message = if (pages.isEmpty()) "此漫画源没有提供探索页面。" else null,
                 )
             }
             page.value = selected

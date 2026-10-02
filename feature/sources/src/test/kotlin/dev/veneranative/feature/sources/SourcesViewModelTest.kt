@@ -73,7 +73,7 @@ class SourcesViewModelTest {
 
         assertEquals(listOf("/tmp/source.js"), repository.installLocations)
         assertEquals("", viewModel.state.value.installLocation)
-        assertEquals("Source A installed.", viewModel.state.value.message)
+        assertEquals("Source A 已安装。", viewModel.state.value.message)
         assertTrue(!viewModel.state.value.installing)
     }
 
@@ -92,7 +92,7 @@ class SourcesViewModelTest {
 
         assertEquals("/tmp/source.js", viewModel.state.value.installLocation)
         // The lower layer's detail must not reach the user.
-        assertEquals("That script does not declare a usable source.", viewModel.state.value.message)
+        assertEquals("此脚本未声明有效的漫画源。", viewModel.state.value.message)
     }
 
     @Test
@@ -102,7 +102,7 @@ class SourcesViewModelTest {
         advanceUntilIdle()
 
         assertEquals(SourcesStatus.Failed, viewModel.state.value.status)
-        assertEquals("The source list could not be read.", viewModel.state.value.message)
+        assertEquals("无法读取漫画源列表。", viewModel.state.value.message)
 
         repository.listFailure = null
         repository.sources = listOf(source("a"))
@@ -138,7 +138,7 @@ class SourcesViewModelTest {
 
         assertEquals(listOf(SourceId("a")), repository.uninstalled)
         assertTrue(viewModel.state.value.sources.isEmpty())
-        assertEquals("Source removed.", viewModel.state.value.message)
+        assertEquals("漫画源已移除。", viewModel.state.value.message)
     }
 
     @Test
@@ -149,7 +149,7 @@ class SourcesViewModelTest {
         viewModel.onAction(SourcesAction.SetEnabled(SourceId("missing"), enabled = true))
         advanceUntilIdle()
 
-        assertEquals("That source is no longer installed.", viewModel.state.value.message)
+        assertEquals("此漫画源已不在已安装列表中。", viewModel.state.value.message)
     }
 
     @Test
@@ -181,7 +181,7 @@ class SourcesViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf(entry.scriptUrl), repository.installLocations)
-        assertEquals("MangaDex installed.", viewModel.state.value.message)
+        assertEquals("MangaDex 已安装。", viewModel.state.value.message)
     }
 
     private fun source(id: String, name: String = "Source $id", enabled: Boolean = true) = InstalledSource(

@@ -15,25 +15,25 @@ class Stage2LibraryNavigationTest {
 
     @Test
     fun homeOpensDownloadsAndLocalLibraryTabs() {
-        composeRule.onNodeWithText("Library").performClick()
-        composeRule.onNodeWithText("Downloads").performClick()
-        composeRule.onNodeWithText("No downloads yet.").assertIsDisplayed()
+        composeRule.onNodeWithText("书架").performClick()
+        composeRule.onNodeWithText("下载").performClick()
+        composeRule.onNodeWithText("暂无下载任务。").assertIsDisplayed()
 
-        composeRule.onNodeWithText("Local").performClick()
-        composeRule.onNodeWithText("Import directory").assertIsDisplayed()
-        composeRule.onNodeWithText("Import CBZ / ZIP / 7z").assertIsDisplayed()
-        composeRule.onNodeWithText("No local directories imported.").assertIsDisplayed()
+        composeRule.onNodeWithText("本地").performClick()
+        composeRule.onNodeWithText("导入文件夹").assertIsDisplayed()
+        composeRule.onNodeWithText("导入 CBZ / ZIP / 7z").assertIsDisplayed()
+        composeRule.onNodeWithText("尚未导入本地漫画。").assertIsDisplayed()
     }
 
     @Test
     fun systemBackFromLibraryReturnsHome() {
-        composeRule.onNodeWithText("Library").performClick()
-        composeRule.onNodeWithText("Downloads").assertIsDisplayed()
+        composeRule.onNodeWithText("书架").performClick()
+        composeRule.onNodeWithText("下载").assertIsDisplayed()
 
         composeRule.runOnUiThread {
             composeRule.activity.onBackPressedDispatcher.onBackPressed()
         }
 
-        composeRule.onNodeWithText("Android-native foundation is ready").assertIsDisplayed()
+        composeRule.onNodeWithText("你的下一段漫画旅程").assertIsDisplayed()
     }
 }

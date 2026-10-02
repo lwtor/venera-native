@@ -78,11 +78,11 @@ class CopyMangaWorkflowTest {
                 )
             }
             composeRule.onNodeWithText("作者").assertIsDisplayed()
-            composeRule.onNodeWithTag("details-content").performScrollToNode(hasText("Chapters", substring = true))
+            composeRule.onNodeWithTag("details-content").performScrollToNode(hasText("章节", substring = true))
             composeRule.waitUntil(20_000) {
-                composeRule.onAllNodesWithText("Read").fetchSemanticsNodes().isNotEmpty()
+                composeRule.onAllNodesWithText("阅读").fetchSemanticsNodes().isNotEmpty()
             }
-            composeRule.onNodeWithText("Read").assertIsDisplayed()
+            composeRule.onNodeWithText("阅读").assertIsDisplayed()
         }
     }
 

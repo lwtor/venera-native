@@ -51,7 +51,7 @@ class SourcesScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("No sources installed yet. Choose a source above or install a local script.").assertIsDisplayed()
+        composeRule.onNodeWithText("尚未安装漫画源。请从上方选择，或安装本地脚本。").assertIsDisplayed()
     }
 
     @Test
@@ -70,8 +70,8 @@ class SourcesScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("The source list could not be read.").assertIsDisplayed()
-        composeRule.onNodeWithText("Retry").performClick()
+        composeRule.onNodeWithText("无法读取已安装的漫画源。").assertIsDisplayed()
+        composeRule.onNodeWithText("重试").performClick()
 
         assertEquals(listOf(SourcesAction.Retry), actions)
     }
@@ -89,7 +89,7 @@ class SourcesScreenTest {
         }
 
         composeRule.onNodeWithText("Demo Source").assertIsDisplayed()
-        composeRule.onNodeWithText("Version 1.2.3").assertIsDisplayed()
+        composeRule.onNodeWithText("版本 1.2.3").assertIsDisplayed()
     }
 
     @Test
@@ -104,7 +104,7 @@ class SourcesScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Install").assertIsNotEnabled()
+        composeRule.onNodeWithText("已安装").assertIsNotEnabled()
     }
 
     @Test

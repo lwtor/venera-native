@@ -92,7 +92,7 @@ fun ReaderScreen(
                 title = {
                     Column {
                         Text(
-                            text = state.chapterTitle.ifEmpty { "Reader" },
+                            text = state.chapterTitle.ifEmpty { "阅读器" },
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -104,7 +104,7 @@ fun ReaderScreen(
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Back") }
+                    TextButton(onClick = onBack) { Text("返回") }
                 },
             )
         },
@@ -133,10 +133,10 @@ fun ReaderScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        text = "This chapter could not be loaded.",
+                        text = "无法加载此章节。",
                         style = MaterialTheme.typography.bodyLarge,
                     )
-                    Button(onClick = { onAction(ReaderAction.Retry) }) { Text("Retry") }
+                    Button(onClick = { onAction(ReaderAction.Retry) }) { Text("重试") }
                 }
 
                 ReaderStatus.Ready -> PageContent(
@@ -157,7 +157,7 @@ private fun PageContent(
 ) {
     if (state.pageCount == 0) {
         Text(
-            text = "This chapter has no pages.",
+            text = "此章节没有页面。",
             style = MaterialTheme.typography.bodyMedium,
         )
         return
@@ -378,7 +378,7 @@ private fun PageTile(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "Page ${item.page.index + 1}",
+                text = "第 ${item.page.index + 1} 页",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -389,7 +389,7 @@ private fun PageTile(
     if (item.page.sizeState != dev.veneranative.core.model.PageSizeState.Ready) {
         Box(modifier = boxModifier, contentAlignment = Alignment.Center) {
             if (item.page.sizeState == dev.veneranative.core.model.PageSizeState.Failed) {
-                Button(onClick = onRetry) { Text("Retry page ${item.page.index + 1}") }
+                Button(onClick = onRetry) { Text("重试第 ${item.page.index + 1} 页") }
             } else CircularProgressIndicator()
         }
         return
@@ -422,16 +422,16 @@ private fun PageTile(
         when (val current = imageState) {
             null -> CircularProgressIndicator()
 
-            PageImageState.Failed -> Button(onClick = { retryGeneration++ }) { Text("Retry page ${item.page.index + 1}") }
+            PageImageState.Failed -> Button(onClick = { retryGeneration++ }) { Text("重试第 ${item.page.index + 1} 页") }
 
             PageImageState.OutOfMemory -> Text(
-                text = "Page image is too large to decode",
+                text = "图片过大，无法解码。",
                 style = MaterialTheme.typography.bodyMedium,
             )
 
             is PageImageState.Decoded -> FittedPageImage(
                 bitmap = current.image.bitmap.asImageBitmap(),
-                contentDescription = "Page ${item.page.index + 1}",
+                contentDescription = "第 ${item.page.index + 1} 页",
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -516,14 +516,14 @@ private fun placeholderTile(page: ComicPage, viewport: PageViewport, continuous:
 }
 
 private fun ReadingDirection.label(): String = when (this) {
-    ReadingDirection.Vertical -> "Vertical"
-    ReadingDirection.LeftToRight -> "LTR"
-    ReadingDirection.RightToLeft -> "RTL"
+    ReadingDirection.Vertical -> "竖向"
+    ReadingDirection.LeftToRight -> "从左到右"
+    ReadingDirection.RightToLeft -> "从右到左"
 }
 
 private fun DecodeStrategy.label(): String = when (this) {
-    DecodeStrategy.Sampled -> "Sampled"
-    DecodeStrategy.Region -> "Region"
+    DecodeStrategy.Sampled -> "采样解码"
+    DecodeStrategy.Region -> "区域解码"
 }
 
 @Preview(showBackground = true)

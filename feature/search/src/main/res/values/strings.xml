@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">Back</string>
+    <string name="search_title">Search</string>
+    <string name="error_source_list">The source list could not be read.</string>
+    <string name="retry">Retry</string>
+    <string name="no_search_source">No installed source can search.</string>
+    <string name="keyword">Keyword</string>
+    <string name="search">Search</string>
+    <string name="no_results">No results.</string>
+    <string name="error_search_unsupported">This source does not support search.</string>
+    <string name="error_source_unavailable">That source is no longer loaded.</string>
+    <string name="error_source_timeout">The source took too long to answer.</string>
+    <string name="error_search_cancelled">The search was cancelled.</string>
+    <string name="error_engine_unavailable">Comic sources are unavailable on this device.</string>
+    <string name="error_engine_restarted">The source engine stopped; search again to reload it.</string>
+    <string name="error_source_generic">The source could not answer.</string>
+</resources>

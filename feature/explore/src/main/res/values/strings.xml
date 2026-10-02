@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">Back</string><string name="explore">Explore</string>
+    <string name="error_source_list">The source list could not be read.</string><string name="retry">Retry</string>
+    <string name="no_explore_source">No installed source has explore pages.</string>
+    <string name="no_explore_pages">This source declares no explore pages.</string>
+    <string name="no_explore_results">Nothing to show here.</string>
+    <string name="error_explore_unsupported">This source does not support explore.</string>
+    <string name="error_source_unavailable">That source is no longer loaded.</string>
+    <string name="error_source_timeout">The source took too long to answer.</string>
+    <string name="error_source_generic">The source could not answer.</string>
+</resources>

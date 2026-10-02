@@ -90,7 +90,7 @@ class LibraryViewModel(
                     _state.update { it.copy(localComics = comics, localChapters = chapters) }
                 }
             }
-            catch (failure: Throwable) { failUnlessCancelled(failure); _state.update { it.copy(message = "Local folders could not be read.") } }
+            catch (failure: Throwable) { failUnlessCancelled(failure); _state.update { it.copy(message = "无法读取本地文件夹。") } }
         }
     }
 
@@ -113,7 +113,7 @@ class LibraryViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _state.update { it.copy(message = "The download could not be updated.") }
+                _state.update { it.copy(message = "无法更新下载任务。") }
             }
         }
     }
@@ -122,10 +122,10 @@ class LibraryViewModel(
         val repo = localRepository ?: return
         viewModelScope.launch {
             when (val result = repo.importArchive(uri)) {
-                is LocalImportResult.Imported -> _state.update { it.copy(message = "Archive imported.") }
-                LocalImportResult.Empty -> _state.update { it.copy(message = "No readable images were found in the archive.") }
-                LocalImportResult.PermissionLost -> _state.update { it.copy(message = "Archive access was not granted. Select it again.") }
-                LocalImportResult.Unavailable -> _state.update { it.copy(message = "The archive could not be read. Check that it is a supported ZIP or 7z file.") }
+                is LocalImportResult.Imported -> _state.update { it.copy(message = "压缩包已导入。") }
+                LocalImportResult.Empty -> _state.update { it.copy(message = "压缩包中没有找到可读取的图片。") }
+                LocalImportResult.PermissionLost -> _state.update { it.copy(message = "未获得压缩包访问权限，请重新选择。") }
+                LocalImportResult.Unavailable -> _state.update { it.copy(message = "无法读取压缩包，请确认文件为受支持的 ZIP 或 7z 格式。") }
             }
         }
     }
@@ -141,10 +141,10 @@ class LibraryViewModel(
                 LocalImportResult.Unavailable
             }
             when (result) {
-                is LocalImportResult.Imported -> _state.update { it.copy(message = "Folder imported.") }
-                LocalImportResult.Empty -> _state.update { it.copy(message = "No readable images were found.") }
-                LocalImportResult.PermissionLost -> _state.update { it.copy(message = "Folder access was not granted. Select it again.") }
-                LocalImportResult.Unavailable -> _state.update { it.copy(message = "The folder could not be imported.") }
+                is LocalImportResult.Imported -> _state.update { it.copy(message = "文件夹已导入。") }
+                LocalImportResult.Empty -> _state.update { it.copy(message = "文件夹中没有找到可读取的图片。") }
+                LocalImportResult.PermissionLost -> _state.update { it.copy(message = "未获得文件夹访问权限，请重新选择。") }
+                LocalImportResult.Unavailable -> _state.update { it.copy(message = "无法导入此文件夹。") }
             }
         }
     }
@@ -180,7 +180,7 @@ class LibraryViewModel(
             }.onFailure { failure ->
                 failUnlessCancelled(failure)
                 _state.update { current ->
-                    current.copy(status = LibraryStatus.Failed, message = "The shelf could not be read.")
+                    current.copy(status = LibraryStatus.Failed, message = "无法读取书架内容。")
                 }
             }
         }
@@ -207,7 +207,7 @@ class LibraryViewModel(
         val editor = _state.value.folderEditor ?: return
         val name = editor.draft.trim()
         if (name.isEmpty()) {
-            _state.update { it.copy(message = "Give the folder a name.") }
+            _state.update { it.copy(message = "请输入文件夹名称。") }
             return
         }
         _state.update { it.copy(folderEditor = null) }
@@ -227,10 +227,10 @@ class LibraryViewModel(
             _state.update { current ->
                 current.copy(
                     message = when (marked) {
-                        null -> "The shelf could not be checked for updates."
-                        0 -> "No new chapters found."
-                        1 -> "1 comic has new chapters."
-                        else -> "$marked comics have new chapters."
+                        null -> "无法检查书架更新。"
+                        0 -> "没有发现新章节。"
+                        1 -> "1 部漫画有新章节。"
+                        else -> "$marked 部漫画有新章节。"
                     },
                 )
             }
@@ -243,7 +243,7 @@ class LibraryViewModel(
             runCatching { block() }
                 .onFailure { failure ->
                     failUnlessCancelled(failure)
-                    _state.update { current -> current.copy(message = "That change could not be saved.") }
+                    _state.update { current -> current.copy(message = "无法保存此更改。") }
                 }
         }
     }

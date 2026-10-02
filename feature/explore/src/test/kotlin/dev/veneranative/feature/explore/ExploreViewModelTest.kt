@@ -77,7 +77,7 @@ class ExploreViewModelTest {
 
         assertEquals(ExploreStatus.Ready, viewModel.state.value.status)
         assertTrue(!viewModel.state.value.hasPages)
-        assertEquals("This source declares no explore pages.", viewModel.state.value.message)
+        assertEquals("此漫画源没有提供探索页面。", viewModel.state.value.message)
     }
 
     @Test

@@ -96,7 +96,7 @@ class SearchViewModel(
                     _state.update {
                         it.copy(
                             status = SearchStatus.Failed,
-                            message = "The source list could not be read.",
+                            message = "无法读取漫画源列表。",
                         )
                     }
                 }

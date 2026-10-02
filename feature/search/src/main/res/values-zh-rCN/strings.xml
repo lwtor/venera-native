@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">返回</string>
+    <string name="search_title">搜索</string>
+    <string name="error_source_list">无法读取漫画源列表。</string>
+    <string name="retry">重试</string>
+    <string name="no_search_source">没有可用于搜索的已安装漫画源。</string>
+    <string name="keyword">关键词</string>
+    <string name="search">搜索</string>
+    <string name="no_results">没有搜索结果。</string>
+    <string name="error_search_unsupported">此漫画源不支持搜索。</string>
+    <string name="error_source_unavailable">此漫画源已无法使用。</string>
+    <string name="error_source_timeout">漫画源响应超时。</string>
+    <string name="error_search_cancelled">搜索已取消。</string>
+    <string name="error_engine_unavailable">此设备暂时无法运行漫画源。</string>
+    <string name="error_engine_restarted">漫画源运行环境已停止，请重新搜索以加载。</string>
+    <string name="error_source_generic">漫画源暂时无法响应。</string>
+</resources>

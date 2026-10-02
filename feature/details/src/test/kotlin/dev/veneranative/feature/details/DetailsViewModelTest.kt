@@ -134,7 +134,7 @@ class DetailsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(DetailsStatus.Failed, viewModel.state.value.status)
-        assertEquals("This source cannot show comic details.", viewModel.state.value.message)
+        assertEquals("此漫画源不支持详情页面。", viewModel.state.value.message)
     }
 
     @Test

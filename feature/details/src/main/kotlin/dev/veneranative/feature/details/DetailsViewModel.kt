@@ -92,14 +92,14 @@ class DetailsViewModel(
                 }
             }.onFailure { failure ->
                 failUnlessCancelled(failure)
-                _state.update { it.copy(shelfMessage = "That change could not be saved.") }
+                _state.update { it.copy(shelfMessage = "无法保存此更改。") }
             }
         }
     }
 
     private fun downloadChapter(chapter: ChapterKey) {
         val repository = downloads ?: run {
-            _state.update { it.copy(downloadMessage = "Downloads are not ready yet.") }
+            _state.update { it.copy(downloadMessage = "下载服务尚未就绪。") }
             return
         }
         viewModelScope.launch {
@@ -113,14 +113,14 @@ class DetailsViewModel(
                             outcome.value,
                             _state.value.detail?.comic?.title,
                         )
-                        _state.update { it.copy(downloadMessage = "Chapter queued for download.", downloadQueueVersion = it.downloadQueueVersion + 1) }
+                        _state.update { it.copy(downloadMessage = "章节已加入下载队列。", downloadQueueVersion = it.downloadQueueVersion + 1) }
                     }
-                    is SourceOutcome.Failure -> _state.update { it.copy(downloadMessage = "Chapter pages could not be loaded for download.") }
+                    is SourceOutcome.Failure -> _state.update { it.copy(downloadMessage = "无法加载章节页面进行下载。") }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _state.update { it.copy(downloadMessage = "The chapter could not be added to downloads.") }
+                _state.update { it.copy(downloadMessage = "无法将此章节加入下载队列。") }
             }
         }
     }
@@ -197,20 +197,20 @@ internal fun ComicDetail.toSnapshot(): ComicSnapshot = ComicSnapshot(
  * written for whoever debugs the source, not for the person reading the comic.
  */
 internal fun SourceRuntimeError.toDetailsMessage(): String = when (this) {
-    is SourceRuntimeError.UnsupportedCapability -> "This source cannot show comic details."
-    is SourceRuntimeError.SourceNotLoaded -> "That source is no longer loaded."
-    is SourceRuntimeError.Timeout -> "The source took too long to answer."
-    is SourceRuntimeError.Cancelled -> "Loading was cancelled."
-    is SourceRuntimeError.EngineUnavailable -> "Comic sources are unavailable on this device."
+    is SourceRuntimeError.UnsupportedCapability -> "此漫画源不支持详情页面。"
+    is SourceRuntimeError.SourceNotLoaded -> "此漫画源已无法使用。"
+    is SourceRuntimeError.Timeout -> "漫画源响应超时。"
+    is SourceRuntimeError.Cancelled -> "加载已取消。"
+    is SourceRuntimeError.EngineUnavailable -> "此设备暂时无法运行漫画源。"
     is SourceRuntimeError.EngineTerminated ->
-        "The source engine stopped; open the comic again to reload it."
+        "漫画源运行环境已停止，请重新打开漫画。"
 
-    is SourceRuntimeError.RuntimeClosed -> "Comic sources are unavailable on this device."
+    is SourceRuntimeError.RuntimeClosed -> "此设备暂时无法运行漫画源。"
 
     is SourceRuntimeError.InvalidPackage,
     is SourceRuntimeError.InvalidCall,
     is SourceRuntimeError.ScriptSyntax,
     is SourceRuntimeError.ScriptExecution,
     is SourceRuntimeError.Internal,
-    -> "The source could not answer."
+    -> "漫画源暂时无法响应。"
 }

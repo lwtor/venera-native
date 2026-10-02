@@ -83,7 +83,7 @@ class SourcesViewModel(
                 }
                 .onFailure {
                     _state.update {
-                        it.copy(status = SourcesStatus.Failed, message = "The source list could not be read.")
+                        it.copy(status = SourcesStatus.Failed, message = "无法读取漫画源列表。")
                     }
                 }
         }
@@ -108,7 +108,7 @@ class SourcesViewModel(
                         sources = sources,
                         status = SourcesStatus.Ready,
                         installLocation = if (current.installLocation.trim() == location) "" else current.installLocation,
-                        message = "${outcome.installed.name} installed.",
+                        message = "${outcome.installed.name} 已安装。",
                     )
 
                     is InstallOutcome.Failure -> current.copy(
@@ -133,7 +133,7 @@ class SourcesViewModel(
                 current.copy(
                     busySourceIds = current.busySourceIds - sourceId,
                     sources = sources,
-                    message = if (changed) null else "That source is no longer installed.",
+                    message = if (changed) null else "此漫画源已不在已安装列表中。",
                 )
             }
         }
@@ -150,7 +150,7 @@ class SourcesViewModel(
                 current.copy(
                     busySourceIds = current.busySourceIds - sourceId,
                     sources = sources,
-                    message = if (removed) "Source removed." else "That source is no longer installed.",
+                    message = if (removed) "漫画源已移除。" else "此漫画源已不在已安装列表中。",
                 )
             }
         }
@@ -164,9 +164,9 @@ class SourcesViewModel(
  * not a single "install failed" string.
  */
 private fun SourceInstallError.toMessage(): String = when (this) {
-    SourceInstallError.LocationUnreadable -> "No source script was found at that location."
-    SourceInstallError.InvalidMetadata -> "That script does not declare a usable source."
-    SourceInstallError.EngineUnavailable -> "Comic sources are unavailable on this device."
-    SourceInstallError.Rejected -> "The source was rejected and was not installed."
-    SourceInstallError.StorageFailed -> "The source could not be saved on this device."
+    SourceInstallError.LocationUnreadable -> "该位置没有可用的漫画源脚本。"
+    SourceInstallError.InvalidMetadata -> "此脚本未声明有效的漫画源。"
+    SourceInstallError.EngineUnavailable -> "此设备暂时无法运行漫画源。"
+    SourceInstallError.Rejected -> "漫画源校验未通过，未安装。"
+    SourceInstallError.StorageFailed -> "无法将漫画源保存到此设备。"
 }

@@ -105,12 +105,12 @@ private fun FavoriteCard(
                 if (item.hasUpdate) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "New chapters",
+                            text = "有新章节",
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.weight(1f),
                         )
                         TextButton(onClick = { onClearUpdate(item.ref) }) {
-                            Text("Mark read")
+                            Text("标记已读")
                         }
                     }
                 }
@@ -123,7 +123,7 @@ private fun FavoriteCard(
                     folders.forEach { folder ->
                         if (folder.id != item.folderId) {
                             DropdownMenuItem(
-                                text = { Text("Move to ${folder.name}") },
+                                text = { Text("移至${folder.name}") },
                                 onClick = {
                                     menuExpanded = false
                                     onMove(item.ref, folder.id)
@@ -132,7 +132,7 @@ private fun FavoriteCard(
                         }
                     }
                     DropdownMenuItem(
-                        text = { Text("Remove from shelf") },
+                        text = { Text("从书架移除") },
                         onClick = {
                             menuExpanded = false
                             onRemove(item.ref)

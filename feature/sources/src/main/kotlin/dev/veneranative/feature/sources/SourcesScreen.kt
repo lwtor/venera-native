@@ -60,8 +60,8 @@ fun SourcesScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Sources") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                title = { Text("漫画源") },
+                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
             )
         },
     ) { contentPadding ->
@@ -81,21 +81,21 @@ fun SourcesScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 when (state.catalogStatus) {
-                    CatalogStatus.Idle -> item { Text("Source catalog is not configured.") }
+                    CatalogStatus.Idle -> item { Text("尚未配置漫画源目录。") }
                     CatalogStatus.Loading -> item {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             CircularProgressIndicator(modifier = Modifier.testTag(CATALOG_LOADING_TAG))
-                            Text("Loading source catalog…")
+                            Text("正在加载漫画源目录…")
                         }
                     }
                     CatalogStatus.Failed -> item {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Could not load the catalog. Check the URL or network and retry.", modifier = Modifier.weight(1f))
-                            TextButton(onClick = { onAction(SourcesAction.RefreshCatalog) }) { Text("Retry") }
+                            Text("目录加载失败，请检查网址或网络后重试。", modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onAction(SourcesAction.RefreshCatalog) }) { Text("重试") }
                         }
                     }
                     CatalogStatus.Ready -> if (state.catalogEntries.isEmpty()) {
-                        item { Text("No usable sources in this catalog.") }
+                        item { Text("目录中没有可用的漫画源。") }
                     } else {
                         items(state.catalogEntries, key = { it.scriptUrl }) { entry ->
                             CatalogSourceRow(
@@ -107,17 +107,17 @@ fun SourcesScreen(
                         }
                     }
                 }
-                item { Text("Installed sources", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp)) }
+                item { Text("已安装的漫画源", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp)) }
                 when (state.status) {
                     SourcesStatus.Loading -> item { CircularProgressIndicator(modifier = Modifier.testTag(LOADING_TAG)) }
                     SourcesStatus.Failed -> item {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Installed sources could not be read.", modifier = Modifier.weight(1f))
-                            TextButton(onClick = { onAction(SourcesAction.Retry) }) { Text("Retry") }
+                            Text("无法读取已安装的漫画源。", modifier = Modifier.weight(1f))
+                            TextButton(onClick = { onAction(SourcesAction.Retry) }) { Text("重试") }
                         }
                     }
                     SourcesStatus.Ready -> if (state.isEmpty) {
-                        item { Text("No sources installed yet. Choose a source above or install a local script.") }
+                        item { Text("尚未安装漫画源。请从上方选择，或安装本地脚本。") }
                     } else {
                         items(state.sources, key = { "installed-${it.sourceId.value}" }) { source ->
                             SourceRow(
@@ -136,8 +136,8 @@ fun SourcesScreen(
     pendingUninstall?.let { source ->
         AlertDialog(
             onDismissRequest = { pendingUninstall = null },
-            title = { Text("Remove source?") },
-            text = { Text("${source.name} and its stored script will be removed from this device.") },
+            title = { Text("移除漫画源？") },
+            text = { Text("${source.name} 及其保存的脚本将从此设备移除。") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -145,11 +145,11 @@ fun SourcesScreen(
                         onAction(SourcesAction.Uninstall(source.sourceId))
                     },
                 ) {
-                    Text("Remove")
+                    Text("移除")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingUninstall = null }) { Text("Cancel") }
+                TextButton(onClick = { pendingUninstall = null }) { Text("取消") }
             },
         )
     }
@@ -161,22 +161,22 @@ private fun CatalogHeader(state: SourcesUiState, onAction: (SourcesAction) -> Un
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("Venera source catalog", style = MaterialTheme.typography.titleMedium)
+        Text("Venera 漫画源目录", style = MaterialTheme.typography.titleMedium)
         OutlinedTextField(
             value = state.catalogLocation,
             onValueChange = { onAction(SourcesAction.CatalogLocationChanged(it)) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Catalog JSON URL") },
+            label = { Text("目录 JSON 地址") },
             singleLine = true,
             enabled = state.catalogStatus != CatalogStatus.Loading,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 when (state.catalogStatus) {
-                    CatalogStatus.Idle -> "Catalog not loaded"
-                    CatalogStatus.Loading -> "Fetching source list…"
-                    CatalogStatus.Ready -> "${state.catalogEntries.size} sources available"
-                    CatalogStatus.Failed -> "Catalog unavailable"
+                    CatalogStatus.Idle -> "目录尚未加载"
+                    CatalogStatus.Loading -> "正在获取漫画源列表…"
+                    CatalogStatus.Ready -> "可用漫画源：${state.catalogEntries.size} 个"
+                    CatalogStatus.Failed -> "目录暂不可用"
                 },
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
@@ -184,7 +184,7 @@ private fun CatalogHeader(state: SourcesUiState, onAction: (SourcesAction) -> Un
             TextButton(
                 onClick = { onAction(SourcesAction.RefreshCatalog) },
                 enabled = state.catalogStatus != CatalogStatus.Loading && state.catalogLocation.isNotBlank(),
-            ) { Text("Refresh") }
+            ) { Text("刷新") }
         }
     }
 }
@@ -203,7 +203,7 @@ private fun CatalogSourceRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.name, style = MaterialTheme.typography.titleMedium)
-                entry.version?.let { Text("Version $it", style = MaterialTheme.typography.bodySmall) }
+                entry.version?.let { Text("版本 $it", style = MaterialTheme.typography.bodySmall) }
                 entry.description?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
             TextButton(
@@ -211,7 +211,7 @@ private fun CatalogSourceRow(
                 modifier = Modifier.testTag(CATALOG_INSTALL_TAG),
                 enabled = !installing && !installed,
             ) {
-                Text(if (installed) "Installed" else if (installing) "Installing…" else "Install")
+                Text(if (installed) "已安装" else if (installing) "正在安装…" else "安装")
             }
         }
     }
@@ -233,7 +233,7 @@ private fun InstallRow(
             value = state.installLocation,
             onValueChange = { onAction(SourcesAction.InstallLocationChanged(it)) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Source script path or file URL") },
+            label = { Text("漫画源脚本路径或文件地址") },
             singleLine = true,
             enabled = !state.installing,
         )
@@ -242,10 +242,10 @@ private fun InstallRow(
             modifier = Modifier.fillMaxWidth(),
             enabled = state.canInstall,
         ) {
-            Text(if (state.installing) "Installing…" else "Install")
+            Text(if (state.installing) "正在安装…" else "安装")
         }
         TextButton(onClick = onChooseScript, enabled = !state.installing) {
-            Text("Choose JavaScript file")
+            Text("选择 JavaScript 文件")
         }
         if (state.installing) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -275,7 +275,7 @@ private fun SourceRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "Version ${source.version}",
+                    text = "版本 ${source.version}",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -290,7 +290,7 @@ private fun SourceRow(
                 onCheckedChange = onEnabledChange,
                 enabled = !busy,
             )
-            TextButton(onClick = onUninstall, enabled = !busy) { Text("Remove") }
+            TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
         }
     }
 }
@@ -317,7 +317,7 @@ private fun MessageRow(
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            TextButton(onClick = onDismiss) { Text("Dismiss") }
+            TextButton(onClick = onDismiss) { Text("关闭") }
         }
     }
 }

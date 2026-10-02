@@ -75,7 +75,7 @@ class ReaderScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("Retry").performClick()
+        composeRule.onNodeWithText("重试").performClick()
 
         assertTrue(retried)
     }
@@ -95,7 +95,7 @@ class ReaderScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("RTL").performClick()
+        composeRule.onNodeWithText("从右到左").performClick()
 
         assertEquals(ReadingDirection.RightToLeft, requested)
     }
@@ -188,7 +188,7 @@ class ReaderScreenTest {
         }
         assertEquals(0, state.value.currentPageIndex)
 
-        composeRule.onNodeWithText("Vertical").performClick()
+        composeRule.onNodeWithText("竖向").performClick()
         composeRule.waitForIdle()
         assertEquals(ReadingDirection.Vertical, state.value.direction)
         val verticalList = composeRule.onNode(hasScrollAction())

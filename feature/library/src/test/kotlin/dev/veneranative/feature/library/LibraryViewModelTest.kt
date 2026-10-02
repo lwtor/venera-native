@@ -159,7 +159,7 @@ class LibraryViewModelTest {
         advanceUntilIdle()
 
         assertTrue(repository.createdFolders.isEmpty())
-        assertEquals("Give the folder a name.", viewModel.state.value.message)
+        assertEquals("请输入文件夹名称。", viewModel.state.value.message)
         assertNotNull(viewModel.state.value.folderEditor)
     }
 
@@ -246,6 +246,6 @@ class LibraryViewModelTest {
         viewModel.onAction(LibraryAction.RefreshUpdates)
         advanceUntilIdle()
 
-        assertEquals("The shelf could not be checked for updates.", viewModel.state.value.message)
+        assertEquals("无法检查书架更新。", viewModel.state.value.message)
     }
 }

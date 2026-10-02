@@ -61,8 +61,8 @@ fun DetailsScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(state.title.ifEmpty { "Comic" }) },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                title = { Text(state.title.ifEmpty { "漫画详情" }) },
+                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
             )
         },
     ) { contentPadding ->
@@ -80,10 +80,10 @@ fun DetailsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = "This comic's source is no longer installed or enabled.",
+                            text = "此漫画所属的漫画源已卸载或停用。",
                             style = MaterialTheme.typography.bodyLarge,
                         )
-                        Button(onClick = onBack) { Text("Back") }
+                        Button(onClick = onBack) { Text("返回") }
                     }
                 }
 
@@ -93,10 +93,10 @@ fun DetailsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = state.message ?: "The source could not answer.",
+                            text = "无法获取漫画详情，请重试。",
                             style = MaterialTheme.typography.bodyLarge,
                         )
-                        Button(onClick = { onAction(DetailsAction.Retry) }) { Text("Retry") }
+                        Button(onClick = { onAction(DetailsAction.Retry) }) { Text("重试") }
                     }
                 }
 
@@ -141,7 +141,7 @@ private fun Content(
         state.detail?.description?.takeIf { it.isNotBlank() }?.let { description ->
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Description", style = MaterialTheme.typography.titleMedium)
+                    Text("简介", style = MaterialTheme.typography.titleMedium)
                     Text(text = description, style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -150,7 +150,7 @@ private fun Content(
         if (state.hasNoChapters) {
             item {
                 Text(
-                    text = "This source returned no chapters.",
+                    text = "此漫画源没有提供章节。",
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
@@ -159,7 +159,7 @@ private fun Content(
 
         item {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Chapters (${state.detail?.chapters?.size ?: 0})", style = MaterialTheme.typography.titleMedium)
+                Text("章节（${state.detail?.chapters?.size ?: 0}）", style = MaterialTheme.typography.titleMedium)
                 ChapterControls(state = state, onAction = onAction)
             }
         }
@@ -252,13 +252,13 @@ private fun DetailTagGroups(groups: Map<String, List<String>>) {
 @Composable
 private fun DetailThumbnails(title: String, urls: List<String>, sourceId: SourceId) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Previews", style = MaterialTheme.typography.titleMedium)
+        Text("预览图", style = MaterialTheme.typography.titleMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             itemsIndexed(urls) { index, url ->
                 Card(modifier = Modifier.size(width = 96.dp, height = 144.dp)) {
                     ComicImage(
                         request = ComicImageRequest(url = url, sourceId = sourceId, variant = "$DETAIL_THUMBNAIL_VARIANT-$index"),
-                        contentDescription = "$title preview ${index + 1}",
+                        contentDescription = "$title 预览图 ${index + 1}",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                         placeholder = { CoverTitle(title = title) },
@@ -284,10 +284,10 @@ private fun ShelfControl(
         FilterChip(
             selected = state.isFavorite,
             onClick = { onAction(DetailsAction.ToggleFavorite) },
-            label = { Text(if (state.isFavorite) "On the shelf" else "Add to shelf") },
+            label = { Text(if (state.isFavorite) "已在书架" else "加入书架") },
         )
         val caption = state.shelfMessage
-            ?: if (state.isFavorite) "Tap to remove it from your shelf." else null
+            ?: if (state.isFavorite) "点击即可从书架移除。" else null
         if (caption != null) {
             Text(
                 text = caption,
@@ -375,7 +375,7 @@ private fun ChapterControls(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            TextButton(onClick = { onAction(DetailsAction.Refresh) }) { Text("Refresh") }
+            TextButton(onClick = { onAction(DetailsAction.Refresh) }) { Text("刷新") }
         }
 
         if (state.groups.size > 1) {
@@ -388,7 +388,7 @@ private fun ChapterControls(
                 FilterChip(
                     selected = state.selectedGroup == null,
                     onClick = { onAction(DetailsAction.GroupSelected(null)) },
-                    label = { Text("All") },
+                    label = { Text("全部") },
                 )
                 state.groups.forEach { group ->
                     FilterChip(
@@ -430,8 +430,8 @@ private fun ChapterRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column {
-                TextButton(onClick = onOpen) { Text("Read") }
-                TextButton(onClick = onDownload) { Text("Download") }
+                TextButton(onClick = onOpen) { Text("阅读") }
+                TextButton(onClick = onDownload) { Text("下载") }
             }
             Text(
                 text = chapter.title,
@@ -449,8 +449,8 @@ private fun Centered(content: @Composable () -> Unit) {
 }
 
 private fun ChapterOrder.label(): String = when (this) {
-    ChapterOrder.SourceOrder -> "Source order"
-    ChapterOrder.Reversed -> "Reversed"
+    ChapterOrder.SourceOrder -> "来源顺序"
+    ChapterOrder.Reversed -> "倒序"
 }
 
 internal const val DETAILS_LOADING_TAG = "details-loading"

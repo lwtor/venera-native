@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
@@ -55,8 +56,8 @@ fun SearchScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Search") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                title = { Text(stringResource(R.string.search_title)) },
+                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
             )
         },
     ) { contentPadding ->
@@ -74,17 +75,17 @@ fun SearchScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = state.message ?: "The source list could not be read.",
+                            text = stringResource(R.string.error_source_list),
                             style = MaterialTheme.typography.bodyLarge,
                         )
-                        Button(onClick = { onAction(SearchAction.Retry) }) { Text("Retry") }
+                        Button(onClick = { onAction(SearchAction.Retry) }) { Text(stringResource(R.string.retry)) }
                     }
                 }
 
                 SearchStatus.Ready -> if (!state.hasSources) {
                     Centered {
                         Text(
-                            text = "No installed source can search.",
+                            text = stringResource(R.string.no_search_source),
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
@@ -129,14 +130,14 @@ private fun SearchForm(
                 value = state.keyword,
                 onValueChange = { onAction(SearchAction.KeywordChanged(it)) },
                 modifier = Modifier.weight(1f),
-                label = { Text("Keyword") },
+                label = { Text(stringResource(R.string.keyword)) },
                 singleLine = true,
             )
             Button(
                 onClick = { onAction(SearchAction.Submit) },
                 enabled = state.canSubmit,
             ) {
-                Text("Search")
+                Text(stringResource(R.string.search))
             }
         }
     }
@@ -165,10 +166,10 @@ private fun Results(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    text = refresh.toMessage(),
+                    text = refresh.localizedMessage(),
                     style = MaterialTheme.typography.bodyLarge,
                 )
-                Button(onClick = { results.retry() }) { Text("Retry") }
+                Button(onClick = { results.retry() }) { Text(stringResource(R.string.retry)) }
             }
         }
 
@@ -176,7 +177,7 @@ private fun Results(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Text(text = "No results.", style = MaterialTheme.typography.titleMedium)
+            Text(text = stringResource(R.string.no_results), style = MaterialTheme.typography.titleMedium)
         }
 
         else -> LazyColumn(
@@ -235,17 +236,18 @@ private fun Centered(content: @Composable () -> Unit) {
  * The domain error travels inside [SourceLoadException], so the screen decides what the user reads
  * instead of printing an exception message.
  */
-internal fun LoadState.Error.toMessage(): String {
+@Composable
+private fun LoadState.Error.localizedMessage(): String {
     val domain = (error as? SourceLoadException)?.error
     return when (domain) {
-        is SourceRuntimeError.UnsupportedCapability -> "This source does not support search."
-        is SourceRuntimeError.SourceNotLoaded -> "That source is no longer loaded."
-        is SourceRuntimeError.Timeout -> "The source took too long to answer."
-        is SourceRuntimeError.Cancelled -> "The search was cancelled."
-        is SourceRuntimeError.EngineUnavailable -> "Comic sources are unavailable on this device."
-        is SourceRuntimeError.EngineTerminated -> "The source engine stopped; search again to reload it."
+        is SourceRuntimeError.UnsupportedCapability -> stringResource(R.string.error_search_unsupported)
+        is SourceRuntimeError.SourceNotLoaded -> stringResource(R.string.error_source_unavailable)
+        is SourceRuntimeError.Timeout -> stringResource(R.string.error_source_timeout)
+        is SourceRuntimeError.Cancelled -> stringResource(R.string.error_search_cancelled)
+        is SourceRuntimeError.EngineUnavailable -> stringResource(R.string.error_engine_unavailable)
+        is SourceRuntimeError.EngineTerminated -> stringResource(R.string.error_engine_restarted)
 
-        else -> domain?.message ?: "The source could not answer."
+        else -> stringResource(R.string.error_source_generic)
     }
 }
 

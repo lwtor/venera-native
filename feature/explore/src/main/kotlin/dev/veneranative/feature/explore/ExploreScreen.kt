@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
@@ -56,8 +57,8 @@ fun ExploreScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(state.selectedSourceNameOr("Explore")) },
-                navigationIcon = { TextButton(onClick = onBack) { Text("Back") } },
+                title = { Text(state.selectedSourceNameOr(stringResource(R.string.explore))) },
+                navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } },
             )
         },
     ) { contentPadding ->
@@ -75,24 +76,24 @@ fun ExploreScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = state.message ?: "The source list could not be read.",
+                            text = stringResource(R.string.error_source_list),
                             style = MaterialTheme.typography.bodyLarge,
                         )
-                        Button(onClick = { onAction(ExploreAction.Retry) }) { Text("Retry") }
+                        Button(onClick = { onAction(ExploreAction.Retry) }) { Text(stringResource(R.string.retry)) }
                     }
                 }
 
                 ExploreStatus.Ready -> when {
                     !state.hasSources -> Centered {
                         Text(
-                            text = "No installed source has explore pages.",
+                            text = stringResource(R.string.no_explore_source),
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
 
                     !state.hasPages -> Centered {
                         Text(
-                            text = state.message ?: "This source declares no explore pages.",
+                            text = stringResource(R.string.no_explore_pages),
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
@@ -166,8 +167,8 @@ private fun Content(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(text = refresh.toMessage(), style = MaterialTheme.typography.bodyLarge)
-                Button(onClick = { results.retry() }) { Text("Retry") }
+                Text(text = refresh.localizedMessage(), style = MaterialTheme.typography.bodyLarge)
+                Button(onClick = { results.retry() }) { Text(stringResource(R.string.retry)) }
             }
         }
 
@@ -175,7 +176,7 @@ private fun Content(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Text(text = "Nothing to show here.", style = MaterialTheme.typography.titleMedium)
+            Text(text = stringResource(R.string.no_explore_results), style = MaterialTheme.typography.titleMedium)
         }
 
         else -> LazyColumn(
@@ -255,17 +256,14 @@ private fun ExploreUiState.selectedSourceNameOr(fallback: String): String =
  * Wording lives with the feature that shows it, so explore and search phrase the same failure for
  * their own context rather than sharing a string table the user never sees as a whole.
  */
-internal fun LoadState.Error.toMessage(): String {
+@Composable
+private fun LoadState.Error.localizedMessage(): String {
     val domain = (error as? SourceLoadException)?.error
     return when (domain) {
-        is SourceRuntimeError.UnsupportedCapability -> "This source has no explore pages."
-        is SourceRuntimeError.SourceNotLoaded -> "That source is no longer loaded."
-        is SourceRuntimeError.Timeout -> "The source took too long to answer."
-        is SourceRuntimeError.Cancelled -> "Loading was cancelled."
-        is SourceRuntimeError.EngineUnavailable -> "Comic sources are unavailable on this device."
-        is SourceRuntimeError.EngineTerminated -> "The source engine stopped; open the page again to reload it."
-
-        else -> domain?.message ?: "The source could not answer."
+        is SourceRuntimeError.UnsupportedCapability -> stringResource(R.string.error_explore_unsupported)
+        is SourceRuntimeError.SourceNotLoaded -> stringResource(R.string.error_source_unavailable)
+        is SourceRuntimeError.Timeout -> stringResource(R.string.error_source_timeout)
+        else -> stringResource(R.string.error_source_generic)
     }
 }
 

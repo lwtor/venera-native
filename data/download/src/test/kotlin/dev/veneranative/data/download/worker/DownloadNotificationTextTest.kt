@@ -31,8 +31,8 @@ class DownloadNotificationTextTest {
 
     @Test
     fun `an unresolved run does not claim a chapter`() {
-        assertEquals("Preparing download", DownloadNotificationText.title(DownloadProgress()))
-        assertEquals("Starting", DownloadNotificationText.content(DownloadProgress()))
+        assertEquals("正在准备下载", DownloadNotificationText.title(DownloadProgress()))
+        assertEquals("正在启动", DownloadNotificationText.content(DownloadProgress()))
     }
 
     @Test
@@ -40,7 +40,7 @@ class DownloadNotificationTextTest {
         val text = DownloadNotificationText.title(
             DownloadProgress(chapterTitle = "Chapter 7", completedPages = 3, totalPages = 20),
         )
-        assertEquals("Downloading Chapter 7", text)
+        assertEquals("正在下载：Chapter 7", text)
     }
 
     @Test
@@ -55,7 +55,7 @@ class DownloadNotificationTextTest {
     fun `a chapter with no pages yet is not reported as zero of zero`() {
         val progress = DownloadProgress(chapterTitle = "Chapter 7")
         assertTrue(progress.isUnresolved)
-        assertEquals("Starting", DownloadNotificationText.content(progress))
+        assertEquals("正在启动", DownloadNotificationText.content(progress))
     }
 
     @Test

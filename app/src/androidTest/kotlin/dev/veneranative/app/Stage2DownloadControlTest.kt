@@ -48,13 +48,13 @@ class Stage2DownloadControlTest {
     @Test
     fun enqueueSlowChapterForProcessRestart() {
         val target = prepareD03Target()
-        click("Explore")
+        click("探索")
         waitFor("D02 Slow Comic")
         selectFixtureSourceIfOffered()
         click("D02 Slow Comic")
         waitFor("D02 Slow Chapter")
-        click("Download")
-        waitFor("Chapter queued for download.")
+        click("下载")
+        waitFor("章节已加入下载队列。")
         val graph = ViewModelProvider(composeRule.activity)[AppGraph::class.java]
         val repository = runBlocking { withTimeout(20_000) { graph.download.filterNotNull().first() } }
         waitForTask(repository, target.chapter, 20_000) { it.state == DownloadChapterState.Running }
@@ -113,24 +113,24 @@ class Stage2DownloadControlTest {
                 withTimeout(20_000) { graph.sourceRepository.install(script.absolutePath) }
             } is InstallOutcome.Success)
 
-            click("Explore")
+            click("探索")
             waitFor("D02 Slow Comic")
             selectFixtureSourceIfOffered()
             click("D02 Slow Comic")
             waitFor("D02 Slow Chapter")
-            click("Add to shelf")
-            click("Download")
-            waitFor("Chapter queued for download.")
+            click("加入书架")
+            click("下载")
+            waitFor("章节已加入下载队列。")
             waitForTask(repository, chapter, 20_000) { it.pageCount == 3 }
 
-            click("Back")
-            click("Back")
-            click("Library")
-            click("Downloads")
+            click("返回")
+            click("返回")
+            click("书架")
+            click("下载")
             waitForTask(repository, chapter, 120_000) { it.state == DownloadChapterState.Completed }
             assertTrue(runBlocking { repository.isCompleteOffline(chapter) })
 
-            click("Favorites")
+            click("收藏")
             click("D02 Slow Comic")
             waitFor("D02 Slow Chapter")
             Log.i(TAG, "D04_AIRPLANE_READY chapter=$chapter")
@@ -138,15 +138,15 @@ class Stage2DownloadControlTest {
                 Settings.Global.getInt(activity.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1
             }
 
-            click("Read")
+            click("阅读")
             waitForReaderPage(1)
             composeRule.onAllNodesWithContentDescription("Page 1")[0].performTouchInput { swipeUp() }
             waitFor("2 / 3")
             waitForReaderPage(2)
-            click("Back")
+            click("返回")
             runBlocking { graph.progressTracker.get()?.flush() }
 
-            click("Read")
+            click("阅读")
             waitFor("2 / 3")
             waitForReaderPage(2)
             composeRule.onAllNodesWithContentDescription("Page 2")[0].performTouchInput { swipeUp() }
@@ -191,19 +191,19 @@ class Stage2DownloadControlTest {
                 withTimeout(20_000) { graph.sourceRepository.install(script.absolutePath) }
             } is InstallOutcome.Success)
 
-            click("Explore")
+            click("探索")
             waitFor("D02 Slow Comic")
             selectFixtureSourceIfOffered()
             click("D02 Slow Comic")
             waitFor("D02 Slow Chapter")
-            click("Download")
-            waitFor("Chapter queued for download.")
+            click("下载")
+            waitFor("章节已加入下载队列。")
             waitForTask(repository, chapter, 20_000) { it.pageCount == 3 }
 
-            click("Back")
-            click("Back")
-            click("Library")
-            click("Downloads")
+            click("返回")
+            click("返回")
+            click("书架")
+            click("下载")
             waitFor("D02 Slow Chapter")
             val notificationManager = activity.getSystemService(NotificationManager::class.java)
             if (notificationManager.areNotificationsEnabled()) {
@@ -271,19 +271,19 @@ class Stage2DownloadControlTest {
                 withTimeout(20_000) { graph.sourceRepository.install(script.absolutePath) }
             } is InstallOutcome.Success)
 
-            click("Explore")
+            click("探索")
             waitFor("D02 Retry Comic")
             selectFixtureSourceIfOffered()
             click("D02 Retry Comic")
             waitFor("D02 Retry Chapter")
-            click("Download")
-            waitFor("Chapter queued for download.")
+            click("下载")
+            waitFor("章节已加入下载队列。")
             waitForTask(repository, chapter, 20_000) { it.pageCount == 3 }
 
-            click("Back")
-            click("Back")
-            click("Library")
-            click("Downloads")
+            click("返回")
+            click("返回")
+            click("书架")
+            click("下载")
             val failed = waitForTask(repository, chapter, 60_000) {
                 it.state == DownloadChapterState.Partial
             }

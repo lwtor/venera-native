@@ -34,7 +34,7 @@ fun FolderChips(
             FilterChip(
                 selected = selectedFolderId == null,
                 onClick = { onSelect(null) },
-                label = { Text("All") },
+                label = { Text("全部") },
             )
         }
         items(count = folders.size, key = { index -> folders[index].id }) { index ->

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="back">返回</string><string name="explore">探索</string>
+    <string name="error_source_list">无法读取漫画源列表。</string><string name="retry">重试</string>
+    <string name="no_explore_source">没有提供探索内容的已安装漫画源。</string>
+    <string name="no_explore_pages">此漫画源没有提供探索页面。</string>
+    <string name="no_explore_results">暂无内容。</string>
+    <string name="error_explore_unsupported">此漫画源不支持探索。</string>
+    <string name="error_source_unavailable">此漫画源已无法使用。</string>
+    <string name="error_source_timeout">漫画源响应超时。</string>
+    <string name="error_source_generic">漫画源暂时无法响应。</string>
+</resources>
