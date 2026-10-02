@@ -72,6 +72,9 @@ internal object SourceInvocationScript {
                   return serializeSourceValue(value);
                 })
                 .finally(function() {
+                  if (typeof globalThis.__veneraClearInvocationTimers === "function") {
+                    try { globalThis.__veneraClearInvocationTimers($quotedInvocationId); } catch (_) {}
+                  }
                   if (previousInvocationId === undefined) {
                     delete globalThis.__veneraInvocationId;
                   } else {

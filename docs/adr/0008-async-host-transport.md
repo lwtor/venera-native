@@ -189,7 +189,8 @@ spike 结果（ABI、体积、实测数据）必须回填本节。
 | `APP.locale` / `APP.version` | 提供 | 真实源读取 `APP.locale` |
 | `URL` / `URLSearchParams` | **不提供** | 真实源 0 次使用；自写 URL 解析器会带来静默误解析风险 |
 | `TextEncoder` / `TextDecoder`、`atob` / `btoa` | **不提供** | 真实源 0 次使用（编码统一走 `Convert`） |
-| `setTimeout` / `setInterval`、`crypto`、`structuredClone`、`Intl` | **不提供** | 真实源 0 次使用 |
+| `setTimeout` / `clearTimeout` | 提供受限实现 | S3-00Q2 在设备安装的 `copy_manga` 1.4.2 脚本中确认使用；限流等待由可取消 `timer.sleep` / `timer.cancel` Host API 承接，见 ADR-0012 |
+| `setInterval`、`crypto`、`structuredClone`、`Intl` | **不提供** | 当前真实来源无已验证调用点 |
 
 规则：**新增一个全局必须同时给出用到它的源和一条测试**。未提供的项记在 `docs/STATUS.md`。
 

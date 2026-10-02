@@ -12,14 +12,27 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 
 class SourceNetworkHostApi(
     private val executor: SourceNetworkExecutor,
     private val json: Json = Json,
+    private val waitForTimer: suspend (Long) -> Unit = { delay(it) },
 ) : SourceHostApi {
-    override fun isMethodAllowed(method: String): Boolean = method == HTTP_REQUEST_METHOD
+    private val timers = ConcurrentHashMap<String, Job>()
+    private val timerLock = Any()
+
+    override fun isMethodAllowed(method: String): Boolean = method in ALLOWED_METHODS
 
     override suspend fun invoke(request: SourceHostRequest): SourceHostResult {
+        when (request.method) {
+            TIMER_SLEEP_METHOD -> return sleep(request)
+            TIMER_CANCEL_METHOD -> return cancelTimer(request)
+        }
         if (!isMethodAllowed(request.method)) {
             return request.failure(
                 SourceHostError.Code.METHOD_NOT_ALLOWED,
@@ -49,6 +62,55 @@ class SourceNetworkHostApi(
             is SourceHttpResult.Failure -> request.failure(result.error)
         }
     }
+
+    private suspend fun sleep(request: SourceHostRequest): SourceHostResult {
+        val payload = runCatching { json.parseToJsonElement(request.payloadJson).jsonObject }.getOrNull()
+        val timerId = payload?.get("timerId")?.jsonPrimitive?.contentOrNull
+        val delayMillis = payload?.get("delayMillis")?.jsonPrimitive?.longOrNull
+        if (timerId.isNullOrBlank() || delayMillis == null || delayMillis !in 0..MAX_TIMER_DELAY_MILLIS) {
+            return request.failure(
+                SourceHostError.Code.INVALID_REQUEST,
+                "Invalid timer request.",
+                retryable = false,
+            )
+        }
+        val key = timerKey(request, timerId)
+        val job = coroutineContext[Job]
+            ?: return request.failure(SourceHostError.Code.INTERNAL, "Timer context unavailable.", false)
+        val registrationFailure = synchronized(timerLock) {
+            val prefix = "${request.sourceId.value}:${request.invocationId}:"
+            if (timers.keys.count { it.startsWith(prefix) } >= MAX_ACTIVE_TIMERS_PER_INVOCATION) {
+                "Too many active timers."
+            } else if (timers.putIfAbsent(key, job) != null) {
+                "Duplicate timer id."
+            } else {
+                null
+            }
+        }
+        if (registrationFailure != null) {
+            return request.failure(SourceHostError.Code.INVALID_REQUEST, registrationFailure, false)
+        }
+        return try {
+            waitForTimer(delayMillis)
+            SourceHostResult.Success(request.requestId, "{}")
+        } finally {
+            synchronized(timerLock) { timers.remove(key, job) }
+        }
+    }
+
+    private fun cancelTimer(request: SourceHostRequest): SourceHostResult {
+        val timerId = runCatching {
+            json.parseToJsonElement(request.payloadJson).jsonObject["timerId"]?.jsonPrimitive?.contentOrNull
+        }.getOrNull()
+        if (timerId.isNullOrBlank()) {
+            return request.failure(SourceHostError.Code.INVALID_REQUEST, "Invalid timer request.", false)
+        }
+        synchronized(timerLock) { timers.remove(timerKey(request, timerId)) }?.cancel()
+        return SourceHostResult.Success(request.requestId, "{}")
+    }
+
+    private fun timerKey(request: SourceHostRequest, timerId: String) =
+        "${request.sourceId.value}:${request.invocationId}:$timerId"
 
     private fun decodeRequest(payloadJson: String): SourceHttpRequest {
         val payload = json.parseToJsonElement(payloadJson).jsonObject
@@ -127,6 +189,11 @@ class SourceNetworkHostApi(
 
     companion object {
         const val HTTP_REQUEST_METHOD = "http.request"
+        const val TIMER_SLEEP_METHOD = "timer.sleep"
+        const val TIMER_CANCEL_METHOD = "timer.cancel"
         private const val MAX_REQUEST_PAYLOAD_CHARS = 262_144
+        const val MAX_TIMER_DELAY_MILLIS = 120_000L
+        private const val MAX_ACTIVE_TIMERS_PER_INVOCATION = 8
+        private val ALLOWED_METHODS = setOf(HTTP_REQUEST_METHOD, TIMER_SLEEP_METHOD, TIMER_CANCEL_METHOD)
     }
 }

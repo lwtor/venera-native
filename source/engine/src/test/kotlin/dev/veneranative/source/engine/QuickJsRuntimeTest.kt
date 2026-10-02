@@ -153,6 +153,38 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `setTimeout waits through the allow-listed cancellable timer host`() = runBlocking {
+        val host = RecordingHostApi { request ->
+            if (request.method == "timer.sleep") {
+                SourceHostResult.Success(request.requestId, "{}")
+            } else {
+                SourceHostResult.Failure(
+                    request.requestId,
+                    SourceHostError(SourceHostError.Code.INVALID_REQUEST, "Unexpected method.", false),
+                )
+            }
+        }
+
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    async waitForTimer() {
+                      await new Promise(resolve => setTimeout(resolve, 25));
+                      return true;
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            assertEquals("true", runtime.invokeSuccess(sourceId, "waitForTimer", "[]"))
+            val timerRequest = host.requests.single { it.method == "timer.sleep" }
+            assertTrue(timerRequest.payloadJson.contains("\"delayMillis\":25"))
+            assertTrue(timerRequest.invocationId.isNotBlank())
+        }
+    }
+
+    @Test
     fun `the declared settings default answers loadSetting`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
@@ -736,7 +768,7 @@ class QuickJsRuntimeTest {
     ) : SourceHostApi {
         val requests = CopyOnWriteArrayList<SourceHostRequest>()
 
-        override fun isMethodAllowed(method: String): Boolean = method == "http.request"
+        override fun isMethodAllowed(method: String): Boolean = method in setOf("http.request", "timer.sleep", "timer.cancel")
 
         override suspend fun invoke(request: SourceHostRequest): SourceHostResult {
             requests += request

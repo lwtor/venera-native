@@ -14,6 +14,7 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | [ADR-0008](0008-async-host-transport.md) | 异步 Host API 传输与引擎选择 | Accepted（选型与 JVM 桥接 spike 已完成，实现进行中） |
 | [ADR-0010](0010-archive-library-choice.md) | ZIP/7z 归档库与许可证选择 | Accepted |
 | [ADR-0011](0011-chapter-reference-identity.md) | 远端与本地章节统一身份 | Accepted |
+| [ADR-0012](0012-bounded-source-timers.md) | 受限且可取消的来源计时器 | Accepted |
 
 ## 编写规则
 

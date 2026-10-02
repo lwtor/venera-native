@@ -14,9 +14,12 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceInstallResult
+import dev.veneranative.source.api.SourceCall
+import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceRuntimeError
+import dev.veneranative.source.api.SourceScriptRuntime
 import dev.veneranative.source.engine.QuickJsRuntime
 import java.security.MessageDigest
 import kotlinx.coroutines.runBlocking
@@ -57,6 +60,47 @@ class EngineSourceCoreTest {
             assertEquals(3, pages.value.size)
             assertTrue(pages.value.all { it.imageRef.startsWith("http://127.0.0.1:8765/") })
         } finally { runtime.close() }
+    }
+
+    @Test
+    fun `chapter page calls get a longer bounded timeout than metadata probes`() = runBlocking {
+        val runtime = RecordingRuntime()
+        val comicKey = ComicKey(sourceId, RemoteComicId("c1"))
+        val core = EngineSourceCore(runtime)
+
+        assertTrue(core.pages(ChapterKey(comicKey, RemoteChapterId("ch1"))) is SourceOutcome.Success)
+
+        assertEquals(60_000L, runtime.calls.single { it.functionName == "comic.loadEp" }.timeoutMillis)
+        assertTrue(runtime.calls.filter { it.functionName == "__venera.probe" }.all { it.timeoutMillis == 10_000L })
+    }
+
+    private class RecordingRuntime : SourceScriptRuntime {
+        val calls = mutableListOf<SourceCall.InvokeFunction>()
+
+        override fun isSupported() = true
+        override suspend fun install(source: SourcePackage) = SourceInstallResult.Installed(source.sourceId, source.version)
+
+        override suspend fun invoke(call: SourceCall): SourceResult {
+            val typed = call as SourceCall.InvokeFunction
+            calls += typed
+            val result = if (typed.functionName == "__venera.probe") {
+                val pathJson = org.json.JSONArray(typed.argumentsJson).getString(0)
+                val firstPath = org.json.JSONArray(pathJson).optString(0)
+                val shape = if (firstPath == "comic") {
+                    """{"type":"object","entries":{"loadEp":"function"}}"""
+                } else {
+                    "null"
+                }
+                org.json.JSONObject.quote(shape)
+            } else {
+                """{"images":["https://image/1"]}"""
+            }
+            return SourceResult.Success(typed.callId, result)
+        }
+
+        override suspend fun cancel(callId: String) = Unit
+        override suspend fun unload(sourceId: SourceId) = Unit
+        override suspend fun close() = Unit
     }
 
     private val sourceId = SourceId(FIXTURE_KEY)

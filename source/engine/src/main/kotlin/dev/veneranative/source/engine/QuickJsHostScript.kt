@@ -10,12 +10,13 @@ package dev.veneranative.source.engine
  * - `fetch(url, options)` with `ok` / `status` / `headers` / `text()` / `json()` / `arrayBuffer()`;
  * - `Convert.encodeUtf8` / `decodeUtf8`, the encoding helper the same source uses for form bodies;
  * - `Network.*` for the calls that are not `fetch`;
+ * - cancellable `setTimeout` / `clearTimeout`, backed by a bounded timer Host API;
  * - `console.*`, routed to the host's log so source diagnostics are visible;
  * - `APP.locale` / `APP.version`.
  *
  * Deliberately **not** provided, because no source measured so far uses them and a hand-written
  * implementation would be guesswork: `URL`, `URLSearchParams`, `TextEncoder` / `TextDecoder`,
- * `atob` / `btoa`, `setTimeout` / `setInterval`, `crypto`, `structuredClone`, `Intl`. They are
+ * `atob` / `btoa`, `setInterval`, `crypto`, `structuredClone`, `Intl`. They are
  * listed in `docs/STATUS.md`; add one when a source needs it, with a test.
  */
 internal object QuickJsHostScript {
@@ -65,6 +66,45 @@ internal object QuickJsHostScript {
               );
             });
           }
+
+          var timerSequence = 0;
+          var activeTimeouts = Object.create(null);
+          globalThis.setTimeout = function (callback, delayMillis) {
+            if (typeof callback !== "function") {
+              throw new TypeError("setTimeout callback must be a function.");
+            }
+            var invocationId = globalThis.__veneraInvocationId;
+            if (typeof invocationId !== "string" || invocationId.length === 0) {
+              throw hostFailure("Timer requires an active invocation.", "INVALID_REQUEST", false);
+            }
+            var timerId = String(++timerSequence);
+            var delay = Number(delayMillis);
+            if (!Number.isFinite(delay) || delay < 0) delay = 0;
+            delay = Math.min(Math.floor(delay), 120000);
+            activeTimeouts[timerId] = invocationId;
+            callHost("timer.sleep", { timerId: timerId, delayMillis: delay }).then(function () {
+              if (activeTimeouts[timerId] !== invocationId) return;
+              delete activeTimeouts[timerId];
+              callback();
+            }).catch(function () {
+              delete activeTimeouts[timerId];
+            });
+            return timerId;
+          };
+          globalThis.clearTimeout = function (timerId) {
+            timerId = String(timerId);
+            var invocationId = activeTimeouts[timerId];
+            if (invocationId === undefined) return;
+            delete activeTimeouts[timerId];
+            callHost("timer.cancel", { timerId: timerId }).catch(function () {});
+          };
+          globalThis.__veneraClearInvocationTimers = function (invocationId) {
+            Object.keys(activeTimeouts).forEach(function (timerId) {
+              if (activeTimeouts[timerId] !== invocationId) return;
+              delete activeTimeouts[timerId];
+              callHost("timer.cancel", { timerId: timerId }).catch(function () {});
+            });
+          };
 
           globalThis.veneraHost = Object.freeze({
             call: function (method, payload) {

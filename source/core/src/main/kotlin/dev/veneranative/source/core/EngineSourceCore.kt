@@ -50,6 +50,7 @@ import kotlinx.serialization.json.JsonPrimitive
 class EngineSourceCore(
     private val runtime: SourceScriptRuntime,
     private val timeoutMillis: Long = SourceCall.DEFAULT_TIMEOUT_MILLIS,
+    private val chapterLoadTimeoutMillis: Long = DEFAULT_CHAPTER_LOAD_TIMEOUT_MILLIS,
     private val onCallFailure: (SourceId, String, String) -> Unit = { _, _, _ -> },
 ) : SourceCore {
 
@@ -263,7 +264,11 @@ class EngineSourceCore(
                     sourceId = sourceId,
                     functionName = call.member,
                     argumentsJson = call.argumentsJson,
-                    timeoutMillis = timeoutMillis,
+                    timeoutMillis = if (call.member == SourceProtocol.MEMBER_LOAD_EP) {
+                        chapterLoadTimeoutMillis
+                    } else {
+                        timeoutMillis
+                    },
                 ),
             )
         return when (result) {
@@ -350,6 +355,7 @@ class EngineSourceCore(
     private data class ExplorePageRuntime(val index: Int, val usesLoadNext: Boolean)
 
     private companion object {
+        const val DEFAULT_CHAPTER_LOAD_TIMEOUT_MILLIS = 60_000L
         const val FIRST_PAGE = 1
         const val PROBE_MEMBER = "__venera.probe"
         const val FILTER_TYPE_SELECT = "select"
