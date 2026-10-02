@@ -167,11 +167,11 @@ git diff --check
    git diff --check
    ```
 
-5. 暂存后检查 `git diff --cached` 与 `git diff --cached --check`；编译必须覆盖将提交的完整切片，不得依赖未提交文件。完成当前子任务的代码、测试、文档后立即提交，再开始下一子任务。完成报告包含 commit hash；commit 不代表自动 push。
+5. 暂存后检查 `git diff --cached` 与 `git diff --cached --check`；编译必须覆盖将提交的完整切片，不得依赖未提交文件。完成当前子任务的代码、测试、文档后立即提交，再开始下一子任务。完成报告包含 commit hash。
 6. 小任务必须有稳定编号、明确验收项，依赖完整且可独立编译。只读审查不制造空提交；纯文档任务可记录“不涉及编译”，执行差异检查。Unix 编译命令为 `sh gradlew :app:assembleDebug`。
 7. **commit message 用 Conventional Commits**，说明是什么改动以及为什么，不要只重复文件名。
 
-推送到远程前再次确认 working tree 干净，并且没有把凭据或真实用户数据带进去。
+提交后默认立即将当前分支推送到已配置的 upstream，无需再次向用户确认。推送前核对 upstream 和待推送 commit 列表，不使用 force push；确保待推送提交没有凭据或真实用户数据，也没有把用户未提交的修改暂存或提交进去。用户已有的无关工作区修改可以保留，不要求为推送而 stash、删除、覆盖或纳入推送内容。
 
 状态标记固定使用：
 
