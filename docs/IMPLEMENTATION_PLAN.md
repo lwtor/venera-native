@@ -562,6 +562,8 @@ S3-00 小任务：
 | S3-00N | 修复竖屏末页状态由 Pending 更新为 Ready 后，末页监听仍持有旧状态而不触发下一话；补回归用例 | DONE（`:feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；设备执行被 auto-review 拦截，因为 UTP 可能卸载用户 App/测试 APK） |
 | S3-00P | 修复来源脚本并发 HTTP 请求超过每源上限时立即失败；改为有界并发排队，并记录脱敏错误分类以便定位持续加载故障 | DONE（来源网络并发排队回归和调用层单测通过；错误日志仅含来源 ID、固定成员名和错误类型） |
 | S3-00O | 下一话作为页段追加进当前 Reader 状态，竖向长画布连续下滑、横向分页连续翻页；保留分话阅读进度；章节/详情临时加载失败可重试且不能伪装成系列结尾 | DONE（data/comic、source/network、source/core、feature/reader JVM 测试及 Android 测试源码编译通过；app debug 构建通过；未做设备 UI 测试） |
+| S3-00Q1 | 详情页和阅读器共享漫画详情短缓存，避免每次预载章节都重复下载完整目录；手动刷新绕过缓存；失败响应不缓存 | DONE（`data:comic`、`feature:details` JVM 测试与 App Debug 编译通过） |
+| S3-00Q2 | 适配拷贝漫画章节限流所需的 `setTimeout`；限制等待时长、支持取消，并给章节调用足够但有上限的超时 | TODO |
 
 ## 8. Stage 4：同步、体验与发布
 

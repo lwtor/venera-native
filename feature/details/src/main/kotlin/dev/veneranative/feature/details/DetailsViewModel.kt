@@ -50,7 +50,7 @@ class DetailsViewModel(
 
     fun onAction(action: DetailsAction) {
         when (action) {
-            DetailsAction.Retry, DetailsAction.Refresh -> load()
+            DetailsAction.Retry, DetailsAction.Refresh -> load(forceRefresh = true)
 
             is DetailsAction.GroupSelected -> _state.update { it.copy(selectedGroup = action.group) }
 
@@ -125,7 +125,7 @@ class DetailsViewModel(
         }
     }
 
-    private fun load() {
+    private fun load(forceRefresh: Boolean = false) {
         _state.update { it.copy(status = DetailsStatus.Loading, message = null) }
         viewModelScope.launch {
             val source = catalog.enabledSource(comicKey.sourceId)
@@ -141,7 +141,8 @@ class DetailsViewModel(
                 return@launch
             }
 
-            when (val outcome = catalog.detail(comicKey)) {
+            val outcome = if (forceRefresh) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
+            when (outcome) {
                 is SourceOutcome.Success -> _state.update { current ->
                     current.copy(
                         status = DetailsStatus.Ready,

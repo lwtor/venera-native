@@ -16,6 +16,9 @@ import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceCore
 import dev.veneranative.source.api.SourceOutcome
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * [ComicCatalog] over the installed sources and one [SourceCore].
@@ -28,7 +31,18 @@ import dev.veneranative.source.api.SourceOutcome
 class DefaultComicCatalog(
     private val sources: SourceRepository,
     private val core: SourceCore,
+    private val detailCacheTtlMillis: Long = DEFAULT_DETAIL_CACHE_TTL_MILLIS,
+    private val nowMillis: () -> Long = System::currentTimeMillis,
 ) : ComicCatalog {
+
+    private data class DetailEntry(
+        val mutex: Mutex = Mutex(),
+        var sourceVersion: String? = null,
+        var expiresAtMillis: Long = 0,
+        var value: ComicDetail? = null,
+    )
+
+    private val details = ConcurrentHashMap<ComicKey, DetailEntry>()
 
     override suspend fun searchableSources(): List<InstalledSource> = usable(SourceCapability.SEARCH)
 
@@ -38,8 +52,32 @@ class DefaultComicCatalog(
         core.capabilities(sourceId)
 
     override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
-        sources.installed()
-        return core.detail(comicKey)
+        val installed = sources.installed()
+        val sourceVersion = installed.firstOrNull { it.sourceId == comicKey.sourceId }?.version
+        val entry = details.getOrPut(comicKey) { DetailEntry() }
+        return entry.mutex.withLock {
+            entry.value?.takeIf {
+                entry.sourceVersion == sourceVersion && nowMillis() < entry.expiresAtMillis
+            }?.let { return@withLock SourceOutcome.Success(it) }
+
+            when (val result = core.detail(comicKey)) {
+                is SourceOutcome.Success -> {
+                    entry.sourceVersion = sourceVersion
+                    entry.expiresAtMillis = nowMillis() + detailCacheTtlMillis
+                    entry.value = result.value
+                    result
+                }
+                is SourceOutcome.Failure -> {
+                    entry.value = null
+                    result
+                }
+            }
+        }
+    }
+
+    override suspend fun refreshDetail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
+        details.remove(comicKey)
+        return detail(comicKey)
     }
 
     override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> {
@@ -80,4 +118,8 @@ class DefaultComicCatalog(
             is SourceOutcome.Success -> outcome.value.supports(capability)
             is SourceOutcome.Failure -> false
         }
+
+    private companion object {
+        const val DEFAULT_DETAIL_CACHE_TTL_MILLIS = 5 * 60 * 1000L
+    }
 }

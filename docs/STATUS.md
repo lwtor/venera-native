@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00B2 上游 Venera 源码对照审查 |
-| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 同源调用并发排队与下一话预载 DONE；S3-00N 竖屏末页监听修复 DONE（仪器测试受 UTP 卸载风险阻止）；S3-00P 来源网络并发请求排队与脱敏诊断 DONE；S3-00O 同画布跨话连续阅读及下一话加载失败修复 DONE；当前唯一后续规划任务 S3-00B2 因环境无法访问 GitHub 源码而 BLOCKED；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务 | S3-00Q2 拷贝漫画限流等待兼容 |
+| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 同源调用并发排队与下一话预载 DONE；S3-00N 竖屏末页监听修复 DONE（仪器测试受 UTP 卸载风险阻止）；S3-00P 来源网络并发请求排队与脱敏诊断 DONE；S3-00O 同画布跨话连续阅读及下一话加载失败修复 DONE；S3-00Q1 详情接口短缓存与显式刷新 DONE；S3-00Q2 拷贝漫画限流等待兼容 IN_PROGRESS；S3-00B2 上游源码审查仍因 GitHub 访问受阻而 BLOCKED；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -56,6 +56,10 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00P DONE：来源并发网络请求不再因达到上限直接失败，并新增安全诊断。** 发现 `SourceNetworkExecutor` 在同一来源同时有 4 个 Host HTTP 请求时直接返回 `ConcurrencyLimit`；并发发请求的脚本把这个 Host 错误作为 JS 异常处理，详情/章节流程会直接显示失败，普通重试容易再次撞上并发窗口。保留每来源最多 4 个在途请求，额外请求改为可取消 FIFO 排队，源被禁用/卸载时旧队列通过 epoch 失效。`EngineSourceCore` 与 AppGraph 新增诊断，只记录 source ID、固定调用成员名和错误类型；网络层记录 source ID 与错误类型，不记录网址、Header、Cookie、Token、漫画标题或搜索词。验证：`:source:network:testDebugUnitTest :source:core:testDebugUnitTest` 在完整相关构建中通过；网络回归确认第五个请求等待名额释放而非得到并发错误。当前无法用上一轮设备日志归因历史每次加载失败；新日志可在用户下次运行这版后区分来源脚本错误与网络错误。
 
 **S3-00O DONE：下一话追加进当前阅读画布，并修复加载失败被误判成“没有下一话”。** Reader 不再对下一话执行路由跳转：章节页被追加到现有页列表，竖向模式沿同一长画布继续下滑，横向模式扩展原分页器的页数；当前页索引和屏幕位置保留，并按章节段分别写阅读进度。下一话失败显示可见重试入口。另发现 `SourcePageProvider` 在 pages 成功但 detail 超时/失败时会静默丢弃 `nextChapter`，导致 Reader 把加载故障误当作系列结束；现在对标记为可重试的 pages/detail 错误有界重试两次，仍失败则进入 Reader 重试状态，只有明确 `UnsupportedCapability(DETAIL)` 才按来源不支持详情处理；空页章节也显式失败，避免空白 Ready 页面。新增 Reader“失败后重试并追加到原画布”回归，以及来源 detail 暂时失败后重试成功、持续失败可见报错的回归。JDK 17 验证：`:data:comic:testDebugUnitTest :source:network:testDebugUnitTest :source:core:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行设备 UI 自动测试；未将安装包写入手机。实际触屏体验与源站当前可用性仍需在安装此版本后确认。
+
+**S3-00Q1 DONE：详情页与阅读器共用短时漫画详情缓存。** 设备日志记录到拷贝漫画 `comic.loadInfo` 返回脚本执行错误；设备内脚本的 `loadInfo` 会在每次调用时请求作品元数据、收藏状态和每个章节分组。此前 Reader 每预载一话都会重新调用完整详情，显著放大同一漫画的源站请求量。`DefaultComicCatalog` 现按漫画键和来源版本缓存成功详情 5 分钟，并以每漫画互斥锁合并并行请求；失败结果不缓存，Details 的 Retry/Refresh 显式绕过缓存。新增缓存命中、超时后不缓存、强制刷新和过期回归。JDK 17 验证：`:data:comic:testDebugUnitTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。
+
+**S3-00Q2 IN_PROGRESS：实现拷贝漫画限流等待所需的受限计时器能力。** 设备已安装的官方 `copy_manga` 1.4.2 脚本在章节接口返回限流状态 210 时使用 `setTimeout` 等待后重试；当前 QuickJS 沙箱没有 `setTimeout`，因此限流后会变成 `ScriptExecution`。已确认的限制还包括源调用默认 10 秒超时，短于来源脚本默认 40 秒限流等待；本任务将提供有界、可取消的 timer host call，并仅延长 `comic.loadEp` 调用的超时时间。尚未完成实现与验证。
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 

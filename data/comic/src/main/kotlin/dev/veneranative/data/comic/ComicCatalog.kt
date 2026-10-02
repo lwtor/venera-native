@@ -43,6 +43,9 @@ interface ComicCatalog {
      */
     suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail>
 
+    /** Refresh comic details, bypassing any short-lived source-response cache. */
+    suspend fun refreshDetail(comicKey: ComicKey): SourceOutcome<ComicDetail> = detail(comicKey)
+
     /**
      * Page references of a chapter, in the order the source listed them.
      *

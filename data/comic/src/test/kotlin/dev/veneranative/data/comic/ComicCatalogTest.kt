@@ -158,6 +158,47 @@ class ComicCatalogTest {
     }
 
     @Test
+    fun `details are shared briefly across reader chapter prefetches`() = runTest {
+        var now = 1_000L
+        val detail = ComicDetail(comic = comic("c1"), chapters = emptyList())
+        val core = FakeSourceCore().apply { detailResponse = SourceOutcome.Success(detail) }
+        val catalog = DefaultComicCatalog(
+            sources = FakeSourceRepository(listOf(source("source-a"))),
+            core = core,
+            detailCacheTtlMillis = 10_000,
+            nowMillis = { now },
+        )
+
+        assertEquals(SourceOutcome.Success(detail), catalog.detail(detail.comic.key))
+        assertEquals(SourceOutcome.Success(detail), catalog.detail(detail.comic.key))
+        assertEquals(1, core.detailCalls)
+
+        catalog.refreshDetail(detail.comic.key)
+        assertEquals(2, core.detailCalls)
+
+        now += 10_001
+        catalog.detail(detail.comic.key)
+        assertEquals(3, core.detailCalls)
+    }
+
+    @Test
+    fun `failed details are not cached`() = runTest {
+        val detail = ComicDetail(comic = comic("c1"))
+        val core = FakeSourceCore().apply {
+            detailResponse = SourceOutcome.Failure(SourceRuntimeError.Timeout(10_000))
+        }
+        val catalog = DefaultComicCatalog(
+            sources = FakeSourceRepository(listOf(source("source-a"))),
+            core = core,
+        )
+
+        assertTrue(catalog.detail(detail.comic.key) is SourceOutcome.Failure)
+        core.detailResponse = SourceOutcome.Success(detail)
+        assertEquals(SourceOutcome.Success(detail), catalog.detail(detail.comic.key))
+        assertEquals(2, core.detailCalls)
+    }
+
+    @Test
     fun `a source failure reaches the caller as the same domain error`() = runTest {
         val failure = SourceRuntimeError.UnsupportedCapability(SourceCapability.DETAIL)
         val core = FakeSourceCore().apply { detailResponse = SourceOutcome.Failure(failure) }
@@ -243,6 +284,7 @@ class ComicCatalogTest {
         var next: PageCursor? = null
         var error: SourceRuntimeError? = null
         var detailResponse: SourceOutcome<ComicDetail>? = null
+        var detailCalls: Int = 0
 
         override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
             declaredCapabilities[sourceId]
@@ -260,9 +302,11 @@ class ComicCatalogTest {
             return SourceOutcome.Success(PagedResult(items = items, next = next))
         }
 
-        override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
-            detailResponse
+        override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
+            detailCalls++
+            return detailResponse
                 ?: SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(comicKey.sourceId))
+        }
 
         override suspend fun chapters(comicKey: ComicKey): SourceOutcome<List<Chapter>> =
             SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(comicKey.sourceId))
