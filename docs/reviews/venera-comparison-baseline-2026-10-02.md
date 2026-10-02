@@ -2,7 +2,7 @@
 
 审查日期：2026-10-02
 工作区代码基线：`main` HEAD（开始审查时 `main...origin/main [ahead 10]`；用户现有的 `gradle.properties` 修改不属于本任务）
-状态：**IN_PROGRESS**。逐项清单、上游版本和权重已冻结；当前设备渲染与上游 UI 的成对截图尚未取得，视觉维度仍为未核验。
+状态：**IN_PROGRESS**。逐项清单、上游版本和权重已冻结；上游源码逐文件审查尚待当前环境恢复 GitHub 访问后完成。视觉维度仍为未核验；截图采集是各页面实现后的视觉验收工作，不是本基线或后续实现任务的前置条件。
 
 ## 1. 基线和范围
 
@@ -21,7 +21,7 @@
 
 - 功能、流程、设计分别以 100 权重单位计分，不跨维度平均。以下适用项权重预先固定；后续仅可通过有理由的基线变更调整分母。
 - `PASS` 仅在实现和适用验收证据都存在时计入得分；`PARTIAL`、`MISSING`、`UNVERIFIED` 都计 0。未核验项继续留在分母。
-- 当前分数是证据覆盖度，不是主观估计的 UI 相似度。流程/功能采用 Stage 2 退出报告、自动化 fixture 验收及代码入口证据；视觉需要同页面/同状态的可比较截图，目前没有证据。
+- 当前分数是证据覆盖度，不是主观估计的 UI 相似度。流程/功能采用 Stage 2 退出报告、自动化 fixture 验收及代码入口证据；视觉需要同页面/同状态的可比较截图，目前没有证据。实现前应先从固定上游源码提取布局层级、导航和状态行为并翻译为 Compose；截图用于实现后的真实渲染差异复核，不替代源码分析，也不作为开工门槛。
 - 除明确平台差异外，原版能力一律适用。Android 原生权限/SAF picker 可替代 Flutter picker 的具体实现，但目录导入、权限恢复和失败处理用户目标仍计入。
 
 ## 2. 功能覆盖矩阵（当前：60 / 100）
@@ -91,14 +91,14 @@
 | Library / downloads / local | [`favorites/`](https://github.com/venera-app/venera/tree/a0eba91/lib/pages/favorites)、[`downloading_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/downloading_page.dart)、[`local_comics_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/local_comics_page.dart) | `feature/library/LibraryScreen.kt`、`data/download`、`data/local` | 截图内容/页面映射待核对；本地 screenshot missing |
 | History / follow updates / settings / account | [`history_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/history_page.dart)、[`follow_updates_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/follow_updates_page.dart)、[`settings/`](https://github.com/venera-app/venera/tree/a0eba91/lib/pages/settings)、[`auth_page.dart`](https://github.com/venera-app/venera/blob/a0eba91/lib/pages/auth_page.dart) | `data/history`（无历史页）；Settings/Auth/Follow UI 无 route | 上游页面需追加图片/流程证据；本地页面缺失 |
 
-截图应记录：上游基线 URL/版本、页面与状态、设备逻辑尺寸和系统栏、同类本地构建版本、捕获日期、匿名 fixture/内容来源。不要为比较引入真实用户 Cookie、商业源数据或受版权漫画内容。获得截图后，存放在 `docs/reviews/assets/venera-baseline/` 或记录受控外部引用；若上游素材不允许入库，仅记来源 URL 与人工核对日期，不复制到仓库。
+截图应记录：上游基线 URL/版本、页面与状态、设备逻辑尺寸和系统栏、同类本地构建版本、捕获日期、匿名 fixture/内容来源。不要为比较引入真实用户 Cookie、商业源数据或受版权漫画内容。对应页面完成后再收集截图，存放在 `docs/reviews/assets/venera-baseline/` 或记录受控外部引用；若上游素材不允许入库，仅记来源 URL 与人工核对日期，不复制到仓库。无需为 S3-00 或 S3-01 等源码/功能工作等待截图。
 
 ## 6. 初步结论、许可证边界和行动项
 
 - 当前已证据覆盖：功能 `60/100`、流程 `66/100`、视觉 `0/100 已核验`。这是保守的验收证据分数；尤其视觉值只代表暂无截图证据，不代表对当前视觉质量作出 0% 的判断。
 - 已发现可直接列为差距：主页仍为技术占位页；分类/排行/聚合搜索缺失；历史和续读没有可访问 UI；远端收藏/追更、账号登录、评论/评分、完整设置页缺失。Stage 3/4 任务须映射到上述矩阵项，不能只新增底层接口后把对应项标 PASS。
 - 已实现但缺闭环证据：下载完成后断网端到端阅读；阅读历史 UI 的精确续读；所有页面在真实设备上的成对视觉比较。
-- 退出前行动：确认并固定归档提交完整 SHA；为 F-Droid 截图来源确认版本关联并逐张标记页面；补齐当前 Android 页面截图（设备当前由用户使用，本次不切换前台；本地模拟器未启动）；将截图按页面/状态命名、复核视觉项及可适用权重；把矩阵 ID 绑定到后续 Stage 3/4 每个功能任务。未完成前 S3-00 保持 `IN_PROGRESS`，不启动 S3-01。
+- 退出前行动：确认并固定归档提交完整 SHA；逐文件审查上游页面、导航、主题与状态源码并对照本地 Compose；把矩阵 ID 绑定到后续 Stage 3/4 每个功能任务。当前执行环境 `git ls-remote https://github.com/venera-app/venera.git a0eba91` 因 DNS 无法解析 `github.com` 失败，网页工具读取固定提交源码也返回 Cache miss；这是源码审查的真实外部限制，不应以截图替代源码读取。恢复上游源码访问后完成此项。截图的页面映射/版本关联核验及本地成对截图移入对应页面实现验收和 S4-09，不再阻断 S3-00/S3-01。
 - 上游仓库标明 **GPL-3.0**；许可证文本：[LICENSE](https://github.com/venera-app/venera/blob/a0eba91/LICENSE)。本项目只把上游用作行为/界面对照，不复制 Dart/Kotlin 代码、翻译文本、图标、品牌素材、截图或漫画内容。复用/派生上游代码或视觉资产前，必须另行做 GPL 义务、商标与素材授权评估并记录来源；Venera Native 保持非官方关系，不暗示官方背书。
 
 ## 7. 本次验证
