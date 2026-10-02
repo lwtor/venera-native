@@ -529,11 +529,15 @@ class QuickJsRuntimeTest {
     }
 
     @Test(timeout = ENGINE_TEST_TIMEOUT_MILLIS)
-    fun `a second call is rejected instead of waiting in an unbounded queue`() = runBlocking {
+    fun `a second call waits for the same source and runs after the first is cancelled`() = runBlocking {
         val entered = CompletableDeferred<Unit>()
         val host = RecordingHostApi { request ->
-            entered.complete(Unit)
-            awaitCancellation()
+            if (request.invocationId == "first") {
+                entered.complete(Unit)
+                awaitCancellation()
+            } else {
+                respondWithBody(request.requestId, 200, "{}")
+            }
         }
         withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
             val sourceId = runtime.installSource(fetchSource())
@@ -541,11 +545,16 @@ class QuickJsRuntimeTest {
                 runtime.invoke(SourceCall.InvokeFunction("first", sourceId, "search.load", "[\"slow\"]", 30_000))
             }
             entered.await()
-            val second = runtime.invoke(SourceCall.InvokeFunction("second", sourceId, "search.load", "[\"next\"]"))
-            val error = (second as SourceResult.Failure).error
-            assertTrue(error is SourceRuntimeError.Busy && error.retryable)
+            val second = async {
+                runtime.invoke(SourceCall.InvokeFunction("second", sourceId, "search.load", "[\"next\"]"))
+            }
+            // The queued invocation must remain pending until the previous source call releases
+            // the single-threaded source session.
+            kotlinx.coroutines.yield()
+            assertTrue("the second call must wait instead of failing Busy", !second.isCompleted)
             runtime.cancel("first")
-            first.await()
+            assertTrue(first.await() is SourceResult.Failure)
+            assertTrue("the queued call should run after cancellation", second.await() is SourceResult.Success)
         }
     }
 

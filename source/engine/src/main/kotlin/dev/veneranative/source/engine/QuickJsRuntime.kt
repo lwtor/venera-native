@@ -123,10 +123,7 @@ class QuickJsRuntime(
             sessions[typedCall.sourceId]
                 ?: return typedCall.failure(SourceRuntimeError.SourceNotLoaded(typedCall.sourceId))
 
-        if (!session.invocationMutex.tryLock()) {
-            return typedCall.failure(SourceRuntimeError.Busy())
-        }
-        return try {
+        return session.invocationMutex.withLock {
             if (closed.get()) return typedCall.failure(SourceRuntimeError.RuntimeClosed())
             if (sessions[typedCall.sourceId] !== session) {
                 return typedCall.failure(
@@ -207,8 +204,6 @@ class QuickJsRuntime(
             } finally {
                 activeCalls.remove(typedCall.callId, activeCall)
             }
-        } finally {
-            session.invocationMutex.unlock()
         }
     }
 

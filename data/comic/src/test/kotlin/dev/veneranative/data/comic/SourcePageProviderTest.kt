@@ -137,6 +137,42 @@ class SourcePageProviderTest {
     }
 
     @Test
+    fun `prefetched next chapter is reused and its first page is warmed`() = runTest {
+        val nextKey = chapter.copy(remoteId = RemoteChapterId("chapter-2"))
+        var pageLoads = 0
+        val catalog = object : ComicCatalog by FakeCatalog(
+            pages = listOf(SourcePage(index = 0, imageRef = "https://img/next")),
+        ) {
+            override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> {
+                pageLoads++
+                return SourceOutcome.Success(listOf(SourcePage(index = 0, imageRef = "https://img/next")))
+            }
+
+            override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
+                SourceOutcome.Success(
+                    ComicDetail(
+                        comic = Comic(comicKey, "Comic"),
+                        chapters = listOf(
+                            Chapter(chapter, "Chapter 1", 0),
+                            Chapter(nextKey, "Chapter 2", 1),
+                        ),
+                    ),
+                )
+        }
+        val provider = SourcePageProvider(
+            catalog,
+            FixedSizer("https://img/next" to ImageSize(900, 1400)),
+        )
+
+        provider.prefetchChapter(dev.veneranative.core.model.ChapterRef.Remote(nextKey))
+        val opened = provider.loadChapter(dev.veneranative.core.model.ChapterRef.Remote(nextKey))
+
+        assertEquals(1, pageLoads)
+        assertEquals(dev.veneranative.core.model.PageSizeState.Ready, opened.pages.single().sizeState)
+        assertEquals("Chapter 2", opened.title)
+    }
+
+    @Test
     fun `a source failure travels as a domain error so the reader can retry`() = runTest {
         val failure = SourceRuntimeError.Timeout(timeoutMillis = 10_000)
         val provider = SourcePageProvider(

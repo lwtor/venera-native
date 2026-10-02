@@ -27,6 +27,9 @@ interface PageProvider {
 
     suspend fun loadChapter(chapter: ChapterRef): ChapterContent
 
+    /** Warm metadata and the first page of an upcoming chapter before it is opened. */
+    suspend fun prefetchChapter(chapter: ChapterRef) = Unit
+
     /** Resolve one page on demand without changing its stable position in the chapter. */
     suspend fun resolve(page: ComicPage): ComicPage = page
 

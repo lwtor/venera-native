@@ -115,7 +115,9 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     )
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
     val catalog = DefaultComicCatalog(sourceRepository, EngineSourceCore(runtime))
-    private val sourcePageProvider: PageProvider = SourcePageProvider(catalog, CoilPageImageSizer(imagePipeline))
+    private val sourcePageProvider: PageProvider = SourcePageProvider(
+        catalog, CoilPageImageSizer(imagePipeline), prefetchScope = scope,
+    )
     private val offlineProvider: PageProvider = OfflineFirstPageProvider(
         downloads = { _download.value ?: _download.filterNotNull().first() },
         layout = DownloadEnvironment.get(getApplication()).layout(),

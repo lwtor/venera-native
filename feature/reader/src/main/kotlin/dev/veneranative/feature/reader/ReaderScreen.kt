@@ -84,17 +84,16 @@ fun ReaderScreen(
 ) {
     var strategy by rememberSaveable { mutableStateOf(DecodeStrategy.Region) }
     var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
-    var autoAdvance by rememberSaveable(state.chapterTitle) { mutableStateOf(true) }
     val decoder: PageImageDecoder? = decoderFactory?.let { factory ->
         remember(factory, strategy) { factory(strategy) }
     }
     DisposableEffect(decoder) {
         onDispose { decoder?.close() }
     }
-    LaunchedEffect(chapterEndReached, autoAdvance, state.nextChapter) {
-        if (!chapterEndReached || !autoAdvance || state.nextChapter == null) return@LaunchedEffect
-        delay(NEXT_CHAPTER_AUTO_ADVANCE_MILLIS)
-        onAction(ReaderAction.OpenNextChapter)
+    LaunchedEffect(chapterEndReached, state.nextChapter) {
+        if (chapterEndReached && state.nextChapter != null) {
+            onAction(ReaderAction.OpenNextChapter)
+        }
     }
 
     Scaffold(
@@ -122,33 +121,12 @@ fun ReaderScreen(
         },
         bottomBar = {
             if (state.status == ReaderStatus.Ready) {
-                Column {
-                    state.nextChapter?.takeIf { chapterEndReached }?.let { next ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = if (autoAdvance) "${NEXT_CHAPTER_AUTO_ADVANCE_MILLIS / 1_000L} 秒后进入下一话：${next.title}"
-                                else "本话已结束：${next.title}",
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (autoAdvance) {
-                                TextButton(onClick = { autoAdvance = false }) { Text("取消自动") }
-                            }
-                            TextButton(onClick = { onAction(ReaderAction.OpenNextChapter) }) { Text("立即进入") }
-                        }
-                    }
-                    ReaderControls(
-                        direction = state.direction,
-                        strategy = if (decoderFactory == null) null else strategy,
-                        onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
-                        onStrategyChange = { strategy = it },
-                    )
-                }
+                ReaderControls(
+                    direction = state.direction,
+                    strategy = if (decoderFactory == null) null else strategy,
+                    onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
+                    onStrategyChange = { strategy = it },
+                )
             }
         },
     ) { contentPadding ->
@@ -637,7 +615,6 @@ private fun placeholderTile(page: ComicPage, viewport: PageViewport, continuous:
 }
 
 private const val PAGE_PREDECODE_IDLE_MILLIS = 350L
-private const val NEXT_CHAPTER_AUTO_ADVANCE_MILLIS = 8_000L
 
 private fun ReadingDirection.label(): String = when (this) {
     ReadingDirection.Vertical -> "竖向"

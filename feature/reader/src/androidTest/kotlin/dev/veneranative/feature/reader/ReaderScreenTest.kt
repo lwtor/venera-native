@@ -13,8 +13,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -27,6 +27,7 @@ import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.model.PageSizeState
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
@@ -159,7 +160,7 @@ class ReaderScreenTest {
             ReaderScreen(
                 state = ReaderUiState(
                     chapterTitle = "Chapter 1",
-                    pages = listOf(ComicPage(0, "test://last", 1080, 300)),
+                    pages = listOf(ComicPage(0, "test://last", 1080, 300, sizeState = PageSizeState.Ready)),
                     direction = ReadingDirection.LeftToRight,
                     nextChapter = nextChapter,
                     status = ReaderStatus.Ready,
@@ -169,9 +170,7 @@ class ReaderScreenTest {
             )
         }
 
-        composeRule.onNodeWithText("立即进入").assertIsDisplayed().performClick()
-
-        assertTrue(openedNext)
+        composeRule.waitUntil(timeoutMillis = 5_000) { openedNext }
     }
 
     @Test

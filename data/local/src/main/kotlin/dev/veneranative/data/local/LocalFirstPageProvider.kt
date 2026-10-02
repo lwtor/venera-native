@@ -47,6 +47,10 @@ class LocalFirstPageProvider(
         }
     }
 
+    override suspend fun prefetchChapter(chapter: ChapterRef) {
+        if (chapter is ChapterRef.Remote) source.prefetchChapter(chapter)
+    }
+
     override suspend fun resolve(page: ComicPage): ComicPage {
         if (page.sourceId != null) return source.resolve(page)
         return withContext(Dispatchers.IO) {

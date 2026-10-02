@@ -45,6 +45,13 @@ class OfflineFirstPageProvider(
         return ChapterContent(task.title, pages, task.comicTitle)
     }
 
+    override suspend fun prefetchChapter(chapter: ChapterRef) {
+        val key = (chapter as? ChapterRef.Remote)?.key
+        if (key == null || !downloads().isCompleteOffline(ChapterRef.Remote(key))) {
+            source.prefetchChapter(chapter)
+        }
+    }
+
     suspend fun loadChapter(chapter: ChapterKey): ChapterContent = loadChapter(ChapterRef.Remote(chapter))
 
     override suspend fun resolve(page: ComicPage): ComicPage {

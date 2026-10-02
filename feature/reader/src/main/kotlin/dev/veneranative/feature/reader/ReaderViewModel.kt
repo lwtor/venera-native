@@ -86,6 +86,9 @@ class ReaderViewModel(
                 }
                 progress?.record(content, resumedIndex)
                 prefetchAround(resumedIndex)
+                content.nextChapter?.let { next ->
+                    viewModelScope.launch { provider.prefetchChapter(ChapterRef.Remote(next.key)) }
+                }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
