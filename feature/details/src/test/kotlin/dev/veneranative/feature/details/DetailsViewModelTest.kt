@@ -93,6 +93,27 @@ class DetailsViewModelTest {
         assertEquals(1, viewModel.state.value.downloadQueueVersion)
     }
 
+    @Test fun `selected chapters are queued in source order`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        catalog.pagesResponse = SourceOutcome.Success(listOf(SourcePage(0, "https://page/1")))
+        val downloads = RecordingDownloadRepository()
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        advanceUntilIdle()
+
+        val chapters = viewModel.state.value.detail!!.chapters
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(chapters.last().key))
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(chapters.first().key))
+        viewModel.onAction(DetailsAction.DownloadSelectedChapters)
+        advanceUntilIdle()
+
+        assertEquals(chapters.map { ChapterRef.Remote(it.key) }, downloads.enqueuedChapters)
+        assertEquals("已将 2 个章节加入下载队列。", viewModel.state.value.downloadMessage)
+        assertFalse(viewModel.state.value.isChapterSelectionMode)
+        assertEquals(2, viewModel.state.value.downloadQueueVersion)
+    }
+
     @Test
     fun `a comic whose source is gone is unavailable rather than failed`() = runTest(dispatcher) {
         // The source was uninstalled between the search result and opening the comic, so the engine
@@ -374,11 +395,13 @@ class DetailsViewModelTest {
     private class RecordingDownloadRepository : DownloadRepository {
         var enqueuedChapter: ChapterRef? = null
         var enqueuedPages: List<SourcePage> = emptyList()
+        val enqueuedChapters = mutableListOf<ChapterRef>()
         override fun observeTasks(): Flow<List<DownloadTask>> = emptyFlow()
         override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = emptyFlow()
         override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) {
             enqueuedChapter = chapter
             enqueuedPages = pages
+            enqueuedChapters += chapter
         }
         override suspend fun pause(chapter: ChapterRef) = Unit
         override suspend fun resume(chapter: ChapterRef) = Unit

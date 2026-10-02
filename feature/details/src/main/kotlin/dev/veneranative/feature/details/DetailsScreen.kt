@@ -1,6 +1,8 @@
 package dev.veneranative.feature.details
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,18 +11,27 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
@@ -61,9 +73,27 @@ fun DetailsScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(state.title.ifEmpty { "漫画详情" }) },
+                title = { Text("漫画详情") },
                 navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
+                actions = {
+                    if (state.status == DetailsStatus.Ready) {
+                        TextButton(onClick = { onAction(DetailsAction.Refresh) }) { Text("刷新") }
+                    }
+                },
             )
+        },
+        bottomBar = {
+            if (state.status == DetailsStatus.Ready && state.hasChapters) {
+                val firstChapter = state.detail?.chapters?.firstOrNull()
+                if (firstChapter != null) {
+                    Surface(tonalElevation = 3.dp) {
+                        Button(
+                            onClick = { onOpenChapter(firstChapter.key) },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        ) { Text("开始阅读 · ${firstChapter.title}", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+            }
         },
     ) { contentPadding ->
         Box(
@@ -93,7 +123,7 @@ fun DetailsScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
-                            text = "无法获取漫画详情，请重试。",
+                            text = state.message ?: "无法获取漫画详情，请重试。",
                             style = MaterialTheme.typography.bodyLarge,
                         )
                         Button(onClick = { onAction(DetailsAction.Retry) }) { Text("重试") }
@@ -116,33 +146,54 @@ private fun Content(
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (ChapterKey) -> Unit,
 ) {
+    val listState = rememberLazyListState()
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().testTag(DETAILS_CONTENT_TAG),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(bottom = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item { Header(state = state, onAction = onAction) }
-        state.downloadMessage?.let { message -> item { Text(message, style = MaterialTheme.typography.bodyMedium) } }
+        state.downloadMessage?.let { message ->
+            item {
+                Text(
+                    message,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
 
         state.detail?.metadata?.takeIf { it.isNotEmpty() }?.let { metadata ->
-            item { DetailFacts(metadata) }
+            item { Section { DetailFacts(metadata) } }
         }
 
         state.detail?.let { detail ->
             val groups = detail.tagGroups.ifEmpty {
                 detail.comic.tags.takeIf { it.isNotEmpty() }?.let { mapOf("Tags" to it) }.orEmpty()
             }
-            if (groups.isNotEmpty()) item { DetailTagGroups(groups) }
+            if (groups.isNotEmpty()) item { Section { DetailTagGroups(groups) } }
             if (detail.thumbnails.isNotEmpty()) {
-                item { DetailThumbnails(title = detail.comic.title, urls = detail.thumbnails, sourceId = detail.comic.key.sourceId) }
+                item { Section { DetailThumbnails(title = detail.comic.title, urls = detail.thumbnails, sourceId = detail.comic.key.sourceId) } }
             }
         }
 
         state.detail?.description?.takeIf { it.isNotBlank() }?.let { description ->
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("简介", style = MaterialTheme.typography.titleMedium)
-                    Text(text = description, style = MaterialTheme.typography.bodyMedium)
+                Section {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("简介", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = if (state.descriptionExpanded) Int.MAX_VALUE else 4,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        TextButton(onClick = { onAction(DetailsAction.DescriptionExpanded(!state.descriptionExpanded)) }) {
+                            Text(if (state.descriptionExpanded) "收起简介" else "展开简介")
+                        }
+                    }
                 }
             }
         }
@@ -158,15 +209,25 @@ private fun Content(
         }
 
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("章节（${state.detail?.chapters?.size ?: 0}）", style = MaterialTheme.typography.titleMedium)
-                ChapterControls(state = state, onAction = onAction)
+            Section {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("章节目录", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            Text("${state.detail?.chapters?.size ?: 0} 话", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        TextButton(onClick = { onAction(DetailsAction.ChapterSelectionModeChanged(!state.isChapterSelectionMode)) }) {
+                            Text(if (state.isChapterSelectionMode) "取消多选" else "批量选择")
+                        }
+                    }
+                    ChapterControls(state = state, onAction = onAction)
+                }
             }
         }
 
         val withHeaders = state.groupsTheList
         var previousGroup: String? = null
-        state.visibleChapters.forEach { chapter ->
+        state.filteredChapters.forEach { chapter ->
             val group = chapter.group
             if (withHeaders && group != null && group != previousGroup) {
                 item(key = "group:$group") { GroupHeader(group) }
@@ -174,7 +235,24 @@ private fun Content(
             if (withHeaders) previousGroup = group ?: previousGroup
 
             item(key = chapter.key.remoteId.value) {
-                ChapterRow(chapter = chapter, onOpen = { onOpenChapter(chapter.key) }, onDownload = { onAction(DetailsAction.DownloadChapter(chapter.key)) })
+                ChapterRow(
+                    chapter = chapter,
+                    selected = chapter.key in state.selectedChapters,
+                    selectionMode = state.isChapterSelectionMode,
+                    onOpen = { onOpenChapter(chapter.key) },
+                    onDownload = { onAction(DetailsAction.DownloadChapter(chapter.key)) },
+                    onToggleSelection = { onAction(DetailsAction.ChapterSelectionToggled(chapter.key)) },
+                )
+            }
+        }
+        if (state.filteredChapters.isEmpty()) {
+            item {
+                Text(
+                    if (state.chapterQuery.isBlank()) "此分组暂无章节。" else "没有匹配的章节。",
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -186,46 +264,62 @@ private fun Header(
     onAction: (DetailsAction) -> Unit,
 ) {
     val comic = state.detail?.comic ?: return
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Cover(title = comic.title, coverUrl = comic.coverUrl, sourceId = comic.key.sourceId)
-
+    Box(
+        modifier = Modifier.fillMaxWidth().height(270.dp).background(MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        comic.coverUrl?.let { coverUrl ->
+            ComicImage(
+                request = ComicImageRequest(url = coverUrl, sourceId = comic.key.sourceId, variant = DETAIL_BACKDROP_VARIANT),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+                placeholder = {},
+            )
+        }
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.verticalGradient(
+                    colors = listOf(Color.Black.copy(alpha = 0.18f), Color.Black.copy(alpha = 0.50f), Color.Black.copy(alpha = 0.92f)),
+                ),
+            ),
+        )
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = comic.title, style = MaterialTheme.typography.titleLarge)
-
-            comic.subtitle?.let { subtitle ->
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            Text(text = comic.title, style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
+            comic.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.88f), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
-
-            state.sourceName?.let { name ->
-                Text(
-                    text = name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
+            state.sourceName?.let { Text("来源 · $it", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.82f)) }
             if (state.hasShelf) {
-                ShelfControl(state = state, onAction = onAction)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = { onAction(DetailsAction.ToggleFavorite) },
+                        shape = RoundedCornerShape(50),
+                    ) { Text(if (state.isFavorite) "✓ 已收藏" else "＋ 收藏", color = Color.White) }
+                }
             }
+            state.shelfMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White) }
         }
     }
 }
 
 @Composable
+private fun Section(content: @Composable () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp)) {
+        content()
+    }
+}
+
+@Composable
 private fun DetailFacts(metadata: Map<String, String>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("作品信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             metadata.forEach { (label, value) ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(label.toChineseMetadataLabel(), modifier = Modifier.width(76.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(value, style = MaterialTheme.typography.bodyMedium)
                 }
             }
@@ -235,14 +329,13 @@ private fun DetailFacts(metadata: Map<String, String>) {
 
 @Composable
 private fun DetailTagGroups(groups: Map<String, List<String>>) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            groups.forEach { (name, values) ->
-                if (values.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(name, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(values.joinToString(" · "), style = MaterialTheme.typography.bodyMedium)
-                    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("标签", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        groups.forEach { (name, values) ->
+            if (values.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(name, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(values.joinToString("  ·  "), style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -252,7 +345,7 @@ private fun DetailTagGroups(groups: Map<String, List<String>>) {
 @Composable
 private fun DetailThumbnails(title: String, urls: List<String>, sourceId: SourceId) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("预览图", style = MaterialTheme.typography.titleMedium)
+        Text("内容预览", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             itemsIndexed(urls) { index, url ->
                 Card(modifier = Modifier.size(width = 96.dp, height = 144.dp)) {
@@ -267,77 +360,6 @@ private fun DetailThumbnails(title: String, urls: List<String>, sourceId: Source
             }
         }
     }
-}
-
-/**
- * Keep or stop keeping this comic.
- *
- * It reads as one control because it is one question — is this comic on my shelf — and the shelf's
- * answer is what the chip shows, not what this screen last wrote.
- */
-@Composable
-private fun ShelfControl(
-    state: DetailsUiState,
-    onAction: (DetailsAction) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        FilterChip(
-            selected = state.isFavorite,
-            onClick = { onAction(DetailsAction.ToggleFavorite) },
-            label = { Text(if (state.isFavorite) "已在书架" else "加入书架") },
-        )
-        val caption = state.shelfMessage
-            ?: if (state.isFavorite) "点击即可从书架移除。" else null
-        if (caption != null) {
-            Text(
-                text = caption,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-/**
- * The cover slot at its final size, rendered by the image pipeline.
- *
- * A cover is a URL that may need the source's headers, so it goes through `ComicImage` rather than
- * through a plain image composable: the request carries the source id, which is what lets the auth
- * provider attach that source's cookies. When the source gave no cover — or the assembly layer has
- * not provided an image loader — the slot still shows the title instead of an empty box.
- */
-@Composable
-private fun Cover(
-    title: String,
-    coverUrl: String?,
-    sourceId: SourceId,
-) {
-    Surface(
-        modifier = Modifier.size(width = 96.dp, height = 144.dp),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant,
-    ) {
-        CoverPlaceholder(title = title, coverUrl = coverUrl, sourceId = sourceId)
-    }
-}
-
-@Composable
-private fun CoverPlaceholder(
-    title: String,
-    coverUrl: String?,
-    sourceId: SourceId,
-) {
-    if (coverUrl == null) {
-        CoverTitle(title = title)
-        return
-    }
-    ComicImage(
-        request = ComicImageRequest(url = coverUrl, sourceId = sourceId, variant = COVER_VARIANT),
-        contentDescription = title,
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.Crop,
-        placeholder = { CoverTitle(title = title) },
-    )
 }
 
 @Composable
@@ -362,6 +384,14 @@ private fun ChapterControls(
     onAction: (DetailsAction) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = state.chapterQuery,
+            onValueChange = { onAction(DetailsAction.ChapterQueryChanged(it)) },
+            modifier = Modifier.fillMaxWidth().testTag(DETAILS_CHAPTER_SEARCH_TAG),
+            singleLine = true,
+            label = { Text("搜索章节") },
+            placeholder = { Text("输入章节名称") },
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -375,7 +405,6 @@ private fun ChapterControls(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
-            TextButton(onClick = { onAction(DetailsAction.Refresh) }) { Text("刷新") }
         }
 
         if (state.groups.size > 1) {
@@ -399,6 +428,23 @@ private fun ChapterControls(
                 }
             }
         }
+
+        if (state.isChapterSelectionMode) {
+            val allVisibleSelected = state.filteredChapters.isNotEmpty() && state.filteredChapters.all { it.key in state.selectedChapters }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { onAction(DetailsAction.VisibleChaptersSelected(!allVisibleSelected)) }) {
+                    Text(if (allVisibleSelected) "取消全选" else "全选当前结果")
+                }
+                Text("已选 ${state.selectedChapters.size} 话", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.weight(1f))
+                Button(
+                    onClick = { onAction(DetailsAction.DownloadSelectedChapters) },
+                    enabled = state.selectedChapters.isNotEmpty() && !state.isBatchDownloading,
+                ) {
+                    Text(if (state.isBatchDownloading) "正在加入…" else "下载所选")
+                }
+            }
+        }
     }
 }
 
@@ -414,31 +460,41 @@ private fun GroupHeader(name: String) {
 @Composable
 private fun ChapterRow(
     chapter: Chapter,
+    selected: Boolean,
+    selectionMode: Boolean,
     onOpen: () -> Unit,
     onDownload: () -> Unit,
+    onToggleSelection: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp)
+            .clickable(onClick = if (selectionMode) onToggleSelection else onOpen),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = (chapter.index + 1).toString(),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = if (selectionMode) if (selected) "✓" else "○" else (chapter.index + 1).toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Column {
-                TextButton(onClick = onOpen) { Text("阅读") }
-                TextButton(onClick = onDownload) { Text("下载") }
-            }
             Text(
                 text = chapter.title,
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (!selectionMode) {
+                TextButton(onClick = onDownload) { Text("下载") }
+            }
         }
     }
 }
@@ -453,9 +509,20 @@ private fun ChapterOrder.label(): String = when (this) {
     ChapterOrder.Reversed -> "倒序"
 }
 
+private fun String.toChineseMetadataLabel(): String = when (this) {
+    "Uploader" -> "上传者"
+    "Uploaded" -> "上传时间"
+    "Updated" -> "更新时间"
+    "Rating" -> "评分"
+    "Likes" -> "点赞数"
+    "Comments" -> "评论数"
+    else -> this
+}
+
 internal const val DETAILS_LOADING_TAG = "details-loading"
 internal const val DETAILS_CONTENT_TAG = "details-content"
+internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
-private const val COVER_VARIANT = "cover"
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"
+private const val DETAIL_BACKDROP_VARIANT = "detail-backdrop"

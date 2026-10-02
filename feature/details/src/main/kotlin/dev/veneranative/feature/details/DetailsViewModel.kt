@@ -56,8 +56,31 @@ class DetailsViewModel(
 
             is DetailsAction.OrderSelected -> _state.update { it.copy(order = action.order) }
 
+            is DetailsAction.ChapterQueryChanged -> _state.update { it.copy(chapterQuery = action.query) }
+
+            is DetailsAction.DescriptionExpanded -> _state.update { it.copy(descriptionExpanded = action.expanded) }
+
+            is DetailsAction.ChapterSelectionModeChanged -> _state.update {
+                it.copy(isChapterSelectionMode = action.enabled, selectedChapters = if (action.enabled) it.selectedChapters else emptySet())
+            }
+
+            is DetailsAction.ChapterSelectionToggled -> _state.update { current ->
+                val selected = current.selectedChapters
+                current.copy(selectedChapters = if (action.chapter in selected) selected - action.chapter else selected + action.chapter)
+            }
+
+            is DetailsAction.VisibleChaptersSelected -> _state.update { current ->
+                val visibleKeys = current.filteredChapters.map { it.key }.toSet()
+                current.copy(
+                    selectedChapters = if (action.selected) current.selectedChapters + visibleKeys
+                    else current.selectedChapters - visibleKeys,
+                )
+            }
+
+            DetailsAction.DownloadSelectedChapters -> downloadChapters(_state.value.selectedChapters)
+
             DetailsAction.ToggleFavorite -> toggleFavorite()
-            is DetailsAction.DownloadChapter -> downloadChapter(action.chapter)
+            is DetailsAction.DownloadChapter -> downloadChapters(setOf(action.chapter))
         }
     }
 
@@ -97,30 +120,56 @@ class DetailsViewModel(
         }
     }
 
-    private fun downloadChapter(chapter: ChapterKey) {
+    private fun downloadChapters(chapters: Set<ChapterKey>) {
+        if (chapters.isEmpty()) return
         val repository = downloads ?: run {
             _state.update { it.copy(downloadMessage = "下载服务尚未就绪。") }
             return
         }
         viewModelScope.launch {
-            _state.update { it.copy(downloadMessage = null) }
-            try {
-                when (val outcome = catalog.pages(chapter)) {
-                    is SourceOutcome.Success -> {
-                        repository.enqueue(
-                            ChapterRef.Remote(chapter),
-                            _state.value.detail?.chapters?.firstOrNull { it.key == chapter }?.title ?: chapter.remoteId.value,
-                            outcome.value,
-                            _state.value.detail?.comic?.title,
-                        )
-                        _state.update { it.copy(downloadMessage = "章节已加入下载队列。", downloadQueueVersion = it.downloadQueueVersion + 1) }
+            _state.update { it.copy(downloadMessage = null, isBatchDownloading = true) }
+            var queued = 0
+            val failed = linkedSetOf<ChapterKey>()
+            val detail = _state.value.detail ?: run {
+                _state.update { it.copy(isBatchDownloading = false) }
+                return@launch
+            }
+            val ordered = detail.chapters.filter { it.key in chapters }
+            ordered.forEach { item ->
+                try {
+                    when (val outcome = catalog.pages(item.key)) {
+                        is SourceOutcome.Success -> {
+                            repository.enqueue(
+                                ChapterRef.Remote(item.key),
+                                item.title,
+                                outcome.value,
+                                detail.comic.title,
+                            )
+                            queued++
+                        }
+                        is SourceOutcome.Failure -> failed += item.key
                     }
-                    is SourceOutcome.Failure -> _state.update { it.copy(downloadMessage = "无法加载章节页面进行下载。") }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    failed += item.key
                 }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                _state.update { it.copy(downloadMessage = "无法将此章节加入下载队列。") }
+            }
+            val message = when {
+                queued == 0 && failed.isEmpty() -> "没有可加入下载的章节。"
+                failed.isEmpty() && queued == 1 -> "章节已加入下载队列。"
+                failed.isEmpty() -> "已将 $queued 个章节加入下载队列。"
+                queued == 0 -> "所选章节暂时无法下载，请稍后重试。"
+                else -> "已加入 $queued 个章节，${failed.size} 个章节加载失败。"
+            }
+            _state.update {
+                it.copy(
+                    downloadMessage = message,
+                    downloadQueueVersion = it.downloadQueueVersion + queued,
+                    isBatchDownloading = false,
+                    selectedChapters = failed,
+                    isChapterSelectionMode = failed.isNotEmpty(),
+                )
             }
         }
     }

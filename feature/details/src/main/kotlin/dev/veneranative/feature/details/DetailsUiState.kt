@@ -1,6 +1,7 @@
 package dev.veneranative.feature.details
 
 import dev.veneranative.core.model.Chapter
+import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicDetail
 
 /**
@@ -17,6 +18,11 @@ data class DetailsUiState(
     /** The group the list is narrowed to; null shows every group. */
     val selectedGroup: String? = null,
     val order: ChapterOrder = ChapterOrder.SourceOrder,
+    val chapterQuery: String = "",
+    val descriptionExpanded: Boolean = false,
+    val isChapterSelectionMode: Boolean = false,
+    val selectedChapters: Set<ChapterKey> = emptySet(),
+    val isBatchDownloading: Boolean = false,
     /**
      * Whether the comic is on the user's shelf. Read from the shelf rather than remembered from the
      * last tap, so removing it there shows up here.
@@ -62,6 +68,11 @@ data class DetailsUiState(
                 ChapterOrder.Reversed -> narrowed.reversed()
             }
         }
+
+    val filteredChapters: List<Chapter>
+        get() = chapterQuery.trim().takeIf { it.isNotEmpty() }?.let { query ->
+            visibleChapters.filter { it.title.contains(query, ignoreCase = true) }
+        } ?: visibleChapters
 }
 
 enum class DetailsStatus {

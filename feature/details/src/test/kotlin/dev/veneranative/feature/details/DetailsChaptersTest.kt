@@ -83,6 +83,22 @@ class DetailsChaptersTest {
     }
 
     @Test
+    fun `chapter search filters the already selected group and order`() {
+        val state = ready(
+            groupedChaptersOf(
+                comicKey,
+                linkedMapOf(
+                    "EN" to linkedMapOf("en1" to "Chapter 1", "en2" to "Chapter 2"),
+                    "JP" to linkedMapOf("jp1" to "第1話"),
+                ),
+            ),
+            selectedGroup = "EN",
+        ).copy(chapterQuery = "chapter 2")
+
+        assertEquals(listOf("Chapter 2"), state.filteredChapters.map { it.title })
+    }
+
+    @Test
     fun `a comic without chapters is not a failure`() {
         val state = ready(emptyList())
 

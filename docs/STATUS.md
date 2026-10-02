@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-03 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00B2 上游 Venera 源码对照审查 |
-| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 同源调用并发排队与下一话预载 DONE；S3-00N 竖屏末页监听修复 DONE（仪器测试受 UTP 卸载风险阻止）；S3-00P 来源网络并发请求排队与脱敏诊断 DONE；S3-00O 同画布跨话连续阅读及下一话加载失败修复 DONE；S3-00Q1 详情接口短缓存与显式刷新 DONE；S3-00Q2 拷贝漫画限流等待兼容 DONE（设备回归待新 APK 验证）；S3-00B2 上游源码审查仍因 GitHub 访问受阻而 BLOCKED；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务 | S4-10B 来源支持的详情附加内容 |
+| 当前任务状态 | S4-10A 详情首屏与章节操作对齐 DONE（回归和 App Debug 编译通过；真机视觉复核待做）；S4-10B 来源支持的推荐/评分/评论/网页内容 IN_PROGRESS；S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 同源调用并发排队与下一话预载 DONE；S3-00N 竖屏末页监听修复 DONE（仪器测试受 UTP 卸载风险阻止）；S3-00P 来源网络并发请求排队与脱敏诊断 DONE；S3-00O 同画布跨话连续阅读及下一话加载失败修复 DONE；S3-00Q1 详情接口短缓存与显式刷新 DONE；S3-00Q2 拷贝漫画限流等待兼容 DONE（设备回归待新 APK 验证）；S3-00B2 上游源码审查因 GitHub 源码访问失败而 BLOCKED（用户指定详情页工作优先）；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -60,6 +60,8 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00Q1 DONE：详情页与阅读器共用短时漫画详情缓存。** 设备日志记录到拷贝漫画 `comic.loadInfo` 返回脚本执行错误；设备内脚本的 `loadInfo` 会在每次调用时请求作品元数据、收藏状态和每个章节分组。此前 Reader 每预载一话都会重新调用完整详情，显著放大同一漫画的源站请求量。`DefaultComicCatalog` 现按漫画键和来源版本缓存成功详情 5 分钟，并以每漫画互斥锁合并并行请求；失败结果不缓存，Details 的 Retry/Refresh 显式绕过缓存。新增缓存命中、超时后不缓存、强制刷新和过期回归。JDK 17 验证：`:data:comic:testDebugUnitTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。
 
 **S3-00Q2 DONE：适配拷贝漫画限流等待。** 设备已安装的官方 `copy_manga` 1.4.2 脚本在章节接口返回限流状态 210 时使用 `setTimeout` 等待后重试；原 QuickJS 环境没有 `setTimeout`，限流分支因此会变成 `ScriptExecution`。新增明确允许的 `timer.sleep` / `timer.cancel`，限制单次等待最长 120 秒、每次调用最多 8 个活动计时器，并在调用结束/取消时清理；只将 `comic.loadEp` 超时提高到 60 秒，其余来源调用保持 10 秒。ADR-0012 记录安全边界与来源依据。回归覆盖 QuickJS 等待回调、Host 等待时长/取消/上限和章节调用超时；JDK 17 验证：`:source:network:testDebugUnitTest :source:engine:testDebugUnitTest :source:core:testDebugUnitTest :data:comic:testDebugUnitTest :feature:details:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。**当前 APK 尚未在设备上复验。**
+
+**S4-10A DONE：重做详情页首屏与章节操作。** 详情页改为封面渐层主视觉，加入固定“开始阅读”入口、来源/副标题、中文作品信息、简介展开、章节搜索，以及按筛选结果全选并批量入下载队列；章节仍保留来源分组、来源顺序/倒序和逐章阅读/下载。下载按来源顺序逐章排队，失败章节保留选择以便重试；详情源错误文案现在显示领域错误映射。新增章节搜索与批量入队 ViewModel 回归。JDK 17 验证：`:feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或操作真机，视觉呈现仍待设备复核。
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 

@@ -14,6 +14,18 @@ sealed interface DetailsAction {
 
     data class OrderSelected(val order: ChapterOrder) : DetailsAction
 
+    data class ChapterQueryChanged(val query: String) : DetailsAction
+
+    data class DescriptionExpanded(val expanded: Boolean) : DetailsAction
+
+    data class ChapterSelectionModeChanged(val enabled: Boolean) : DetailsAction
+
+    data class ChapterSelectionToggled(val chapter: dev.veneranative.core.model.ChapterKey) : DetailsAction
+
+    data class VisibleChaptersSelected(val selected: Boolean) : DetailsAction
+
+    data object DownloadSelectedChapters : DetailsAction
+
     /**
      * Keep the comic, or stop keeping it.
      *
