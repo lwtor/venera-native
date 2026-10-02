@@ -124,7 +124,7 @@ class QuickJsRuntime(
                 ?: return typedCall.failure(SourceRuntimeError.SourceNotLoaded(typedCall.sourceId))
 
         if (!session.invocationMutex.tryLock()) {
-            return typedCall.failure(SourceRuntimeError.Internal("Source is busy; retry the call."))
+            return typedCall.failure(SourceRuntimeError.Busy())
         }
         return try {
             if (closed.get()) return typedCall.failure(SourceRuntimeError.RuntimeClosed())

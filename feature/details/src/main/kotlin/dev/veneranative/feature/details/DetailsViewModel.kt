@@ -201,6 +201,7 @@ internal fun SourceRuntimeError.toDetailsMessage(): String = when (this) {
     is SourceRuntimeError.SourceNotLoaded -> "此漫画源已无法使用。"
     is SourceRuntimeError.Timeout -> "漫画源响应超时。"
     is SourceRuntimeError.Cancelled -> "加载已取消。"
+    is SourceRuntimeError.Busy -> "漫画源正在处理其他请求，请稍后重试。"
     is SourceRuntimeError.EngineUnavailable -> "此设备暂时无法运行漫画源。"
     is SourceRuntimeError.EngineTerminated ->
         "漫画源运行环境已停止，请重新打开漫画。"

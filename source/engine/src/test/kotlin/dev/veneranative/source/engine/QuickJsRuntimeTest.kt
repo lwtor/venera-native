@@ -543,7 +543,7 @@ class QuickJsRuntimeTest {
             entered.await()
             val second = runtime.invoke(SourceCall.InvokeFunction("second", sourceId, "search.load", "[\"next\"]"))
             val error = (second as SourceResult.Failure).error
-            assertTrue(error is SourceRuntimeError.Internal && error.retryable)
+            assertTrue(error is SourceRuntimeError.Busy && error.retryable)
             runtime.cancel("first")
             first.await()
         }

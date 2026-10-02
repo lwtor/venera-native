@@ -145,6 +145,13 @@ sealed interface SourceRuntimeError {
         override val retryable: Boolean = true
     }
 
+    /** A prior call for this source is still unwinding; callers may retry after a short delay. */
+    data class Busy(
+        override val message: String = "Source is busy; retry the call.",
+    ) : SourceRuntimeError {
+        override val retryable: Boolean = true
+    }
+
     data class RuntimeClosed(
         override val message: String = "Source runtime is closed.",
     ) : SourceRuntimeError {

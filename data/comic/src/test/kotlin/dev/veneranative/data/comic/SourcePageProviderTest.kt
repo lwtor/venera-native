@@ -127,6 +127,32 @@ class SourcePageProviderTest {
         assertEquals(failure, (thrown as? SourceLoadException)?.error)
     }
 
+    @Test
+    fun `chapter load retries briefly when the source is still unwinding a prior call`() = runTest {
+        val references = listOf(SourcePage(index = 0, imageRef = "https://img/0"))
+        var attempts = 0
+        val catalog = object : ComicCatalog by FakeCatalog(pages = references) {
+            override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> {
+                attempts++
+                return if (attempts == 1) {
+                    SourceOutcome.Failure(SourceRuntimeError.Busy())
+                } else {
+                    SourceOutcome.Success(references)
+                }
+            }
+        }
+        val provider = SourcePageProvider(
+            catalog = catalog,
+            sizer = FixedSizer(),
+            waitBeforeBusyRetry = {},
+        )
+
+        val content = provider.loadChapter(chapter)
+
+        assertEquals(2, attempts)
+        assertEquals(references.single().imageRef, content.pages.single().imageRef)
+    }
+
     /** Only the sizes it was given; every other reference is "could not be resolved". */
     private class FixedSizer(
         vararg known: Pair<String, ImageSize>,
