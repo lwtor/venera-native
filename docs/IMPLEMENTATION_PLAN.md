@@ -559,6 +559,7 @@ S3-00 小任务：
 | S3-00K | 阅读器性能补强：纵向与分页均在滚动停稳后预解码邻页，远端页数据预取扩至前后两页，快速滑动取消过时解码 | DONE（`:data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；未做设备耗时对比） |
 | S3-00L | 阅读到章节末尾后自动衔接来源顺序中的下一话；首页续读也可用 | DONE（原实现曾加入 8 秒等待，已由 S3-00M 改为末页立即切换） |
 | S3-00M | 修复漫画源调用并发时详情/章节被标记失败；同源请求排队，阅读期间预载下一话与首张图片，末页无倒计时直接切换 | DONE（QuickJS 会话排队回归、预载缓存复用回归、阅读器立即切章 UI 回归及相关编译通过；未操作用户前台做真机复现） |
+| S3-00N | 修复竖屏末页状态由 Pending 更新为 Ready 后，末页监听仍持有旧状态而不触发下一话；补回归用例 | DONE（`:feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；设备执行被 auto-review 拦截，因为 UTP 可能卸载用户 App/测试 APK） |
 
 ## 8. Stage 4：同步、体验与发布
 

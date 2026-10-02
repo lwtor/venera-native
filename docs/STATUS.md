@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00B2 上游 Venera 源码对照审查 |
-| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 修复同源调用并发导致详情/章节失败、预载下一话并改为末页立即切换 DONE（单测和编译通过，未做用户前台真机复现）；当前唯一下一任务 S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；S4-04A 全 App 简体中文 UI DONE；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 修复同源调用并发导致详情/章节失败、预载下一话并改为末页立即切换 DONE；S3-00N 修复竖屏末页未触发下一话 DONE（Android 测试源码编译通过，真机测试因 UTP 可能卸载 App 被 auto-review 拦截）；当前唯一下一任务 S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；S4-04A 全 App 简体中文 UI DONE；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -50,6 +50,8 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00L DONE：阅读器自动衔接下一话基础能力。** `ChapterContent` 保留来源目录原顺序中的下一章；Reader 从详情或首页续读均可使用。原来的 8 秒等待由 S3-00M 移除。
 
 **S3-00M DONE：修复阅读器源请求并发失败并实现末页即时衔接。** 代码审查确认 QuickJS 每来源只有一个串行会话，但此前 `tryLock()` 在会话忙时立即返回可重试 `Busy`；来源能力探测需连续多次调用，详情页又将 `Busy` 当最终失败，只有章节页提供器有局部重试，因而短暂并发/Reader 退出取消与详情加载重叠会让页面落入失败态。这是代码已证实的间歇失败路径；当前真机进程日志未记录源调用错误分类，不能断言此前每次失败都由此引起，源站网络错误仍可能发生。QuickJS 现在对同源调用使用可取消的互斥排队，避免把正常并发当永久失败；下一话元数据和首张图片在当前章节阅读期间后台预载并缓存，章节末页到达后立即导航，不再等待倒计时。JVM 回归覆盖排队调用在前一调用取消后正常完成、预载章与首图缓存复用；Compose 回归覆盖末页即时触发导航。JDK 17 验证：`:source:engine:testDebugUnitTest :data:comic:testDebugUnitTest :data:download:compileDebugUnitTestKotlin :data:local:compileDebugUnitTestKotlin :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL（81 项 JVM 测试，0 失败；Android 测试源码编译通过）。设备近期日志读取未发现 QuickJS 崩溃；本次未操作用户手机前台复现。**历史失败是否还含源站网络/API 故障，需后续看实际失败时的类型化错误；不能把代码修复说成所有源站故障均已排除。**
+
+**S3-00N DONE：修复竖屏末页无法自动进入下一话。** 根因是竖向末页监听的 `LaunchedEffect` 只用列表与 item 数量作 key，却在 effect 启动时捕获最后一页 `Pending` 状态；随后图片解析将页面变为 `Ready` 时 effect 没有重建，因此即使滚到列表末尾也永远不满足触发条件。现在将最后一页就绪状态纳入监听 key，横向单页末尾监听也同步绑定 page-ready 状态。新增 Compose 回归：先在竖屏末页保持 Pending，再更新为 Ready，断言不切换方向会触发下一话。JDK 17 验证：`:feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。尝试在 Xiaomi 25128PNA1C 运行该仪器测试时，auto-review 因 Android UTP 可能卸载用户 App 和测试 APK 而拒绝；遵守保留安装规则，真机用例未运行，不记为设备通过。
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 

@@ -174,6 +174,44 @@ class ReaderScreenTest {
     }
 
     @Test
+    fun verticalEndDetectionUpdatesWhenLastPageFinishesLoading() {
+        val nextChapter = Chapter(
+            ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("chapter-2")),
+            title = "Chapter 2",
+            index = 1,
+        )
+        val state = mutableStateOf(
+            ReaderUiState(
+                chapterTitle = "Chapter 1",
+                pages = listOf(
+                    ComicPage(0, "test://last", 1080, 12_000, sizeState = PageSizeState.Pending),
+                ),
+                nextChapter = nextChapter,
+                status = ReaderStatus.Ready,
+            ),
+        )
+        var openedNext = false
+        composeRule.setContent {
+            ReaderScreen(
+                state = state.value,
+                onAction = { if (it == ReaderAction.OpenNextChapter) openedNext = true },
+                onBack = {},
+            )
+        }
+
+        val reader = composeRule.onNode(hasScrollAction())
+        repeat(20) { reader.performTouchInput { swipeUp() } }
+        composeRule.waitForIdle()
+        assertTrue("a pending page cannot end the chapter", !openedNext)
+
+        state.value = state.value.copy(
+            pages = state.value.pages.map { it.copy(sizeState = PageSizeState.Ready) },
+        )
+
+        composeRule.waitUntil(timeoutMillis = 5_000) { openedNext }
+    }
+
+    @Test
     fun showsLoaderWhileLoading() {
         composeRule.setContent {
             ReaderScreen(

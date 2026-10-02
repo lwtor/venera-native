@@ -245,12 +245,13 @@ private fun ContinuousPages(
             page?.let { onAction(ReaderAction.PageShown(it)) }
         }
     }
-    LaunchedEffect(listState, items.size) {
+    val lastPageReady = state.pages.lastOrNull()?.sizeState == PageSizeState.Ready
+    LaunchedEffect(listState, items.size, lastPageReady) {
         snapshotFlow {
             val visibleLast = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
             items.isNotEmpty() && listState.layoutInfo.totalItemsCount > 0 &&
                 visibleLast == items.lastIndex && !listState.canScrollForward && !zoomState.isZoomed &&
-                state.pages.lastOrNull()?.sizeState == PageSizeState.Ready
+                lastPageReady
         }.distinctUntilChanged().collect(onChapterEndChange)
     }
     val contentWidthPx = items.maxOfOrNull { it.tile.displayWidthPx }?.toFloat() ?: viewport.widthPx.toFloat()
@@ -399,13 +400,14 @@ private fun PagedPage(
             ?: listOf(placeholderTile(page, viewport, continuous = true))
     }
     val listState = rememberLazyListState()
-    LaunchedEffect(listState, tiles.size, isLastChapterPage) {
+    val pageReady = page.sizeState == PageSizeState.Ready
+    LaunchedEffect(listState, tiles.size, isLastChapterPage, pageReady) {
         if (!isLastChapterPage) return@LaunchedEffect
         snapshotFlow {
             val visibleLast = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index
             tiles.isNotEmpty() && listState.layoutInfo.totalItemsCount > 0 &&
                 visibleLast == tiles.lastIndex && !listState.canScrollForward && !zoomState.isZoomed &&
-                page.sizeState == PageSizeState.Ready
+                pageReady
         }.distinctUntilChanged().collect(onChapterEndChange)
     }
     val contentWidthPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.widthPx * zoomState.scale
