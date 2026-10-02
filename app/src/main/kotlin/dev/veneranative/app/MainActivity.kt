@@ -132,15 +132,20 @@ private fun App(
     var detailsOrigin by rememberSaveable(stateSaver = AppRouteSaver) {
         mutableStateOf<AppRoute>(AppRoute.Home)
     }
+    var readerOrigin by rememberSaveable(stateSaver = AppRouteSaver) {
+        mutableStateOf<AppRoute>(AppRoute.Home)
+    }
 
     CompositionLocalProvider(LocalComicImageLoader provides imageLoader) {
         AppNavHost(
             route = route,
             onRouteChange = { next ->
                 detailsOrigin = detailsOriginAfterNavigation(route, next, detailsOrigin)
+                if (next is AppRoute.Reader) readerOrigin = route
                 route = next
             },
             detailsOrigin = detailsOrigin,
+            readerOrigin = readerOrigin,
             catalog = catalog,
             sourceRepository = sourceRepository,
             sourceCatalogRepository = sourceCatalogRepository,
@@ -162,6 +167,7 @@ private fun AppNavHost(
     route: AppRoute,
     onRouteChange: (AppRoute) -> Unit,
     detailsOrigin: AppRoute,
+    readerOrigin: AppRoute,
     catalog: DefaultComicCatalog,
     sourceRepository: DefaultSourceRepository,
     sourceCatalogRepository: dev.veneranative.data.source.SourceCatalogRepository,
@@ -175,7 +181,7 @@ private fun AppNavHost(
     downloadRepository: DownloadRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
-    val backRoute = backDestination(route, detailsOrigin)
+    val backRoute = backDestination(route, detailsOrigin, readerOrigin)
     val onBack: () -> Unit = { onRouteChange(backRoute ?: AppRoute.Home) }
     BackHandler(enabled = backRoute != null, onBack = onBack)
 

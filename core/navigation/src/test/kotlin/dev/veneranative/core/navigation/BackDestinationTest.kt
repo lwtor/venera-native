@@ -40,4 +40,13 @@ class BackDestinationTest {
             origin,
         ))
     }
+
+    @Test fun readerReturnsToTheRouteThatOpenedIt() {
+        val reader = AppRoute.Reader(ChapterRef.Remote(ChapterKey(comic, RemoteChapterId("chapter"))))
+        val details = AppRoute.ComicDetails(comic)
+
+        assertEquals(AppRoute.Home, backDestination(reader, origin, AppRoute.Home))
+        assertEquals(details, backDestination(reader, origin, details))
+        assertEquals(AppRoute.Library, backDestination(reader, origin, AppRoute.Library))
+    }
 }

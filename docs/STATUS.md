@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00B2 上游页面、导航与状态源码对照 |
-| 当前任务状态 | S3-00F 阅读器图片比例修复 DONE（Xiaomi 实机像素断言 1/1 通过）；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务 | S3-00H 阅读器图片白屏/尺寸修复 |
+| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H IN_PROGRESS；S3-00I TODO；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -36,6 +36,10 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00E DONE：详情模型与页面内容完善。** `ComicDetail` 保留有序标签分组和展示用标量元数据；协议解析器将来源 JS `Map` 标签映射成分组，保留简介、章节、缩略图并筛选作者、上传/更新时间、评分、点赞/评论数；QuickJS 结果序列化现在递归保留嵌套 `Map` 顺序，修复 CopyManga 章节被 JSON 序列化成空对象的问题。Compose 详情页展示元数据卡、分组标签、预览图、带标题的简介及章节数/分组标题。新增解析与引擎回归测试，以及使用真实来源搜索/详情并渲染生产详情组件的 Android 测试。验证：JDK 17 `:source:engine:testDebugUnitTest :source:api:testDebugUnitTest :feature:details:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机两次尝试均在 Compose 首页入口选择处失败，未到详情渲染断言；已修正测试使其不依赖活动已保存路由，编译通过但本次没有再运行前台测试，因此**真实详情 UI 的设备验收仍待执行，不计为通过**。本机 `gradle.properties` 变更属于用户既有修改，未纳入本任务。
 
 **S3-00F DONE：修复阅读器页面图片拉伸。** 解码后 bitmap 不再用 `ContentScale.FillBounds` 强制拉满显示 tile，改为 `ContentScale.Fit` 以保持长宽比。新增像素级 Compose 回归：在小米 Xiaomi 25128PNA1C / API 36 上用窄长红色页面验证 tile 内留白区仍为蓝色、页面像素居中；`ReaderScreenTest#decodedPageImageKeepsItsAspectRatioInsideTheTileBounds` — `OK (1 test)`。验证构建：JDK 17 `:feature:reader:compileDebugAndroidTestKotlin :feature:reader:assembleDebugAndroidTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。MIUI 阻止测试 Activity 自动到前台，本次通过 ADB 显式启动测试 Activity 后运行通过；没有卸载主 App 或清理用户数据。
+
+**S3-00G DONE：修复首页续读的阅读器返回目标。** 之前 Reader 的返回目标总是按章节类型回到详情/书架，首页“接着阅读”直接打开 Reader 时因此多退一层。根导航现在保存打开 Reader 前的路由，并将其用于工具栏与系统返回；新增 Home、Details、Library 三种 Reader 来源的 JVM 回归。JDK 17 验证：`:core:navigation:testDebugUnitTest :app:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机导航未在本次执行。
+
+**S3-00H IN_PROGRESS：复查阅读器图片白屏与尺寸。** 继续追踪用户在真实来源阅读时出现的纵向白屏和横向页面过小；目标是覆盖图片解码、tile 尺寸计算及两种阅读方向，而非仅验证 bitmap 在 tile 内的宽高比。
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 
