@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-02 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00H 阅读器图片白屏/尺寸修复 |
-| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H IN_PROGRESS；S3-00I TODO；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务状态 | S3-00G 阅读器续读返回目标修复 DONE（导航 JVM 回归及 App 编译通过，设备路径未测）；S3-00H IN_PROGRESS（横向长页缩小已修复，纵向白屏原因尚待设备复现）；S3-00I TODO；S4-04A 全 App 简体中文 UI DONE（用户指定的提前任务）；S3-00B2 因执行环境无法访问 GitHub 源码而 BLOCKED，解除条件为恢复访问；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -39,7 +39,7 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 
 **S3-00G DONE：修复首页续读的阅读器返回目标。** 之前 Reader 的返回目标总是按章节类型回到详情/书架，首页“接着阅读”直接打开 Reader 时因此多退一层。根导航现在保存打开 Reader 前的路由，并将其用于工具栏与系统返回；新增 Home、Details、Library 三种 Reader 来源的 JVM 回归。JDK 17 验证：`:core:navigation:testDebugUnitTest :app:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机导航未在本次执行。
 
-**S3-00H IN_PROGRESS：复查阅读器图片白屏与尺寸。** 继续追踪用户在真实来源阅读时出现的纵向白屏和横向页面过小；目标是覆盖图片解码、tile 尺寸计算及两种阅读方向，而非仅验证 bitmap 在 tile 内的宽高比。
+**S3-00H IN_PROGRESS：修复横向分页长图过小并继续查纵向白屏。** 原分页模式用 `containScale` 把整张长页塞进视口高度，超长漫画会缩成窄条；现在每页通过受限分块解码按屏幕宽度显示，并在该页内部纵向滚动，水平方向仍由 Pager 翻页。扩展 `ReaderScreenTest#longChapterCanAdvanceReturnAndScrollTallPages`，覆盖分页页内纵向滚动与左右翻页；仪器测试源码已编译，未在本次前台真机运行。横向缩小修复的验证：JDK 17 `:feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — PASS；`git diff --check` — PASS。用户报告的默认纵向模式白屏尚未复现并定位，不能据此宣告图片问题全部解决。
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 

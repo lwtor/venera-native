@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -46,7 +46,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.image.decode.PageImageDecoder
@@ -288,36 +287,31 @@ private fun SinglePagePager(
         modifier = Modifier.fillMaxSize(),
         reverseLayout = state.direction == ReadingDirection.RightToLeft,
     ) { index ->
-        if (decoder == null) {
-            PageTile(
-                item = TileItem(state.pages[index], 0, placeholderTile(state.pages[index], viewport, false)),
-                decoder = null,
-            )
-        } else {
-            ZoomablePage(page = state.pages[index], viewport = viewport, decoder = decoder,
-                onRetry = { onAction(ReaderAction.RetryPage(index)) })
-        }
+        PagedPage(
+            page = state.pages[index],
+            viewport = viewport,
+            decoder = decoder,
+            onRetry = { onAction(ReaderAction.RetryPage(index)) },
+        )
     }
 }
 
-/**
- * Paged page with pan and zoom: the decoder is asked for the window around the current pan offset,
- * so zooming in decodes fewer source pixels at a higher scale instead of up-scaling one bitmap.
- */
+/** A horizontally paged comic page stays fitted to the screen width and scrolls vertically. */
 @Composable
-private fun ZoomablePage(
+private fun PagedPage(
     page: ComicPage,
     viewport: PageViewport,
-    decoder: PageImageDecoder,
-    onRetry: () -> Unit,
+    decoder: PageImageDecoder?,
+    onRetry: () -> Unit = {},
 ) {
     val zoomState = rememberReaderZoomState()
-    val scale = PageTiling.containScale(page.widthPx, page.heightPx, viewport) * zoomState.scale
-    val contentWidthPx = page.widthPx * scale
-    val contentHeightPx = page.heightPx * scale
-    val tile = remember(page, viewport, zoomState.scale, zoomState.offsetX, zoomState.offsetY, decoder) {
-        decoder.planWindow(page, viewport, zoomState.scale, zoomState.offsetX, zoomState.offsetY)
+    val tiles = remember(page, viewport, decoder, zoomState.scale) {
+        decoder?.plan(page, viewport, zoom = zoomState.scale, continuous = true)
+            ?: listOf(placeholderTile(page, viewport, continuous = true))
     }
+    val listState = rememberLazyListState()
+    val contentWidthPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.widthPx * zoomState.scale
+    val contentHeightPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.heightPx * zoomState.scale
     val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
         zoomState.applyGesture(
             pan = pan,
@@ -327,28 +321,35 @@ private fun ZoomablePage(
             contentHeightPx = contentHeightPx,
         )
     }
-    Box(
+    LaunchedEffect(zoomState.isZoomed) {
+        if (zoomState.isZoomed) listState.scrollToItem(0)
+    }
+    LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
+            .graphicsLayer {
+                translationX = zoomState.offsetX
+                translationY = zoomState.offsetY
+            }
             .transformable(
                 state = transformState,
                 canPan = { zoomState.isZoomed },
                 lockRotationOnZoomPan = true,
             ),
+        userScrollEnabled = !zoomState.isZoomed,
+        contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        val baseXPx = (viewport.widthPx - contentWidthPx) / 2f + zoomState.offsetX
-        val baseYPx = (viewport.heightPx - contentHeightPx) / 2f + zoomState.offsetY
-        PageTile(
-            item = TileItem(page, 0, tile),
-            decoder = decoder,
-            onRetry = onRetry,
-            modifier = Modifier.offset {
-                IntOffset(
-                    x = (baseXPx + tile.contentOffsetXPx).roundToInt(),
-                    y = (baseYPx + tile.contentOffsetYPx).roundToInt(),
+        items(tiles.size, key = { "${page.index}:$it" }) { tileIndex ->
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                PageTile(
+                    item = TileItem(page, tileIndex, tiles[tileIndex]),
+                    decoder = decoder,
+                    onRetry = onRetry,
+                    modifier = Modifier.padding(vertical = 4.dp),
                 )
-            },
-        )
+            }
+        }
     }
 }
 
@@ -369,7 +370,7 @@ private fun PageTile(
     val density = LocalDensity.current
     val tile = item.tile
     val boxModifier = with(density) {
-        modifier.size(width = tile.displayWidthPx.toDp(), height = tile.displayHeightPx.toDp())
+        modifier.requiredSize(width = tile.displayWidthPx.toDp(), height = tile.displayHeightPx.toDp())
     }
 
     if (decoder == null) {

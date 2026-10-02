@@ -175,6 +175,11 @@ class ReaderScreenTest {
         }
 
         composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
+        val pagedVerticalList = composeRule.onNode(hasScrollAction())
+        pagedVerticalList.assertIsDisplayed()
+        pagedVerticalList.performTouchInput { swipeUp() }
+        composeRule.waitForIdle()
+        assertEquals("a tall page scrolls before the user flips pages", 0, state.value.currentPageIndex)
         composeRule.onRoot().performTouchInput { swipeLeft() }
         composeRule.waitForIdle()
         assertEquals(1, state.value.currentPageIndex)
