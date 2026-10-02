@@ -2,6 +2,7 @@ package dev.veneranative.feature.reader.image
 
 import android.app.ActivityManager
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Build
 import android.os.Process
@@ -21,6 +22,7 @@ import dev.veneranative.core.model.ComicPage
 import java.io.File
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
+import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -43,6 +45,37 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class LargeImageProbeTest {
+
+    @Test
+    fun generatedPngDecodesToExpectedPixelsWithTheContinuousPlan() = runBlocking {
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val fixture = File.createTempFile("reader-region-", ".png", context.cacheDir)
+        val decoder = RegionPageImageDecoder()
+        try {
+            Bitmap.createBitmap(40, 80, Bitmap.Config.ARGB_8888).apply {
+                eraseColor(android.graphics.Color.RED)
+                fixture.outputStream().use { compress(Bitmap.CompressFormat.PNG, 100, it) }
+                recycle()
+            }
+            val page = ComicPage(index = 0, imageRef = fixture.absolutePath, widthPx = 40, heightPx = 80)
+            val viewport = PageViewport(widthPx = 600, heightPx = 1_000)
+            val tile = decoder.plan(page, viewport, zoom = 1f, continuous = true).single()
+            val image = decoder.decode(
+                PageDecodeRequest(
+                    path = fixture.absolutePath,
+                    targetWidthPx = tile.displayWidthPx,
+                    targetHeightPx = tile.displayHeightPx,
+                    region = tile.region,
+                    fitWidthOnly = tile.fitWidthOnly,
+                ),
+            )
+
+            assertEquals(android.graphics.Color.RED, image.bitmap.getPixel(image.bitmap.width / 2, image.bitmap.height / 2))
+        } finally {
+            decoder.close()
+            fixture.delete()
+        }
+    }
 
     @Test
     fun measuresDecodeCostPerStrategyAndMode() {
