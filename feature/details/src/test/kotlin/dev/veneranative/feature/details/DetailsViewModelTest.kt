@@ -42,6 +42,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -94,6 +95,26 @@ class DetailsViewModelTest {
 
         assertEquals(RemoteChapterId("2"), viewModel.state.value.lastReadChapterId)
         assertEquals("Chapter 2", viewModel.state.value.detail!!.chapters.first { it.key.remoteId == viewModel.state.value.lastReadChapterId }.title)
+    }
+
+    @Test fun `only chapters with a completed page position are marked read`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val history = FakeHistoryRepository(
+            progressEntry = ReadingProgress(comicKey, RemoteChapterId("2"), pageIndex = 4, updatedAtEpochMillis = 1L),
+            chapterEntries = flowOf(
+                listOf(
+                    historyEntry("1", pageIndex = 9, pageCount = 10),
+                    historyEntry("2", pageIndex = 4, pageCount = 10),
+                ),
+            ),
+        )
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, history = history)
+        advanceUntilIdle()
+
+        assertEquals(setOf(RemoteChapterId("1")), viewModel.state.value.readChapterIds)
+        assertEquals(RemoteChapterId("2"), viewModel.state.value.lastReadChapterId)
     }
 
     @Test fun `selected chapters are queued in source order`() = runTest(dispatcher) {
@@ -355,6 +376,17 @@ class DetailsViewModelTest {
         },
     )
 
+    private fun historyEntry(chapterId: String, pageIndex: Int, pageCount: Int) = ReadingHistoryEntry(
+        comicKey = comicKey,
+        comicTitle = "Frieren",
+        chapterId = RemoteChapterId(chapterId),
+        chapterTitle = "Chapter $chapterId",
+        coverUrl = null,
+        pageIndex = pageIndex,
+        pageCount = pageCount,
+        updatedAtEpochMillis = 1L,
+    )
+
     private fun installed(id: String, name: String = id) = InstalledSource(
         sourceId = SourceId(id),
         name = name,
@@ -418,8 +450,12 @@ class DetailsViewModelTest {
         override suspend fun markFailed(chapter: ChapterRef, index: Int, error: DownloadError) = false
     }
 
-    private class FakeHistoryRepository(private val progressEntry: ReadingProgress?) : HistoryRepository {
+    private class FakeHistoryRepository(
+        private val progressEntry: ReadingProgress?,
+        private val chapterEntries: Flow<List<ReadingHistoryEntry>> = emptyFlow(),
+    ) : HistoryRepository {
         override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>> = emptyFlow()
+        override fun observeComicHistory(comicKey: ComicKey): Flow<List<ReadingHistoryEntry>> = chapterEntries
         override suspend fun record(entry: ReadingHistoryEntry) = Unit
         override suspend fun progress(comicKey: ComicKey): ReadingProgress? =
             progressEntry?.takeIf { it.comicKey == comicKey }

@@ -125,6 +125,7 @@ class HomeViewModelTest {
         private val recent: Flow<List<ReadingHistoryEntry>>,
     ) : HistoryRepository {
         override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>> = recent
+        override fun observeComicHistory(comicKey: ComicKey): Flow<List<ReadingHistoryEntry>> = emptyFlow()
         override suspend fun record(entry: ReadingHistoryEntry) = Unit
         override suspend fun progress(comicKey: ComicKey): ReadingProgress? = null
         override suspend fun remove(comicKey: ComicKey) = Unit

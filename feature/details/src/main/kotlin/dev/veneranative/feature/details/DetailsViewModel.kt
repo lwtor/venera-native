@@ -48,6 +48,7 @@ class DetailsViewModel(
     init {
         load()
         observeShelf()
+        observeReadChapters()
     }
 
     fun onAction(action: DetailsAction) {
@@ -112,6 +113,24 @@ class DetailsViewModel(
             runCatching {
                 repository.observeItem(comicRef).collect { item ->
                     _state.update { it.copy(isFavorite = item != null) }
+                }
+            }.onFailure { failure -> failUnlessCancelled(failure) }
+        }
+    }
+
+    private fun observeReadChapters() {
+        val repository = history ?: return
+        viewModelScope.launch {
+            runCatching {
+                repository.observeComicHistory(comicKey).collect { entries ->
+                    _state.update { current ->
+                        current.copy(
+                            readChapterIds = entries.asSequence()
+                                .filter { it.pageCount > 0 && it.pageIndex >= it.pageCount - 1 }
+                                .map { it.chapterId }
+                                .toSet(),
+                        )
+                    }
                 }
             }.onFailure { failure -> failUnlessCancelled(failure) }
         }

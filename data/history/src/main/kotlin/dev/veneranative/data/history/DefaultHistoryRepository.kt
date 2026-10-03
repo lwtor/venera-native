@@ -39,6 +39,10 @@ class DefaultHistoryRepository internal constructor(
     override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>> =
         historyDao.observeRecent(limit).map { rows -> rows.mapNotNull { it.toDomainOrNull() } }
 
+    override fun observeComicHistory(comicKey: ComicKey): Flow<List<ReadingHistoryEntry>> =
+        historyDao.observeComic(comicKey.sourceId.value, comicKey.remoteId.value)
+            .map { rows -> rows.mapNotNull { it.toDomainOrNull() } }
+
     override suspend fun record(entry: ReadingHistoryEntry) {
         transaction {
             historyDao.upsert(entry.toEntity())

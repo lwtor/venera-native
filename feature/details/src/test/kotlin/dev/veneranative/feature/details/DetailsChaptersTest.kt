@@ -109,6 +109,22 @@ class DetailsChaptersTest {
         assertFalse("a failed load is not a partial result", failed.hasNoChapters)
     }
 
+    @Test
+    fun `hero tag groups put variable length tags before fixed update row`() {
+        val groups = linkedMapOf(
+            "作者" to listOf("作者甲"),
+            "更新" to listOf("2026-10-03"),
+            "标签" to listOf("冒险", "奇幻", "长篇"),
+            "状态" to listOf("连载中"),
+        )
+
+        val ordered = orderHeroTagGroups(groups)
+
+        assertEquals(listOf("作者", "标签", "更新", "状态"), ordered.keys.toList())
+        assertEquals(groups.getValue("标签"), ordered.getValue("标签"))
+        assertEquals(groups.getValue("更新"), ordered.getValue("更新"))
+    }
+
     private fun ready(
         chapters: List<Chapter>,
         selectedGroup: String? = null,

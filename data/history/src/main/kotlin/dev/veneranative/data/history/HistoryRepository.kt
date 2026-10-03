@@ -35,6 +35,9 @@ interface HistoryRepository {
     /** Newest positions first. */
     fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>>
 
+    /** Every persisted chapter position for one comic, used for chapter read-state presentation. */
+    fun observeComicHistory(comicKey: ComicKey): Flow<List<ReadingHistoryEntry>>
+
     suspend fun record(entry: ReadingHistoryEntry)
 
     suspend fun progress(comicKey: ComicKey): ReadingProgress?

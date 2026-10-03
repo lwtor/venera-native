@@ -18,6 +18,8 @@ data class DetailsUiState(
     val sourceName: String? = null,
     /** Last chapter recorded by the reader, if this comic has reading history. */
     val lastReadChapterId: RemoteChapterId? = null,
+    /** Chapters whose persisted position reached the final page. */
+    val readChapterIds: Set<RemoteChapterId> = emptySet(),
     /** The group the list is narrowed to; null shows every group. */
     val selectedGroup: String? = null,
     val order: ChapterOrder = ChapterOrder.SourceOrder,

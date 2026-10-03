@@ -13,6 +13,9 @@ interface ReadingHistoryDao {
     fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntity>>
 
     @Query("SELECT * FROM reading_history WHERE source_id = :sourceId AND comic_id = :comicId")
+    fun observeComic(sourceId: String, comicId: String): Flow<List<ReadingHistoryEntity>>
+
+    @Query("SELECT * FROM reading_history WHERE source_id = :sourceId AND comic_id = :comicId")
     suspend fun find(sourceId: String, comicId: String): ReadingHistoryEntity?
 
     @Upsert suspend fun upsert(entry: ReadingHistoryEntity)

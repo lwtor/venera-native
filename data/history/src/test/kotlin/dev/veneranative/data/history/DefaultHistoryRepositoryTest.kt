@@ -98,6 +98,18 @@ class DefaultHistoryRepositoryTest {
         assertEquals(2, historyDao.rows.value.size)
     }
 
+    @Test fun `comic history observes every chapter and excludes other comics`() = runTest {
+        repository.record(entry(chapterId = "chapter-1"))
+        repository.record(entry(chapterId = "chapter-2"))
+        val otherKey = ComicKey(SourceId("source-a"), RemoteComicId("comic-2"))
+        repository.record(entry(chapterId = "chapter-other").copy(comicKey = otherKey))
+
+        assertEquals(
+            setOf("chapter-1", "chapter-2"),
+            repository.observeComicHistory(key).first().map { it.chapterId.value }.toSet(),
+        )
+    }
+
     @Test fun `the same comic id under another source is another history row`() = runTest {
         repository.record(entry())
         val otherKey = ComicKey(SourceId("source-b"), RemoteComicId("comic-1"))

@@ -41,7 +41,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -94,7 +93,15 @@ fun DetailsScreen(
     onOpenComic: (ComicKey) -> Unit = {},
 ) {
     val listState = rememberLazyListState()
-    val heroHeight = 440.dp
+    val tagGroups = state.detail?.let { detail ->
+        orderHeroTagGroups(detail.tagGroups.ifEmpty {
+            detail.comic.tags.takeIf { it.isNotEmpty() }?.let { mapOf("Tags" to it) }.orEmpty()
+        })
+    }.orEmpty()
+    val metadataRowCount = ((state.detail?.metadata?.size ?: 0) + 1) / 2
+    val tagRowCount = tagGroups.values.sumOf { (it.size + 1) / 2 }
+    val estimatedHeroHeight = 200 + metadataRowCount * 52 + tagRowCount * 34 + tagGroups.size * 8
+    val heroHeight = maxOf(480, estimatedHeroHeight).dp
     val density = androidx.compose.ui.platform.LocalDensity.current
     val collapseDistancePx = with(density) { (heroHeight - 96.dp).toPx() }
     val scrollPx by remember(listState, collapseDistancePx) {
@@ -140,6 +147,7 @@ fun DetailsScreen(
                         state = state,
                         listState = listState,
                         heroHeight = heroHeight,
+                        tagGroups = tagGroups,
                         collapseFraction = collapseFraction,
                         onAction = onAction,
                         onOpenChapter = onOpenChapter,
@@ -180,6 +188,9 @@ fun DetailsScreen(
                 title = title,
                 collapseFraction = collapseFraction,
                 onBack = onBack,
+                isFavorite = state.isFavorite,
+                showFavorite = state.hasShelf,
+                onToggleFavorite = { onAction(DetailsAction.ToggleFavorite) },
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -191,6 +202,7 @@ private fun Content(
     state: DetailsUiState,
     listState: androidx.compose.foundation.lazy.LazyListState,
     heroHeight: androidx.compose.ui.unit.Dp,
+    tagGroups: Map<String, List<String>>,
     collapseFraction: Float,
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (ChapterKey) -> Unit,
@@ -202,7 +214,15 @@ private fun Content(
         contentPadding = PaddingValues(bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        item { Header(state = state, onAction = onAction, heroHeight = heroHeight, collapseFraction = collapseFraction) }
+        item {
+            Header(
+                state = state,
+                onAction = onAction,
+                heroHeight = heroHeight,
+                tagGroups = tagGroups,
+                collapseFraction = collapseFraction,
+            )
+        }
         if (state.status == DetailsStatus.Failed) {
             item {
                 Text(
@@ -224,40 +244,42 @@ private fun Content(
             }
         }
 
-        state.detail?.metadata?.takeIf { it.isNotEmpty() }?.let { metadata ->
-            item { Section { DetailFacts(metadata) } }
-        }
-
         state.detail?.let { detail ->
-            val groups = detail.tagGroups.ifEmpty {
-                detail.comic.tags.takeIf { it.isNotEmpty() }?.let { mapOf("Tags" to it) }.orEmpty()
+            item {
+                Section {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(detail.comic.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            detail.comic.subtitle?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            state.sourceName?.let {
+                                Text("来源 · $it", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        detail.description?.takeIf { it.isNotBlank() }?.let { description ->
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("简介", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = description,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = if (state.descriptionExpanded) Int.MAX_VALUE else 4,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                TextButton(onClick = { onAction(DetailsAction.DescriptionExpanded(!state.descriptionExpanded)) }) {
+                                    Text(if (state.descriptionExpanded) "收起简介" else "展开简介")
+                                }
+                            }
+                        }
+                    }
+                }
             }
-            if (groups.isNotEmpty()) item { Section { DetailTagGroups(groups) } }
             if (detail.thumbnails.isNotEmpty()) {
                 item { Section { DetailThumbnails(title = detail.comic.title, urls = detail.thumbnails, sourceId = detail.comic.key.sourceId) } }
             }
             detail.sourceUrl?.takeIf { it.isHttpUrl() }?.let { url -> item { SourcePageButton(url = url) } }
             if (detail.recommendations.isNotEmpty()) {
                 item { Section { DetailRecommendations(detail.recommendations, onOpenComic) } }
-            }
-        }
-
-        state.detail?.description?.takeIf { it.isNotBlank() }?.let { description ->
-            item {
-                Section {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("简介", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            text = description,
-                            style = MaterialTheme.typography.bodyMedium,
-                            maxLines = if (state.descriptionExpanded) Int.MAX_VALUE else 4,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        TextButton(onClick = { onAction(DetailsAction.DescriptionExpanded(!state.descriptionExpanded)) }) {
-                            Text(if (state.descriptionExpanded) "收起简介" else "展开简介")
-                        }
-                    }
-                }
             }
         }
 
@@ -302,6 +324,8 @@ private fun Content(
                             ChapterRow(
                                 chapter = chapter,
                                 selected = chapter.key in state.selectedChapters,
+                                current = chapter.key.remoteId == state.lastReadChapterId,
+                                read = chapter.key.remoteId in state.readChapterIds,
                                 selectionMode = state.isChapterSelectionMode,
                                 modifier = Modifier.weight(1f),
                                 onOpen = { onOpenChapter(chapter.key) },
@@ -334,6 +358,7 @@ private fun Header(
     state: DetailsUiState,
     onAction: (DetailsAction) -> Unit,
     heroHeight: androidx.compose.ui.unit.Dp,
+    tagGroups: Map<String, List<String>>,
     collapseFraction: Float,
 ) {
     val comic = state.detail?.comic ?: return
@@ -364,20 +389,36 @@ private fun Header(
                 .alpha(1f - collapseFraction),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(text = comic.title, style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
-            comic.subtitle?.takeIf { it.isNotBlank() }?.let { subtitle ->
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.88f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val hasTagGroups = tagGroups.any { (_, values) -> values.isNotEmpty() }
+            if (state.detail.metadata.isNotEmpty()) {
+                HeroFacts(
+                    metadata = state.detail.metadata,
+                    trailingFavorite = if (!hasTagGroups && state.hasShelf) {
+                        { FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }
+                    } else null,
+                )
             }
-            state.sourceName?.let { Text("来源 · $it", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.82f)) }
-            if (state.hasShelf) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(
-                        onClick = { onAction(DetailsAction.ToggleFavorite) },
-                        shape = RoundedCornerShape(50),
-                    ) { Text(if (state.isFavorite) "✓ 已收藏" else "＋ 收藏", color = Color.White) }
+            if (hasTagGroups) {
+                HeroTagGroups(
+                    groups = tagGroups,
+                    trailingFavorite = if (state.hasShelf) {
+                        { FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }
+                    } else null,
+                )
+            }
+            if (state.detail.metadata.isEmpty() && !hasTagGroups && state.hasShelf) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) }
                 }
             }
-            state.shelfMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White) }
+        }
+        state.shelfMessage?.let { message ->
+            Text(
+                text = message,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 30.dp).alpha(1f - collapseFraction),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White,
+            )
         }
     }
 }
@@ -387,6 +428,9 @@ private fun DetailsToolbar(
     title: String,
     collapseFraction: Float,
     onBack: () -> Unit,
+    isFavorite: Boolean,
+    showFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val background = androidx.compose.ui.graphics.lerp(Color.Transparent, MaterialTheme.colorScheme.surface, collapseFraction)
@@ -414,13 +458,55 @@ private fun DetailsToolbar(
             }
             Text(
                 text = title,
-                modifier = Modifier.weight(1f).padding(end = 16.dp).alpha(collapseFraction),
+                modifier = Modifier.weight(1f).alpha(collapseFraction),
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            if (showFavorite) {
+                IconButton(
+                    onClick = onToggleFavorite,
+                    modifier = Modifier.alpha(collapseFraction).semantics {
+                        contentDescription = if (isFavorite) "取消收藏" else "收藏"
+                    },
+                    enabled = collapseFraction >= 0.98f,
+                ) {
+                    BookmarkGlyph(
+                        favorite = isFavorite,
+                        color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(16.dp))
+            }
         }
+    }
+}
+
+@Composable
+private fun BookmarkGlyph(favorite: Boolean, color: Color) {
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(24.dp)) {
+        val path = Path().apply {
+            moveTo(size.width * .34f, size.height * .12f)
+            cubicTo(size.width * .25f, size.height * .12f, size.width * .2f, size.height * .17f, size.width * .2f, size.height * .27f)
+            lineTo(size.width * .2f, size.height * .88f)
+            lineTo(size.width * .5f, size.height * .72f)
+            lineTo(size.width * .8f, size.height * .88f)
+            lineTo(size.width * .8f, size.height * .27f)
+            cubicTo(size.width * .8f, size.height * .17f, size.width * .75f, size.height * .12f, size.width * .66f, size.height * .12f)
+            close()
+        }
+        if (favorite) drawPath(path, color)
+        else drawPath(
+            path,
+            color,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = 1.8.dp.toPx(),
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round,
+            ),
+        )
     }
 }
 
@@ -446,32 +532,73 @@ private fun Section(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun DetailFacts(metadata: Map<String, String>) {
-    Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            metadata.forEach { (label, value) ->
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+private fun HeroFacts(metadata: Map<String, String>, trailingFavorite: (@Composable () -> Unit)? = null) {
+    if (metadata.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        val factRows = metadata.entries.toList().chunked(2)
+        factRows.forEachIndexed { rowIndex, rowFacts ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                rowFacts.forEach { (label, value) ->
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White.copy(alpha = 0.16f),
                     ) {
-                        InfoLabel(label.toChineseMetadataLabel())
-                        Text(
-                            value,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium,
-                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                label.toChineseMetadataLabel(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.78f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                value,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
+                if (rowFacts.size == 1) Spacer(modifier = Modifier.weight(1f))
+                if (rowIndex == factRows.lastIndex) trailingFavorite?.invoke()
             }
         }
     }
+}
+
+@Composable
+private fun FavoriteAction(isFavorite: Boolean, onToggleFavorite: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color.Black.copy(alpha = 0.34f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.68f)),
+    ) {
+        IconButton(
+            onClick = onToggleFavorite,
+            modifier = Modifier.size(44.dp).semantics {
+                contentDescription = if (isFavorite) "取消收藏" else "收藏"
+            },
+        ) { BookmarkGlyph(favorite = isFavorite, color = Color.White) }
+    }
+}
+
+internal fun orderHeroTagGroups(groups: Map<String, List<String>>): Map<String, List<String>> {
+    val orderedKeys = groups.keys.toMutableList()
+    val updateIndex = orderedKeys.indexOfFirst { it.toChineseTagGroupLabel() == "更新" }
+    val tagsIndex = orderedKeys.indexOfFirst { it.toChineseTagGroupLabel() == "标签" }
+    if (updateIndex >= 0 && tagsIndex >= 0 && updateIndex < tagsIndex) {
+        val updateKey = orderedKeys[updateIndex]
+        orderedKeys[updateIndex] = orderedKeys[tagsIndex]
+        orderedKeys[tagsIndex] = updateKey
+    }
+    return orderedKeys.associateWith { groups.getValue(it) }
 }
 
 @Composable
@@ -489,43 +616,50 @@ private fun InfoLabel(text: String) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DetailTagGroups(groups: Map<String, List<String>>) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        groups.forEach { (name, values) ->
-            if (values.isNotEmpty()) {
-                Surface(
+private fun HeroTagGroups(
+    groups: Map<String, List<String>>,
+    trailingFavorite: (@Composable () -> Unit)? = null,
+) {
+    val visibleGroups = groups.filterValues { it.isNotEmpty() }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        visibleGroups.entries.forEachIndexed { index, (name, values) ->
+            Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Top,
+                    Surface(shape = RoundedCornerShape(7.dp), color = Color.White.copy(alpha = 0.16f)) {
+                        Text(
+                            name.toChineseTagGroupLabel(),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.84f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FlowRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        InfoLabel(name.toChineseTagGroupLabel())
-                        FlowRow(
-                            modifier = Modifier.weight(1f),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            values.forEach { value ->
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                ) {
-                                    Text(
-                                        value,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                    )
-                                }
+                        values.forEach { value ->
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color.White.copy(alpha = 0.2f),
+                            ) {
+                                androidx.compose.foundation.text.BasicText(
+                                    text = value,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     }
+                    if (index == visibleGroups.size - 1) trailingFavorite?.invoke()
                 }
-            }
         }
     }
 }
@@ -688,23 +822,27 @@ private fun ChapterControls(
         }
 
         if (state.groups.size > 1) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                FilterChip(
-                    selected = state.selectedGroup == null,
-                    onClick = { onAction(DetailsAction.GroupSelected(null)) },
-                    label = { Text("全部") },
-                )
-                state.groups.forEach { group ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("版本筛选", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     FilterChip(
-                        selected = state.selectedGroup == group,
-                        onClick = { onAction(DetailsAction.GroupSelected(group)) },
-                        label = { Text(group, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        selected = state.selectedGroup == null,
+                        onClick = { onAction(DetailsAction.GroupSelected(null)) },
+                        label = { Text("全部 · ${state.detail?.chapters?.size ?: 0}") },
                     )
+                    state.groups.forEach { group ->
+                        val groupCount = state.detail?.chapters?.count { it.group == group } ?: 0
+                        FilterChip(
+                            selected = state.selectedGroup == group,
+                            onClick = { onAction(DetailsAction.GroupSelected(group)) },
+                            label = { Text("$group · $groupCount", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        )
+                    }
                 }
             }
         }
@@ -750,11 +888,36 @@ private fun SearchGlyph() {
 
 @Composable
 private fun GroupHeader(name: String) {
-    Text(
-        text = name,
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(top = 4.dp),
-    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.primaryContainer,
+        ) {
+            Text(
+                text = "版本",
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        Text(
+            text = name,
+            modifier = Modifier.weight(1f, fill = false),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
+        )
+    }
 }
 
 private sealed interface ChapterListEntry {
@@ -793,6 +956,8 @@ private fun buildChapterListEntries(chapters: List<Chapter>, showGroups: Boolean
 private fun ChapterRow(
     chapter: Chapter,
     selected: Boolean,
+    current: Boolean,
+    read: Boolean,
     selectionMode: Boolean,
     modifier: Modifier = Modifier,
     onOpen: () -> Unit,
@@ -803,8 +968,13 @@ private fun ChapterRow(
             .clickable(onClick = if (selectionMode) onToggleSelection else onOpen),
         shape = RoundedCornerShape(9.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+            containerColor = when {
+                selected -> MaterialTheme.colorScheme.secondaryContainer
+                current -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
+            },
         ),
+        border = if (current && !selected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
     ) {
         Row(
             modifier = Modifier
@@ -838,6 +1008,12 @@ private fun ChapterRow(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                color = when {
+                    selected -> MaterialTheme.colorScheme.onSecondaryContainer
+                    current -> MaterialTheme.colorScheme.onPrimaryContainer
+                    read -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f)
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
             )
         }
     }
@@ -865,6 +1041,8 @@ private fun String.toChineseMetadataLabel(): String = when (this) {
 
 private fun String.toChineseTagGroupLabel(): String = when (this) {
     "Tags" -> "标签"
+    "Updated", "Update" -> "更新"
+    "Status" -> "状态"
     "Authors" -> "作者"
     "Artists" -> "画师"
     "Genres" -> "题材"

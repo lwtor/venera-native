@@ -22,6 +22,9 @@ internal class FakeReadingHistoryDao : ReadingHistoryDao {
     override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntity>> =
         rows.map { list -> list.sortedByDescending { it.updatedAtEpochMillis }.take(limit) }
 
+    override fun observeComic(sourceId: String, comicId: String): Flow<List<ReadingHistoryEntity>> =
+        rows.map { list -> list.filter { it.sourceId == sourceId && it.comicId == comicId } }
+
     override suspend fun find(sourceId: String, comicId: String): ReadingHistoryEntity? =
         rows.value.firstOrNull { it.sourceId == sourceId && it.comicId == comicId }
 
