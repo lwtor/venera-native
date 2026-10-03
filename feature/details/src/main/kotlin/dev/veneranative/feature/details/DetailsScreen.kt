@@ -12,17 +12,23 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,13 +42,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +66,7 @@ import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicComment
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.SourceId
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 
 
 /**
@@ -74,24 +86,29 @@ fun DetailsScreen(
     modifier: Modifier = Modifier,
     onOpenComic: (ComicKey) -> Unit = {},
 ) {
+    val listState = rememberLazyListState()
+    val heroHeight = 440.dp
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val collapseDistancePx = with(density) { (heroHeight - 96.dp).toPx() }
+    val scrollPx by remember(listState, collapseDistancePx) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) collapseDistancePx
+            else listState.firstVisibleItemScrollOffset.toFloat()
+        }
+    }
+    val collapseFraction = (scrollPx / collapseDistancePx).coerceIn(0f, 1f)
+    val title = state.detail?.comic?.title.orEmpty()
+    val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
+    val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
+
     Scaffold(
         modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = { Text("漫画详情") },
-                navigationIcon = { TextButton(onClick = onBack) { Text("返回") } },
-                actions = {
-                    if (state.status == DetailsStatus.Ready) {
-                        TextButton(onClick = { onAction(DetailsAction.Refresh) }) { Text("刷新") }
-                    }
-                },
-            )
-        },
+        contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
-            if (state.status == DetailsStatus.Ready && state.hasChapters) {
-                val firstChapter = state.detail?.chapters?.firstOrNull()
+            if (state.detail != null && state.hasChapters) {
+                val firstChapter = state.detail.chapters.firstOrNull()
                 if (firstChapter != null) {
-                    Surface(tonalElevation = 3.dp) {
+                    Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
                         Button(
                             onClick = { onOpenChapter(firstChapter.key) },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
@@ -101,15 +118,27 @@ fun DetailsScreen(
             }
         },
     ) { contentPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
-        ) {
-            when (state.status) {
-                DetailsStatus.Loading -> Centered { CircularProgressIndicator(modifier = Modifier.testTag(DETAILS_LOADING_TAG)) }
+        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            when {
+                showContent -> PullToRefreshBox(
+                    isRefreshing = isRefreshing,
+                    onRefresh = { onAction(DetailsAction.Refresh) },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Content(
+                        state = state,
+                        listState = listState,
+                        heroHeight = heroHeight,
+                        collapseFraction = collapseFraction,
+                        onAction = onAction,
+                        onOpenChapter = onOpenChapter,
+                        onOpenComic = onOpenComic,
+                    )
+                }
 
-                DetailsStatus.SourceUnavailable -> Centered {
+                state.status == DetailsStatus.Loading -> Centered { CircularProgressIndicator(modifier = Modifier.testTag(DETAILS_LOADING_TAG)) }
+
+                state.status == DetailsStatus.SourceUnavailable -> Centered {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -118,11 +147,10 @@ fun DetailsScreen(
                             text = "此漫画所属的漫画源已卸载或停用。",
                             style = MaterialTheme.typography.bodyLarge,
                         )
-                        Button(onClick = onBack) { Text("返回") }
                     }
                 }
 
-                DetailsStatus.Failed -> Centered {
+                else -> Centered {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -135,13 +163,14 @@ fun DetailsScreen(
                     }
                 }
 
-                DetailsStatus.Ready -> Content(
-                    state = state,
-                    onAction = onAction,
-                    onOpenChapter = onOpenChapter,
-                    onOpenComic = onOpenComic,
-                )
             }
+
+            DetailsToolbar(
+                title = title,
+                collapseFraction = collapseFraction,
+                onBack = onBack,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
     }
 }
@@ -149,18 +178,30 @@ fun DetailsScreen(
 @Composable
 private fun Content(
     state: DetailsUiState,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    heroHeight: androidx.compose.ui.unit.Dp,
+    collapseFraction: Float,
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (ChapterKey) -> Unit,
     onOpenComic: (ComicKey) -> Unit,
 ) {
-    val listState = rememberLazyListState()
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().testTag(DETAILS_CONTENT_TAG),
         contentPadding = PaddingValues(bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
-        item { Header(state = state, onAction = onAction) }
+        item { Header(state = state, onAction = onAction, heroHeight = heroHeight, collapseFraction = collapseFraction) }
+        if (state.status == DetailsStatus.Failed) {
+            item {
+                Text(
+                    state.message ?: "无法获取漫画详情，请下拉重试。",
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
         state.downloadMessage?.let { message ->
             item {
                 Text(
@@ -276,10 +317,12 @@ private fun Content(
 private fun Header(
     state: DetailsUiState,
     onAction: (DetailsAction) -> Unit,
+    heroHeight: androidx.compose.ui.unit.Dp,
+    collapseFraction: Float,
 ) {
     val comic = state.detail?.comic ?: return
     Box(
-        modifier = Modifier.fillMaxWidth().height(270.dp).background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth().height(heroHeight).background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         comic.coverUrl?.let { coverUrl ->
             ComicImage(
@@ -298,7 +341,11 @@ private fun Header(
             ),
         )
         Column(
-            modifier = Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(horizontal = 20.dp, vertical = 18.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .alpha(1f - collapseFraction),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(text = comic.title, style = MaterialTheme.typography.headlineSmall, color = Color.White, fontWeight = FontWeight.Bold)
@@ -316,6 +363,63 @@ private fun Header(
             }
             state.shelfMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White) }
         }
+    }
+}
+
+@Composable
+private fun DetailsToolbar(
+    title: String,
+    collapseFraction: Float,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val background = androidx.compose.ui.graphics.lerp(Color.Transparent, MaterialTheme.colorScheme.surface, collapseFraction)
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = background,
+        shadowElevation = 2.dp * collapseFraction,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().statusBarsPadding().height(56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .padding(start = 4.dp)
+                    .background(
+                        color = androidx.compose.ui.graphics.lerp(Color.Black.copy(alpha = 0.36f), Color.Transparent, collapseFraction),
+                        shape = CircleShape,
+                    )
+                    .semantics { contentDescription = "返回" },
+            ) {
+                CanvasBackArrow(
+                    color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.onSurface, collapseFraction),
+                )
+            }
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f).padding(end = 16.dp).alpha(collapseFraction),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CanvasBackArrow(color: Color) {
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(24.dp)) {
+        val path = Path().apply {
+            moveTo(size.width * .72f, size.height * .18f)
+            lineTo(size.width * .38f, size.height * .5f)
+            lineTo(size.width * .72f, size.height * .82f)
+            moveTo(size.width * .4f, size.height * .5f)
+            lineTo(size.width * .9f, size.height * .5f)
+        }
+        drawPath(path, color = color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
 }
 
