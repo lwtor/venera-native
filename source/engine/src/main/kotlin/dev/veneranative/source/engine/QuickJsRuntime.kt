@@ -487,6 +487,7 @@ class QuickJsRuntime(
         const val EVALUATION_INTERRUPT_GRACE_MILLIS = 1_000L
         const val KEY_FIELD = "key"
         const val DEFAULT_APP_LOCALE = "en"
-        const val DEFAULT_APP_VERSION = "0"
+        // Compatibility level required by sources that switch from flat to grouped chapters at 1.3.0.
+        const val DEFAULT_APP_VERSION = "1.3.1"
     }
 }

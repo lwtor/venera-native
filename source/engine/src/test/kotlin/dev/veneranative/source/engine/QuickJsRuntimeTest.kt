@@ -386,6 +386,28 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `source compatibility version enables grouped chapters without claiming later APIs`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """chapterShape() { return this.isAppVersionAfter("1.3.0") ? "grouped" : "flat"; }""",
+                ),
+            )
+
+            assertEquals("\"grouped\"", runtime.invokeSuccess(sourceId, "chapterShape", "[]"))
+        }
+        withRuntime(QuickJsRuntime(appVersion = "1.3.0")) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """chapterShape() { return this.isAppVersionAfter("1.3.0") ? "grouped" : "flat"; }""",
+                ),
+            )
+
+            assertEquals("\"flat\"", runtime.invokeSuccess(sourceId, "chapterShape", "[]"))
+        }
+    }
+
+    @Test
     fun `an unknown member fails without killing the source`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(fixtureSource("""known() { return 1; }"""))

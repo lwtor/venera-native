@@ -36,6 +36,18 @@ internal object SourceBaseScript {
 
             init() {}
 
+            isAppVersionAfter(version) {
+              var currentParts = String(globalThis.APP && globalThis.APP.version || "0").split(".");
+              var requiredParts = String(version || "0").split(".");
+              var length = Math.max(currentParts.length, requiredParts.length);
+              for (var index = 0; index < length; index++) {
+                var current = parseInt(currentParts[index] || "0", 10) || 0;
+                var required = parseInt(requiredParts[index] || "0", 10) || 0;
+                if (current !== required) return current > required;
+              }
+              return false;
+            }
+
             loadData(dataKey) {
               return Object.prototype.hasOwnProperty.call(data, dataKey) ? data[dataKey] : null;
             }
