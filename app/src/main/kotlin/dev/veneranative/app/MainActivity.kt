@@ -17,7 +17,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.veneranative.core.database.VeneraDatabase
 import dev.veneranative.core.database.VeneraDatabaseFactory
@@ -200,7 +209,50 @@ private fun AppNavHost(
         uri?.toString()?.let { scriptSelection?.invoke(it) }
         scriptSelection = null
     }
-    when (val current = route) {
+    val isMainTab = route == AppRoute.Home ||
+        route == AppRoute.Library ||
+        route == AppRoute.Sources ||
+        route is AppRoute.Explore
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = {
+            if (isMainTab) {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = route == AppRoute.Home,
+                        onClick = { onRouteChange(AppRoute.Home) },
+                        icon = { Text("⌂") },
+                        label = { Text("首页") },
+                        modifier = Modifier.testTag("root_tab_home"),
+                    )
+                    NavigationBarItem(
+                        selected = route is AppRoute.Explore,
+                        onClick = { onRouteChange(AppRoute.Explore(null)) },
+                        icon = { Text("◉") },
+                        label = { Text("探索") },
+                        modifier = Modifier.testTag("root_tab_explore"),
+                    )
+                    NavigationBarItem(
+                        selected = route == AppRoute.Library,
+                        onClick = { onRouteChange(AppRoute.Library) },
+                        icon = { Text("▤") },
+                        label = { Text("书架") },
+                        modifier = Modifier.testTag("root_tab_library"),
+                    )
+                    NavigationBarItem(
+                        selected = route == AppRoute.Sources,
+                        onClick = { onRouteChange(AppRoute.Sources) },
+                        icon = { Text("＋") },
+                        label = { Text("来源") },
+                        modifier = Modifier.testTag("root_tab_sources"),
+                    )
+                }
+            }
+        },
+    ) { contentPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            when (val current = route) {
         AppRoute.Home -> HomeRoute(
             history = historyRepository,
             collection = collectionRepository,
@@ -288,6 +340,8 @@ private fun AppNavHost(
                     },
                     onExit = { appScope.launch { runCatching { tracker.flush() } } },
                 )
+            }
+        }
             }
         }
     }

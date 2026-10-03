@@ -65,6 +65,8 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 
 **S4-10B DONE：接入来源详情页的附加只读内容。** `ComicDetail` 与来源协议解析现在保留可选推荐作品、评论预览、评论回复/评分/投票状态、来源网页 URL 与不展示的 source subId；缺字段或单条坏数据不会让整页解析失败。详情页显示来源评分等中文信息、评论预览与推荐作品横向卡片；点推荐进入对应详情，来源网页只开放 HTTP(S) URL。JDK 17 验证：`:source:api:testDebugUnitTest :feature:details:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。上游契约另列了可选点赞、评分、评论加载/发送/投票函数，但 Native `SourceCore`/`ComicCatalog` 目前没有类型化写操作，归 S4-10C；当前评论仅展示 `loadInfo` 已带回的只读预览，不宣称支持分页、回复或提交。真机视觉和来源实际字段验收待做。
 
+**S4-08D DONE：修复主页面四个底部 Tab 被当作独立页面打开的问题。** 根导航统一承载首页、探索、书架、来源四个 Tab 的底栏，点击后切换对应根页面并更新选中态；搜索、详情和阅读器仍走内部页面导航。新增根 Tab AndroidTest 源码。JDK 17 验证：`:app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。按用户工作流程，未运行设备测试，等待用户真机验收。
+
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 
 ### S4-08A Android 启动页 — DONE

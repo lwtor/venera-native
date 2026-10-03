@@ -23,8 +23,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -93,34 +91,6 @@ internal fun HomeScreen(
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = true,
-                    onClick = {},
-                    icon = { Text("⌂") },
-                    label = { Text("首页") },
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onOpenExplore,
-                    icon = { Text("◉") },
-                    label = { Text("探索") },
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onOpenLibrary,
-                    icon = { Text("▤") },
-                    label = { Text("书架") },
-                )
-                NavigationBarItem(
-                    selected = false,
-                    onClick = onOpenSources,
-                    icon = { Text("＋") },
-                    label = { Text("来源") },
-                )
-            }
-        },
     ) { contentPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),

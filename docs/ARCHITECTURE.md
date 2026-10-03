@@ -35,7 +35,7 @@ immutable UiState
 
 | 模块 | 当前职责 | 可依赖 |
 | --- | --- | --- |
-| `:app` | MainActivity、应用 Theme、根装配 | Feature、Core、实现模块 |
+| `:app` | MainActivity、应用 Theme、根装配与首页/探索/书架/来源四个根级 Tab 导航壳 | Feature、Core、实现模块 |
 | `:core:model` | 稳定领域 ID 与跨层模型（包括远端/本地 `ChapterRef`） | 尽量只依赖 Kotlin |
 | `:core:archive` | ZIP/CBZ、7z/CB7 只读访问接口与 Commons Compress 适配 | Commons Compress、XZ、Android Framework |
 | `:data:source` | 上游来源目录的获取与解析、来源包远程/本地安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:core:network`、`:source:api` |
