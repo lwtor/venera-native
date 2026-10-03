@@ -20,6 +20,9 @@ data class SearchUiState(
     /** Filters the selected source declares, in declaration order. */
     val filters: List<SourceFilter> = emptyList(),
     val filterSelection: FilterSelection = FilterSelection.Empty,
+    val aggregateSearch: Boolean = false,
+    val hasSubmitted: Boolean = false,
+    val searchHistory: List<String> = emptyList(),
     /** Product copy for the last failure; never a lower layer's wording. */
     val message: String? = null,
 ) {
@@ -29,6 +32,14 @@ data class SearchUiState(
 
     val selectedSource: InstalledSource? get() = sources.firstOrNull { it.sourceId == selectedSourceId }
 }
+
+data class AggregateSearchResult(
+    val sourceId: SourceId,
+    val sourceName: String,
+    val comics: List<dev.veneranative.core.model.Comic> = emptyList(),
+    val isLoading: Boolean = true,
+    val hasError: Boolean = false,
+)
 
 enum class SearchStatus {
     Loading,

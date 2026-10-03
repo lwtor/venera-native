@@ -40,6 +40,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(project(":data:history"))
     implementation(project(":data:local"))
+    implementation(project(":data:search"))
     implementation(project(":data:source"))
     implementation(project(":feature:details"))
     implementation(project(":feature:explore"))

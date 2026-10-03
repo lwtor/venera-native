@@ -1,6 +1,7 @@
 package dev.veneranative.feature.search
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -8,6 +9,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.comic.ComicCatalog
+import dev.veneranative.data.search.SearchHistoryRepository
 
 /**
  * Entry point of the search screen: owns the ViewModel, collects state and results, forwards actions.
@@ -18,20 +20,33 @@ import dev.veneranative.data.comic.ComicCatalog
 @Composable
 fun SearchRoute(
     catalog: ComicCatalog,
+    historyRepository: SearchHistoryRepository? = null,
     onOpenComic: (ComicKey) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val viewModel: SearchViewModel = viewModel { SearchViewModel(catalog) }
+    val viewModel: SearchViewModel = viewModel { SearchViewModel(catalog, initialHistoryRepository = historyRepository) }
+    LaunchedEffect(historyRepository) { historyRepository?.let(viewModel::attachSearchHistory) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val results = viewModel.results.collectAsLazyPagingItems()
+    val aggregateResults by viewModel.aggregateResults.collectAsStateWithLifecycle()
 
-    SearchScreen(
-        state = state,
-        results = results,
-        onAction = viewModel::onAction,
-        onOpenComic = onOpenComic,
-        onBack = onBack,
-        modifier = modifier,
-    )
+    if (state.hasSubmitted) {
+        SearchResultScreen(
+            state = state,
+            results = results,
+            aggregateResults = aggregateResults,
+            onAction = viewModel::onAction,
+            onOpenComic = onOpenComic,
+            onBackToSearch = { viewModel.onAction(SearchAction.EditSearch) },
+            modifier = modifier,
+        )
+    } else {
+        SearchScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            onBack = onBack,
+            modifier = modifier,
+        )
+    }
 }

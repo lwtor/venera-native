@@ -16,6 +16,7 @@ import dev.veneranative.core.model.SourceFilter
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
+import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
@@ -34,6 +35,8 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModelTest {
@@ -149,6 +152,80 @@ class SearchViewModelTest {
         assertEquals(SearchStatus.Ready, viewModel.state.value.status)
     }
 
+    @Test
+    fun `aggregate search keeps a failed source isolated from the other source`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"), source("b"))
+        catalog.searchFailures += SourceId("b")
+        val viewModel = SearchViewModel(catalog)
+        advanceUntilIdle()
+
+        viewModel.onAction(SearchAction.KeywordChanged("kagurabachi"))
+        viewModel.onAction(SearchAction.AggregateToggled)
+        viewModel.onAction(SearchAction.Submit)
+        advanceUntilIdle()
+
+        val rows = viewModel.aggregateResults.value
+        assertEquals(listOf("a", "b"), rows.map { it.sourceId.value })
+        assertTrue(!rows.first().hasError)
+        assertTrue(!rows.first().isLoading)
+        assertTrue(rows.last().hasError)
+        assertEquals(listOf("a", "b"), catalog.searchRequests.map { it.sourceId.value })
+    }
+
+    @Test
+    fun `submitting opens the result page and returning preserves the search form`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"))
+        val viewModel = SearchViewModel(catalog)
+        advanceUntilIdle()
+        viewModel.onAction(SearchAction.KeywordChanged("frieren"))
+        viewModel.onAction(SearchAction.Submit)
+
+        assertTrue(viewModel.state.value.hasSubmitted)
+        viewModel.onAction(SearchAction.EditSearch)
+
+        assertTrue(!viewModel.state.value.hasSubmitted)
+        assertEquals("frieren", viewModel.state.value.keyword)
+    }
+
+    @Test
+    fun `initial search history repository is observed`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"))
+        val history = FakeSearchHistoryRepository(listOf("frieren", "kagurabachi"))
+        val viewModel = SearchViewModel(catalog, initialHistoryRepository = history)
+        advanceUntilIdle()
+
+        assertEquals(listOf("frieren", "kagurabachi"), viewModel.state.value.searchHistory)
+    }
+
+    @Test
+    fun `selecting history while aggregate mode is enabled searches every source`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"), source("b"))
+        val viewModel = SearchViewModel(catalog)
+        advanceUntilIdle()
+
+        viewModel.onAction(SearchAction.AggregateToggled)
+        viewModel.onAction(SearchAction.HistorySelected("kagurabachi"))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.aggregateSearch)
+        assertTrue(viewModel.state.value.hasSubmitted)
+        assertEquals(listOf("a", "b"), catalog.searchRequests.map { it.sourceId.value })
+    }
+
+    @Test
+    fun `source selection is ignored while aggregate mode is enabled`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"), source("b"))
+        val viewModel = SearchViewModel(catalog)
+        advanceUntilIdle()
+        assertEquals(SourceId("a"), viewModel.state.value.selectedSourceId)
+
+        viewModel.onAction(SearchAction.AggregateToggled)
+        viewModel.onAction(SearchAction.SourceSelected(SourceId("b")))
+
+        assertTrue(viewModel.state.value.aggregateSearch)
+        assertEquals(SourceId("a"), viewModel.state.value.selectedSourceId)
+    }
+
     private fun capabilities(
         filters: List<SourceFilter> = emptyList(),
     ) = SourceOutcome.Success(
@@ -173,6 +250,7 @@ class SearchViewModelTest {
         var searchable: List<InstalledSource> = emptyList()
         var capabilityResponses: Map<SourceId, SourceOutcome<SourceCapabilities>> = emptyMap()
         var failList: Boolean = false
+        val searchFailures = mutableSetOf<SourceId>()
         val searchRequests = mutableListOf<SearchRequest>()
 
         override suspend fun searchableSources(): List<InstalledSource> {
@@ -199,14 +277,24 @@ class SearchViewModelTest {
 
         override fun search(request: SearchRequest): PagingSource<PageKey, Comic> {
             searchRequests += request
-            return EmptyPagingSource()
+            return EmptyPagingSource(fail = request.sourceId in searchFailures)
         }
     }
 
-    private class EmptyPagingSource : PagingSource<PageKey, Comic>() {
+    private class FakeSearchHistoryRepository(private val terms: List<String>) : SearchHistoryRepository {
+        override fun observeRecent(): Flow<List<String>> = flowOf(terms)
+        override suspend fun record(keyword: String) = Unit
+        override suspend fun remove(keyword: String) = Unit
+        override suspend fun clear() = Unit
+    }
+
+    private class EmptyPagingSource(private val fail: Boolean = false) : PagingSource<PageKey, Comic>() {
         override fun getRefreshKey(state: PagingState<PageKey, Comic>): PageKey = PageKey.Start
 
-        override suspend fun load(params: LoadParams<PageKey>): LoadResult<PageKey, Comic> =
+        override suspend fun load(params: LoadParams<PageKey>): LoadResult<PageKey, Comic> = if (fail) {
+            LoadResult.Error(IllegalStateException("source fixture failure"))
+        } else {
             LoadResult.Page(data = emptyList(), prevKey = null, nextKey = null)
+        }
     }
 }

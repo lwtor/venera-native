@@ -57,6 +57,8 @@ import dev.veneranative.data.local.DefaultLocalPageSource
 import dev.veneranative.data.local.LocalFirstPageProvider
 import dev.veneranative.data.local.LocalPageCache
 import dev.veneranative.data.local.LocalPageMaterializer
+import dev.veneranative.data.search.DefaultSearchHistoryRepository
+import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
@@ -159,12 +161,15 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     val collection: kotlinx.coroutines.flow.StateFlow<CollectionRepository?> = _collection
     private val _download = kotlinx.coroutines.flow.MutableStateFlow<DownloadRepository?>(null)
     private val _local = kotlinx.coroutines.flow.MutableStateFlow<LocalComicRepository?>(null)
+    private val _searchHistory = kotlinx.coroutines.flow.MutableStateFlow<SearchHistoryRepository?>(null)
     val local: kotlinx.coroutines.flow.StateFlow<LocalComicRepository?> = _local
+    val searchHistory: kotlinx.coroutines.flow.StateFlow<SearchHistoryRepository?> = _searchHistory
     val download: kotlinx.coroutines.flow.StateFlow<DownloadRepository?> = _download
     init {
         scope.launch {
             val db = VeneraDatabaseFactory.get(getApplication())
             val repository = DefaultHistoryRepository(db)
+            _searchHistory.value = DefaultSearchHistoryRepository(db.searchHistoryDao())
             progressTracker.set(ReadingProgressTracker(repository, scope, clock = { System.currentTimeMillis() }))
             _history.value = repository
             // The shelf asks installed sources for chapter snapshots; the assembly layer is the only

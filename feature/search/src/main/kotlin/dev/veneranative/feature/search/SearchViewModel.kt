@@ -5,12 +5,16 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.paging.PagingSource
 import androidx.paging.cachedIn
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.SourceCapability
+import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.SourceFilter
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.ComicCatalog
+import dev.veneranative.data.comic.PageKey
+import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -21,6 +25,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.launch
 
 /**
@@ -36,12 +45,18 @@ import kotlinx.coroutines.launch
 class SearchViewModel(
     private val catalog: ComicCatalog,
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
+    initialHistoryRepository: SearchHistoryRepository? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
 
     private val query = MutableStateFlow<SearchRequest?>(null)
+    private var historyRepository: SearchHistoryRepository? = initialHistoryRepository
+    private var historyJob: kotlinx.coroutines.Job? = null
+    private val _aggregateResults = MutableStateFlow<List<AggregateSearchResult>>(emptyList())
+    val aggregateResults: StateFlow<List<AggregateSearchResult>> = _aggregateResults.asStateFlow()
+    private var aggregateJob: kotlinx.coroutines.Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val results: Flow<PagingData<Comic>> = query
@@ -59,17 +74,60 @@ class SearchViewModel(
 
     init {
         loadSources()
+        initialHistoryRepository?.let(::attachSearchHistory)
     }
 
     fun onAction(action: SearchAction) {
         when (action) {
-            is SearchAction.SourceSelected -> selectSource(action.sourceId)
+            is SearchAction.SourceSelected -> if (!_state.value.aggregateSearch) selectSource(action.sourceId)
+
+            SearchAction.AggregateToggled -> {
+                _state.update { it.copy(aggregateSearch = !it.aggregateSearch) }
+                if (_state.value.hasSubmitted) submit()
+            }
+
+            SearchAction.EditSearch -> {
+                aggregateJob?.cancel()
+                query.value = null
+                _aggregateResults.value = emptyList()
+                _state.update { it.copy(hasSubmitted = false) }
+            }
 
             is SearchAction.KeywordChanged -> _state.update { it.copy(keyword = action.value) }
+
+            is SearchAction.FilterSelected -> _state.update { current ->
+                val values = current.filterSelection.values.toMutableMap()
+                values[action.key] = action.values
+                current.copy(filterSelection = FilterSelection(values))
+            }
+
+            is SearchAction.HistorySelected -> {
+                _state.update { it.copy(keyword = action.keyword) }
+                submit()
+            }
+
+            is SearchAction.HistoryRemoved -> historyRepository?.let { repository ->
+                viewModelScope.launch { repository.remove(action.keyword) }
+            }
+
+            SearchAction.HistoryCleared -> historyRepository?.let { repository ->
+                viewModelScope.launch { repository.clear() }
+            }
+
+            is SearchAction.AggregatedSourceSelected -> openSourceResults(action.sourceId)
 
             SearchAction.Submit -> submit()
 
             SearchAction.Retry -> loadSources()
+        }
+    }
+
+    fun attachSearchHistory(repository: SearchHistoryRepository) {
+        if (historyRepository === repository && historyJob?.isActive == true) return
+        historyRepository = repository
+        historyJob?.cancel()
+        historyJob = viewModelScope.launch {
+            repository.observeRecent().collect { terms -> _state.update { it.copy(searchHistory = terms) } }
         }
     }
 
@@ -104,8 +162,19 @@ class SearchViewModel(
     }
 
     private fun selectSource(sourceId: SourceId) {
+        if (!_state.value.aggregateSearch) {
+            aggregateJob?.cancel()
+            query.value = null
+            _aggregateResults.value = emptyList()
+        }
         _state.update {
-            it.copy(selectedSourceId = sourceId, filters = emptyList(), message = null)
+            it.copy(
+                selectedSourceId = sourceId,
+                filters = emptyList(),
+                filterSelection = FilterSelection.Empty,
+                hasSubmitted = if (it.aggregateSearch) it.hasSubmitted else false,
+                message = null,
+            )
         }
         loadFilters(sourceId)
     }
@@ -134,11 +203,67 @@ class SearchViewModel(
     }
 
     private fun submit() {
-        query.value = _state.value.toRequest() ?: return
+        val state = _state.value
+        val request = state.toRequest() ?: return
+        _state.update { it.copy(hasSubmitted = true) }
+        historyRepository?.let { repository -> viewModelScope.launch { repository.record(request.keyword) } }
+        if (state.aggregateSearch) {
+            query.value = null
+            searchAll(request.keyword)
+        } else {
+            aggregateJob?.cancel()
+            _aggregateResults.value = emptyList()
+            query.value = request
+        }
+    }
+
+    private fun openSourceResults(sourceId: SourceId) {
+        val current = _state.value
+        val request = current.copy(selectedSourceId = sourceId, aggregateSearch = false, filterSelection = FilterSelection.Empty).toRequest()
+            ?: return
+        aggregateJob?.cancel()
+        _aggregateResults.value = emptyList()
+        _state.update { it.copy(selectedSourceId = sourceId, aggregateSearch = false, filterSelection = FilterSelection.Empty, hasSubmitted = true) }
+        loadFilters(sourceId)
+        query.value = request
+    }
+
+    private fun searchAll(keyword: String) {
+        aggregateJob?.cancel()
+        val sources = _state.value.sources
+        _aggregateResults.value = sources.map { AggregateSearchResult(it.sourceId, it.name) }
+        aggregateJob = viewModelScope.launch {
+            val semaphore = Semaphore(AGGREGATE_CONCURRENCY)
+            coroutineScope {
+                sources.map { source ->
+                    async {
+                        semaphore.withPermit {
+                            val row = runCatching {
+                                val pagingSource = catalog.search(SearchRequest(sourceId = source.sourceId, keyword = keyword, filters = FilterSelection.Empty))
+                                val load = pagingSource.load(
+                                    PagingSource.LoadParams.Refresh(PageKey.Start, AGGREGATE_PREVIEW_SIZE, false),
+                                )
+                                when (load) {
+                                    is PagingSource.LoadResult.Page -> AggregateSearchResult(source.sourceId, source.name, load.data, false, false)
+                                    is PagingSource.LoadResult.Error -> throw load.throwable
+                                    is PagingSource.LoadResult.Invalid -> AggregateSearchResult(source.sourceId, source.name, emptyList(), false, false)
+                                }
+                            }.getOrElse {
+                                if (it is kotlinx.coroutines.CancellationException) throw it
+                                AggregateSearchResult(source.sourceId, source.name, emptyList(), false, true)
+                            }
+                            _aggregateResults.update { rows -> rows.map { if (it.sourceId == source.sourceId) row else it } }
+                        }
+                    }
+                }.awaitAll()
+            }
+        }
     }
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 20
+        const val AGGREGATE_PREVIEW_SIZE = 8
+        const val AGGREGATE_CONCURRENCY = 3
     }
 }
 

@@ -1,18 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="back">Back</string>
-    <string name="search_title">Search</string>
-    <string name="error_source_list">The source list could not be read.</string>
-    <string name="retry">Retry</string>
-    <string name="no_search_source">No installed source can search.</string>
-    <string name="keyword">Keyword</string>
-    <string name="search">Search</string>
-    <string name="no_results">No results.</string>
-    <string name="error_search_unsupported">This source does not support search.</string>
-    <string name="error_source_unavailable">That source is no longer loaded.</string>
-    <string name="error_source_timeout">The source took too long to answer.</string>
-    <string name="error_search_cancelled">The search was cancelled.</string>
-    <string name="error_engine_unavailable">Comic sources are unavailable on this device.</string>
-    <string name="error_engine_restarted">The source engine stopped; search again to reload it.</string>
-    <string name="error_source_generic">The source could not answer.</string>
+    <string name="back">返回</string>
+    <string name="search_title">搜索</string>
+    <string name="error_source_list">暂时无法读取漫画源列表。</string>
+    <string name="retry">重试</string>
+    <string name="no_search_source">没有已启用且支持搜索的漫画源。</string>
+    <string name="keyword">漫画名称</string>
+    <string name="search">搜索</string>
+    <string name="no_results">没有找到相关漫画。</string>
+    <string name="error_search_unsupported">此漫画源不支持搜索。</string>
+    <string name="error_source_unavailable">此漫画源已不可用。</string>
+    <string name="error_source_timeout">漫画源响应超时。</string>
+    <string name="error_search_cancelled">搜索已取消。</string>
+    <string name="error_engine_unavailable">此设备上的漫画源运行环境不可用。</string>
+    <string name="error_engine_restarted">漫画源运行环境已重启，请重新搜索。</string>
+    <string name="error_source_generic">漫画源暂时无法响应。</string>
+    <string name="search_in">搜索来源</string>
+    <string name="aggregate_search">聚合搜索全部来源</string>
+    <string name="filter_any">全部</string>
+    <string name="search_history">搜索历史</string>
+    <string name="clear_history">清空</string>
+    <string name="search_hint">搜索已启用来源中的漫画</string>
+    <string name="view_all">查看全部</string>
+    <string name="source_search_failed">该来源暂时无法响应</string>
+    <string name="edit_search">返回搜索与历史</string>
+    <string name="aggregate_results">聚合搜索结果</string>
 </resources>

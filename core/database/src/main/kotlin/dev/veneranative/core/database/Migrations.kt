@@ -126,5 +126,13 @@ val MIGRATION_3_4: Migration = object : Migration(3, 4) {
     }
 }
 
+/** S3-01: keep recent search terms across process restarts. */
+val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS `search_history` (`keyword` TEXT NOT NULL, `searchedAt` INTEGER NOT NULL, PRIMARY KEY(`keyword`))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_search_history_searchedAt` ON `search_history` (`searchedAt`)")
+    }
+}
+
 /** Every migration the database knows about, in order. */
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)

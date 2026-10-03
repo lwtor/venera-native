@@ -58,7 +58,7 @@ sealed interface SourceFilter {
                 if (selection.values.containsKey(key)) chosen else defaultValues,
             )
 
-            is Dropdown -> (chosen.firstOrNull() ?: defaultValue)
+            is Dropdown -> (if (selection.values.containsKey(key)) chosen.firstOrNull() else defaultValue)
                 ?.let(FilterValue::Single)
                 ?: FilterValue.Unselected
         }

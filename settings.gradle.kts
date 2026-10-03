@@ -31,6 +31,7 @@ include(
     ":data:download",
     ":data:history",
     ":data:local",
+    ":data:search",
     ":data:source",
     ":feature:details",
     ":feature:explore",

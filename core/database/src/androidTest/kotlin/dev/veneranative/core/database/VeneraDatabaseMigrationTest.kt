@@ -203,6 +203,16 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migratingFromFourToFiveCreatesSearchHistory() {
+        helper.createDatabase(TEST_DB, 4).close()
+
+        helper.runMigrationsAndValidate(TEST_DB, 5, true, MIGRATION_4_5).use { db ->
+            assertEquals(1, db.query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'search_history'").use { it.moveToFirst(); it.getInt(0) })
+            db.execSQL("INSERT INTO search_history VALUES('frieren', 123)")
+            assertEquals("frieren", db.query("SELECT keyword FROM search_history").use { it.moveToFirst(); it.getString(0) })
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

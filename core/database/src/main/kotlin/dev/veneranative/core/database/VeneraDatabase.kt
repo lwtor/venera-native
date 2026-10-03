@@ -10,7 +10,8 @@ import androidx.room.RoomDatabase
  * `exportSchema` stays true: the exported files are the baseline `MigrationTestHelper` validates
  * against, and a version bump without one is a database Room silently cannot open on upgrade.
  *
- * Version 2 adds the shelf, version 3 the download queue, and version 4 the local library (S2-05).
+ * Version 2 adds the shelf, version 3 the download queue, version 4 the local library (S2-05),
+ * and version 5 the persisted search history (S3-01).
  * Each task adds one migration rather than editing an existing step.
  */
 @Database(
@@ -25,8 +26,9 @@ import androidx.room.RoomDatabase
         LocalComicEntity::class,
         LocalChapterEntity::class,
         LocalPageEntity::class,
+        SearchHistoryEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class VeneraDatabase : RoomDatabase() {
@@ -40,4 +42,6 @@ abstract class VeneraDatabase : RoomDatabase() {
     abstract fun downloadDao(): DownloadDao
 
     abstract fun localDao(): LocalDao
+
+    abstract fun searchHistoryDao(): SearchHistoryDao
 }

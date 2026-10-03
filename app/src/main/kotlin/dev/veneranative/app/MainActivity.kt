@@ -129,6 +129,7 @@ private fun App(
     val collectionRepository by graph.collection.collectAsStateWithLifecycle()
     val localRepository by graph.local.collectAsStateWithLifecycle()
     val downloadRepository by graph.download.collectAsStateWithLifecycle()
+    val searchHistoryRepository by graph.searchHistory.collectAsStateWithLifecycle()
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -169,6 +170,7 @@ private fun App(
             collectionRepository = collectionRepository,
             localRepository = localRepository,
             downloadRepository = downloadRepository,
+            searchHistoryRepository = searchHistoryRepository,
             progressTracker = progressTracker,
         )
     }
@@ -191,6 +193,7 @@ private fun AppNavHost(
     collectionRepository: CollectionRepository?,
     localRepository: dev.veneranative.data.local.LocalComicRepository?,
     downloadRepository: DownloadRepository?,
+    searchHistoryRepository: dev.veneranative.data.search.SearchHistoryRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
@@ -321,6 +324,7 @@ private fun AppNavHost(
 
         is AppRoute.Search -> SearchRoute(
             catalog = catalog,
+            historyRepository = searchHistoryRepository,
             onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
             onBack = onBack,
         )

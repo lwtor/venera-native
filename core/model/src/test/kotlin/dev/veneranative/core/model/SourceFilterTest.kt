@@ -80,6 +80,13 @@ class SourceFilterTest {
     }
 
     @Test
+    fun `a dropdown can explicitly clear its declared default`() {
+        val dropdownWithDefault = status.copy(defaultValue = "ongoing")
+
+        assertEquals(FilterValue.Unselected, dropdownWithDefault.selectionValue(FilterSelection(mapOf("status" to emptyList()))))
+    }
+
+    @Test
     fun `the payload follows the declared filter order, not the selection order`() {
         val selection = FilterSelection(
             linkedMapOf(
