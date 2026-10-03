@@ -118,23 +118,29 @@ class SourcePageProviderTest {
 
     @Test
     fun `the next chapter follows the source declared order`() = runTest {
+        val previous = Chapter(
+            key = chapter.copy(remoteId = RemoteChapterId("chapter-0")),
+            title = "Chapter 0",
+            index = 0,
+        )
         val next = Chapter(
             key = chapter.copy(remoteId = RemoteChapterId("chapter-2")),
             title = "Chapter 2",
-            index = 1,
+            index = 2,
         )
         val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
             override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
                 SourceOutcome.Success(
                     ComicDetail(
                         comic = Comic(comicKey, "Comic"),
-                        chapters = listOf(Chapter(chapter, "Chapter 1", 0), next),
+                        chapters = listOf(previous, Chapter(chapter, "Chapter 1", 1), next),
                     ),
                 )
         }
         val content = SourcePageProvider(catalog, FixedSizer()).loadChapter(chapter)
 
         assertEquals(next, content.nextChapter)
+        assertEquals(previous, content.previousChapter)
     }
 
     @Test

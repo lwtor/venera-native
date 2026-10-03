@@ -22,6 +22,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.test.swipeUp
@@ -62,12 +64,18 @@ class ReaderScreenTest {
     }
 
     @Test
-    fun showsChapterTitleAndPageCounter() {
+    fun centerTapShowsFullscreenReaderControls() {
+        val next = Chapter(
+            ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
+            "下一话", 1,
+        )
         composeRule.setContent {
             ReaderScreen(
                 state = ReaderUiState(
-                    chapterTitle = "Chapter 7",
+                    chapterTitle = "当前话",
                     pages = pages,
+                    currentChapterPageCount = pages.size,
+                    nextChapter = next,
                     status = ReaderStatus.Ready,
                 ),
                 onAction = {},
@@ -75,6 +83,28 @@ class ReaderScreenTest {
             )
         }
 
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput { click(center) }
+        composeRule.onNodeWithContentDescription("上一话").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("下一话").assertIsDisplayed()
+        composeRule.onNodeWithText("1 / 3 页").assertIsDisplayed()
+    }
+
+    @Test
+    fun showsChapterTitleAndPageCounter() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "Chapter 7",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput { click(center) }
         composeRule.onNodeWithText("Chapter 7").assertIsDisplayed()
         composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
     }

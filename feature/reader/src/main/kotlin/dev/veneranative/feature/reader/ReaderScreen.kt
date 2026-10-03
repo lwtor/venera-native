@@ -2,6 +2,10 @@ package dev.veneranative.feature.reader
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
@@ -10,11 +14,18 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,16 +34,20 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -40,13 +55,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.image.decode.PageImageDecoder
 import dev.veneranative.core.image.tiling.DecodeStrategy
@@ -63,7 +90,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
+import android.app.Activity
+import android.content.Context
 import kotlin.math.roundToInt
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 
 
 /**
@@ -83,12 +122,33 @@ fun ReaderScreen(
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
 ) {
     var strategy by rememberSaveable { mutableStateOf(DecodeStrategy.Region) }
+    var controlsVisible by rememberSaveable { mutableStateOf(false) }
+    var sliderPage by remember(state.currentPageNumber) { mutableStateOf(state.currentPageNumber.toFloat()) }
+    val view = LocalView.current
+    val window = remember(view) { view.context.findActivity()?.window }
     var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
     val decoder: PageImageDecoder? = decoderFactory?.let { factory ->
         remember(factory, strategy) { factory(strategy) }
     }
     DisposableEffect(decoder) {
         onDispose { decoder?.close() }
+    }
+    SideEffect {
+        window?.let { target ->
+            val controller = WindowCompat.getInsetsController(target, target.decorView)
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.navigationBars())
+            if (controlsVisible && state.status == ReaderStatus.Ready) {
+                controller.show(WindowInsetsCompat.Type.statusBars())
+            } else {
+                controller.hide(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+    DisposableEffect(window) {
+        onDispose {
+            window?.let { WindowCompat.getInsetsController(it, it.decorView).show(WindowInsetsCompat.Type.systemBars()) }
+        }
     }
     LaunchedEffect(state.pages.size) {
         chapterEndReached = false
@@ -99,64 +159,17 @@ fun ReaderScreen(
         }
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = state.chapterTitle.ifEmpty { "阅读器" },
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = "${state.currentPageNumber} / ${state.pageCount}",
-                            style = MaterialTheme.typography.labelMedium,
-                        )
-                    }
-                },
-                navigationIcon = {
-                    TextButton(onClick = onBack) { Text("返回") }
-                },
-            )
-        },
-        bottomBar = {
-            if (state.status == ReaderStatus.Ready) {
-                Column {
-                    if (state.isLoadingNextChapter) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                            Text("正在无缝载入下一话…", modifier = Modifier.padding(start = 8.dp))
-                        }
-                    } else if (state.nextChapterLoadFailed) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text("下一话载入失败")
-                            TextButton(onClick = { onAction(ReaderAction.RetryNextChapter) }) { Text("重试") }
-                        }
-                    }
-                    ReaderControls(
-                        direction = state.direction,
-                        strategy = if (decoderFactory == null) null else strategy,
-                        onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
-                        onStrategyChange = { strategy = it },
-                    )
-                }
-            }
-        },
-    ) { contentPadding ->
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(contentPadding),
+            modifier = Modifier.fillMaxSize().testTag("reader-canvas").pointerInput(state.status) {
+                detectTapGestures { tap ->
+                    val width = size.width.toFloat()
+                    val height = size.height.toFloat()
+                    if (tap.x in width * 0.28f..width * 0.72f && tap.y in height * 0.25f..height * 0.75f) {
+                        controlsVisible = !controlsVisible
+                    }
+                }
+            },
             contentAlignment = Alignment.Center,
         ) {
             when (state.status) {
@@ -180,6 +193,240 @@ fun ReaderScreen(
                     onChapterEndChange = { chapterEndReached = it },
                 )
             }
+        }
+        val showControls = controlsVisible && state.status == ReaderStatus.Ready
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(tween(180)) + slideInVertically(
+                animationSpec = tween(260, easing = FastOutSlowInEasing),
+                initialOffsetY = { it / 5 },
+            ),
+            exit = fadeOut(tween(130)) + slideOutVertically(
+                animationSpec = tween(200, easing = FastOutSlowInEasing),
+                targetOffsetY = { it / 5 },
+            ),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            ReaderToolOverlay(
+                state = state,
+                sliderPage = sliderPage,
+                onSliderPageChange = { sliderPage = it },
+                onSeek = { onAction(ReaderAction.SeekPage(it - 1)) },
+                onPreviousChapter = { onAction(ReaderAction.LoadPreviousChapter) },
+                onNextChapter = { onAction(ReaderAction.NavigateNextChapter) },
+                onRetryNextChapter = { onAction(ReaderAction.RetryNextChapter) },
+                onRetryPreviousChapter = { onAction(ReaderAction.RetryPreviousChapter) },
+                strategy = if (decoderFactory == null) null else strategy,
+                onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
+                onStrategyChange = { strategy = it },
+            )
+        }
+        AnimatedVisibility(
+            visible = showControls,
+            enter = fadeIn(tween(180)) + slideInVertically(
+                animationSpec = tween(260, easing = FastOutSlowInEasing),
+                initialOffsetY = { -it },
+            ),
+            exit = fadeOut(tween(120)) + slideOutVertically(
+                animationSpec = tween(180, easing = FastOutSlowInEasing),
+                targetOffsetY = { -it },
+            ),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            ReaderTopBar(state = state, onBack = onBack)
+        }
+    }
+}
+
+@Composable
+private fun ReaderToolOverlay(
+    state: ReaderUiState,
+    sliderPage: Float,
+    onSliderPageChange: (Float) -> Unit,
+    onSeek: (Int) -> Unit,
+    onPreviousChapter: () -> Unit,
+    onNextChapter: () -> Unit,
+    onRetryNextChapter: () -> Unit,
+    onRetryPreviousChapter: () -> Unit,
+    strategy: DecodeStrategy?,
+    onDirectionChange: (ReadingDirection) -> Unit,
+    onStrategyChange: (DecodeStrategy) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        Surface(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 4.dp,
+            shadowElevation = 8.dp,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+                if (state.isLoadingNextChapter || state.isLoadingPreviousChapter) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("正在加载章节…", modifier = Modifier.padding(start = 8.dp))
+                    }
+                } else if (state.nextChapterLoadFailed || state.previousChapterLoadFailed) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("章节加载失败", modifier = Modifier.weight(1f))
+                        if (state.nextChapterLoadFailed) TextButton(onClick = onRetryNextChapter) { Text("重试") }
+                        else TextButton(onClick = onRetryPreviousChapter) { Text("重试") }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = onPreviousChapter,
+                        enabled = state.previousChapter != null && !state.isLoadingPreviousChapter,
+                        modifier = Modifier.semantics { contentDescription = "上一话" },
+                    ) { ChapterStepIcon(previous = true) }
+                    ReaderPageSeekBar(
+                        currentPage = sliderPage.roundToInt().coerceIn(1, state.currentChapterPageCount.coerceAtLeast(1)),
+                        pageCount = state.currentChapterPageCount,
+                        onPagePreview = { onSliderPageChange(it.toFloat()) },
+                        onPageSelected = onSeek,
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                    )
+                    IconButton(
+                        onClick = onNextChapter,
+                        enabled = state.nextChapter != null && !state.isLoadingNextChapter,
+                        modifier = Modifier.semantics { contentDescription = "下一话" },
+                    ) { ChapterStepIcon(previous = false) }
+                }
+                Text(
+                    "${sliderPage.roundToInt().coerceAtLeast(1)} / ${state.currentChapterPageCount} 页",
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                ReaderControls(
+                    direction = state.direction,
+                    strategy = strategy,
+                    onDirectionChange = onDirectionChange,
+                    onStrategyChange = onStrategyChange,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReaderTopBar(
+    state: ReaderUiState,
+    onBack: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .height(56.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) { Text("‹", style = MaterialTheme.typography.headlineMedium) }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(state.chapterTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("${state.currentPageNumber} / ${state.currentChapterPageCount}", style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+@Composable
+private fun ReaderPageSeekBar(
+    currentPage: Int,
+    pageCount: Int,
+    onPagePreview: (Int) -> Unit,
+    onPageSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val lastIndex = (pageCount - 1).coerceAtLeast(0)
+    BoxWithConstraints(modifier = modifier.height(42.dp)) {
+        val density = LocalDensity.current
+        val horizontalInsetPx = with(density) { 10.dp.toPx() }
+        val trackWidthPx = with(density) { (maxWidth - 20.dp).toPx() }.coerceAtLeast(1f)
+        val pageStepPx = trackWidthPx / lastIndex.coerceAtLeast(1)
+        var dragPageIndex by remember(pageCount) {
+            mutableFloatStateOf((currentPage - 1).coerceIn(0, lastIndex).toFloat())
+        }
+        val dragState = rememberDraggableState { delta ->
+            if (lastIndex > 0) {
+                dragPageIndex = (dragPageIndex + delta / pageStepPx).coerceIn(0f, lastIndex.toFloat())
+                onPagePreview(dragPageIndex.roundToInt() + 1)
+            }
+        }
+        val colors = MaterialTheme.colorScheme
+
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics {
+                    if (lastIndex > 0) {
+                        progressBarRangeInfo = ProgressBarRangeInfo(
+                            currentPage.toFloat() - 1f,
+                            0f..lastIndex.toFloat(),
+                        )
+                    }
+                }
+                .draggable(
+                    state = dragState,
+                    orientation = Orientation.Horizontal,
+                    enabled = lastIndex > 0,
+                    onDragStarted = { position ->
+                        dragPageIndex = (((position.x - horizontalInsetPx) / trackWidthPx).coerceIn(0f, 1f) * lastIndex)
+                        onPagePreview(dragPageIndex.roundToInt() + 1)
+                    },
+                    onDragStopped = {
+                        onPageSelected(dragPageIndex.roundToInt() + 1)
+                    },
+                )
+                .pointerInput(lastIndex, trackWidthPx) {
+                    detectTapGestures { position ->
+                        if (lastIndex > 0) {
+                            val target = (((position.x - horizontalInsetPx) / trackWidthPx).coerceIn(0f, 1f) * lastIndex)
+                                .roundToInt() + 1
+                            dragPageIndex = (target - 1).toFloat()
+                            onPagePreview(target)
+                            onPageSelected(target)
+                        }
+                    }
+                },
+        ) {
+            val startX = horizontalInsetPx
+            val endX = size.width - horizontalInsetPx
+            val centerY = size.height / 2f
+            val progress = if (lastIndex == 0) 0f else ((currentPage - 1f) / lastIndex).coerceIn(0f, 1f)
+            val thumbX = startX + (endX - startX) * progress
+            drawLine(
+                color = colors.surfaceVariant,
+                start = Offset(startX, centerY),
+                end = Offset(endX, centerY),
+                strokeWidth = 3.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+            if (progress > 0f) {
+                drawLine(
+                    color = colors.primary,
+                    start = Offset(startX, centerY),
+                    end = Offset(thumbX, centerY),
+                    strokeWidth = 3.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            }
+            drawCircle(colors.surface, radius = 8.dp.toPx(), center = Offset(thumbX, centerY))
+            drawCircle(colors.primary, radius = 5.dp.toPx(), center = Offset(thumbX, centerY))
         }
     }
 }
@@ -268,6 +515,10 @@ private fun ContinuousPages(
             page?.let { onAction(ReaderAction.PageShown(it)) }
         }
     }
+    LaunchedEffect(state.currentPageIndex, items) {
+        val targetItem = items.indexOfFirst { it.page.index == state.currentPageIndex }.coerceAtLeast(0)
+        if (targetItem != listState.firstVisibleItemIndex) listState.scrollToItem(targetItem)
+    }
     val lastPageReady = state.pages.lastOrNull()?.sizeState == PageSizeState.Ready
     LaunchedEffect(listState, items.size, lastPageReady) {
         snapshotFlow {
@@ -339,6 +590,11 @@ private fun SinglePagePager(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .collect { onAction(ReaderAction.PageShown(it)) }
+    }
+    LaunchedEffect(state.currentPageIndex) {
+        if (state.currentPageIndex in 0 until pagerState.pageCount && pagerState.currentPage != state.currentPageIndex) {
+            pagerState.animateScrollToPage(state.currentPageIndex)
+        }
     }
     LaunchedEffect(pagerState.currentPage) { onChapterEndChange(false) }
     LaunchedEffect(pagerState, state.pages, viewport, decoder) {
@@ -583,40 +839,63 @@ private fun ReaderControls(
     onDirectionChange: (ReadingDirection) -> Unit,
     onStrategyChange: (DecodeStrategy) -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        ReadingDirection.entries.forEach { candidate ->
-            TextButton(onClick = { onDirectionChange(candidate) }) {
-                Text(
-                    text = candidate.label(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (candidate == direction) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text("翻页方式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            ReadingDirection.entries.forEach { candidate ->
+                FilterChip(
+                    selected = candidate == direction,
+                    onClick = { onDirectionChange(candidate) },
+                    label = {
+                        Text(candidate.label(), maxLines = 1, style = MaterialTheme.typography.labelMedium)
                     },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
         if (strategy != null) {
-            DecodeStrategy.entries.forEach { candidate ->
-                TextButton(onClick = { onStrategyChange(candidate) }) {
-                    Text(
-                        text = candidate.label(),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (candidate == strategy) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+            Text("图片解码", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                DecodeStrategy.entries.forEach { candidate ->
+                    FilterChip(
+                        selected = candidate == strategy,
+                        onClick = { onStrategyChange(candidate) },
+                        label = {
+                            Text(candidate.label(), maxLines = 1, style = MaterialTheme.typography.labelMedium)
                         },
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ChapterStepIcon(previous: Boolean) {
+    val color = LocalContentColor.current
+    Canvas(Modifier.size(22.dp)) {
+        val strokeWidth = 2.dp.toPx()
+        val x = if (previous) size.width * .28f else size.width * .72f
+        drawLine(
+            color = color,
+            start = Offset(x, size.height * .2f),
+            end = Offset(x, size.height * .8f),
+            strokeWidth = strokeWidth,
+            cap = StrokeCap.Round,
+        )
+        val chevron = Path().apply {
+            if (previous) {
+                moveTo(size.width * .72f, size.height * .2f)
+                lineTo(size.width * .42f, size.height * .5f)
+                lineTo(size.width * .72f, size.height * .8f)
+            } else {
+                moveTo(size.width * .28f, size.height * .2f)
+                lineTo(size.width * .58f, size.height * .5f)
+                lineTo(size.width * .28f, size.height * .8f)
+            }
+        }
+        drawPath(chevron, color, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
     }
 }
 

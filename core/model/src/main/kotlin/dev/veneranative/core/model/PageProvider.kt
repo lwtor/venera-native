@@ -8,6 +8,8 @@ data class ChapterContent(
     val coverUrl: String? = null,
     /** Next chapter in the source's declared order, when available. */
     val nextChapter: Chapter? = null,
+    /** Previous chapter in the source's declared order, when available. */
+    val previousChapter: Chapter? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }

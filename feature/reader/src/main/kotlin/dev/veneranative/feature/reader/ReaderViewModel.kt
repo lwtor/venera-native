@@ -47,6 +47,7 @@ class ReaderViewModel(
     private val loadedChapters = mutableSetOf<ChapterRef>()
     private var loadJob: kotlinx.coroutines.Job? = null
     private var nextChapterLoadJob: kotlinx.coroutines.Job? = null
+    private var previousChapterLoadJob: kotlinx.coroutines.Job? = null
 
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
@@ -75,6 +76,10 @@ class ReaderViewModel(
                 resolvePage(action.index)
             }
             is ReaderAction.PageShown -> showPage(action.index)
+            is ReaderAction.SeekPage -> seekPage(action.chapterPageIndex)
+            ReaderAction.LoadPreviousChapter -> loadPreviousChapter()
+            ReaderAction.RetryPreviousChapter -> loadPreviousChapter()
+            ReaderAction.NavigateNextChapter -> navigateNextChapter()
             is ReaderAction.ChangeDirection -> _state.update { it.copy(direction = action.direction) }
             ReaderAction.LoadNextChapter -> loadNextChapter()
             ReaderAction.RetryNextChapter -> {
@@ -106,6 +111,10 @@ class ReaderViewModel(
                         chapterTitle = content.title,
                         pages = content.pages.mapIndexed { index, page -> page.copy(index = index) },
                         currentPageIndex = resumedIndex,
+                        currentChapterStartIndex = 0,
+                        currentChapterPageCount = content.pages.size,
+                        previousChapter = content.previousChapter,
+                        nextChapterStartIndex = null,
                         nextChapter = content.nextChapter,
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
@@ -131,14 +140,42 @@ class ReaderViewModel(
         val target = index.coerceIn(0, pages.lastIndex)
         if (target == _state.value.currentPageIndex) return
         val segment = chapters.lastOrNull { target in it.startPageIndex..it.endPageIndex }
-        _state.update { it.copy(currentPageIndex = target, chapterTitle = segment?.content?.title ?: it.chapterTitle) }
+        _state.update { current ->
+            current.copy(
+                currentPageIndex = target,
+                chapterTitle = segment?.content?.title ?: current.chapterTitle,
+                currentChapterStartIndex = segment?.startPageIndex ?: current.currentChapterStartIndex,
+                currentChapterPageCount = segment?.content?.pages?.size ?: current.currentChapterPageCount,
+                previousChapter = segment?.content?.previousChapter,
+                nextChapter = segment?.content?.nextChapter,
+                nextChapterStartIndex = segment?.let { currentSegment ->
+                    chapters.firstOrNull { it.startPageIndex == currentSegment.endPageIndex + 1 }?.startPageIndex
+                },
+            )
+        }
         segment?.let { loaded ->
             loaded.progress?.record(loaded.content, target - loaded.startPageIndex)
         }
         prefetchAround(target)
     }
 
-    private fun loadNextChapter() {
+    private fun seekPage(chapterPageIndex: Int) {
+        val state = _state.value
+        if (state.currentChapterPageCount == 0) return
+        showPage(state.currentChapterStartIndex + chapterPageIndex.coerceIn(0, state.currentChapterPageCount - 1))
+    }
+
+    private fun navigateNextChapter() {
+        val current = _state.value
+        val loadedStart = current.nextChapterStartIndex
+        if (loadedStart != null) {
+            showPage(loadedStart)
+            return
+        }
+        loadNextChapter(navigateAfterLoad = true)
+    }
+
+    private fun loadNextChapter(navigateAfterLoad: Boolean = false) {
         val next = _state.value.nextChapter ?: return
         val nextRef = ChapterRef.Remote(next.key)
         if (nextRef in loadedChapters || nextChapterLoadJob?.isActive == true) return
@@ -153,13 +190,25 @@ class ReaderViewModel(
                 loadedChapters += nextRef
                 val appended = content.pages.mapIndexed { offset, page -> page.copy(index = startIndex + offset) }
                 _state.update { current ->
+                    val visibleSegment = chapters.lastOrNull {
+                        current.currentPageIndex in it.startPageIndex..it.endPageIndex
+                    }
                     current.copy(
                         pages = current.pages + appended,
-                        nextChapter = content.nextChapter,
+                        currentPageIndex = if (navigateAfterLoad) startIndex else current.currentPageIndex,
+                        currentChapterStartIndex = if (navigateAfterLoad) startIndex else current.currentChapterStartIndex,
+                        currentChapterPageCount = if (navigateAfterLoad) content.pages.size else current.currentChapterPageCount,
+                        nextChapterStartIndex = if (navigateAfterLoad) null else visibleSegment?.let { segment ->
+                            chapters.firstOrNull { it.startPageIndex == segment.endPageIndex + 1 }?.startPageIndex
+                        },
+                        chapterTitle = if (navigateAfterLoad) content.title else current.chapterTitle,
+                        previousChapter = if (navigateAfterLoad) content.previousChapter else visibleSegment?.content?.previousChapter,
+                        nextChapter = if (navigateAfterLoad) content.nextChapter else visibleSegment?.content?.nextChapter,
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
                     )
                 }
+                if (navigateAfterLoad) segmentProgress?.record(content, 0)
                 content.nextChapter?.let { following ->
                     viewModelScope.launch { provider.prefetchChapter(ChapterRef.Remote(following.key)) }
                 }
@@ -167,6 +216,53 @@ class ReaderViewModel(
                 throw cancellation
             } catch (_: Exception) {
                 _state.update { it.copy(isLoadingNextChapter = false, nextChapterLoadFailed = true) }
+            }
+        }
+    }
+
+    private fun loadPreviousChapter() {
+        val previous = _state.value.previousChapter ?: return
+        val previousRef = ChapterRef.Remote(previous.key)
+        if (previousRef in loadedChapters) {
+            val start = chapters.firstOrNull { it.chapter == previousRef }?.startPageIndex ?: return
+            showPage(start + (chapters.first { it.chapter == previousRef }.content.pages.lastIndex))
+            return
+        }
+        if (previousChapterLoadJob?.isActive == true) return
+        _state.update { it.copy(isLoadingPreviousChapter = true, previousChapterLoadFailed = false) }
+        previousChapterLoadJob = viewModelScope.launch {
+            try {
+                val content = provider.loadChapter(previousRef)
+                if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
+                val count = content.pages.size
+                val shiftedPages = _state.value.pages.map { it.copy(index = it.index + count) }
+                chapters.replaceAll { segment -> segment.copy(startPageIndex = segment.startPageIndex + count) }
+                val segmentProgress = progressFactory(previousRef)
+                chapters.add(0, ChapterSegment(previousRef, content, 0, segmentProgress))
+                loadedChapters += previousRef
+                _state.update { current ->
+                    current.copy(
+                        pages = content.pages.mapIndexed { index, page -> page.copy(index = index) } + shiftedPages,
+                        currentPageIndex = count - 1,
+                        currentChapterStartIndex = 0,
+                        currentChapterPageCount = count,
+                        chapterTitle = content.title,
+                        previousChapter = content.previousChapter,
+                        nextChapterStartIndex = count,
+                        nextChapter = content.nextChapter,
+                        isLoadingPreviousChapter = false,
+                        previousChapterLoadFailed = false,
+                    )
+                }
+                segmentProgress?.record(content, count - 1)
+                pageJobs.values.forEach { it.cancel() }
+                pageJobs.clear()
+                prefetched.clear()
+                prefetchAround(count - 1)
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                _state.update { it.copy(isLoadingPreviousChapter = false, previousChapterLoadFailed = true) }
             }
         }
     }

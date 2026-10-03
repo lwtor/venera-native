@@ -109,7 +109,43 @@ class ReaderViewModelTest {
         assertEquals(listOf(0, 1), viewModel.state.value.pages.map { it.index })
         assertEquals(0, viewModel.state.value.currentPageIndex)
         assertEquals("Chapter 1", viewModel.state.value.chapterTitle)
-        assertEquals(null, viewModel.state.value.nextChapter)
+        assertEquals(next, viewModel.state.value.nextChapter)
+    }
+
+    @Test
+    fun `quick chapter navigation loads the previous chapter and keeps pages on one canvas`() = runTest(dispatcher) {
+        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = when (chapter) {
+                ChapterRef.Remote(chapterKey) -> ChapterContent(
+                    "Chapter 1", listOf(ComicPage(0, "current-0", 100, 100), ComicPage(1, "current-1", 100, 100)),
+                    previousChapter = previous,
+                )
+                ChapterRef.Remote(previous.key) -> ChapterContent(
+                    "Chapter 0", listOf(ComicPage(0, "previous-0", 100, 100), ComicPage(1, "previous-1", 100, 100),
+                        ComicPage(2, "previous-2", 100, 100)),
+                )
+                else -> error("Unexpected chapter $chapter")
+            }
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+
+        viewModel.onAction(ReaderAction.LoadPreviousChapter)
+        advanceUntilIdle()
+
+        assertEquals(listOf("previous-0", "previous-1", "previous-2", "current-0", "current-1"),
+            viewModel.state.value.pages.map { it.imageRef })
+        assertEquals(2, viewModel.state.value.currentPageIndex)
+        assertEquals("Chapter 0", viewModel.state.value.chapterTitle)
+        assertEquals(3, viewModel.state.value.currentChapterPageCount)
+        assertEquals(3, viewModel.state.value.nextChapterStartIndex)
+
+        viewModel.onAction(ReaderAction.SeekPage(0))
+        assertEquals(0, viewModel.state.value.currentPageIndex)
+        viewModel.onAction(ReaderAction.NavigateNextChapter)
+        assertEquals(3, viewModel.state.value.currentPageIndex)
+        assertEquals("Chapter 1", viewModel.state.value.chapterTitle)
     }
 
     @Test

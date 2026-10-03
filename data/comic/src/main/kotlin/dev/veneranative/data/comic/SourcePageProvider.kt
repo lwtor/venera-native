@@ -92,6 +92,7 @@ class SourcePageProvider(
             title = detail?.chapters?.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
             pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
             nextChapter = detail?.chapters?.getOrNull(chapterIndex + 1).takeIf { chapterIndex >= 0 },
+            previousChapter = detail?.chapters?.getOrNull(chapterIndex - 1).takeIf { chapterIndex > 0 },
         )
     }
 

@@ -565,6 +565,7 @@ S3-00 小任务：
 | S3-00Q1 | 详情页和阅读器共享漫画详情短缓存，避免每次预载章节都重复下载完整目录；手动刷新绕过缓存；失败响应不缓存 | DONE（`data:comic`、`feature:details` JVM 测试与 App Debug 编译通过） |
 | S3-00Q2 | 适配拷贝漫画章节限流所需的 `setTimeout`；限制等待时长、支持取消，并给章节调用足够但有上限的超时 | DONE（`:source:network:testDebugUnitTest :source:engine:testDebugUnitTest :source:core:testDebugUnitTest` 通过；QuickJS 计时器与清理、Host 等待取消和章节调用专属超时均有回归；App 编译通过，未做设备 UI 验证） |
 | S3-00R | 来源函数抛出未处理的 JS 异常后，废弃可能已变更的 QuickJS 单例状态，并在下一次调用时从已安装脚本重新初始化；覆盖异常后状态重置 | IN_PROGRESS（针对“进程内多个详情持续失败、重启进程后恢复”增加恢复逻辑；JVM 定向回归与 App Debug 构建通过，等待用户真机复验） |
+| S3-00S | 阅读器沉浸全屏；点击画面中央呼出/收起工具层；按本话页码拖动定位；快捷跳转上一话/下一话且保持同一阅读画布 | DONE（默认隐藏系统栏；控制层展开时显示状态栏、隐藏导航栏；详情及阅读器顶部栏使用 safeDrawing inset 避让挖孔区；阅读器顶部栏从上向下滑入，底部工具区从下向上滑入，均带淡入；页码自绘轨道支持点击和拖动；前后话图标置于滑块两侧；翻页/解码方式分组等宽；编译与真机验收记录见 STATUS） |
 
 ## 8. Stage 4：同步、体验与发布
 

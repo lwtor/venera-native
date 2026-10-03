@@ -9,11 +9,13 @@
 | 最后更新 | 2026-10-03 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00R 来源脚本异常后的 QuickJS 实例恢复 |
-| 当前任务状态 | S3-00R IN_PROGRESS：未处理的 JS 来源函数异常后废弃当前实例，下次调用重新初始化；已增加“异常修改单例状态后，下次调用回到干净状态”的 JVM 回归，定向测试和 App Debug 构建通过，等待用户真机复验。S4-10A3 详情页章节目录与续读入口 IN_PROGRESS（目录已改为每行三项网格，普通状态不显示序号、批量选择时显示勾选框；次要搜索入口、批量下载及历史续读已实现；测试源码编译和 App Debug 构建通过；等待用户真机验证）；S4-10A 详情首屏与章节操作对齐 DONE（回归和 App Debug 编译通过；真机视觉复核待做）；S4-10B 来源支持的推荐/评分/评论/网页内容 DONE（模型解析、详情渲染和 App Debug 验证通过；只读评论，未做设备验收）；S4-10A2 详情页沉浸式封面折叠栏 DONE（详情 JVM 单测与 App Debug 构建通过；用户真机视觉确认通过）；S4-10C 详情点赞/评分/评论发送与投票等来源操作 TODO（当前 SourceCore/ComicCatalog 无对应类型化契约）；S4-08D 根级四 Tab 导航修复 DONE（根导航共享底栏，App Debug 与 AndroidTest 源码编译通过；真机交互待用户验收）；S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 同源调用并发排队与下一话预载 DONE；S3-00N 竖屏末页监听修复 DONE（仪器测试受 UTP 卸载风险阻止）；S3-00P 来源网络并发请求排队与脱敏诊断 DONE；S3-00O 同画布跨话连续阅读及下一话加载失败修复 DONE；S3-00Q1 详情接口短缓存与显式刷新 DONE；S3-00Q2 拷贝漫画限流等待兼容 DONE（设备回归待新 APK 验证）；S3-00B2 上游源码审查因 GitHub 源码访问失败而 BLOCKED（用户指定详情页工作优先）；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务状态 | S3-00R IN_PROGRESS：未处理的 JS 来源函数异常后废弃当前实例，下次调用重新初始化；已增加“异常修改单例状态后，下次调用回到干净状态”的 JVM 回归，定向测试和 App Debug 构建通过，等待用户真机复验。S4-10A3 详情页章节目录与续读入口 IN_PROGRESS（目录已改为每行三项网格，普通状态不显示序号、批量选择时显示勾选框；次要搜索入口、批量下载及历史续读已实现；测试源码编译和 App Debug 构建通过；等待用户真机验证）；S4-10A 详情首屏与章节操作对齐 DONE（回归和 App Debug 编译通过；真机视觉复核待做）；S4-10B 来源支持的推荐/评分/评论/网页内容 DONE（模型解析、详情渲染和 App Debug 验证通过；只读评论，未做设备验收）；S4-10A2 详情页沉浸式封面折叠栏 DONE（详情 JVM 单测与 App Debug 构建通过；用户真机视觉确认通过）；S4-10C 详情点赞/评分/评论发送与投票等来源操作 TODO（当前 SourceCore/ComicCatalog 无对应类型化契约）；S4-08D 根级四 Tab 导航修复 DONE（根导航共享底栏，App Debug 与 AndroidTest 源码编译通过；真机交互待用户验收）；S3-00G 阅读器续读返回目标修复 DONE；S3-00H 阅读器图片黑屏修复 DONE；S3-00I 阅读器快速重进时源调用恢复 DONE；S3-00J 邻页首屏预解码 DONE（设备耗时未测）；S3-00K 停稳后邻页预解码 DONE（设备耗时未测）；S3-00L 下一话基础衔接 DONE；S3-00M 同源调用并发排队与下一话预载 DONE；S3-00N 竖屏末页监听修复 DONE（仪器测试受 UTP 卸载风险阻止）；S3-00P 来源网络并发请求排队与脱敏诊断 DONE；S3-00O 同画布跨话连续阅读及下一话加载失败修复 DONE；S3-00Q1 详情接口短缓存与显式刷新 DONE；S3-00Q2 拷贝漫画限流等待兼容 DONE（设备回归待新 APK 验证）；S3-00S 阅读器控制层视觉修订已实现并编译通过，等待用户真机确认挖孔屏安全区、滑块拖动与工具层动画；S3-00B2 上游源码审查因 GitHub 源码访问失败而 BLOCKED（用户指定详情页工作优先）；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
 | 工作基线 | AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20（AGP 内置）、JDK 17、SDK 37、minSdk 26、KSP 2.3.12、Coil 3.6.3、QuickJS 1.0.15、Room 2.8.5 |
+
+**S3-00S DONE：阅读器沉浸式控制层与章节/页码快速导航。** 阅读器默认隐藏系统栏；点页面中央后显示状态栏和工具层，导航栏仍隐藏。详情折叠栏和阅读器顶部标题栏使用 safeDrawing 顶部 inset 避让状态栏及挖孔区；阅读器标题栏从屏幕上方滑入（向下出现），底部工具区从屏幕下方向上滑入，两处均带淡入并独立收起。页码滑块为自绘窄轨道与圆形滑块，支持点击和拖动定位；上一话/下一话图标置于滑块两侧，翻页与解码方式分组等宽。最近修改验证：JDK 17 `:feature:details:compileDebugKotlin :feature:reader:compileDebugKotlin :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或操作真机，挖孔屏避让、状态栏显示及动画方向由用户复验。
 
 ### 最终产品目标：全 App 对齐原 Venera
 
