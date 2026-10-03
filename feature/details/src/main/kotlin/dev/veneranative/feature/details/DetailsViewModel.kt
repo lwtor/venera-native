@@ -12,6 +12,7 @@ import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
@@ -36,6 +37,7 @@ class DetailsViewModel(
     private val comicKey: ComicKey,
     private val collection: CollectionRepository?,
     private val downloads: DownloadRepository? = null,
+    private val history: HistoryRepository? = null,
 ) : ViewModel() {
 
     private val comicRef = ComicRef.Remote(comicKey)
@@ -80,7 +82,21 @@ class DetailsViewModel(
             DetailsAction.DownloadSelectedChapters -> downloadChapters(_state.value.selectedChapters)
 
             DetailsAction.ToggleFavorite -> toggleFavorite()
-            is DetailsAction.DownloadChapter -> downloadChapters(setOf(action.chapter))
+        }
+    }
+
+    /** Refreshes the resume target when the details route becomes visible again after reading. */
+    fun refreshReadingProgress(repository: HistoryRepository? = history) {
+        repository ?: return
+        viewModelScope.launch {
+            try {
+                val progress = repository.progress(comicKey)
+                _state.update { it.copy(lastReadChapterId = progress?.chapterId) }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Reading history is optional; its failure must not block comic details.
+            }
         }
     }
 

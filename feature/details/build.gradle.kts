@@ -14,6 +14,7 @@ dependencies {
     implementation(project(":data:collection"))
     implementation(project(":data:comic"))
     implementation(project(":data:download"))
+    implementation(project(":data:history"))
     implementation(project(":source:api"))
 
     implementation(platform(libs.compose.bom))

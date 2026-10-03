@@ -9,6 +9,7 @@ import dev.veneranative.core.model.ComicRef
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.RemoteComicId
+import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.core.model.SourceId
@@ -25,6 +26,9 @@ import dev.veneranative.data.download.DownloadTask
 import dev.veneranative.data.download.DownloadPage
 import dev.veneranative.data.download.DownloadError
 import dev.veneranative.data.download.RecoveryReport
+import dev.veneranative.data.history.HistoryRepository
+import dev.veneranative.data.history.ReadingHistoryEntry
+import dev.veneranative.data.history.ReadingProgress
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
@@ -78,19 +82,18 @@ class DetailsViewModelTest {
         assertEquals(listOf("Chapter 1", "Chapter 2"), viewModel.state.value.visibleChapters.map { it.title })
     }
 
-    @Test fun `download chapter action resolves source pages and enqueues remote reference`() = runTest(dispatcher) {
+    @Test fun `details exposes the most recently read chapter as the resume target`() = runTest(dispatcher) {
         catalog.source = installed("s", name = "Source S")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
-        catalog.pagesResponse = SourceOutcome.Success(listOf(SourcePage(0, "https://page/1"), SourcePage(1, "https://page/2")))
-        val downloads = RecordingDownloadRepository()
-        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        val history = FakeHistoryRepository(
+            ReadingProgress(comicKey, RemoteChapterId("2"), pageIndex = 5, updatedAtEpochMillis = 1L),
+        )
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, history = history)
+        viewModel.refreshReadingProgress()
         advanceUntilIdle()
-        val chapter = viewModel.state.value.detail!!.chapters.first()
-        viewModel.onAction(DetailsAction.DownloadChapter(chapter.key))
-        advanceUntilIdle()
-        assertEquals(ChapterRef.Remote(chapter.key), downloads.enqueuedChapter)
-        assertEquals(listOf("https://page/1", "https://page/2"), downloads.enqueuedPages.map { it.imageRef })
-        assertEquals(1, viewModel.state.value.downloadQueueVersion)
+
+        assertEquals(RemoteChapterId("2"), viewModel.state.value.lastReadChapterId)
+        assertEquals("Chapter 2", viewModel.state.value.detail!!.chapters.first { it.key.remoteId == viewModel.state.value.lastReadChapterId }.title)
     }
 
     @Test fun `selected chapters are queued in source order`() = runTest(dispatcher) {
@@ -393,13 +396,11 @@ class DetailsViewModelTest {
     }
 
     private class RecordingDownloadRepository : DownloadRepository {
-        var enqueuedChapter: ChapterRef? = null
         var enqueuedPages: List<SourcePage> = emptyList()
         val enqueuedChapters = mutableListOf<ChapterRef>()
         override fun observeTasks(): Flow<List<DownloadTask>> = emptyFlow()
         override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = emptyFlow()
         override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) {
-            enqueuedChapter = chapter
             enqueuedPages = pages
             enqueuedChapters += chapter
         }
@@ -415,5 +416,13 @@ class DetailsViewModelTest {
         override suspend fun markPaused(chapter: ChapterRef, index: Int) = false
         override suspend fun markSucceeded(chapter: ChapterRef, index: Int, relativePath: String, bytes: Long) = false
         override suspend fun markFailed(chapter: ChapterRef, index: Int, error: DownloadError) = false
+    }
+
+    private class FakeHistoryRepository(private val progressEntry: ReadingProgress?) : HistoryRepository {
+        override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>> = emptyFlow()
+        override suspend fun record(entry: ReadingHistoryEntry) = Unit
+        override suspend fun progress(comicKey: ComicKey): ReadingProgress? =
+            progressEntry?.takeIf { it.comicKey == comicKey }
+        override suspend fun remove(comicKey: ComicKey) = Unit
     }
 }

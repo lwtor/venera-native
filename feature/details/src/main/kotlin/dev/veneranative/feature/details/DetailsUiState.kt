@@ -3,6 +3,7 @@ package dev.veneranative.feature.details
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicDetail
+import dev.veneranative.core.model.RemoteChapterId
 
 /**
  * Everything the details screen renders.
@@ -15,6 +16,8 @@ data class DetailsUiState(
     val detail: ComicDetail? = null,
     /** Name of the source the comic came from, once it is known to be installed and enabled. */
     val sourceName: String? = null,
+    /** Last chapter recorded by the reader, if this comic has reading history. */
+    val lastReadChapterId: RemoteChapterId? = null,
     /** The group the list is narrowed to; null shows every group. */
     val selectedGroup: String? = null,
     val order: ChapterOrder = ChapterOrder.SourceOrder,

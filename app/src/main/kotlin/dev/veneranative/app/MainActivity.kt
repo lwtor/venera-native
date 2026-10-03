@@ -191,7 +191,17 @@ private fun AppNavHost(
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
-    val onBack: () -> Unit = { onRouteChange(backRoute ?: AppRoute.Home) }
+    val onBack: () -> Unit = {
+        val destination = backRoute ?: AppRoute.Home
+        if (route is AppRoute.Reader) {
+            appScope.launch {
+                progressTracker.get()?.let { tracker -> runCatching { tracker.flush() } }
+                onRouteChange(destination)
+            }
+        } else {
+            onRouteChange(destination)
+        }
+    }
     BackHandler(enabled = backRoute != null, onBack = onBack)
 
     var scriptSelection by remember { mutableStateOf<((String) -> Unit)?>(null) }
@@ -312,6 +322,7 @@ private fun AppNavHost(
             comicKey = current.comicKey,
             collection = collectionRepository,
             downloads = downloadRepository,
+            history = historyRepository,
             onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
             onBack = onBack,

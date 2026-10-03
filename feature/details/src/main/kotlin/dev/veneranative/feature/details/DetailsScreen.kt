@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -47,6 +48,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -107,13 +110,17 @@ fun DetailsScreen(
         contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             if (state.detail != null && state.hasChapters) {
-                val firstChapter = state.detail.chapters.firstOrNull()
-                if (firstChapter != null) {
+                val resumeChapter = state.detail.chapters.firstOrNull { it.key.remoteId == state.lastReadChapterId }
+                val primaryChapter = resumeChapter ?: state.detail.chapters.firstOrNull()
+                if (primaryChapter != null) {
                     Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
                         Button(
-                            onClick = { onOpenChapter(firstChapter.key) },
+                            onClick = { onOpenChapter(primaryChapter.key) },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                        ) { Text("开始阅读 · ${firstChapter.title}", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        ) {
+                            val action = if (resumeChapter != null) "继续阅读" else "开始阅读"
+                            Text("$action · ${primaryChapter.title}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -279,23 +286,28 @@ private fun Content(
         }
 
         val withHeaders = state.groupsTheList
-        var previousGroup: String? = null
-        state.filteredChapters.forEach { chapter ->
-            val group = chapter.group
-            if (withHeaders && group != null && group != previousGroup) {
-                item(key = "group:$group") { GroupHeader(group) }
-            }
-            if (withHeaders) previousGroup = group ?: previousGroup
-
-            item(key = chapter.key.remoteId.value) {
-                ChapterRow(
-                    chapter = chapter,
-                    selected = chapter.key in state.selectedChapters,
-                    selectionMode = state.isChapterSelectionMode,
-                    onOpen = { onOpenChapter(chapter.key) },
-                    onDownload = { onAction(DetailsAction.DownloadChapter(chapter.key)) },
-                    onToggleSelection = { onAction(DetailsAction.ChapterSelectionToggled(chapter.key)) },
-                )
+        val chapterEntries = buildChapterListEntries(state.filteredChapters, withHeaders)
+        chapterEntries.forEach { entry ->
+            when (entry) {
+                is ChapterListEntry.Group -> item(key = "group:${entry.name}") { GroupHeader(entry.name) }
+                is ChapterListEntry.Row -> item(key = "chapter-row:${entry.chapters.first().key.remoteId.value}") {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        entry.chapters.forEach { chapter ->
+                            ChapterRow(
+                                chapter = chapter,
+                                selected = chapter.key in state.selectedChapters,
+                                selectionMode = state.isChapterSelectionMode,
+                                modifier = Modifier.weight(1f),
+                                onOpen = { onOpenChapter(chapter.key) },
+                                onToggleSelection = { onAction(DetailsAction.ChapterSelectionToggled(chapter.key)) },
+                            )
+                        }
+                        repeat(3 - entry.chapters.size) { Spacer(modifier = Modifier.weight(1f)) }
+                    }
+                }
             }
         }
         if (state.filteredChapters.isEmpty()) {
@@ -633,15 +645,8 @@ private fun ChapterControls(
     state: DetailsUiState,
     onAction: (DetailsAction) -> Unit,
 ) {
+    var searchExpanded by remember { mutableStateOf(state.chapterQuery.isNotBlank()) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = state.chapterQuery,
-            onValueChange = { onAction(DetailsAction.ChapterQueryChanged(it)) },
-            modifier = Modifier.fillMaxWidth().testTag(DETAILS_CHAPTER_SEARCH_TAG),
-            singleLine = true,
-            label = { Text("搜索章节") },
-            placeholder = { Text("输入章节名称") },
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -655,6 +660,25 @@ private fun ChapterControls(
                 )
             }
             Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = {
+                    if (searchExpanded) onAction(DetailsAction.ChapterQueryChanged(""))
+                    searchExpanded = !searchExpanded
+                },
+                modifier = Modifier.semantics { contentDescription = "搜索章节" },
+            ) {
+                SearchGlyph()
+            }
+        }
+
+        if (searchExpanded) {
+            OutlinedTextField(
+                value = state.chapterQuery,
+                onValueChange = { onAction(DetailsAction.ChapterQueryChanged(it)) },
+                modifier = Modifier.fillMaxWidth().testTag(DETAILS_CHAPTER_SEARCH_TAG),
+                singleLine = true,
+                placeholder = { Text("搜索章节") },
+            )
         }
 
         if (state.groups.size > 1) {
@@ -699,6 +723,26 @@ private fun ChapterControls(
 }
 
 @Composable
+private fun SearchGlyph() {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(20.dp)) {
+        drawCircle(
+            color = color,
+            radius = size.minDimension * 0.30f,
+            center = androidx.compose.ui.geometry.Offset(size.width * 0.42f, size.height * 0.42f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.8.dp.toPx()),
+        )
+        drawLine(
+            color = color,
+            start = androidx.compose.ui.geometry.Offset(size.width * 0.63f, size.height * 0.63f),
+            end = androidx.compose.ui.geometry.Offset(size.width * 0.9f, size.height * 0.9f),
+            strokeWidth = 1.8.dp.toPx(),
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+        )
+    }
+}
+
+@Composable
 private fun GroupHeader(name: String) {
     Text(
         text = name,
@@ -707,18 +751,51 @@ private fun GroupHeader(name: String) {
     )
 }
 
+private sealed interface ChapterListEntry {
+    data class Group(val name: String) : ChapterListEntry
+    data class Row(val chapters: List<Chapter>) : ChapterListEntry
+}
+
+private fun buildChapterListEntries(chapters: List<Chapter>, showGroups: Boolean): List<ChapterListEntry> {
+    val entries = mutableListOf<ChapterListEntry>()
+    val row = mutableListOf<Chapter>()
+    var previousGroup: String? = null
+
+    fun flushRow() {
+        if (row.isNotEmpty()) {
+            entries += ChapterListEntry.Row(row.toList())
+            row.clear()
+        }
+    }
+
+    chapters.forEach { chapter ->
+        val group = chapter.group
+        if (showGroups && group != null && group != previousGroup) {
+            flushRow()
+            entries += ChapterListEntry.Group(group)
+        }
+        if (showGroups) previousGroup = group ?: previousGroup
+
+        row += chapter
+        if (row.size == 3) flushRow()
+    }
+    flushRow()
+    return entries
+}
+
 @Composable
 private fun ChapterRow(
     chapter: Chapter,
     selected: Boolean,
     selectionMode: Boolean,
+    modifier: Modifier = Modifier,
     onOpen: () -> Unit,
-    onDownload: () -> Unit,
     onToggleSelection: () -> Unit,
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 4.dp)
+        modifier = modifier.fillMaxWidth().padding(vertical = 2.dp)
             .clickable(onClick = if (selectionMode) onToggleSelection else onOpen),
+        shape = RoundedCornerShape(9.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         ),
@@ -726,25 +803,36 @@ private fun ChapterRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = if (selectionMode) if (selected) "✓" else "○" else (chapter.index + 1).toString(),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (selectionMode) {
+                Surface(
+                    modifier = Modifier.size(14.dp),
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        if (selected) {
+                            Text(
+                                text = "✓",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
+                    }
+                }
+            }
             Text(
                 text = chapter.title,
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 2,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (!selectionMode) {
-                TextButton(onClick = onDownload) { Text("下载") }
-            }
         }
     }
 }

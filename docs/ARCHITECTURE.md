@@ -51,7 +51,7 @@ immutable UiState
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索/探索/书架/来源入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
 | `:feature:library` | 书架页：收藏、下载队列与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local` |
-| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏与下载操作；打开章节通过远端 `ChapterRef` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:source:api` |
+| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；从阅读历史恢复最近章节，打开章节通过远端 `ChapterRef` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索：来源与关键词、分页结果、列表级失败与重试 | Design System、`:data:comic` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度 | Design System、`:core:model`、`:core:image` |

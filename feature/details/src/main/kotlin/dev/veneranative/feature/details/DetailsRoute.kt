@@ -10,6 +10,7 @@ import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.history.HistoryRepository
 
 /**
  * Entry point of the details screen: owns the ViewModel, collects state, forwards actions.
@@ -32,11 +33,15 @@ fun DetailsRoute(
     downloads: DownloadRepository? = null,
     onScheduleDownloads: () -> Unit = {},
     onOpenComic: (ComicKey) -> Unit = {},
+    history: HistoryRepository? = null,
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
-        DetailsViewModel(catalog, comicKey, collection, downloads)
+        DetailsViewModel(catalog, comicKey, collection, downloads, history)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(comicKey, history) {
+        viewModel.refreshReadingProgress(history)
+    }
     androidx.compose.runtime.LaunchedEffect(state.downloadQueueVersion) {
         if (state.downloadQueueVersion > 0) onScheduleDownloads()
     }
