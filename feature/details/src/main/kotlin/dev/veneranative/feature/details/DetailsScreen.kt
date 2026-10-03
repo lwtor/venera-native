@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Brush
@@ -387,10 +388,6 @@ private fun DetailsToolbar(
                 onClick = onBack,
                 modifier = Modifier
                     .padding(start = 4.dp)
-                    .background(
-                        color = androidx.compose.ui.graphics.lerp(Color.Black.copy(alpha = 0.36f), Color.Transparent, collapseFraction),
-                        shape = CircleShape,
-                    )
                     .semantics { contentDescription = "返回" },
             ) {
                 CanvasBackArrow(
@@ -433,12 +430,26 @@ private fun Section(content: @Composable () -> Unit) {
 @Composable
 private fun DetailFacts(metadata: Map<String, String>) {
     Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("作品信息", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             metadata.forEach { (label, value) ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(label.toChineseMetadataLabel(), modifier = Modifier.width(76.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(value, style = MaterialTheme.typography.bodyMedium)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        InfoLabel(label.toChineseMetadataLabel())
+                        Text(
+                            value,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
         }
@@ -446,14 +457,55 @@ private fun DetailFacts(metadata: Map<String, String>) {
 }
 
 @Composable
+private fun InfoLabel(text: String) {
+    Surface(shape = RoundedCornerShape(7.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        Text(
+            text,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 private fun DetailTagGroups(groups: Map<String, List<String>>) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("标签", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         groups.forEach { (name, values) ->
             if (values.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(name, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(values.joinToString("  ·  "), style = MaterialTheme.typography.bodyMedium)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        InfoLabel(name.toChineseTagGroupLabel())
+                        FlowRow(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            values.forEach { value ->
+                                Surface(
+                                    shape = RoundedCornerShape(50),
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                ) {
+                                    Text(
+                                        value,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -714,6 +766,18 @@ private fun String.toChineseMetadataLabel(): String = when (this) {
     "Rating" -> "评分"
     "Likes" -> "点赞数"
     "Comments" -> "评论数"
+    else -> this
+}
+
+private fun String.toChineseTagGroupLabel(): String = when (this) {
+    "Tags" -> "标签"
+    "Authors" -> "作者"
+    "Artists" -> "画师"
+    "Genres" -> "题材"
+    "Characters" -> "角色"
+    "Parodies" -> "原作"
+    "Groups" -> "社团"
+    "Categories" -> "分类"
     else -> this
 }
 
