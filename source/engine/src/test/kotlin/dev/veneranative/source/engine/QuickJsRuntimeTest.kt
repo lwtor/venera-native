@@ -413,6 +413,28 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `an uncaught source error resets mutated singleton state before the next call`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    failAfterMutation() {
+                      this.counter = 99;
+                      throw new Error("temporary detail failure");
+                    }
+                    readCounter() { return this.counter || 0; }
+                    """.trimIndent(),
+                ),
+            )
+
+            val failed = runtime.invoke(SourceCall.InvokeFunction("failure-1", sourceId, "failAfterMutation"))
+            assertTrue("expected source failure, got $failed", failed is SourceResult.Failure)
+
+            assertEquals("0", runtime.invokeSuccess(sourceId, "readCounter"))
+        }
+    }
+
+    @Test
     fun `a host method outside the allow list is rejected`() = runBlocking {
         val host = RecordingHostApi { request -> respondWithBody(request.requestId, 200, "{}") }
 

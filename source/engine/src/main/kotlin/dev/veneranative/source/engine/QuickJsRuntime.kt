@@ -177,6 +177,10 @@ class QuickJsRuntime(
                         }
                         throw cancellation
                     } catch (failure: Throwable) {
+                        // A source function can leave its singleton instance in a partially
+                        // mutated state before throwing. Drop that isolate so the next call starts
+                        // from the installed script's constructor/init state, like a process restart.
+                        if (failure is QuickJsException) session.discardEngine()
                         return typedCall.failure(mapInvocationFailure(failure))
                     }
 
