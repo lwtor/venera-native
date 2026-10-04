@@ -61,13 +61,40 @@ class LibraryViewModel(
             LibraryAction.DismissFolderEditor -> _state.update { it.copy(folderEditor = null) }
             is LibraryAction.DeleteFolder -> runSafely { repository.deleteFolder(action.folderId) }
 
-            is LibraryAction.RemoveItem -> runSafely { repository.remove(action.ref) }
-            is LibraryAction.MoveItem -> runSafely { repository.moveTo(action.ref, action.folderId) }
-            is LibraryAction.ClearUpdate -> runSafely { repository.clearUpdate(action.ref) }
+            is LibraryAction.RemoveItem -> {
+                _state.update { it.copy(selectedFavorite = null) }
+                runSafely { repository.remove(action.ref) }
+            }
+            is LibraryAction.MoveItem -> {
+                _state.update { it.copy(selectedFavorite = null) }
+                runSafely { repository.moveTo(action.ref, action.folderId) }
+            }
+            is LibraryAction.ClearUpdate -> {
+                _state.update { it.copy(selectedFavorite = null) }
+                runSafely { repository.clearUpdate(action.ref) }
+            }
+            is LibraryAction.ShowFavoriteActions -> _state.update { state ->
+                state.copy(selectedFavorite = state.items.firstOrNull { it.ref == action.ref })
+            }
+            LibraryAction.DismissFavoriteActions -> _state.update { it.copy(selectedFavorite = null) }
 
             LibraryAction.RefreshUpdates -> refreshUpdates()
+            LibraryAction.ToggleFavoriteSearch -> _state.update {
+                it.copy(
+                    favoriteSearchVisible = !it.favoriteSearchVisible,
+                    favoriteQuery = if (it.favoriteSearchVisible) "" else it.favoriteQuery,
+                )
+            }
+            is LibraryAction.FavoriteQueryChanged -> _state.update { it.copy(favoriteQuery = action.query) }
             LibraryAction.Retry -> startItems()
-            is LibraryAction.SelectTab -> _state.update { it.copy(tab = action.tab) }
+            is LibraryAction.SelectTab -> _state.update {
+                it.copy(
+                    tab = action.tab,
+                    favoriteSearchVisible = false,
+                    favoriteQuery = "",
+                    selectedFavorite = null,
+                )
+            }
             LibraryAction.RequestLocalImport -> Unit
             LibraryAction.RequestArchiveImport -> Unit
             is LibraryAction.ImportTree -> importTree(action.uri)

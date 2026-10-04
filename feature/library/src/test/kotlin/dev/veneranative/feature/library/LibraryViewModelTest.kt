@@ -62,6 +62,39 @@ class LibraryViewModelTest {
         assertEquals(listOf("default", "reading"), viewModel.state.value.folders.map { it.id })
     }
 
+    @Test
+    fun `favorite search filters title and subtitle without changing the repository list`() = runTest(dispatcher) {
+        repository.items.value = listOf(
+            favoriteItem("comic-1", "Frieren").copy(subtitle = "Beyond Journey's End"),
+            favoriteItem("comic-2", "Kagurabachi"),
+        )
+        val viewModel = LibraryViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(LibraryAction.ToggleFavoriteSearch)
+        viewModel.onAction(LibraryAction.FavoriteQueryChanged("JOURNEY"))
+
+        assertEquals(listOf("Frieren"), viewModel.state.value.filteredItems.map { it.title })
+        assertEquals(2, viewModel.state.value.items.size)
+
+        viewModel.onAction(LibraryAction.ToggleFavoriteSearch)
+        assertEquals("", viewModel.state.value.favoriteQuery)
+        assertTrue(!viewModel.state.value.favoriteSearchVisible)
+    }
+
+    @Test
+    fun `long press selects a favorite for its action sheet and dismissal clears it`() = runTest(dispatcher) {
+        repository.items.value = listOf(favoriteItem("comic-1", "Frieren"))
+        val viewModel = LibraryViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(LibraryAction.ShowFavoriteActions(comicRef("comic-1")))
+        assertEquals("Frieren", viewModel.state.value.selectedFavorite?.title)
+
+        viewModel.onAction(LibraryAction.DismissFavoriteActions)
+        assertNull(viewModel.state.value.selectedFavorite)
+    }
+
     @Test fun `download list observes persisted tasks and delegates all controls`() = runTest(dispatcher) {
         val downloads = FakeDownloadRepository()
         val chapter = ChapterRef.Remote(ChapterKey(ComicKey(SourceId("source"), RemoteComicId("comic")), RemoteChapterId("chapter")))

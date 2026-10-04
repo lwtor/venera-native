@@ -301,7 +301,6 @@ private fun AppNavHost(
                     onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
                     downloads = downloadRepository,
                     onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
-                    onBack = onBack,
                 )
             }
         }

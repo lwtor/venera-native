@@ -39,11 +39,24 @@ data class LibraryUiState(
     val selectedFolderId: String? = null,
     val sort: ShelfSort = ShelfSort.AddedAt,
     val items: List<FavoriteItem> = emptyList(),
+    val favoriteSearchVisible: Boolean = false,
+    val favoriteQuery: String = "",
+    /** Comic whose contextual bottom sheet is currently open. */
+    val selectedFavorite: FavoriteItem? = null,
     /** Set while the create/rename dialog is open. */
     val folderEditor: FolderEditor? = null,
     /** Product copy for the last outcome; never a lower layer's wording. */
     val message: String? = null,
-)
+) {
+    val filteredItems: List<FavoriteItem>
+        get() {
+            val query = favoriteQuery.trim()
+            return if (query.isEmpty()) items else items.filter { item ->
+                item.title.contains(query, ignoreCase = true) ||
+                    item.subtitle.orEmpty().contains(query, ignoreCase = true)
+            }
+        }
+}
 
 /** What the user did. Actions name intent, not the storage call behind it. */
 sealed interface LibraryAction {
@@ -70,7 +83,15 @@ sealed interface LibraryAction {
 
     data class ClearUpdate(val ref: ComicRef) : LibraryAction
 
+    data class ShowFavoriteActions(val ref: ComicRef) : LibraryAction
+
+    data object DismissFavoriteActions : LibraryAction
+
     data object RefreshUpdates : LibraryAction
+
+    data object ToggleFavoriteSearch : LibraryAction
+
+    data class FavoriteQueryChanged(val query: String) : LibraryAction
 
     data object Retry : LibraryAction
 

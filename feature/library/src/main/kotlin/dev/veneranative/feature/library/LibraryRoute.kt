@@ -20,7 +20,6 @@ import dev.veneranative.data.download.DownloadRepository
 fun LibraryRoute(
     collection: CollectionRepository,
     onOpenComic: (ComicKey) -> Unit,
-    onBack: () -> Unit,
     modifier: Modifier = Modifier,
     localRepository: LocalComicRepository? = null,
     downloads: DownloadRepository? = null,
@@ -46,7 +45,6 @@ fun LibraryRoute(
         },
         onOpenComic = onOpenComic,
         onOpenLocalChapter = onOpenLocalChapter,
-        onBack = onBack,
         modifier = modifier,
     )
 }
