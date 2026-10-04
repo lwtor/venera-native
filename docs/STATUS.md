@@ -6,10 +6,10 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-10-03 |
+| 最后更新 | 2026-10-04 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-01A 搜索页真机验收（由用户执行） |
-| 当前任务状态 | S3-01A DONE：用户继续验收时发现源/筛选选择行会跳动、聚合模式下点搜索历史会错误退回单源；另修正聚合仍可选来源的问题。现已固定芯片尺寸和选择标记占位、平滑筛选区高度变化；聚合模式保留来源芯片列表并显示全部选中，单独点击来源不会取消或切换；ViewModel 忽略聚合态单源切换；搜索历史保留聚合模式。新增对应回归测试。JDK 17 下 `:feature:search:compileDebugKotlin :feature:search:compileDebugUnitTestKotlin :app:assembleDebug` 通过，`git diff --check` 通过。新 APK 由用户安装验收；未自动安装。其余搜索页改造包括独立结果页、固定双行漫画名称、来源动态筛选、按来源聚合分组及 Room 历史。S3-00B2 的上游全面基线审查仍保持原阻塞状态。S3-00R 来源脚本异常后的 QuickJS 实例恢复仍待用户真机复验；S4-10A3 详情页章节目录与续读入口等待用户真机验证；S4-10C 详情点赞/评分/评论发送与投票等来源操作 TODO（当前 SourceCore/ComicCatalog 无对应类型化契约）；S3-00Q2 拷贝漫画限流等待新 APK 验证；S3-00S 阅读器控制层等待用户真机确认挖孔屏安全区、滑块拖动与工具层动画；Stage 0 / Stage 1 / Stage 2 DONE；S4-08 整体仍 IN_PROGRESS |
+| 当前任务 | 等待用户提出下一项问题 |
+| 当前任务状态 | S3-00T 已完成：拷贝漫画阅读器图片请求默认携带 Chrome User-Agent，单图来源显式指定的 UA 优先；整次 HTTP 请求设为 90 秒总时限，并保留页级重试。新增 UA 优先级与慢速响应回归。JDK 17 下 `:core:image:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码已编译、未执行；`git diff --check` — PASS。用户真机确认《超自然武装当哒当》图片正常显示。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |

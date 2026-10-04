@@ -5,6 +5,7 @@ import coil3.disk.DiskCache
 import dev.veneranative.core.model.ImageSize
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -30,7 +31,14 @@ class CoilComicImagePipeline(
     private val auth: ComicImageAuthProvider,
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
     private val headerBytes: Int = DEFAULT_HEADER_BYTES,
+    private val callTimeoutMillis: Long = DEFAULT_CALL_TIMEOUT_MILLIS,
 ) : ComicImagePipeline {
+
+    init {
+        require(maxBytes > 0)
+        require(headerBytes > 0)
+        require(callTimeoutMillis > 0)
+    }
 
     private val locks = Array(32) { kotlinx.coroutines.sync.Mutex() }
 
@@ -65,6 +73,10 @@ class CoilComicImagePipeline(
         val http = httpRequest(request, headers) ?: return null
         return kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
             val call = client.newCall(http)
+            // OkHttp's connect/read timeouts are phase/individual-read limits. A peer that keeps
+            // trickling bytes can otherwise leave this coroutine (and the reader spinner) pending
+            // indefinitely, so cap the complete image request as well.
+            call.timeout().timeout(callTimeoutMillis, TimeUnit.MILLISECONDS)
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : okhttp3.Callback {
                 override fun onFailure(call: okhttp3.Call, e: IOException) {
@@ -136,6 +148,11 @@ class CoilComicImagePipeline(
             (request.referer?.let { referer -> mapOf("Referer" to referer) } ?: emptyMap())
         val builder = Request.Builder().url(url)
         headers.forEach { (name, value) -> builder.header(name, value) }
+        // Image CDNs commonly reject library-default user agents even when a source API accepts
+        // them. Sources may still provide an explicit User-Agent on the individual image request.
+        if (headers.keys.none { it.equals("User-Agent", ignoreCase = true) }) {
+            builder.header("User-Agent", DEFAULT_IMAGE_USER_AGENT)
+        }
         when (request.method) {
             ComicImageMethod.GET -> builder.get()
             ComicImageMethod.POST -> builder.post(request.body.toRequestBody())
@@ -154,6 +171,9 @@ class CoilComicImagePipeline(
     private companion object {
         const val DEFAULT_HEADER_BYTES = 64 * 1024
         const val DEFAULT_MAX_BYTES = 64L * 1024 * 1024
+        const val DEFAULT_CALL_TIMEOUT_MILLIS = 90_000L
+        const val DEFAULT_IMAGE_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         const val FORM_CONTENT_TYPE = "application/x-www-form-urlencoded"
         val EMPTY_BODY: RequestBody = ByteArray(0).toRequestBody(null)
     }

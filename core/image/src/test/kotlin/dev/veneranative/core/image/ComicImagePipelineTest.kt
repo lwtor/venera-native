@@ -10,6 +10,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.util.concurrent.TimeUnit
 
 class ComicImagePipelineTest {
     @get:Rule val temp = TemporaryFolder()
@@ -43,6 +44,54 @@ class ComicImagePipelineTest {
                 assertEquals("session=1", recorded.headers["Cookie"])
                 assertEquals("https://example.invalid/", recorded.headers["Referer"])
                 assertEquals(1, authReads)
+            } finally { cache.shutdown() }
+        }
+    }
+
+    @Test fun slowImageBodyIsBoundedByWholeCallTimeout() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val cache = DiskCache.Builder().directory(temp.newFolder().toOkioPath()).maxSizeBytes(1024 * 1024).build()
+            try {
+                val pipeline = CoilComicImagePipeline(
+                    OkHttpClient(), cache, ComicImageAuthProvider { _, _ -> emptyMap() },
+                    callTimeoutMillis = 150,
+                )
+                server.enqueue(
+                    MockResponse.Builder()
+                        .body("0123456789")
+                        .throttleBody(1, 100, TimeUnit.MILLISECONDS)
+                        .build(),
+                )
+
+                val result = withTimeout(3_000) {
+                    pipeline.cachedFileOf(ComicImageRequest(server.url("/slow").toString()))
+                }
+
+                assertNull(result)
+            } finally { cache.shutdown() }
+        }
+    }
+
+    @Test fun browserUserAgentIsUsedByDefaultAndSourceOverrideWins() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val cache = DiskCache.Builder().directory(temp.newFolder().toOkioPath()).maxSizeBytes(1024 * 1024).build()
+            try {
+                val pipeline = CoilComicImagePipeline(OkHttpClient(), cache, ComicImageAuthProvider { _, _ -> emptyMap() })
+                server.enqueue(MockResponse.Builder().body("first").build())
+                server.enqueue(MockResponse.Builder().body("second").build())
+
+                pipeline.cachedFileOf(ComicImageRequest(server.url("/default").toString()))?.close()
+                pipeline.cachedFileOf(
+                    ComicImageRequest(
+                        server.url("/override").toString(),
+                        headers = mapOf("User-Agent" to "source-image-agent"),
+                    ),
+                )?.close()
+
+                assertTrue(server.takeRequest().headers["User-Agent"].orEmpty().contains("Chrome/"))
+                assertEquals("source-image-agent", server.takeRequest().headers["User-Agent"])
             } finally { cache.shutdown() }
         }
     }
