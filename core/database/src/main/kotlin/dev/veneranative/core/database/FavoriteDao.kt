@@ -51,8 +51,15 @@ interface FavoriteDao {
     fun observeByTitle(folderId: String?): Flow<List<FavoriteEntryEntity>>
 
     @Query(
-        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR folder_id = :folderId) " +
-            "ORDER BY last_read_at IS NULL ASC, last_read_at DESC, added_at DESC",
+        "SELECT favorite_entry.* FROM favorite_entry " +
+            "WHERE (:folderId IS NULL OR favorite_entry.folder_id = :folderId) " +
+            "ORDER BY COALESCE((SELECT MAX(reading_history.updated_at) FROM reading_history " +
+            "WHERE reading_history.source_id = favorite_entry.ref_source " +
+            "AND reading_history.comic_id = favorite_entry.ref_comic), favorite_entry.last_read_at) " +
+            "IS NULL ASC, COALESCE((SELECT MAX(reading_history.updated_at) FROM reading_history " +
+            "WHERE reading_history.source_id = favorite_entry.ref_source " +
+            "AND reading_history.comic_id = favorite_entry.ref_comic), favorite_entry.last_read_at) " +
+            "DESC, favorite_entry.added_at DESC",
     )
     fun observeByLastRead(folderId: String?): Flow<List<FavoriteEntryEntity>>
 

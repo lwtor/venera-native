@@ -1228,3 +1228,5 @@ AGP 9.2.1 / JDK 17 / compileSdk 37，adb 连接的设备或模拟器（API ≥ 2
 - [ ] 已确认没有依赖未完成。
 - [ ] 已按 `AGENTS.md` 确认验证级别；普通任务只做编译检查，关键节点才做完整验证。
 - [ ] 完成后会更新本文件及实施计划状态。
+
+**S4-09A1 DONE：修复书架“最近阅读”排序不随新阅读变化。** 原排序只读取收藏表的 `last_read_at`，但 Reader 写入的是 `reading_history.updated_at`，两者没有同步。收藏 DAO 现在按该漫画所有章节阅读记录的最新时间排序，并以旧 `last_read_at` 作为兼容回退；DAO 订阅同时依赖 `reading_history`，阅读后 Room Flow 会刷新顺序。新增 SQLite AndroidTest 覆盖：漫画原先排在后面，写入更新的阅读历史后升至第一位。JDK 17 `:core:database:compileDebugAndroidTestKotlin :data:collection:compileDebugKotlin :data:collection:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试仅编译、未运行；未安装真机，交由用户复验。

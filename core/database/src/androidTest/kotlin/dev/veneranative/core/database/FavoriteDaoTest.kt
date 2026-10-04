@@ -133,6 +133,30 @@ class FavoriteDaoTest {
         assertEquals("a-comic", dao.observeByLastRead(null).first().last().refComic)
     }
 
+    @Test fun aNewReadingHistoryEntryMovesItsFavoriteToTheTopOfLastReadOrder() = runTest {
+        insert(
+            entry("comic-1", title = "Read again", addedAt = 1_000L, lastReadAt = 1_500L),
+            entry("comic-2", title = "Read before", addedAt = 2_000L, lastReadAt = 2_500L),
+        )
+        assertEquals("comic-2", dao.observeByLastRead(null).first().first().refComic)
+
+        database.readingHistoryDao().upsert(
+            ReadingHistoryEntity(
+                sourceId = "source-a",
+                comicId = "comic-1",
+                chapterId = "chapter-new",
+                comicTitle = "Read again",
+                chapterTitle = "New chapter",
+                coverUrl = null,
+                pageIndex = 0,
+                pageCount = 10,
+                updatedAtEpochMillis = 3_000L,
+            ),
+        )
+
+        assertEquals("comic-1", dao.observeByLastRead(null).first().first().refComic)
+    }
+
     @Test fun deletingAFolderMovesItsComicsInsteadOfDroppingThem() = runTest {
         insert(entry("comic-1", folderId = "folder-2"))
 
