@@ -1,6 +1,7 @@
 package dev.veneranative.core.image
 
 import coil3.disk.DiskCache
+import dev.veneranative.core.model.SourceId
 import kotlinx.coroutines.*
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -92,6 +93,50 @@ class ComicImagePipelineTest {
 
                 assertTrue(server.takeRequest().headers["User-Agent"].orEmpty().contains("Chrome/"))
                 assertEquals("source-image-agent", server.takeRequest().headers["User-Agent"])
+            } finally { cache.shutdown() }
+        }
+    }
+
+    @Test fun copyMangaRetriesForbiddenImageWithItsSourceUserAgent() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val cache = DiskCache.Builder().directory(temp.newFolder().toOkioPath()).maxSizeBytes(1024 * 1024).build()
+            try {
+                val pipeline = CoilComicImagePipeline(OkHttpClient(), cache, ComicImageAuthProvider { _, _ -> emptyMap() })
+                server.enqueue(MockResponse.Builder().code(403).body("denied").build())
+                server.enqueue(MockResponse.Builder().body("page bytes").build())
+                val request = ComicImageRequest(server.url("/page.webp").toString(), SourceId("copy_manga"))
+
+                pipeline.cachedFileOf(request)!!.use { assertEquals("page bytes", it.file.readText()) }
+
+                assertTrue(server.takeRequest().headers["User-Agent"].orEmpty().contains("Chrome/"))
+                assertEquals("COPY/3.0.6", server.takeRequest().headers["User-Agent"])
+                pipeline.cachedFileOf(request)!!.use { assertEquals("page bytes", it.file.readText()) }
+                assertEquals("403 response is not cached; successful fallback is cached", 2, server.requestCount)
+            } finally { cache.shutdown() }
+        }
+    }
+
+    @Test fun explicitCopyMangaImageUserAgentDoesNotGetOverriddenAfterDenial() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val cache = DiskCache.Builder().directory(temp.newFolder().toOkioPath()).maxSizeBytes(1024 * 1024).build()
+            try {
+                val pipeline = CoilComicImagePipeline(OkHttpClient(), cache, ComicImageAuthProvider { _, _ -> emptyMap() })
+                server.enqueue(MockResponse.Builder().code(403).body("denied").build())
+
+                assertNull(
+                    pipeline.cachedFileOf(
+                        ComicImageRequest(
+                            server.url("/page.webp").toString(),
+                            SourceId("copy_manga"),
+                            headers = mapOf("User-Agent" to "source-selected-agent"),
+                        ),
+                    ),
+                )
+
+                assertEquals("source-selected-agent", server.takeRequest().headers["User-Agent"])
+                assertEquals(1, server.requestCount)
             } finally { cache.shutdown() }
         }
     }

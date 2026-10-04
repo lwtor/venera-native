@@ -50,7 +50,28 @@ class CoilComicImagePipeline(
         try {
             return withContext(Dispatchers.IO) {
                 locks[(key.hashCode() and Int.MAX_VALUE) % locks.size].withLock {
-                    (readSnapshot(key) ?: download(request, headers, key)).also { acquired = it }
+                    val cached = readSnapshot(key)
+                    if (cached != null) {
+                        acquired = cached
+                        return@withLock cached
+                    }
+
+                    val primary = download(request, headers, key)
+                    val primaryFile = primary.file
+                    if (primaryFile != null) {
+                        acquired = primaryFile
+                        return@withLock primaryFile
+                    }
+
+                    val fallbackHeaders = copyMangaFallbackHeaders(request, headers, primary.statusCode)
+                        ?: return@withLock null
+                    val fallbackKey = ComicImageCacheKey.of(
+                        request.copy(headers = request.headers + fallbackHeaders),
+                        headers,
+                    )
+                    (readSnapshot(fallbackKey)
+                        ?: download(request, headers + fallbackHeaders, fallbackKey).file)
+                        .also { acquired = it }
                 }
             }
         } catch (failure: kotlinx.coroutines.CancellationException) {
@@ -69,8 +90,10 @@ class CoilComicImagePipeline(
     private fun DiskCache.Snapshot.asFile(mimeType: String? = null): ComicImageFile =
         ComicImageFile(File(data.toString()), mimeType) { close() }
 
-    private suspend fun download(request: ComicImageRequest, headers: Map<String, String>, key: String): ComicImageFile? {
-        val http = httpRequest(request, headers) ?: return null
+    private data class DownloadResult(val file: ComicImageFile?, val statusCode: Int? = null)
+
+    private suspend fun download(request: ComicImageRequest, headers: Map<String, String>, key: String): DownloadResult {
+        val http = httpRequest(request, headers) ?: return DownloadResult(null)
         return kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
             val call = client.newCall(http)
             // OkHttp's connect/read timeouts are phase/individual-read limits. A peer that keeps
@@ -80,12 +103,13 @@ class CoilComicImagePipeline(
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : okhttp3.Callback {
                 override fun onFailure(call: okhttp3.Call, e: IOException) {
-                    if (continuation.isActive) continuation.resumeWith(Result.success(null))
+                    if (continuation.isActive) continuation.resumeWith(Result.success(DownloadResult(null)))
                 }
                 override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
-                    val file = try { response.use { executed ->
-                        if (!executed.isSuccessful || executed.body.contentLength() > maxBytes) return@use null
-                        val editor = diskCache.openEditor(key) ?: return@use null
+                    val result = try { response.use { executed ->
+                        if (!executed.isSuccessful) return@use DownloadResult(null, executed.code)
+                        if (executed.body.contentLength() > maxBytes) return@use DownloadResult(null)
+                        val editor = diskCache.openEditor(key) ?: return@use DownloadResult(null)
                         var committed = false
                         try {
                             diskCache.fileSystem.sink(editor.data).buffer().use { sink ->
@@ -103,13 +127,25 @@ class CoilComicImagePipeline(
                             if (call.isCanceled()) throw IOException("Cancelled")
                             val snapshot = editor.commitAndOpenSnapshot()
                             committed = true
-                            snapshot?.asFile(executed.header("Content-Type"))
+                            DownloadResult(snapshot?.asFile(executed.header("Content-Type")))
                         } finally { if (!committed) editor.abort() }
-                    } } catch (_: IOException) { null }
-                    continuation.resume(file) { _, value, _ -> value?.close() }
+                    } } catch (_: IOException) { DownloadResult(null) }
+                    continuation.resume(result) { _, value, _ -> value.file?.close() }
                 }
             })
         }
+    }
+
+    private fun copyMangaFallbackHeaders(
+        request: ComicImageRequest,
+        authHeaders: Map<String, String>,
+        statusCode: Int?,
+    ): Map<String, String>? {
+        if (request.sourceId?.value != COPY_MANGA_SOURCE_ID || statusCode !in COPY_MANGA_FALLBACK_STATUSES) return null
+        val requestHeaders = request.headers + authHeaders +
+            (request.referer?.let { mapOf("Referer" to it) } ?: emptyMap())
+        if (requestHeaders.keys.any { it.equals("User-Agent", ignoreCase = true) }) return null
+        return mapOf("User-Agent" to COPY_MANGA_IMAGE_USER_AGENT)
     }
 
     /**
@@ -169,6 +205,9 @@ class CoilComicImagePipeline(
     }
 
     private companion object {
+        const val COPY_MANGA_SOURCE_ID = "copy_manga"
+        const val COPY_MANGA_IMAGE_USER_AGENT = "COPY/3.0.6"
+        val COPY_MANGA_FALLBACK_STATUSES = setOf(403, 406)
         const val DEFAULT_HEADER_BYTES = 64 * 1024
         const val DEFAULT_MAX_BYTES = 64L * 1024 * 1024
         const val DEFAULT_CALL_TIMEOUT_MILLIS = 90_000L
