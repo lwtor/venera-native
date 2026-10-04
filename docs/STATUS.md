@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-04 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00V 拷贝漫画图片请求拒绝兜底 |
-| 当前任务状态 | S3-00V 修复代码已完成，待用户真机验收。拷贝漫画图片请求在默认 Chrome UA 收到 403/406 时改用官方脚本使用的 `COPY/3.0.6` UA 重试；显式 UA 不覆盖，其他来源不受影响。JDK 17 下 `:core:image:testDebugUnitTest --tests dev.veneranative.core.image.ComicImagePipelineTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。当前未读取真机日志，因此这是基于请求头差异的定向修复，尚未确认神乐钵服务端确实返回 403/406。S3-01C 与 S3-00U 的真机验收仍由用户执行。 |
+| 当前任务 | S3-00W Komiic 与禁漫天堂搜索兼容性 |
+| 当前任务状态 | 用户已确认 Komiic 搜索恢复可用。继续处理禁漫天堂报错 `ReferenceError: Comic is not defined`：对照上游 `venera-configs/jm.js` 与 `_venera_.js` 确认 JM 的 `parseComic()` 通过 `new Comic({...})` 创建搜索/推荐卡片，而 Native 的 QuickJS 兼容基础脚本缺少这个全局值对象。已在 `SourceBaseScript` 加入与上游字段一致的纯 JavaScript `Comic` 构造器，并新增定向回归模拟 JM `parseComic()`→`search.load` 返回漫画对象；定向测试及 App Debug 编译通过。尚未安装新 APK 或真机验证，按用户工作方式等待用户验证。S3-00W IN_PROGRESS（Komiic DONE；JM 代码修复 DONE、设备验收待完成）。Komiic 诊断日志仅 debug、仅该源，自动写入应用私有目录 `files/diagnostics/komiic-network.log`，轮转两份、单份 512 KiB，不记录 URL 路径/查询词、Header、Cookie、Token 或正文。验证：JDK 17 `:source:engine:testDebugUnitTest --tests 'dev.veneranative.source.engine.QuickJsRuntimeTest.JM parseComic can construct and return upstream Comic values' :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -76,6 +76,8 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00U IN_PROGRESS：阅读器按选择的版本组隔离章节导航。** 详情页将完整章节（含来源版本组）带入 Reader 路由；`SourcePageProvider` 在该组内解析前后章节；阅读器追加章节和预载时继续携带组上下文，因此所选版本末尾不再接到其它版本。新增“版本组末话无下一话、上一话仍属于本组”回归以及版本组路由往返用例。JDK 17 验证：`:core:model:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码未执行；`git diff --check` — PASS。未安装或操作真机，待用户验收。
 
 **S3-00V IN_PROGRESS：拷贝漫画图片请求的来源 UA 兜底。** 在默认 Chrome UA 被拷贝漫画图片 CDN 以 403/406 拒绝时，针对 `copy_manga` 重试官方源脚本使用的 `COPY/3.0.6` UA；如果调用方显式提供 UA 则尊重该值，其他源保持单次请求。新增 MockWebServer 回归覆盖 403 后成功缓存及显式 UA 不被覆盖。JDK 17 验证：`:core:image:testDebugUnitTest --tests dev.veneranative.core.image.ComicImagePipelineTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未取得神乐钵设备请求日志，服务端拒绝状态仍属待验证假设；需要用户真机复测确认。
+
+**S3-00W IN_PROGRESS：来源搜索兼容（Komiic 已由用户确认恢复；JM 等待真机验收）。** Komiic 的 GraphQL JSON POST 保留脚本声明的 Content-Type，来源请求有总超时与脱敏阶段日志；Native 已增加 Android 默认网络代理动态读取。针对 JM `ReferenceError: Comic is not defined`，对照上游 [`jm.js`](https://github.com/venera-app/venera-configs/blob/main/jm.js#L194-L215) 和 [`_venera_.js`](https://github.com/venera-app/venera-configs/blob/main/_venera_.js#L862-L889)，确认 `parseComic()` 依赖宿主提供全局 `Comic` 纯数据构造器。Native QuickJS 基础脚本缺少该对象；现已补齐上游字段兼容并新增 JM 形状的运行时回归，验证 `parseComic()` 返回值可序列化为漫画列表。JDK 17 定向 `QuickJsRuntimeTest` 与 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装新 APK，JM 真机搜索待用户验证；用户此前约定由其在真机验证，之后再通知提交/push。
 
 **S3-01C IN_PROGRESS：记住书架、搜索和详情页的最后选择。** 新增通用 Room 页面偏好表和 `:data:settings` 仓库；书架恢复 tab/收藏夹/排序，搜索恢复来源/聚合/筛选项，详情按作品恢复章节顺序/版本组。对于已移除来源、筛选选项或收藏夹会回退到有效值。数据库 5→6 迁移与 schema 6 已生成，迁移回归源码编译通过。三个页面的 ViewModel 定向 JVM 测试通过；JDK 17 编译命令 `:core:database:compileDebugUnitTestKotlin :core:database:compileDebugAndroidTestKotlin :data:settings:compileDebugUnitTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。迁移 AndroidTest 未运行；真机验收由用户执行。
 

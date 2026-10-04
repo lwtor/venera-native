@@ -35,6 +35,7 @@ import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
+import java.net.URI
 import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.decodeAppRoute
 import dev.veneranative.core.navigation.encode
@@ -102,9 +103,29 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val imageCache = PageImageCache(64L * 1024 * 1024)
     private val httpClient = host.httpClient
     private val cookieJars = host.cookieJars
+    private val debugNetworkTraceEnabled =
+        getApplication<android.app.Application>().applicationInfo.flags and
+            android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+    private val localKomiicNetworkLog =
+        if (debugNetworkTraceEnabled) LocalKomiicNetworkLog(getApplication<android.app.Application>().filesDir) else null
+    init {
+        if (debugNetworkTraceEnabled) {
+            val selectedProxy = runCatching {
+                host.networkProxySelector.select(URI("https://komiic.com")).firstOrNull()
+            }.getOrNull()
+            localKomiicNetworkLog?.append(
+                "source=Komiic method=POST host=komiic.com stage=proxySelection selected=$selectedProxy",
+            )
+        }
+    }
     private val network = SourceNetworkExecutor(
         baseClient = httpClient,
         cookieJars = cookieJars,
+        diagnosticSourceIds = if (debugNetworkTraceEnabled) setOf(SourceId("Komiic")) else emptySet(),
+        onNetworkTrace = { _, message ->
+            localKomiicNetworkLog?.append(message)
+            android.util.Log.d("VeneraSourceNet", message)
+        },
         onRequestFailure = { source, error ->
             android.util.Log.w("VeneraSource", "Network request failed: source=${source.value} error=$error")
         },

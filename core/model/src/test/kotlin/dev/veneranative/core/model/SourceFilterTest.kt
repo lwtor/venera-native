@@ -45,10 +45,21 @@ class SourceFilterTest {
     }
 
     @Test
-    fun `a select without a default is not sent at all`() {
-        val noDefault = SourceFilter.Select(key = "x", label = "x", options = emptyList())
+    fun `a select without a default uses the first advertised option`() {
+        val noDefault = SourceFilter.Select(
+            key = "x",
+            label = "x",
+            options = listOf(FilterOption("mr", "最新"), FilterOption("mv", "总排行")),
+        )
 
-        assertNull(noDefault.selectionValue(FilterSelection.Empty))
+        assertEquals(FilterValue.Single("mr"), noDefault.selectionValue(FilterSelection.Empty))
+    }
+
+    @Test
+    fun `a select with no default and no options remains absent`() {
+        val noOptions = SourceFilter.Select(key = "x", label = "x", options = emptyList())
+
+        assertNull(noOptions.selectionValue(FilterSelection.Empty))
     }
 
     @Test

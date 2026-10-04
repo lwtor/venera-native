@@ -39,6 +39,7 @@ data class AggregateSearchResult(
     val comics: List<dev.veneranative.core.model.Comic> = emptyList(),
     val isLoading: Boolean = true,
     val hasError: Boolean = false,
+    val errorDetail: String? = null,
 )
 
 enum class SearchStatus {

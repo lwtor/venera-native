@@ -6,6 +6,7 @@ import dev.veneranative.core.network.NetworkFailure
 import dev.veneranative.core.network.NetworkFailureMapper
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Semaphore
@@ -15,8 +16,9 @@ import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody
 import okhttp3.Response
+import okio.BufferedSink
 import okio.Buffer
 
 class SourceNetworkExecutor(
@@ -24,7 +26,10 @@ class SourceNetworkExecutor(
     private val cookieJars: PerSourceCookieJarRegistry = PerSourceCookieJarRegistry(),
     private val maxConcurrentPerSource: Int = DEFAULT_MAX_CONCURRENT_PER_SOURCE,
     private val maxResponseBytes: Long = DEFAULT_MAX_RESPONSE_BYTES,
+    private val callTimeoutMillis: Long = DEFAULT_CALL_TIMEOUT_MILLIS,
     private val onRequestFailure: (SourceId, String) -> Unit = { _, _ -> },
+    private val diagnosticSourceIds: Set<SourceId> = emptySet(),
+    private val onNetworkTrace: (SourceId, String) -> Unit = { _, _ -> },
 ) {
     private val clients = ConcurrentHashMap<SourceId, OkHttpClient>()
     private val sourcePermits = ConcurrentHashMap<SourceId, Semaphore>()
@@ -34,6 +39,7 @@ class SourceNetworkExecutor(
     init {
         require(maxConcurrentPerSource > 0)
         require(maxResponseBytes > 0)
+        require(callTimeoutMillis > 0)
     }
 
     suspend fun execute(sourceId: SourceId, request: SourceHttpRequest): SourceHttpResult {
@@ -89,6 +95,19 @@ class SourceNetworkExecutor(
         clients.computeIfAbsent(sourceId) {
             baseClient.newBuilder()
                 .cookieJar(cookieJars.forSource(sourceId))
+                .callTimeout(callTimeoutMillis, TimeUnit.MILLISECONDS)
+                .apply {
+                    if (sourceId in diagnosticSourceIds) {
+                        eventListenerFactory { call ->
+                            SourceNetworkTraceListener(
+                                sourceId = sourceId,
+                                method = call.request().method,
+                                host = call.request().url.host,
+                                emit = { message -> onNetworkTrace(sourceId, message) },
+                            )
+                        }
+                    }
+                }
                 .build()
         }
 
@@ -104,8 +123,7 @@ class SourceNetworkExecutor(
                                 NetworkFailure.Cancelled -> SourceNetworkError.Cancelled
                                 NetworkFailure.Timeout -> SourceNetworkError.Timeout
                                 NetworkFailure.Protocol,
-                                NetworkFailure.Connection,
-                                -> SourceNetworkError.Connection
+                                NetworkFailure.Connection -> SourceNetworkError.Connection(e.safeDiagnostic())
                             }
                         continuation.resume(SourceHttpResult.Failure(error))
                     }
@@ -153,7 +171,15 @@ class SourceNetworkExecutor(
 
     private fun SourceHttpRequest.toOkHttpRequest(): Request {
         val builder = Request.Builder().url(url)
-        headers.forEach { (name, value) -> builder.header(name, value) }
+        // Let OkHttp negotiate and transparently decode response compression. Source scripts may
+        // advertise encodings the app transport cannot decode (JM advertises gzip, deflate, br and
+        // zstd); forwarding that header disables OkHttp's transparent gzip handling and can expose
+        // compressed bytes to the JavaScript JSON parser.
+        headers.forEach { (name, value) ->
+            if (!name.equals("Accept-Encoding", ignoreCase = true)) {
+                builder.header(name, value)
+            }
+        }
         return when (method) {
             SourceHttpRequest.Method.GET -> {
                 require(body == null) { "GET requests cannot have a body." }
@@ -164,13 +190,42 @@ class SourceNetworkExecutor(
                     .firstOrNull { (name, _) -> name.equals("Content-Type", ignoreCase = true) }
                     ?.value
                     ?.toMediaTypeOrNull()
-                builder.post((body ?: "").toRequestBody(mediaType)).build()
+                builder.post(ExactContentTypeRequestBody((body ?: "").toByteArray(Charsets.UTF_8), mediaType)).build()
             }
         }
+    }
+
+    /** Keeps a source script's Content-Type verbatim; OkHttp's convenience body factory adds a charset. */
+    private class ExactContentTypeRequestBody(
+        private val bytes: ByteArray,
+        private val mediaType: okhttp3.MediaType?,
+    ) : RequestBody() {
+        override fun contentType() = mediaType
+
+        override fun contentLength() = bytes.size.toLong()
+
+        override fun writeTo(sink: BufferedSink) {
+            sink.write(bytes)
+        }
+    }
+
+    private fun IOException.safeDiagnostic(): String {
+        var root: Throwable = this
+        repeat(4) {
+            root.cause?.let { root = it } ?: return@repeat
+        }
+        val kind = root.javaClass.simpleName.ifBlank { "IOException" }
+        val message = root.message.orEmpty()
+            .replace(Regex("https?://\\S+"), "<url>")
+            .replace(Regex("([?&][^=\\s]+)=([^&\\s]+)"), "$1=<redacted>")
+            .filterNot(Char::isISOControl)
+            .take(140)
+        return if (message.isBlank()) kind else "$kind: $message"
     }
 
     private companion object {
         const val DEFAULT_MAX_CONCURRENT_PER_SOURCE = 4
         const val DEFAULT_MAX_RESPONSE_BYTES = 1_048_576L
+        const val DEFAULT_CALL_TIMEOUT_MILLIS = 15_000L
     }
 }

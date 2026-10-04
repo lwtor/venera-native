@@ -1,8 +1,8 @@
 package dev.veneranative.core.network
 
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.ProtocolException
-import java.net.SocketTimeoutException
 
 sealed interface NetworkFailure {
     data object Cancelled : NetworkFailure
@@ -14,8 +14,10 @@ sealed interface NetworkFailure {
 object NetworkFailureMapper {
     fun from(failure: IOException, cancelled: Boolean): NetworkFailure =
         when {
+            // OkHttp's total call timeout cancels the Call and reports InterruptedIOException.
+            // Check timeout first so it remains retryable instead of looking like user cancel.
+            failure is InterruptedIOException -> NetworkFailure.Timeout
             cancelled -> NetworkFailure.Cancelled
-            failure is SocketTimeoutException -> NetworkFailure.Timeout
             failure is ProtocolException -> NetworkFailure.Protocol
             else -> NetworkFailure.Connection
         }

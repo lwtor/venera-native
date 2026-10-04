@@ -222,7 +222,9 @@ internal object QuickJsHostScript {
 
           var base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
           function decodeBase64(value) {
-            var text = String(value).replace(/\\s/g, "");
+            // JM's live domain configuration is UTF-8 text with a BOM before its Base64 payload.
+            // The original source decoder accepts it; strip the BOM before validating alphabet.
+            var text = String(value).replace(/^\uFEFF/, "").replace(/\s/g, "");
             if (text.length % 4 === 1 || /[^A-Za-z0-9+/=]/.test(text)) {
               throw new TypeError("Invalid base64 input.");
             }
@@ -338,6 +340,147 @@ internal object QuickJsHostScript {
             return bytesOf(input).map(function (byte) { return byte.toString(16).padStart(2, "0"); }).join("");
           }
 
+          // Keep the synchronous Convert crypto helpers inside the JS sandbox. Source scripts
+          // such as JM use them while constructing auth headers and decrypting discovery data.
+          function md5(input) {
+            var bytes = bytesOf(input).slice();
+            var bitLength = bytes.length * 8;
+            bytes.push(0x80);
+            while (bytes.length % 64 !== 56) bytes.push(0);
+            var lowLength = bitLength >>> 0;
+            var highLength = Math.floor(bitLength / 0x100000000) >>> 0;
+            bytes.push(lowLength & 255, (lowLength >>> 8) & 255, (lowLength >>> 16) & 255, (lowLength >>> 24) & 255,
+              highLength & 255, (highLength >>> 8) & 255, (highLength >>> 16) & 255, (highLength >>> 24) & 255);
+            var shifts = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+            var constants = new Array(64);
+            for (var ci = 0; ci < 64; ci += 1) constants[ci] = Math.floor(Math.abs(Math.sin(ci + 1)) * 0x100000000) >>> 0;
+            var a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+            for (var offset = 0; offset < bytes.length; offset += 64) {
+              var words = new Array(16);
+              for (var wi = 0; wi < 16; wi += 1) {
+                var at = offset + wi * 4;
+                words[wi] = (bytes[at] | (bytes[at + 1] << 8) | (bytes[at + 2] << 16) | (bytes[at + 3] << 24)) >>> 0;
+              }
+              var a = a0, b = b0, c = c0, d = d0;
+              for (var i = 0; i < 64; i += 1) {
+                var f, g, round = i >>> 4;
+                if (round === 0) { f = (b & c) | (~b & d); g = i; }
+                else if (round === 1) { f = (d & b) | (~d & c); g = (5 * i + 1) & 15; }
+                else if (round === 2) { f = b ^ c ^ d; g = (3 * i + 5) & 15; }
+                else { f = c ^ (b | ~d); g = (7 * i) & 15; }
+                var shift = shifts[round * 4 + (i & 3)];
+                var sum = (a + f + constants[i] + words[g]) >>> 0;
+                var rotated = ((sum << shift) | (sum >>> (32 - shift))) >>> 0;
+                var previousD = d;
+                d = c; c = b; b = (b + rotated) >>> 0; a = previousD;
+              }
+              a0 = (a0 + a) >>> 0; b0 = (b0 + b) >>> 0;
+              c0 = (c0 + c) >>> 0; d0 = (d0 + d) >>> 0;
+            }
+            var digest = new Uint8Array(16), state = [a0, b0, c0, d0];
+            for (var si = 0; si < 4; si += 1) {
+              digest[si * 4] = state[si] & 255;
+              digest[si * 4 + 1] = (state[si] >>> 8) & 255;
+              digest[si * 4 + 2] = (state[si] >>> 16) & 255;
+              digest[si * 4 + 3] = (state[si] >>> 24) & 255;
+            }
+            return digest;
+          }
+
+          var aesSbox = [
+            99,124,119,123,242,107,111,197,48,1,103,43,254,215,171,118,202,130,201,125,250,89,71,240,173,212,162,175,156,164,114,192,
+            183,253,147,38,54,63,247,204,52,165,229,241,113,216,49,21,4,199,35,195,24,150,5,154,7,18,128,226,235,39,178,117,
+            9,131,44,26,27,110,90,160,82,59,214,179,41,227,47,132,83,209,0,237,32,252,177,91,106,203,190,57,74,76,88,207,208,239,
+            170,251,67,77,51,133,69,249,2,127,80,60,159,168,81,163,64,143,146,157,56,245,188,182,218,33,16,255,243,210,205,12,
+            19,236,95,151,68,23,196,167,126,61,100,93,25,115,96,129,79,220,34,42,144,136,70,238,184,20,222,94,11,219,224,50,
+            58,10,73,6,36,92,194,211,172,98,145,149,228,121,231,200,55,109,141,213,78,169,108,86,244,234,101,122,174,8,186,120,
+            37,46,28,166,180,198,232,221,116,31,75,189,139,138,112,62,181,102,72,3,246,14,97,53,87,185,134,193,29,158,225,248,
+            152,17,105,217,142,148,155,30,135,233,206,85,40,223,140,161,137,13,191,230,66,104,65,153,45,15,176,84,187,22
+          ];
+          var aesInvSbox = new Array(256);
+          for (var ai = 0; ai < 256; ai += 1) aesInvSbox[aesSbox[ai]] = ai;
+          function aesMultiply(a, b) {
+            var result = 0;
+            while (b) {
+              if (b & 1) result ^= a;
+              a = ((a << 1) ^ ((a & 0x80) ? 0x11b : 0)) & 255;
+              b >>>= 1;
+            }
+            return result;
+          }
+          function aesExpandKey(key) {
+            var nk = key.length / 4, rounds = nk + 6, words = new Array(4 * (rounds + 1));
+            if (key.length !== 16 && key.length !== 24 && key.length !== 32) throw new TypeError("AES key must be 16, 24, or 32 bytes.");
+            for (var i = 0; i < nk; i += 1) words[i] = key.slice(i * 4, i * 4 + 4);
+            var rcon = 1;
+            for (var wi = nk; wi < words.length; wi += 1) {
+              var temp = words[wi - 1].slice();
+              if (wi % nk === 0) {
+                temp.push(temp.shift());
+                for (var ti = 0; ti < 4; ti += 1) temp[ti] = aesSbox[temp[ti]];
+                temp[0] ^= rcon;
+                rcon = aesMultiply(rcon, 2);
+              } else if (nk > 6 && wi % nk === 4) {
+                for (var tj = 0; tj < 4; tj += 1) temp[tj] = aesSbox[temp[tj]];
+              }
+              words[wi] = [
+                words[wi - nk][0] ^ temp[0], words[wi - nk][1] ^ temp[1],
+                words[wi - nk][2] ^ temp[2], words[wi - nk][3] ^ temp[3]
+              ];
+            }
+            return { words: words, rounds: rounds };
+          }
+          function aesDecryptBlock(block, expanded) {
+            var state = block.slice(), words = expanded.words, rounds = expanded.rounds;
+            function addKey(round) {
+              for (var col = 0; col < 4; col += 1) for (var row = 0; row < 4; row += 1) {
+                state[col * 4 + row] ^= words[round * 4 + col][row];
+              }
+            }
+            function inverseShiftRows() {
+              for (var row = 1; row < 4; row += 1) {
+                var saved = [];
+                for (var col = 0; col < 4; col += 1) saved[col] = state[col * 4 + row];
+                for (var dst = 0; dst < 4; dst += 1) state[dst * 4 + row] = saved[(dst - row + 4) & 3];
+              }
+            }
+            addKey(rounds);
+            for (var round = rounds - 1; round > 0; round -= 1) {
+              inverseShiftRows();
+              for (var si = 0; si < 16; si += 1) state[si] = aesInvSbox[state[si]];
+              addKey(round);
+              for (var col = 0; col < 4; col += 1) {
+                var at = col * 4, a = state[at], b = state[at + 1], c = state[at + 2], d = state[at + 3];
+                state[at] = aesMultiply(a, 14) ^ aesMultiply(b, 11) ^ aesMultiply(c, 13) ^ aesMultiply(d, 9);
+                state[at + 1] = aesMultiply(a, 9) ^ aesMultiply(b, 14) ^ aesMultiply(c, 11) ^ aesMultiply(d, 13);
+                state[at + 2] = aesMultiply(a, 13) ^ aesMultiply(b, 9) ^ aesMultiply(c, 14) ^ aesMultiply(d, 11);
+                state[at + 3] = aesMultiply(a, 11) ^ aesMultiply(b, 13) ^ aesMultiply(c, 9) ^ aesMultiply(d, 14);
+              }
+            }
+            inverseShiftRows();
+            for (var last = 0; last < 16; last += 1) state[last] = aesInvSbox[state[last]];
+            addKey(0);
+            return state;
+          }
+          function decryptAesEcb(ciphertextInput, keyInput) {
+            var ciphertext = bytesOf(ciphertextInput), key = bytesOf(keyInput);
+            if (ciphertext.length === 0 || ciphertext.length % 16 !== 0) throw new TypeError("AES-ECB data must contain complete blocks.");
+            var expanded = aesExpandKey(key), plaintext = [];
+            for (var offset = 0; offset < ciphertext.length; offset += 16) {
+              var block = aesDecryptBlock(ciphertext.slice(offset, offset + 16), expanded);
+              for (var bi = 0; bi < 16; bi += 1) plaintext.push(block[bi]);
+            }
+            var padding = plaintext[plaintext.length - 1];
+            if (padding > 0 && padding <= 16) {
+              var validPadding = true;
+              for (var pi = plaintext.length - padding; pi < plaintext.length; pi += 1) {
+                if (plaintext[pi] !== padding) { validPadding = false; break; }
+              }
+              if (validPadding) plaintext.length -= padding;
+            }
+            return new Uint8Array(plaintext);
+          }
+
           globalThis.Convert = Object.freeze({
             encodeUtf8: function (text) {
               return utf8Encode(String(text === undefined || text === null ? "" : text));
@@ -347,6 +490,8 @@ internal object QuickJsHostScript {
             },
             encodeBase64: encodeBase64,
             decodeBase64: decodeBase64,
+            md5: md5,
+            decryptAesEcb: decryptAesEcb,
             hmac: function (key, value, hash) {
               if (String(hash).toLowerCase() !== "sha256") throw new TypeError("Unsupported HMAC algorithm.");
               return hmacSha256(key, value).buffer;
@@ -446,6 +591,12 @@ internal object QuickJsHostScript {
               // True binary bodies need a byte channel in the Host API, which Stage 1 does not have.
               return utf8Decode(body);
             }
+            // Source scripts commonly pass a plain object to Network.post for JSON APIs (for
+            // example, GraphQL sources). String(object) would send "[object Object]" and make
+            // those requests fail before the source can parse a response.
+            if (typeof body === "object") {
+              return JSON.stringify(body);
+            }
             return String(body);
           }
 
@@ -486,6 +637,64 @@ internal object QuickJsHostScript {
             }).then(decodeResponse).catch(function (failure) {
               if (invocationId === "source-install") {
                 return { status: 0, headers: {}, body: "" };
+              }
+              throw failure;
+            });
+          }
+
+          function jmApiFailoverUrls(url) {
+            var source = globalThis.ComicSource && globalThis.ComicSource.sources
+              ? globalThis.ComicSource.sources.jm
+              : null;
+            var sourceClass = source && source.constructor;
+            var domains = sourceClass && Array.isArray(sourceClass.apiDomains)
+              ? sourceClass.apiDomains
+              : sourceClass && Array.isArray(sourceClass.fallbackServers)
+                ? sourceClass.fallbackServers
+                : [];
+            var match = /^https:\/\/([^/?#]+)/i.exec(url);
+            if (!match || domains.length < 2) return [];
+            var host = match[1].toLowerCase();
+            var candidates = [];
+            domains.slice(0, 8).forEach(function (value) {
+              var candidate = String(value || "").trim().replace(/^https?:\/\//i, "").replace(/\/$/, "");
+              if (!/^[a-z0-9.-]+(?::[0-9]{1,5})?$/i.test(candidate)) return;
+              if (candidate.toLowerCase() !== host && candidates.indexOf(candidate) < 0) {
+                candidates.push(candidate);
+              }
+            });
+            return candidates.map(function (candidate) {
+              return url.replace(/^https:\/\/[^/?#]+/i, "https://" + candidate);
+            });
+          }
+
+          function requestJmWithFailover(url, headers) {
+            var alternatives = jmApiFailoverUrls(url);
+            if (alternatives.length === 0) return request("GET", url, headers, null);
+
+            function retry(index, lastResponse) {
+              if (index >= alternatives.length) return Promise.resolve(lastResponse);
+              return request("GET", alternatives[index], headers, null).then(function (response) {
+                if (response.status === 404 || response.status === 0) {
+                  return retry(index + 1, response);
+                }
+                return response;
+              }).catch(function (failure) {
+                if (failure && (failure.code === "NETWORK_CONNECTION" || failure.code === "NETWORK_TIMEOUT")) {
+                  return retry(index + 1, lastResponse);
+                }
+                throw failure;
+              });
+            }
+
+            return request("GET", url, headers, null).then(function (response) {
+              if (response.status === 404 || response.status === 0) {
+                return retry(0, response);
+              }
+              return response;
+            }).catch(function (failure) {
+              if (failure && (failure.code === "NETWORK_CONNECTION" || failure.code === "NETWORK_TIMEOUT")) {
+                return retry(0, null);
               }
               throw failure;
             });
@@ -544,7 +753,10 @@ internal object QuickJsHostScript {
 
           globalThis.Network = Object.freeze({
             get: function (url, headers) {
-              return request("GET", String(url), headers, null);
+              var target = String(url);
+              return jmApiFailoverUrls(target).length > 0
+                ? requestJmWithFailover(target, headers)
+                : request("GET", target, headers, null);
             },
             post: function (url, headers, data) {
               return request("POST", String(url), headers, data);

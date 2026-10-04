@@ -577,6 +577,7 @@ S3-00 小任务：
 | S3-00T | 修复拷贝漫画阅读器图片一直 loading：补齐独立图片请求的浏览器 User-Agent（允许单图来源请求头覆盖），并设置整次 HTTP 请求总时限；失败进入现有重试状态 | DONE（默认 Chrome UA、单图 UA 覆盖和 90 秒请求总时限已实现；慢速响应及 UA 优先级回归测试源码编译通过；`:app:assembleDebug` 通过；用户在真机确认《超自然武装当哒当》图片正常显示） |
 | S3-00U | 阅读器章节前后导航必须限制在用户从详情页选择的来源版本组内；把组上下文保留到阅读路由、预载、上一话/下一话追加；组末尾视为当前版本结束，不串入其它版本。编写分组章节回归并编译 App。 | IN_PROGRESS（实现和相关测试源码编译通过；待用户真机验收） |
 | S3-00V | 拷贝漫画图片请求在浏览器 UA 收到拒绝响应时，以来源官方脚本 UA 兜底；尊重单图显式 UA，新增 HTTP 回归，编译 App | IN_PROGRESS（403/406 回退与显式 UA 回归通过；`:core:image:testDebugUnitTest --tests ComicImagePipelineTest :app:assembleDebug` 通过；神乐钵真机验证待用户执行，服务端拒绝状态尚未由设备日志确认） |
+| S3-00W | 恢复 Komiic 搜索并修复禁漫天堂 JM 来源的搜索兼容；遵循官方脚本的请求契约与宿主 API，建立来源级回归并编译 App | IN_PROGRESS（Komiic：用户已确认恢复可用；设备诊断曾确认原因为 Native 不在 CordCloud 的按应用 VPN 分流，代码已动态读取系统代理。JM：`ReferenceError: Comic is not defined` 已确认是 Native QuickJS 基础脚本缺少上游 `Comic` 值构造器；已按官方 `_venera_.js` 字段实现纯 JS 全局对象，并新增真实形状的 `JM.parseComic()`→`search.load` 回归。JDK 17 定向 `QuickJsRuntimeTest` 与 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。JM APK/真机验收待用户执行，用户已约定之后通知提交/push） |
 
 ## 8. Stage 4：同步、体验与发布
 

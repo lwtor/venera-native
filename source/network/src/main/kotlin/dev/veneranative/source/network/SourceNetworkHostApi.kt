@@ -148,8 +148,8 @@ class SourceNetworkHostApi(
             SourceNetworkError.InvalidRequest -> invalidRequest()
             SourceNetworkError.Timeout ->
                 failure(SourceHostError.Code.NETWORK_TIMEOUT, "Network request timed out.", true)
-            SourceNetworkError.Connection ->
-                failure(SourceHostError.Code.NETWORK_CONNECTION, "Network request failed.", true)
+            is SourceNetworkError.Connection ->
+                failure(SourceHostError.Code.NETWORK_CONNECTION, error.detail, true)
             SourceNetworkError.ConcurrencyLimit ->
                 failure(
                     SourceHostError.Code.CONCURRENCY_LIMIT,

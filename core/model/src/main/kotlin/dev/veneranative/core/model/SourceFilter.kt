@@ -52,7 +52,11 @@ sealed interface SourceFilter {
     fun selectionValue(selection: FilterSelection): FilterValue? {
         val chosen = selection.values[key].orEmpty()
         return when (this) {
-            is Select -> (chosen.firstOrNull() ?: defaultValue)?.let(FilterValue::Single)
+            // A select is a required choice. If neither the caller nor the source declares one,
+            // use the first advertised value so aggregate searches can still invoke sources that
+            // read options[0] (such as JM's search sort parameter).
+            is Select -> (chosen.firstOrNull() ?: defaultValue ?: options.firstOrNull()?.value)
+                ?.let(FilterValue::Single)
 
             is MultiSelect -> FilterValue.Multiple(
                 if (selection.values.containsKey(key)) chosen else defaultValues,

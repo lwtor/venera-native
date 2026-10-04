@@ -14,6 +14,7 @@ import dev.veneranative.core.model.SourceFilter
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
+import dev.veneranative.data.comic.SourceLoadException
 import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.source.api.SearchRequest
@@ -335,9 +336,19 @@ class SearchViewModel(
                                     is PagingSource.LoadResult.Error -> throw load.throwable
                                     is PagingSource.LoadResult.Invalid -> AggregateSearchResult(source.sourceId, source.name, emptyList(), false, false)
                                 }
-                            }.getOrElse {
-                                if (it is kotlinx.coroutines.CancellationException) throw it
-                                AggregateSearchResult(source.sourceId, source.name, emptyList(), false, true)
+                            }.getOrElse { failure ->
+                                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                                val detail = ((failure as? SourceLoadException)?.error?.message ?: failure.message)
+                                    ?.filterNot(Char::isISOControl)
+                                    ?.take(180)
+                                AggregateSearchResult(
+                                    source.sourceId,
+                                    source.name,
+                                    emptyList(),
+                                    false,
+                                    true,
+                                    detail,
+                                )
                             }
                             _aggregateResults.update { rows -> rows.map { if (it.sourceId == source.sourceId) row else it } }
                         }

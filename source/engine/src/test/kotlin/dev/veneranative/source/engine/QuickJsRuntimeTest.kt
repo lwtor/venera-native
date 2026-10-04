@@ -12,7 +12,10 @@ import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.SourceRuntimeError
 import dev.veneranative.source.api.SourceScriptRuntime
 import java.security.MessageDigest
+import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
+import javax.crypto.Cipher
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
@@ -53,6 +56,62 @@ class QuickJsRuntimeTest {
             val result = JSONObject(runtime.invokeSuccess(sourceId, "registryCheck", "[]"))
 
             assertTrue("the instance should be the registry entry", result.getBoolean("registered"))
+        }
+    }
+
+    @Test
+    fun `JM parseComic can construct and return upstream Comic values`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val script = buildString {
+                appendLine("class JM extends ComicSource {")
+                appendLine("  constructor() {")
+                appendLine("    super();")
+                appendLine("    this.name = \"禁漫天堂\";")
+                appendLine("    this.key = \"jm\";")
+                appendLine("    this.version = \"1.4.0\";")
+                appendLine("  }")
+                appendLine("  parseComic(comic) {")
+                appendLine("    return new Comic({ id: String(comic.id), title: comic.name, subtitle: comic.author,")
+                appendLine("      cover: `https://images.example/\${comic.id}.jpg`, tags: [comic.category.title],")
+                appendLine("      description: comic.description });")
+                appendLine("  }")
+                appendLine("  search = { load: async () => ({ comics: [this.parseComic({")
+                appendLine("    id: 42, name: \"测试作品\", author: \"测试作者\", category: { title: \"短篇\" },")
+                appendLine("    description: \"来源漫画\" })], maxPage: 1 }) };")
+                appendLine("}")
+            }
+            val sourceId = SourceId("jm")
+            val install = runtime.install(
+                SourcePackage(sourceId, version = "1.4.0", script = script, sha256 = sha256(script)),
+            )
+            assertTrue("expected install, got $install", install is SourceInstallResult.Installed)
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "search.load"))
+            val comic = result.getJSONArray("comics").getJSONObject(0)
+            assertEquals("42", comic.getString("id"))
+            assertEquals("测试作品", comic.getString("title"))
+            assertEquals("测试作者", comic.getString("subtitle"))
+            assertEquals("https://images.example/42.jpg", comic.getString("cover"))
+            assertEquals("短篇", comic.getJSONArray("tags").getString(0))
+            assertEquals("来源漫画", comic.getString("description"))
+            assertEquals(1, result.getInt("maxPage"))
+        }
+    }
+
+    @Test
+    fun `source fallback servers initialize api domains before async init`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    static fallbackServers = ["api-one.example", "api-two.example"];
+                    static apiDomains;
+                    firstApiDomain() { return this.constructor.apiDomains[0]; }
+                    """.trimIndent(),
+                ),
+            )
+
+            assertEquals("\"api-one.example\"", runtime.invokeSuccess(sourceId, "firstApiDomain"))
         }
     }
 
@@ -205,6 +264,232 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `JM keeps the source declared default API line`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val script = fixtureSource(
+                """
+                settings = { apiDomain: { default: "1" } };
+                apiDomain() { return this.loadSetting("apiDomain"); }
+                """.trimIndent(),
+                key = "jm",
+            )
+            val sourceId = SourceId("jm")
+            val install = runtime.install(
+                SourcePackage(sourceId, version = "1", script = script, sha256 = sha256(script)),
+            )
+            assertTrue("expected install, got $install", install is SourceInstallResult.Installed)
+
+            assertEquals("\"1\"", runtime.invokeSuccess(sourceId, "apiDomain", "[]"))
+        }
+    }
+
+    @Test
+    fun `source initialization can finish an HTTP-backed domain refresh`() = runBlocking {
+        val host = RecordingHostApi { request ->
+            delay(5_100)
+            respondWithBody(request.requestId, 200, "domain list")
+        }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val script = fixtureSource(
+                """
+                async init() { await fetch("https://domains.example/list"); }
+                currentDomain() { return "ready"; }
+                """.trimIndent(),
+                key = "jm",
+            )
+            val sourceId = SourceId("jm")
+
+            val install = runtime.install(
+                SourcePackage(sourceId, version = "1", script = script, sha256 = sha256(script)),
+            )
+
+            assertTrue("expected init to complete, got $install", install is SourceInstallResult.Installed)
+            assertEquals("\"ready\"", runtime.invokeSuccess(sourceId, "currentDomain"))
+        }
+        assertEquals(1, host.requests.size)
+    }
+
+    @Test
+    fun `JM startup decrypts refreshed domains and searches through the next API line`() = runBlocking {
+        val encryptedDomains = "\uFEFF" + encryptJmConfig("""{"Server":["jm-a.example","jm-b.example"]}""")
+        val host = RecordingHostApi { request ->
+            val payload = JSONObject(request.payloadJson)
+            when {
+                payload.getString("url") == "https://domains.example/newsvr-2025.txt" ->
+                    respondWithBody(request.requestId, 200, encryptedDomains)
+                payload.getString("url").startsWith("https://jm-a.example/") ->
+                    respondWithBody(request.requestId, 404, "not found")
+                payload.getString("url").startsWith("https://jm-b.example/") ->
+                    respondWithBody(request.requestId, 200, "mock-search-ok")
+                else -> error("Unexpected JM request: ${payload.getString("url")}")
+            }
+        }
+
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val script = fixtureSource(
+                """
+                static fallbackServers = ["fallback-a.example", "fallback-b.example"];
+                static apiDomains;
+                settings = { refreshDomainsOnStart: { default: true }, apiDomain: { default: "1" } };
+                async init() {
+                  if (this.loadSetting("refreshDomainsOnStart")) await this.refreshApiDomains();
+                }
+                async refreshApiDomains() {
+                  const response = await fetch("https://domains.example/newsvr-2025.txt");
+                  if (!response.ok) return;
+                  const secret = "diosfjckwpqpdfjkvnqQjsik";
+                  const key = Convert.encodeUtf8(Convert.hexEncode(Convert.md5(Convert.encodeUtf8(secret))));
+                  const encrypted = Convert.decodeBase64(await response.text());
+                  const text = Convert.decodeUtf8(Convert.decryptAesEcb(encrypted, key));
+                  const config = JSON.parse(text);
+                  this.constructor.apiDomains = config.Server.slice(0, 4);
+                }
+                get baseUrl() {
+                  const index = parseInt(this.loadSetting("apiDomain"), 10) - 1;
+                  return "https://" + this.constructor.apiDomains[index];
+                }
+                async search(keyword, order, timestamp) {
+                  const query = encodeURIComponent(keyword).replace(/%20/g, "+");
+                  const url = `${'$'}{this.baseUrl}/search?search_query=${'$'}{query}&o=${'$'}{order}`;
+                  const token = Convert.hexEncode(Convert.md5(Convert.encodeUtf8(`${'$'}{timestamp}18comicAPPContent`)));
+                  const response = await Network.get(url, {
+                    "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36",
+                    "Accept-Encoding": "gzip, deflate, br, zstd",
+                    "Referer": "https://localhost/",
+                    "token": token,
+                    "tokenparam": `${'$'}{timestamp},2.0.16`
+                  });
+                  if (response.status !== 200) throw new Error("bad status " + response.status);
+                  return response.body;
+                }
+                """.trimIndent(),
+                key = "jm",
+            )
+            val sourceId = SourceId("jm")
+            val install = runtime.install(
+                SourcePackage(sourceId, version = "1", script = script, sha256 = sha256(script)),
+            )
+            assertTrue("expected install, got $install", install is SourceInstallResult.Installed)
+
+            assertEquals("\"mock-search-ok\"", runtime.invokeSuccess(sourceId, "search", "[\"海贼王\",\"mr\",1760000000]"))
+        }
+
+        assertEquals(3, host.requests.size)
+        val configRequest = JSONObject(host.requests[0].payloadJson)
+        assertEquals("https://domains.example/newsvr-2025.txt", configRequest.getString("url"))
+        val initialSearch = JSONObject(host.requests[1].payloadJson)
+        assertEquals(
+            "https://jm-a.example/search?search_query=%E6%B5%B7%E8%B4%BC%E7%8E%8B&o=mr",
+            initialSearch.getString("url"),
+        )
+        val headers = initialSearch.getJSONObject("headers")
+        assertEquals("1760000000,2.0.16", headers.getString("tokenparam"))
+        assertEquals("969efa5931c54a87cfe1db70e240a2e5", headers.getString("token"))
+        assertTrue(headers.getString("User-Agent").contains("Android 13"))
+        assertEquals(
+            "https://jm-b.example/search?search_query=%E6%B5%B7%E8%B4%BC%E7%8E%8B&o=mr",
+            JSONObject(host.requests[2].payloadJson).getString("url"),
+        )
+    }
+
+    @Test
+    fun `Komiic GraphQL search posts the configured request and parses mocked results`() = runBlocking {
+        val host = RecordingHostApi { request ->
+            val payload = JSONObject(request.payloadJson)
+            assertEquals("POST", payload.getString("method"))
+            respondWithBody(
+                request.requestId,
+                200,
+                """{"data":{"searchComicsAndAuthors":{"comics":[{"id":"c-1","title":"舞舞舞"}]}}}""",
+            )
+        }
+
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val script = fixtureSource(
+                """
+                queryJson(query) {
+                  return Network.post("https://komiic.com/api/query", {
+                    "Referer": "https://komiic.com/",
+                    "User-Agent": "Mozilla/5.0 Chrome/120.0.0.0 Safari/537.36",
+                    "Content-Type": "application/json"
+                  }, query).then(response => {
+                    if (response.status !== 200) throw new Error("status " + response.status);
+                    return JSON.parse(response.body);
+                  });
+                }
+                search(keyword) {
+                  return this.queryJson({
+                    operationName: "searchComicAndAuthorQuery",
+                    variables: { keyword: keyword },
+                    query: "query searchComicAndAuthorQuery(${'$'}keyword: String!) { searchComicsAndAuthors(keyword: ${'$'}keyword) { comics { id title } } }"
+                  }).then(result => result.data.searchComicsAndAuthors.comics.map(comic => comic.title));
+                }
+                """.trimIndent(),
+            )
+            val sourceId = runtime.installSource(script)
+            assertEquals("[\"舞舞舞\"]", runtime.invokeSuccess(sourceId, "search", "[\"舞舞舞\"]"))
+        }
+
+        assertEquals(1, host.requests.size)
+        val request = JSONObject(host.requests.single().payloadJson)
+        assertEquals("https://komiic.com/api/query", request.getString("url"))
+        val headers = request.getJSONObject("headers")
+        assertEquals("application/json", headers.getString("Content-Type"))
+        assertEquals("https://komiic.com/", headers.getString("Referer"))
+        val body = JSONObject(request.getString("body"))
+        assertEquals("searchComicAndAuthorQuery", body.getString("operationName"))
+        assertEquals("舞舞舞", body.getJSONObject("variables").getString("keyword"))
+        assertTrue(body.getString("query").contains("searchComicsAndAuthors"))
+    }
+
+    @Test
+    fun `JM GET retries other API lines after DNS failure and 404`() = runBlocking {
+        val host = RecordingHostApi { request ->
+            val url = JSONObject(request.payloadJson).getString("url")
+            when {
+                url.contains("api-two.example") ->
+                    SourceHostResult.Failure(
+                        request.requestId,
+                        SourceHostError(
+                            SourceHostError.Code.NETWORK_CONNECTION,
+                            "DNS lookup failed.",
+                            retryable = true,
+                        ),
+                    )
+                url.contains("api-one.example") -> respondWithBody(request.requestId, 404, "not found")
+                else -> respondWithBody(request.requestId, 200, "works")
+            }
+        }
+
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val script = fixtureSource(
+                """
+                static fallbackServers = ["api-one.example", "api-two.example", "api-three.example"];
+                static apiDomains;
+                settings = { apiDomain: { default: "1" } };
+                get baseUrl() {
+                  return `https://${'$'}{this.constructor.apiDomains[parseInt(this.loadSetting("apiDomain")) - 1]}`;
+                }
+                search() {
+                  return Network.get(`${'$'}{this.baseUrl}/search`).then(response => response.body);
+                }
+                """.trimIndent(),
+                key = "jm",
+            )
+            val sourceId = SourceId("jm")
+            val install = runtime.install(
+                SourcePackage(sourceId, version = "1", script = script, sha256 = sha256(script)),
+            )
+            assertTrue("expected install, got $install", install is SourceInstallResult.Installed)
+
+            val result = runtime.invokeSuccess(sourceId, "search", "[]")
+            assertTrue(result.contains("works"))
+        }
+
+        assertEquals(3, host.requests.size)
+    }
+
+    @Test
     fun `a source can replace a setting value during initialization`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
@@ -258,6 +543,67 @@ class QuickJsRuntimeTest {
                 "keyword should reach the host: ${recordedUrls.single()}",
                 recordedUrls.single().contains("cats%20and%20dogs"),
             )
+        }
+    }
+
+    @Test
+    fun `Network post serializes object bodies as json`() = runBlocking {
+        val requestBodies = CopyOnWriteArrayList<String?>()
+        val host = RecordingHostApi { request ->
+            requestBodies += JSONObject(request.payloadJson).getString("body")
+            respondWithBody(request.requestId, 200, "{}")
+        }
+
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    sendGraphQl() {
+                      return Network.post(
+                        "https://example.com/graphql",
+                        { "Content-Type": "application/json" },
+                        { operationName: "search", variables: { keyword: "漫画" } }
+                      ).then(response => response.status);
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            assertEquals("200", runtime.invokeSuccess(sourceId, "sendGraphQl"))
+        }
+
+        assertEquals(
+            """{"operationName":"search","variables":{"keyword":"漫画"}}""",
+            requestBodies.single(),
+        )
+    }
+
+    @Test
+    fun `Convert exposes md5 and AES ECB decryption used by source scripts`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    cryptoVectors() {
+                      const key = new Uint8Array([
+                        0x60,0x3d,0xeb,0x10,0x15,0xca,0x71,0xbe,0x2b,0x73,0xae,0xf0,0x85,0x7d,0x77,0x81,
+                        0x1f,0x35,0x2c,0x07,0x3b,0x61,0x08,0xd7,0x2d,0x98,0x10,0xa3,0x09,0x14,0xdf,0xf4
+                      ]);
+                      const ciphertext = new Uint8Array([
+                        0xf3,0xee,0xd1,0xbd,0xb5,0xd2,0xa0,0x3c,0x06,0x4b,0x5a,0x7e,0x3d,0xb1,0x81,0xf8
+                      ]);
+                      return {
+                        md5: Convert.hexEncode(Convert.md5(Convert.encodeUtf8("abc"))),
+                        aes: Convert.hexEncode(Convert.decryptAesEcb(ciphertext, key))
+                      };
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "cryptoVectors"))
+            assertEquals("900150983cd24fb0d6963f7d28e17f72", result.getString("md5"))
+            assertEquals("6bc1bee22e409f96e93d7e117393172a", result.getString("aes"))
         }
     }
 
@@ -871,6 +1217,15 @@ class QuickJsRuntimeTest {
                         .put("body", body)
                         .toString(),
             )
+
+        fun encryptJmConfig(clearText: String): String {
+            val secret = "diosfjckwpqpdfjkvnqQjsik"
+            val digest = MessageDigest.getInstance("MD5").digest(secret.toByteArray(Charsets.UTF_8))
+            val hexKey = digest.joinToString(separator = "") { byte -> "%02x".format(byte) }
+            val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(hexKey.toByteArray(Charsets.UTF_8), "AES"))
+            return Base64.getEncoder().encodeToString(cipher.doFinal(clearText.toByteArray(Charsets.UTF_8)))
+        }
 
         fun sha256(value: String): String =
             MessageDigest.getInstance("SHA-256")

@@ -186,6 +186,7 @@ class SearchViewModelTest {
         assertTrue(!rows.first().hasError)
         assertTrue(!rows.first().isLoading)
         assertTrue(rows.last().hasError)
+        assertEquals("source fixture failure", rows.last().errorDetail)
         assertEquals(listOf("a", "b"), catalog.searchRequests.map { it.sourceId.value })
     }
 

@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- The download worker runs in the foreground: without a foreground-service permission the
          system stops it, and from API 34 a foreground service must also declare the type it runs
          under (ADR-0005 §2.2). -->

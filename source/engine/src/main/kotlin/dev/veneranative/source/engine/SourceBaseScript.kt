@@ -24,6 +24,23 @@ internal object SourceBaseScript {
 
           var data = {};
 
+          // Upstream source scripts construct search/explore results with `new Comic({...})`.
+          // This is a plain value object (no host capabilities); keep its fields aligned with the
+          // constructor in venera-configs/_venera_.js so JSON serialization exposes the same data.
+          function Comic({id, title, subtitle, subTitle, cover, tags, description, maxPage, language, favoriteId, stars}) {
+            this.id = id;
+            this.title = title;
+            this.subtitle = subtitle;
+            this.subTitle = subTitle;
+            this.cover = cover;
+            this.tags = tags;
+            this.description = description;
+            this.maxPage = maxPage;
+            this.language = language;
+            this.favoriteId = favoriteId;
+            this.stars = stars;
+          }
+
           class ComicSource {
             constructor() {
               this.name = "";
@@ -32,6 +49,14 @@ internal object SourceBaseScript {
               this.minAppVersion = "";
               this.url = "";
               this.translation = {};
+
+              // Several source scripts declare fallbackServers and populate apiDomains during
+              // async init(). Keep their baseUrl usable if endpoint discovery fails before it
+              // can assign apiDomains.
+              var sourceClass = this.constructor;
+              if (sourceClass && Array.isArray(sourceClass.fallbackServers) && !Array.isArray(sourceClass.apiDomains)) {
+                sourceClass.apiDomains = sourceClass.fallbackServers.slice();
+              }
             }
 
             init() {}
@@ -91,6 +116,7 @@ internal object SourceBaseScript {
           }
 
           ComicSource.sources = {};
+          globalThis.Comic = Comic;
           globalThis.ComicSource = ComicSource;
         })();
         """.trimIndent()

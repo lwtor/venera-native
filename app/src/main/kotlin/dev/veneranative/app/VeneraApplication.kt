@@ -15,6 +15,7 @@ import dev.veneranative.data.download.DownloadLimits
 import dev.veneranative.source.network.PerSourceCookieJarRegistry
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import java.net.ProxySelector
 import okhttp3.OkHttpClient
 
 /**
@@ -31,7 +32,14 @@ class VeneraApplication : Application() {
 
     val cookieJars: PerSourceCookieJarRegistry = PerSourceCookieJarRegistry()
 
-    val httpClient: OkHttpClient = AppHttpClientFactory.create(AppHttpClientFactory.createDispatcher())
+    val networkProxySelector: ProxySelector by lazy { androidDefaultProxySelector(this) }
+
+    val httpClient: OkHttpClient by lazy {
+        AppHttpClientFactory.create(
+            dispatcher = AppHttpClientFactory.createDispatcher(),
+            proxySelector = networkProxySelector,
+        )
+    }
 
     val authProvider: SourceCookieImageAuth = SourceCookieImageAuth(cookieJars)
 

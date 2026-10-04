@@ -34,7 +34,7 @@ sealed interface SourceNetworkError {
         override val retryable: Boolean = true
     }
 
-    data object Connection : SourceNetworkError {
+    data class Connection(val detail: String = "Connection failed.") : SourceNetworkError {
         override val retryable: Boolean = true
     }
 

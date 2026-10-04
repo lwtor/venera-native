@@ -1,6 +1,7 @@
 package dev.veneranative.core.network
 
 import java.util.concurrent.TimeUnit
+import java.net.ProxySelector
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 
@@ -22,12 +23,14 @@ object AppHttpClientFactory {
         connectTimeoutMillis: Long = DEFAULT_CONNECT_TIMEOUT_MILLIS,
         readTimeoutMillis: Long = DEFAULT_READ_TIMEOUT_MILLIS,
         writeTimeoutMillis: Long = DEFAULT_WRITE_TIMEOUT_MILLIS,
+        proxySelector: ProxySelector? = null,
     ): OkHttpClient {
         require(connectTimeoutMillis > 0)
         require(readTimeoutMillis > 0)
         require(writeTimeoutMillis > 0)
         return OkHttpClient.Builder()
             .dispatcher(dispatcher)
+            .apply { proxySelector?.let(::proxySelector) }
             .connectTimeout(connectTimeoutMillis, TimeUnit.MILLISECONDS)
             .readTimeout(readTimeoutMillis, TimeUnit.MILLISECONDS)
             .writeTimeout(writeTimeoutMillis, TimeUnit.MILLISECONDS)

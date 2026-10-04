@@ -386,7 +386,9 @@ class AndroidJavaScriptRuntime(
     }
 
     private companion object {
-        const val DEFAULT_INSTALL_TIMEOUT_MILLIS = 5_000L
+        // Source init hooks may refresh endpoints through an HTTP request. Match the source
+        // transport's 15-second cap while leaving time for script setup and cleanup.
+        const val DEFAULT_INSTALL_TIMEOUT_MILLIS = 30_000L
         const val DEFAULT_MAX_RESULT_BYTES = 1_048_576
         const val MAX_CALL_TIMEOUT_MILLIS = 120_000L
         const val MAX_ERROR_DETAIL_LENGTH = 512

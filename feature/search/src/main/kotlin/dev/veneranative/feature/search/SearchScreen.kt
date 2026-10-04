@@ -243,7 +243,12 @@ private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (Searc
                 }
                 when {
                     row.isLoading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-                    row.hasError -> Text(stringResource(R.string.source_search_failed), Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error)
+                    row.hasError -> Column(Modifier.padding(horizontal = 16.dp)) {
+                        Text(stringResource(R.string.source_search_failed), color = MaterialTheme.colorScheme.error)
+                        row.errorDetail?.let { detail ->
+                            Text(detail, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
                     row.comics.isEmpty() -> Text(stringResource(R.string.no_results), Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
                     else -> LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(row.comics, key = { it.key.remoteId.value }) { comic ->
