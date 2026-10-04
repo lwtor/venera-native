@@ -33,7 +33,7 @@ class AppRouteEncodingTest {
             ChapterRef.Remote(ChapterKey(
                 comicKey = comicKey("manga_dex", "a1b2c3"),
                 remoteId = RemoteChapterId("chapter:1"),
-            )),
+            ), group = "版本:繁中"),
         ),
         AppRoute.Reader(
             ChapterRef.Local(LocalComicId("local-comic"), LocalChapterId("local-chapter")),

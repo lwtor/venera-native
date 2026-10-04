@@ -32,6 +32,7 @@ include(
     ":data:history",
     ":data:local",
     ":data:search",
+    ":data:settings",
     ":data:source",
     ":feature:details",
     ":feature:explore",

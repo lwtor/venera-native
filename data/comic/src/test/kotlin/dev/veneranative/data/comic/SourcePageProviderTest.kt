@@ -144,6 +144,40 @@ class SourcePageProviderTest {
     }
 
     @Test
+    fun `chapter navigation stays inside the selected source version`() = runTest {
+        val versionOne = listOf(
+            Chapter(chapter.copy(remoteId = RemoteChapterId("v1-1")), "Chapter 1", 0, "Version 1"),
+            Chapter(chapter.copy(remoteId = RemoteChapterId("v1-2")), "Chapter 2", 1, "Version 1"),
+        )
+        val versionTwo = listOf(
+            Chapter(chapter.copy(remoteId = RemoteChapterId("v2-1")), "Chapter 1", 2, "Version 2"),
+            Chapter(chapter.copy(remoteId = RemoteChapterId("v2-2")), "Chapter 2", 3, "Version 2"),
+        )
+        val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
+            override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
+                SourceOutcome.Success(ComicDetail(
+                    comic = Comic(comicKey, "Comic"),
+                    chapters = versionOne + versionTwo,
+                ))
+        }
+        val provider = SourcePageProvider(catalog, FixedSizer())
+
+        val middle = provider.loadChapter(dev.veneranative.core.model.ChapterRef.Remote(
+            versionOne.first().key,
+            group = "Version 1",
+        ))
+        val last = provider.loadChapter(dev.veneranative.core.model.ChapterRef.Remote(
+            versionOne.last().key,
+            group = "Version 1",
+        ))
+
+        assertEquals(versionOne.last(), middle.nextChapter)
+        assertEquals(null, middle.previousChapter)
+        assertEquals(null, last.nextChapter)
+        assertEquals(versionOne.first(), last.previousChapter)
+    }
+
+    @Test
     fun `prefetched next chapter is reused and its first page is warmed`() = runTest {
         val nextKey = chapter.copy(remoteId = RemoteChapterId("chapter-2"))
         var pageLoads = 0

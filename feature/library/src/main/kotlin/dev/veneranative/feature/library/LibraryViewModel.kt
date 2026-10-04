@@ -7,6 +7,7 @@ import dev.veneranative.data.collection.ShelfSort
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.local.LocalImportResult
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,10 @@ class LibraryViewModel(
     private val repository: CollectionRepository,
     private val localRepository: LocalComicRepository? = null,
     private val downloads: DownloadRepository? = null,
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) : ViewModel() {
+
+    private var screenPreferences: ScreenPreferenceRepository? = screenPreferences
 
     private val _state = MutableStateFlow(LibraryUiState())
     val state: StateFlow<LibraryUiState> = _state.asStateFlow()
@@ -40,12 +44,19 @@ class LibraryViewModel(
     /** The current query. Distinct values only, so re-selecting the same folder costs nothing. */
     private val selection = MutableStateFlow(LibrarySelection())
     private var itemsJob: Job? = null
+    private var folderJob: Job? = null
+    private var preferenceRestoreJob: Job? = null
 
     init {
-        observeFolders()
-        startItems()
+        restorePreferences()
         observeLocalComics()
         observeDownloads()
+    }
+
+    fun attachScreenPreferences(repository: ScreenPreferenceRepository) {
+        if (screenPreferences === repository) return
+        screenPreferences = repository
+        restorePreferences()
     }
 
     fun onAction(action: LibraryAction) {
@@ -87,13 +98,14 @@ class LibraryViewModel(
             }
             is LibraryAction.FavoriteQueryChanged -> _state.update { it.copy(favoriteQuery = action.query) }
             LibraryAction.Retry -> startItems()
-            is LibraryAction.SelectTab -> _state.update {
-                it.copy(
+            is LibraryAction.SelectTab -> {
+                _state.update { it.copy(
                     tab = action.tab,
                     favoriteSearchVisible = false,
                     favoriteQuery = "",
                     selectedFavorite = null,
-                )
+                ) }
+                persist(PREF_TAB, action.tab.name)
             }
             LibraryAction.RequestLocalImport -> Unit
             LibraryAction.RequestArchiveImport -> Unit
@@ -177,12 +189,39 @@ class LibraryViewModel(
     }
 
     private fun observeFolders() {
-        viewModelScope.launch {
+        if (folderJob?.isActive == true) return
+        folderJob = viewModelScope.launch {
             runCatching {
                 repository.observeFolders().collect { folders ->
-                    _state.update { it.copy(folders = folders) }
+                    val selected = _state.value.selectedFolderId?.takeIf { id -> folders.any { it.id == id } }
+                    if (selected != _state.value.selectedFolderId) {
+                        _state.update { it.copy(folders = folders, selectedFolderId = selected) }
+                        selection.update { it.copy(folderId = selected) }
+                        persist(PREF_FOLDER, selected ?: ALL_FOLDERS)
+                    } else {
+                        _state.update { it.copy(folders = folders) }
+                    }
                 }
             }.onFailure { failure -> failUnlessCancelled(failure) }
+        }
+    }
+
+    private fun restorePreferences() {
+        preferenceRestoreJob?.cancel()
+        preferenceRestoreJob = viewModelScope.launch {
+            val preferences = screenPreferences
+            val storedFolder = runCatching { preferences?.get(PREF_FOLDER) }.getOrNull()
+            val folderId = storedFolder?.takeUnless { it == ALL_FOLDERS }
+            val sort = runCatching { preferences?.get(PREF_SORT) }.getOrNull()?.let { value ->
+                ShelfSort.entries.firstOrNull { it.name == value }
+            } ?: ShelfSort.AddedAt
+            val tab = runCatching { preferences?.get(PREF_TAB) }.getOrNull()?.let { value ->
+                LibraryTab.entries.firstOrNull { it.name == value }
+            } ?: LibraryTab.Favorites
+            selection.value = LibrarySelection(folderId, sort)
+            _state.update { it.copy(tab = tab, selectedFolderId = folderId, sort = sort) }
+            observeFolders()
+            startItems()
         }
     }
 
@@ -217,12 +256,19 @@ class LibraryViewModel(
         if (_state.value.selectedFolderId == folderId) return
         _state.update { it.copy(selectedFolderId = folderId) }
         selection.update { it.copy(folderId = folderId) }
+        persist(PREF_FOLDER, folderId ?: ALL_FOLDERS)
     }
 
     private fun changeSort(sort: ShelfSort) {
         if (_state.value.sort == sort) return
         _state.update { it.copy(sort = sort) }
         selection.update { it.copy(sort = sort) }
+        persist(PREF_SORT, sort.name)
+    }
+
+    private fun persist(key: String, value: String) {
+        val preferences = screenPreferences ?: return
+        viewModelScope.launch { runCatching { preferences.put(key, value) } }
     }
 
     private fun openFolderEditor(folderId: String?) {
@@ -287,4 +333,11 @@ class LibraryViewModel(
         val folderId: String? = null,
         val sort: ShelfSort = ShelfSort.AddedAt,
     )
+
+    private companion object {
+        const val PREF_TAB = "library.tab"
+        const val PREF_FOLDER = "library.favorite.folder"
+        const val PREF_SORT = "library.favorite.sort"
+        const val ALL_FOLDERS = "@all"
+    }
 }

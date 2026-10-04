@@ -65,6 +65,23 @@ class SearchViewModelTest {
         assertEquals(SourceId("a"), viewModel.state.value.selectedSourceId)
     }
 
+    @Test fun `the search form restores its source and aggregate selection`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"), source("b"))
+        val preferences = FakeScreenPreferences(mutableMapOf(
+            "search.source" to "b",
+            "search.aggregate" to "true",
+        ))
+
+        val viewModel = SearchViewModel(catalog, screenPreferences = preferences)
+        advanceUntilIdle()
+
+        assertEquals(SourceId("b"), viewModel.state.value.selectedSourceId)
+        assertTrue(viewModel.state.value.aggregateSearch)
+        viewModel.onAction(SearchAction.AggregateToggled)
+        advanceUntilIdle()
+        assertEquals("false", preferences.get("search.aggregate"))
+    }
+
     @Test
     fun `no searchable source is a ready state with an empty list`() = runTest(dispatcher) {
         val viewModel = SearchViewModel(catalog)

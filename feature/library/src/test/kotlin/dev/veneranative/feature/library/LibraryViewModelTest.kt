@@ -62,6 +62,26 @@ class LibraryViewModelTest {
         assertEquals(listOf("default", "reading"), viewModel.state.value.folders.map { it.id })
     }
 
+    @Test fun `the shelf restores its last tab folder and sort`() = runTest(dispatcher) {
+        repository.folders.value = listOf(
+            favoriteFolder("default", "Default", removable = false),
+            favoriteFolder("reading", "Reading"),
+        )
+        val preferences = FakeScreenPreferences(mutableMapOf(
+            "library.tab" to "Downloads",
+            "library.favorite.folder" to "reading",
+            "library.favorite.sort" to "Title",
+        ))
+
+        val viewModel = LibraryViewModel(repository, screenPreferences = preferences)
+        advanceUntilIdle()
+
+        assertEquals(LibraryTab.Downloads, viewModel.state.value.tab)
+        assertEquals("reading", viewModel.state.value.selectedFolderId)
+        assertEquals(ShelfSort.Title, viewModel.state.value.sort)
+        assertTrue(repository.observeItemQueries.contains("reading" to ShelfSort.Title))
+    }
+
     @Test
     fun `favorite search filters title and subtitle without changing the repository list`() = runTest(dispatcher) {
         repository.items.value = listOf(
@@ -264,7 +284,7 @@ class LibraryViewModelTest {
         viewModel.onAction(LibraryAction.RefreshUpdates)
         advanceUntilIdle()
 
-        assertEquals("3 comics have new chapters.", viewModel.state.value.message)
+        assertEquals("3 部漫画有新章节。", viewModel.state.value.message)
 
         viewModel.onAction(LibraryAction.DismissMessage)
         assertNull(viewModel.state.value.message)

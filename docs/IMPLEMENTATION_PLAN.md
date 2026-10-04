@@ -547,6 +547,7 @@ S3-01 小任务：
 | --- | --- | --- |
 | S3-01A | 对齐原版搜索：首页支持单源选择、按来源能力动态显示 select/multi-select/dropdown 选项、可持久化搜索历史；聚合搜索按来源并发受限地加载预览、分别展示失败/空/结果，进入来源完整分页结果；结果使用独立页面，漫画标题区域固定两行 | DONE（聚合即全部可搜索来源：保留来源芯片列表并在聚合态显示全部选中，单源切换无效；ViewModel 忽略聚合态单源切换并有回归覆盖。编译及 `git diff --check` 通过；真机由用户验收） |
 | S3-01B | 探索页分类筛选与排行入口按来源能力呈现，分页/错误状态与用户流程覆盖 | TODO |
+| S3-01C | 跨页面记住用户选择：书架最后选择的 tab/收藏夹/排序；搜索来源、聚合开关及各来源有效筛选项；详情按作品记住章节排序/版本。新增数据库迁移与恢复回归；失效选项安全回退 | IN_PROGRESS（`:feature:library:testDebugUnitTest --tests LibraryViewModelTest :feature:search:testDebugUnitTest --tests SearchViewModelTest :feature:details:testDebugUnitTest --tests DetailsViewModelTest` 均通过；`:core:database:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；Android migration test 源码未在设备运行，真机验收由用户执行） |
 
 S3-00 小任务：
 
@@ -574,6 +575,7 @@ S3-00 小任务：
 | S3-00R | 来源函数抛出未处理的 JS 异常后，废弃可能已变更的 QuickJS 单例状态，并在下一次调用时从已安装脚本重新初始化；覆盖异常后状态重置 | IN_PROGRESS（针对“进程内多个详情持续失败、重启进程后恢复”增加恢复逻辑；JVM 定向回归与 App Debug 构建通过，等待用户真机复验） |
 | S3-00S | 阅读器沉浸全屏；点击画面中央呼出/收起工具层；按本话页码拖动定位；快捷跳转上一话/下一话且保持同一阅读画布 | DONE（默认隐藏系统栏；控制层展开时显示状态栏、隐藏导航栏；详情及阅读器顶部栏使用 safeDrawing inset 避让挖孔区；阅读器顶部栏从上向下滑入，底部工具区从下向上滑入，均带淡入；页码自绘轨道支持点击和拖动；前后话图标置于滑块两侧；翻页/解码方式分组等宽；编译与真机验收记录见 STATUS） |
 | S3-00T | 修复拷贝漫画阅读器图片一直 loading：补齐独立图片请求的浏览器 User-Agent（允许单图来源请求头覆盖），并设置整次 HTTP 请求总时限；失败进入现有重试状态 | DONE（默认 Chrome UA、单图 UA 覆盖和 90 秒请求总时限已实现；慢速响应及 UA 优先级回归测试源码编译通过；`:app:assembleDebug` 通过；用户在真机确认《超自然武装当哒当》图片正常显示） |
+| S3-00U | 阅读器章节前后导航必须限制在用户从详情页选择的来源版本组内；把组上下文保留到阅读路由、预载、上一话/下一话追加；组末尾视为当前版本结束，不串入其它版本。编写分组章节回归并编译 App。 | IN_PROGRESS（实现和相关测试源码编译通过；待用户真机验收） |
 
 ## 8. Stage 4：同步、体验与发布
 

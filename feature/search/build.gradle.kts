@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":data:comic"))
     api(project(":data:search"))
+    implementation(project(":data:settings"))
     implementation(project(":core:image"))
     implementation(project(":source:api"))
 

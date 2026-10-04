@@ -9,6 +9,7 @@ import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.PageSizeState
 import dev.veneranative.core.model.ReaderProgress
+import dev.veneranative.core.model.Chapter
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -124,7 +125,7 @@ class ReaderViewModel(
                 chapterProgress?.record(content, resumedIndex)
                 prefetchAround(resumedIndex)
                 content.nextChapter?.let { next ->
-                    viewModelScope.launch { provider.prefetchChapter(ChapterRef.Remote(next.key)) }
+                    viewModelScope.launch { provider.prefetchChapter(next.toChapterRef()) }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -177,7 +178,7 @@ class ReaderViewModel(
 
     private fun loadNextChapter(navigateAfterLoad: Boolean = false) {
         val next = _state.value.nextChapter ?: return
-        val nextRef = ChapterRef.Remote(next.key)
+        val nextRef = next.toChapterRef()
         if (nextRef in loadedChapters || nextChapterLoadJob?.isActive == true) return
         _state.update { it.copy(isLoadingNextChapter = true, nextChapterLoadFailed = false) }
         nextChapterLoadJob = viewModelScope.launch {
@@ -210,7 +211,7 @@ class ReaderViewModel(
                 }
                 if (navigateAfterLoad) segmentProgress?.record(content, 0)
                 content.nextChapter?.let { following ->
-                    viewModelScope.launch { provider.prefetchChapter(ChapterRef.Remote(following.key)) }
+                    viewModelScope.launch { provider.prefetchChapter(following.toChapterRef()) }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -222,7 +223,7 @@ class ReaderViewModel(
 
     private fun loadPreviousChapter() {
         val previous = _state.value.previousChapter ?: return
-        val previousRef = ChapterRef.Remote(previous.key)
+        val previousRef = previous.toChapterRef()
         if (previousRef in loadedChapters) {
             val start = chapters.firstOrNull { it.chapter == previousRef }?.startPageIndex ?: return
             showPage(start + (chapters.first { it.chapter == previousRef }.content.pages.lastIndex))
@@ -314,3 +315,5 @@ class ReaderViewModel(
         const val DEFAULT_PREFETCH_RADIUS = 1
     }
 }
+
+private fun Chapter.toChapterRef(): ChapterRef.Remote = ChapterRef.Remote(key, group)

@@ -20,7 +20,12 @@ value class LocalChapterId(val value: String) {
  */
 sealed interface ChapterRef {
 
-    data class Remote(val key: ChapterKey) : ChapterRef
+    /** `group` scopes reader navigation to the source version selected in the details list. */
+    data class Remote(val key: ChapterKey, val group: String? = null) : ChapterRef {
+        init {
+            require(group == null || group.isNotBlank()) { "group must not be blank" }
+        }
+    }
 
     data class Local(val comicId: LocalComicId, val chapterId: LocalChapterId) : ChapterRef
 

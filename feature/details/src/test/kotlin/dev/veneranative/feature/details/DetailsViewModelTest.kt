@@ -83,6 +83,29 @@ class DetailsViewModelTest {
         assertEquals(listOf("Chapter 1", "Chapter 2"), viewModel.state.value.visibleChapters.map { it.title })
     }
 
+    @Test fun `details restores the last chapter order and valid version`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(
+            detail(title = "Frieren").copy(chapters = groupedChaptersOf(
+                comicKey,
+                linkedMapOf("JP" to linkedMapOf("jp-1" to "Chapter 1"), "EN" to linkedMapOf("en-1" to "Chapter 1")),
+            )),
+        )
+        val preferences = FakeScreenPreferences(mutableMapOf(
+            "details.1:s:c1.chapter-order" to "Reversed",
+            "details.1:s:c1.chapter-version" to "EN",
+        ))
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, screenPreferences = preferences)
+        advanceUntilIdle()
+
+        assertEquals(ChapterOrder.Reversed, viewModel.state.value.order)
+        assertEquals("EN", viewModel.state.value.selectedGroup)
+        viewModel.onAction(DetailsAction.GroupSelected("JP"))
+        advanceUntilIdle()
+        assertEquals("JP", preferences.get("details.1:s:c1.chapter-version"))
+    }
+
     @Test fun `details exposes the most recently read chapter as the resume target`() = runTest(dispatcher) {
         catalog.source = installed("s", name = "Source S")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
@@ -111,6 +134,7 @@ class DetailsViewModelTest {
         )
 
         val viewModel = DetailsViewModel(catalog, comicKey, collection, history = history)
+        viewModel.refreshReadingProgress()
         advanceUntilIdle()
 
         assertEquals(setOf(RemoteChapterId("1")), viewModel.state.value.readChapterIds)

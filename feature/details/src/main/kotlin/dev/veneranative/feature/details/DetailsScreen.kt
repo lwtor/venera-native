@@ -87,7 +87,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 fun DetailsScreen(
     state: DetailsUiState,
     onAction: (DetailsAction) -> Unit,
-    onOpenChapter: (ChapterKey) -> Unit,
+    onOpenChapter: (Chapter) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenComic: (ComicKey) -> Unit = {},
@@ -125,7 +125,7 @@ fun DetailsScreen(
                 if (primaryChapter != null) {
                     Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
                         Button(
-                            onClick = { onOpenChapter(primaryChapter.key) },
+                            onClick = { onOpenChapter(primaryChapter) },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                         ) {
                             val action = if (resumeChapter != null) "继续阅读" else "开始阅读"
@@ -205,7 +205,7 @@ private fun Content(
     tagGroups: Map<String, List<String>>,
     collapseFraction: Float,
     onAction: (DetailsAction) -> Unit,
-    onOpenChapter: (ChapterKey) -> Unit,
+    onOpenChapter: (Chapter) -> Unit,
     onOpenComic: (ComicKey) -> Unit,
 ) {
     LazyColumn(
@@ -328,7 +328,7 @@ private fun Content(
                                 read = chapter.key.remoteId in state.readChapterIds,
                                 selectionMode = state.isChapterSelectionMode,
                                 modifier = Modifier.weight(1f),
-                                onOpen = { onOpenChapter(chapter.key) },
+                                onOpen = { onOpenChapter(chapter) },
                                 onToggleSelection = { onAction(DetailsAction.ChapterSelectionToggled(chapter.key)) },
                             )
                         }

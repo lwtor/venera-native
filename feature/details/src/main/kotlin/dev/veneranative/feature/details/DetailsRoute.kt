@@ -5,17 +5,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.history.HistoryRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 
 /**
  * Entry point of the details screen: owns the ViewModel, collects state, forwards actions.
  *
- * Picking a chapter leaves through [onOpenChapter] as a typed [ChapterKey]: the screen knows which
+ * Picking a chapter leaves through [onOpenChapter] as a typed [Chapter]: the screen knows which
  * chapter the user chose, not which screen shows it.
  *
  * [collection] is nullable because the assembly layer builds it from the database, which does not
@@ -27,18 +28,22 @@ fun DetailsRoute(
     catalog: ComicCatalog,
     comicKey: ComicKey,
     collection: CollectionRepository?,
-    onOpenChapter: (ChapterKey) -> Unit,
+    onOpenChapter: (Chapter) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     downloads: DownloadRepository? = null,
     onScheduleDownloads: () -> Unit = {},
     onOpenComic: (ComicKey) -> Unit = {},
     history: HistoryRepository? = null,
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
-        DetailsViewModel(catalog, comicKey, collection, downloads, history)
+        DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(screenPreferences) {
+        screenPreferences?.let(viewModel::attachScreenPreferences)
+    }
     androidx.compose.runtime.LaunchedEffect(comicKey, history) {
         viewModel.refreshReadingProgress(history)
     }

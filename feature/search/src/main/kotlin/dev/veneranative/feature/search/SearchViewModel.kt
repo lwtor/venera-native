@@ -15,6 +15,7 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
 import dev.veneranative.data.search.SearchHistoryRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +32,9 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.launch
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 /**
  * Owns the search form and the paged results.
@@ -46,6 +50,7 @@ class SearchViewModel(
     private val catalog: ComicCatalog,
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
     initialHistoryRepository: SearchHistoryRepository? = null,
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SearchUiState())
@@ -57,6 +62,8 @@ class SearchViewModel(
     private val _aggregateResults = MutableStateFlow<List<AggregateSearchResult>>(emptyList())
     val aggregateResults: StateFlow<List<AggregateSearchResult>> = _aggregateResults.asStateFlow()
     private var aggregateJob: kotlinx.coroutines.Job? = null
+    private var userChangedSelection = false
+    private var screenPreferences: ScreenPreferenceRepository? = screenPreferences
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val results: Flow<PagingData<Comic>> = query
@@ -73,7 +80,7 @@ class SearchViewModel(
         .cachedIn(viewModelScope)
 
     init {
-        loadSources()
+        loadSources(restoreSavedSelection = screenPreferences != null)
         initialHistoryRepository?.let(::attachSearchHistory)
     }
 
@@ -82,7 +89,9 @@ class SearchViewModel(
             is SearchAction.SourceSelected -> if (!_state.value.aggregateSearch) selectSource(action.sourceId)
 
             SearchAction.AggregateToggled -> {
+                userChangedSelection = true
                 _state.update { it.copy(aggregateSearch = !it.aggregateSearch) }
+                persistSelection()
                 if (_state.value.hasSubmitted) submit()
             }
 
@@ -95,10 +104,13 @@ class SearchViewModel(
 
             is SearchAction.KeywordChanged -> _state.update { it.copy(keyword = action.value) }
 
-            is SearchAction.FilterSelected -> _state.update { current ->
-                val values = current.filterSelection.values.toMutableMap()
-                values[action.key] = action.values
-                current.copy(filterSelection = FilterSelection(values))
+            is SearchAction.FilterSelected -> {
+                _state.update { current ->
+                    val values = current.filterSelection.values.toMutableMap()
+                    values[action.key] = action.values
+                    current.copy(filterSelection = FilterSelection(values))
+                }
+                persistFilters(_state.value.selectedSourceId, _state.value.filterSelection)
             }
 
             is SearchAction.HistorySelected -> {
@@ -131,24 +143,40 @@ class SearchViewModel(
         }
     }
 
-    private fun loadSources() {
+    fun attachScreenPreferences(repository: ScreenPreferenceRepository) {
+        if (screenPreferences === repository) return
+        screenPreferences = repository
+        loadSources(restoreSavedSelection = true)
+    }
+
+    private fun loadSources(restoreSavedSelection: Boolean = false) {
         _state.update { it.copy(status = SearchStatus.Loading, message = null) }
         viewModelScope.launch {
             runCatching { catalog.searchableSources() }
                 .onSuccess { sources ->
                     val current = _state.value.selectedSourceId
-                    val selected = current?.takeIf { id -> sources.any { it.sourceId == id } }
+                    val restoredId = if (restoreSavedSelection && !userChangedSelection) {
+                        screenPreferences?.get(PREF_SOURCE)?.let(::decodeSourceId)
+                    } else null
+                    val selected = restoredId?.takeIf { id -> sources.any { it.sourceId == id } }
+                        ?: current?.takeIf { id -> sources.any { it.sourceId == id } }
                         ?: sources.firstOrNull()?.sourceId
+                    val aggregate = if (!restoreSavedSelection || userChangedSelection) _state.value.aggregateSearch
+                    else screenPreferences?.get(PREF_AGGREGATE)?.toBooleanStrictOrNull() ?: false
                     _state.update {
                         it.copy(
                             status = SearchStatus.Ready,
                             sources = sources,
                             selectedSourceId = selected,
+                            aggregateSearch = aggregate,
                             filters = emptyList(),
                             message = null,
                         )
                     }
-                    selected?.let { sourceId -> loadFilters(sourceId) }
+                    selected?.let { sourceId ->
+                        persistSelection(selected, aggregate)
+                        loadFilters(sourceId)
+                    }
                 }
                 .onFailure {
                     _state.update {
@@ -162,6 +190,7 @@ class SearchViewModel(
     }
 
     private fun selectSource(sourceId: SourceId) {
+        userChangedSelection = true
         if (!_state.value.aggregateSearch) {
             aggregateJob?.cancel()
             query.value = null
@@ -176,6 +205,7 @@ class SearchViewModel(
                 message = null,
             )
         }
+        persistSelection(sourceId)
         loadFilters(sourceId)
     }
 
@@ -196,11 +226,66 @@ class SearchViewModel(
                 is SourceOutcome.Failure -> emptyList()
             }
             // The selection may have moved on while this was in flight.
+            val storedSelection = screenPreferences?.get(filterPreferenceKey(sourceId))?.let(::decodeFilterSelection)
             _state.update { current ->
-                if (current.selectedSourceId == sourceId) current.copy(filters = filters) else current
+                if (current.selectedSourceId == sourceId) {
+                    val restored = if (current.filterSelection.values.isEmpty()) {
+                        storedSelection?.let { validateSelection(filters, it) } ?: current.filterSelection
+                    } else current.filterSelection
+                    current.copy(filters = filters, filterSelection = restored)
+                } else current
             }
         }
     }
+
+    private fun persistSelection(sourceId: SourceId? = _state.value.selectedSourceId, aggregate: Boolean = _state.value.aggregateSearch) {
+        val preferences = screenPreferences ?: return
+        viewModelScope.launch {
+            runCatching {
+                sourceId?.let { preferences.put(PREF_SOURCE, encode(it.value)) }
+                preferences.put(PREF_AGGREGATE, aggregate.toString())
+            }
+        }
+    }
+
+    private fun persistFilters(sourceId: SourceId?, selection: FilterSelection) {
+        val preferences = screenPreferences ?: return
+        sourceId ?: return
+        viewModelScope.launch { runCatching { preferences.put(filterPreferenceKey(sourceId), encodeFilterSelection(selection)) } }
+    }
+
+    private fun filterPreferenceKey(sourceId: SourceId): String = "$PREF_FILTERS.${encode(sourceId.value)}"
+
+    private fun encodeFilterSelection(selection: FilterSelection): String = selection.values.entries.joinToString("&") { (key, values) ->
+        "${encode(key)}=${values.joinToString(",", transform = ::encode)}"
+    }
+
+    private fun decodeFilterSelection(encoded: String): FilterSelection = runCatching {
+        FilterSelection(encoded.split('&').filter(String::isNotEmpty).associate { item ->
+            val parts = item.split('=', limit = 2)
+            decode(parts[0]) to parts.getOrElse(1) { "" }.takeIf(String::isNotEmpty)?.split(',')?.map(::decode).orEmpty()
+        })
+    }.getOrDefault(FilterSelection.Empty)
+
+    private fun validateSelection(filters: List<SourceFilter>, saved: FilterSelection): FilterSelection {
+        val valid = filters.associateBy { it.key }
+        return FilterSelection(saved.values.mapNotNull { (key, values) ->
+            val filter = valid[key] ?: return@mapNotNull null
+            val options = when (filter) {
+                is SourceFilter.Select -> filter.options
+                is SourceFilter.MultiSelect -> filter.options
+                is SourceFilter.Dropdown -> filter.options
+            }.map { it.value }.toSet()
+            val accepted = values.filter { it in options }.let {
+                if (filter is SourceFilter.MultiSelect) it else it.take(1)
+            }
+            if (accepted.isEmpty() && values.isNotEmpty()) null else key to accepted
+        }.toMap())
+    }
+
+    private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+    private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+    private fun decodeSourceId(value: String): SourceId? = runCatching { SourceId(decode(value)) }.getOrNull()
 
     private fun submit() {
         val state = _state.value
@@ -218,12 +303,14 @@ class SearchViewModel(
     }
 
     private fun openSourceResults(sourceId: SourceId) {
+        userChangedSelection = true
         val current = _state.value
         val request = current.copy(selectedSourceId = sourceId, aggregateSearch = false, filterSelection = FilterSelection.Empty).toRequest()
             ?: return
         aggregateJob?.cancel()
         _aggregateResults.value = emptyList()
         _state.update { it.copy(selectedSourceId = sourceId, aggregateSearch = false, filterSelection = FilterSelection.Empty, hasSubmitted = true) }
+        persistSelection(sourceId, aggregate = false)
         loadFilters(sourceId)
         query.value = request
     }
@@ -264,6 +351,9 @@ class SearchViewModel(
         const val DEFAULT_PAGE_SIZE = 20
         const val AGGREGATE_PREVIEW_SIZE = 8
         const val AGGREGATE_CONCURRENCY = 3
+        const val PREF_SOURCE = "search.source"
+        const val PREF_AGGREGATE = "search.aggregate"
+        const val PREF_FILTERS = "search.filters"
     }
 }
 

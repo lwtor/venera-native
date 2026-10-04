@@ -29,7 +29,8 @@ fun AppRoute.encode(): String = when (this) {
 
     is AppRoute.Reader -> when (val ref = chapter) {
         is ChapterRef.Remote -> "reader:${ref.key.comicKey.sourceId.value.escape()}:" +
-            "${ref.key.comicKey.remoteId.value.escape()}:${ref.key.remoteId.value.escape()}"
+            "${ref.key.comicKey.remoteId.value.escape()}:${ref.key.remoteId.value.escape()}:" +
+            (ref.group?.escape() ?: "")
         is ChapterRef.Local -> "reader:@local:${ref.comicId.value.escape()}:${ref.chapterId.value.escape()}"
     }
 }
@@ -71,7 +72,7 @@ fun decodeAppRoute(encoded: String): AppRoute? {
                     ChapterRef.Remote(ChapterKey(
                         comicKey = ComicKey(SourceId(sourceId), RemoteComicId(comicId)),
                         remoteId = RemoteChapterId(chapterId),
-                    )),
+                    ), parts.getOrNull(4)?.unescapeOrNull()),
                 )
             }
         }

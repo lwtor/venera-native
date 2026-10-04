@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-04 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | 等待用户提出下一项问题 |
-| 当前任务状态 | S3-00T 已完成：拷贝漫画阅读器图片请求默认携带 Chrome User-Agent，单图来源显式指定的 UA 优先；整次 HTTP 请求设为 90 秒总时限，并保留页级重试。新增 UA 优先级与慢速响应回归。JDK 17 下 `:core:image:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码已编译、未执行；`git diff --check` — PASS。用户真机确认《超自然武装当哒当》图片正常显示。 |
+| 当前任务 | S3-01C 页面选择偏好持久化 |
+| 当前任务状态 | S3-01C 代码完成，待用户真机验收。书架记住 tab/收藏夹/排序；搜索记住来源/聚合/来源各自有效的筛选项；详情按漫画记住章节顺序/版本组。新增 Room `screen_preference`、5→6 迁移和 schema 6；无效选择会回退。JDK 17：书架/搜索/详情 ViewModel 定向 JVM 回归通过；`:core:database:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；`git diff --check` 通过。迁移 instrumentation 源码已编译但未在设备运行。前一项 S3-00U 代码和回归已编译，真机验收仍待用户。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -72,6 +72,10 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 **S3-00Q1 DONE：详情页与阅读器共用短时漫画详情缓存。** 设备日志记录到拷贝漫画 `comic.loadInfo` 返回脚本执行错误；设备内脚本的 `loadInfo` 会在每次调用时请求作品元数据、收藏状态和每个章节分组。此前 Reader 每预载一话都会重新调用完整详情，显著放大同一漫画的源站请求量。`DefaultComicCatalog` 现按漫画键和来源版本缓存成功详情 5 分钟，并以每漫画互斥锁合并并行请求；失败结果不缓存，Details 的 Retry/Refresh 显式绕过缓存。新增缓存命中、超时后不缓存、强制刷新和过期回归。JDK 17 验证：`:data:comic:testDebugUnitTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。
 
 **S3-00Q2 DONE：适配拷贝漫画限流等待。** 设备已安装的官方 `copy_manga` 1.4.2 脚本在章节接口返回限流状态 210 时使用 `setTimeout` 等待后重试；原 QuickJS 环境没有 `setTimeout`，限流分支因此会变成 `ScriptExecution`。新增明确允许的 `timer.sleep` / `timer.cancel`，限制单次等待最长 120 秒、每次调用最多 8 个活动计时器，并在调用结束/取消时清理；只将 `comic.loadEp` 超时提高到 60 秒，其余来源调用保持 10 秒。ADR-0012 记录安全边界与来源依据。回归覆盖 QuickJS 等待回调、Host 等待时长/取消/上限和章节调用超时；JDK 17 验证：`:source:network:testDebugUnitTest :source:engine:testDebugUnitTest :source:core:testDebugUnitTest :data:comic:testDebugUnitTest :feature:details:testDebugUnitTest :feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。**当前 APK 尚未在设备上复验。**
+
+**S3-00U IN_PROGRESS：阅读器按选择的版本组隔离章节导航。** 详情页将完整章节（含来源版本组）带入 Reader 路由；`SourcePageProvider` 在该组内解析前后章节；阅读器追加章节和预载时继续携带组上下文，因此所选版本末尾不再接到其它版本。新增“版本组末话无下一话、上一话仍属于本组”回归以及版本组路由往返用例。JDK 17 验证：`:core:model:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码未执行；`git diff --check` — PASS。未安装或操作真机，待用户验收。
+
+**S3-01C IN_PROGRESS：记住书架、搜索和详情页的最后选择。** 新增通用 Room 页面偏好表和 `:data:settings` 仓库；书架恢复 tab/收藏夹/排序，搜索恢复来源/聚合/筛选项，详情按作品恢复章节顺序/版本组。对于已移除来源、筛选选项或收藏夹会回退到有效值。数据库 5→6 迁移与 schema 6 已生成，迁移回归源码编译通过。三个页面的 ViewModel 定向 JVM 测试通过；JDK 17 编译命令 `:core:database:compileDebugUnitTestKotlin :core:database:compileDebugAndroidTestKotlin :data:settings:compileDebugUnitTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。迁移 AndroidTest 未运行；真机验收由用户执行。
 
 **S4-10A DONE：重做详情页首屏与章节操作。** 详情页改为封面渐层主视觉，加入固定“开始阅读”入口、来源/副标题、中文作品信息、简介展开、章节搜索，以及按筛选结果全选并批量入下载队列；章节仍保留来源分组、来源顺序/倒序和逐章阅读/下载。下载按来源顺序逐章排队，失败章节保留选择以便重试；详情源错误文案现在显示领域错误映射。新增章节搜索与批量入队 ViewModel 回归。JDK 17 验证：`:feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或操作真机，视觉呈现仍待设备复核。
 

@@ -213,6 +213,19 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migratingFromFiveToSixCreatesScreenPreferencesWithoutLosingSearchHistory() {
+        helper.createDatabase(TEST_DB, 5).apply {
+            execSQL("INSERT INTO search_history VALUES('frieren', 123)")
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 6, true, MIGRATION_5_6).use { db ->
+            assertEquals("frieren", db.query("SELECT keyword FROM search_history").use { it.moveToFirst(); it.getString(0) })
+            db.execSQL("INSERT INTO screen_preference VALUES('library.tab', 'Downloads')")
+            assertEquals("Downloads", db.query("SELECT `value` FROM screen_preference WHERE `key` = 'library.tab'").use { it.moveToFirst(); it.getString(0) })
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

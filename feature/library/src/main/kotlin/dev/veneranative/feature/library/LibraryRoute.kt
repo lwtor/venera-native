@@ -9,6 +9,7 @@ import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 
 /**
  * Entry point of the library screen: owns the ViewModel, collects state and forwards navigation.
@@ -27,9 +28,13 @@ fun LibraryRoute(
     onRequestArchiveImport: ((String) -> Unit) -> Unit = {},
     onOpenLocalChapter: (dev.veneranative.core.model.LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
     onScheduleDownloads: () -> Unit = {},
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) {
-    val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection, localRepository, downloads) }
+    val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection, localRepository, downloads, screenPreferences) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(screenPreferences) {
+        screenPreferences?.let(viewModel::attachScreenPreferences)
+    }
     androidx.compose.runtime.LaunchedEffect(state.downloadQueueVersion) {
         if (state.downloadQueueVersion > 0) onScheduleDownloads()
     }

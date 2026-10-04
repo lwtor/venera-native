@@ -10,6 +10,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.search.SearchHistoryRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 
 /**
  * Entry point of the search screen: owns the ViewModel, collects state and results, forwards actions.
@@ -24,10 +25,14 @@ fun SearchRoute(
     onOpenComic: (ComicKey) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) {
-    val viewModel: SearchViewModel = viewModel { SearchViewModel(catalog, initialHistoryRepository = historyRepository) }
+    val viewModel: SearchViewModel = viewModel { SearchViewModel(catalog, initialHistoryRepository = historyRepository, screenPreferences = screenPreferences) }
     LaunchedEffect(historyRepository) { historyRepository?.let(viewModel::attachSearchHistory) }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(screenPreferences) {
+        screenPreferences?.let(viewModel::attachScreenPreferences)
+    }
     val results = viewModel.results.collectAsLazyPagingItems()
     val aggregateResults by viewModel.aggregateResults.collectAsStateWithLifecycle()
 

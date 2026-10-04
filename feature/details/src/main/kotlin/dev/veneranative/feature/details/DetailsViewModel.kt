@@ -13,6 +13,7 @@ import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.history.HistoryRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
@@ -38,7 +39,11 @@ class DetailsViewModel(
     private val collection: CollectionRepository?,
     private val downloads: DownloadRepository? = null,
     private val history: HistoryRepository? = null,
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) : ViewModel() {
+
+    private var screenPreferences: ScreenPreferenceRepository? = screenPreferences
+    private var presentationSelectionChanged = false
 
     private val comicRef = ComicRef.Remote(comicKey)
 
@@ -46,7 +51,14 @@ class DetailsViewModel(
     val state: StateFlow<DetailsUiState> = _state.asStateFlow()
 
     init {
-        load()
+        viewModelScope.launch {
+            val order = runCatching { screenPreferences?.get(orderPreferenceKey()) }.getOrNull()
+                ?.let { value -> ChapterOrder.entries.firstOrNull { it.name == value } }
+            val group = runCatching { screenPreferences?.get(groupPreferenceKey()) }.getOrNull()
+                ?.takeUnless { it == ALL_VERSIONS }
+            _state.update { it.copy(order = order ?: it.order, selectedGroup = group) }
+            load()
+        }
         observeShelf()
         observeReadChapters()
     }
@@ -55,9 +67,17 @@ class DetailsViewModel(
         when (action) {
             DetailsAction.Retry, DetailsAction.Refresh -> load(forceRefresh = true)
 
-            is DetailsAction.GroupSelected -> _state.update { it.copy(selectedGroup = action.group) }
+            is DetailsAction.GroupSelected -> {
+                presentationSelectionChanged = true
+                _state.update { it.copy(selectedGroup = action.group) }
+                persist(groupPreferenceKey(), action.group ?: ALL_VERSIONS)
+            }
 
-            is DetailsAction.OrderSelected -> _state.update { it.copy(order = action.order) }
+            is DetailsAction.OrderSelected -> {
+                presentationSelectionChanged = true
+                _state.update { it.copy(order = action.order) }
+                persist(orderPreferenceKey(), action.order.name)
+            }
 
             is DetailsAction.ChapterQueryChanged -> _state.update { it.copy(chapterQuery = action.query) }
 
@@ -83,6 +103,20 @@ class DetailsViewModel(
             DetailsAction.DownloadSelectedChapters -> downloadChapters(_state.value.selectedChapters)
 
             DetailsAction.ToggleFavorite -> toggleFavorite()
+        }
+    }
+
+    fun attachScreenPreferences(repository: ScreenPreferenceRepository) {
+        if (screenPreferences === repository) return
+        screenPreferences = repository
+        viewModelScope.launch {
+            val order = runCatching { repository.get(orderPreferenceKey()) }.getOrNull()
+                ?.let { value -> ChapterOrder.entries.firstOrNull { it.name == value } }
+            val group = runCatching { repository.get(groupPreferenceKey()) }.getOrNull()
+                ?.takeUnless { it == ALL_VERSIONS }
+            if (!presentationSelectionChanged) {
+                _state.update { it.copy(order = order ?: it.order, selectedGroup = group) }
+            }
         }
     }
 
@@ -257,6 +291,21 @@ class DetailsViewModel(
      */
     private fun failUnlessCancelled(failure: Throwable) {
         if (failure is CancellationException) throw failure
+    }
+
+    private fun orderPreferenceKey(): String = "details.${comicPreferenceId()}.chapter-order"
+
+    private fun groupPreferenceKey(): String = "details.${comicPreferenceId()}.chapter-version"
+
+    private fun comicPreferenceId(): String = "${comicKey.sourceId.value.length}:${comicKey.sourceId.value}:${comicKey.remoteId.value}"
+
+    private fun persist(key: String, value: String) {
+        val preferences = screenPreferences ?: return
+        viewModelScope.launch { runCatching { preferences.put(key, value) } }
+    }
+
+    private companion object {
+        const val ALL_VERSIONS = "@all"
     }
 }
 

@@ -130,6 +130,7 @@ private fun App(
     val localRepository by graph.local.collectAsStateWithLifecycle()
     val downloadRepository by graph.download.collectAsStateWithLifecycle()
     val searchHistoryRepository by graph.searchHistory.collectAsStateWithLifecycle()
+    val screenPreferences by graph.screenPreferences.collectAsStateWithLifecycle()
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -171,6 +172,7 @@ private fun App(
             localRepository = localRepository,
             downloadRepository = downloadRepository,
             searchHistoryRepository = searchHistoryRepository,
+            screenPreferences = screenPreferences,
             progressTracker = progressTracker,
         )
     }
@@ -194,6 +196,7 @@ private fun AppNavHost(
     localRepository: dev.veneranative.data.local.LocalComicRepository?,
     downloadRepository: DownloadRepository?,
     searchHistoryRepository: dev.veneranative.data.search.SearchHistoryRepository?,
+    screenPreferences: dev.veneranative.data.settings.ScreenPreferenceRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
@@ -300,6 +303,7 @@ private fun AppNavHost(
                     onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
                     onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
                     downloads = downloadRepository,
+                    screenPreferences = screenPreferences,
                     onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                 )
             }
@@ -324,6 +328,7 @@ private fun AppNavHost(
         is AppRoute.Search -> SearchRoute(
             catalog = catalog,
             historyRepository = searchHistoryRepository,
+            screenPreferences = screenPreferences,
             onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
             onBack = onBack,
         )
@@ -334,7 +339,8 @@ private fun AppNavHost(
             collection = collectionRepository,
             downloads = downloadRepository,
             history = historyRepository,
-            onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it))) },
+            screenPreferences = screenPreferences,
+            onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it.key, it.group))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
             onBack = onBack,
             onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },

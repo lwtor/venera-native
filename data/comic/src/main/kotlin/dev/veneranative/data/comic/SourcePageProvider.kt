@@ -30,30 +30,30 @@ class SourcePageProvider(
 ) : PageProvider {
 
     private val chapterLoadMutex = Mutex()
-    private var prefetchedChapter: Pair<ChapterKey, ChapterContent>? = null
+    private var prefetchedChapter: Pair<ChapterRef.Remote, ChapterContent>? = null
 
     override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
-        val key = (chapter as? ChapterRef.Remote)?.key ?: throw IllegalArgumentException("Source provider only accepts remote chapters")
+        val ref = chapter as? ChapterRef.Remote ?: throw IllegalArgumentException("Source provider only accepts remote chapters")
         return chapterLoadMutex.withLock {
-            prefetchedChapter?.takeIf { it.first == key }?.second?.also { prefetchedChapter = null }
-                ?: loadChapterFromSource(key)
+            prefetchedChapter?.takeIf { it.first == ref }?.second?.also { prefetchedChapter = null }
+                ?: loadChapterFromSource(ref)
         }
     }
 
     override suspend fun prefetchChapter(chapter: ChapterRef) {
-        val key = (chapter as? ChapterRef.Remote)?.key ?: return
+        val ref = chapter as? ChapterRef.Remote ?: return
         val scope = prefetchScope
         if (scope != null) {
-            scope.launch { runCatching { prefetchChapterNow(key) } }
+            scope.launch { runCatching { prefetchChapterNow(ref) } }
             return
         }
-        prefetchChapterNow(key)
+        prefetchChapterNow(ref)
     }
 
-    private suspend fun prefetchChapterNow(key: ChapterKey) {
+    private suspend fun prefetchChapterNow(ref: ChapterRef.Remote) {
         chapterLoadMutex.withLock {
-            if (prefetchedChapter?.first == key) return
-            val content = loadChapterFromSource(key)
+            if (prefetchedChapter?.first == ref) return
+            val content = loadChapterFromSource(ref)
             val firstPage = content.pages.firstOrNull()
             val warmed = if (firstPage == null) content else {
                 try {
@@ -64,11 +64,12 @@ class SourcePageProvider(
                     content
                 }
             }
-            prefetchedChapter = key to warmed
+            prefetchedChapter = ref to warmed
         }
     }
 
-    private suspend fun loadChapterFromSource(key: ChapterKey): ChapterContent {
+    private suspend fun loadChapterFromSource(ref: ChapterRef.Remote): ChapterContent {
+        val key = ref.key
         val references = retrySourceCall { catalog.pages(key) }
         if (references.isEmpty()) throw IllegalStateException("Source returned no pages")
         val pages = references.mapIndexed { index, reference ->
@@ -87,12 +88,15 @@ class SourcePageProvider(
                 throw failure
             }
         }
-        val chapterIndex = detail?.chapters?.indexOfFirst { it.key == key } ?: -1
+        val chapterList = detail?.chapters?.let { chapters ->
+            ref.group?.let { selectedGroup -> chapters.filter { it.group == selectedGroup } } ?: chapters
+        }.orEmpty()
+        val chapterIndex = chapterList.indexOfFirst { it.key == key }
         return ChapterContent(
-            title = detail?.chapters?.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
+            title = chapterList.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
             pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
-            nextChapter = detail?.chapters?.getOrNull(chapterIndex + 1).takeIf { chapterIndex >= 0 },
-            previousChapter = detail?.chapters?.getOrNull(chapterIndex - 1).takeIf { chapterIndex > 0 },
+            nextChapter = chapterList.getOrNull(chapterIndex + 1).takeIf { chapterIndex >= 0 },
+            previousChapter = chapterList.getOrNull(chapterIndex - 1).takeIf { chapterIndex > 0 },
         )
     }
 

@@ -43,18 +43,19 @@ immutable UiState
 | `:core:image` | 漫画图片管线：`ComicImageRequest` 与稳定缓存键、自建 Fetcher（走 `:core:network` 的共享 OkHttp）、Coil 磁盘缓存、图片头部尺寸解析、封面渲染的 `ComicImage`，以及从 `:feature:reader` 迁来的页面解码与分块 | `:core:model`、`:core:network`、Coil 3.6.3、Compose |
 | `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |
 | `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
-| `:core:database` | Room 持久化：阅读历史/进度、收藏、下载、本地库索引和搜索历史实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
+| `:core:database` | Room 持久化：阅读历史/进度、收藏、下载、本地库索引、搜索历史和轻量页面偏好实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：`HistoryRepository` 契约、按漫画观察章节进度、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:data:search` | 最近搜索词仓库：规范化查询词、去重置顶、有界保留及单项删除/清空；数据保存在 Room | `:core:database`、Coroutines |
+| `:data:settings` | 轻量页面选择偏好的类型无关持久化仓库；为 S4-01 设置模块前的页面状态切片提供 Room 存储 | `:core:database` |
 | `:data:collection` | 书架收藏：文件夹增删改名、条目加入/移出/移动、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
 | `:data:local` | SAF 目录/归档授权、扫描、自然排序、本地索引及有界页面缓存物化；按需复用图片头尺寸解析 | `:core:model`、`:core:database`、`:core:archive`、`:core:image`、DocumentFile |
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索/探索/书架/来源入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
-| `:feature:library` | 书架页：收藏、下载队列与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local` |
-| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；从阅读历史恢复最近章节，打开章节通过远端 `ChapterRef` 交给装配层 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:source:api` |
+| `:feature:library` | 书架页：收藏、下载队列与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的 tab、收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
+| `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
-| `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史 | Design System、`:data:comic`、`:data:search`、`:core:image` |
+| `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度 | Design System、`:core:model`、`:core:image` |
 | `:feature:sources` | 来源列表：安装、启停、卸载，以及加载 / 空 / 失败 / 成功四种页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
