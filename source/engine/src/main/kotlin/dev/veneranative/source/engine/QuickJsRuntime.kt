@@ -10,6 +10,7 @@ import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.SourceRuntimeError
 import dev.veneranative.source.api.SourceScriptRuntime
+import dev.veneranative.source.api.protocol.SourceProtocol
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -159,7 +160,16 @@ class QuickJsRuntime(
                         root = SourceClassConvention.INSTANCE,
                     )
 
-                val evaluation = session.evaluate(engine, invocationScript)
+                // Source init often performs optional network discovery. Do not make installation
+                // or capability enumeration wait for every enabled source; initialize only the
+                // source the user is actually calling. The probe itself must remain side-effect-free.
+                val script = if (typedCall.functionName == SourceProtocol.MEMBER_PROBE) {
+                    invocationScript
+                } else {
+                    "${SourceClassConvention.INIT_IF_NEEDED_SCRIPT}\n$invocationScript"
+                }
+
+                val evaluation = session.evaluate(engine, script)
                 activeCall.attach(evaluation)
 
                 val envelope =
@@ -389,7 +399,6 @@ class QuickJsRuntime(
             }
 
             engine.evaluate<Any?>(SourceClassConvention.PROBE_ATTACHMENT_SCRIPT)
-            engine.evaluate<Any?>(SourceClassConvention.INIT_SCRIPT)
         }
 
         /** Reads one string field off the instance; the script JSON-encodes it so null is explicit. */

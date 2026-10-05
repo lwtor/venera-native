@@ -93,7 +93,7 @@ internal object SourceClassConvention {
         });
         """.trimIndent()
 
-    /** Calls `init()` when the source declares one; sources without it must not fail. */
+    /** Calls `init()` once on the first actual source call, not during loading or shape probing. */
     val INIT_SCRIPT: String =
         """
         {
@@ -110,6 +110,15 @@ internal object SourceClassConvention {
             if (previousInvocationId === undefined) delete globalThis.__veneraInvocationId;
             else globalThis.__veneraInvocationId = previousInvocationId;
           }
+        }
+        """.trimIndent()
+
+    /** Prefix for a real call; capability probes must stay local and never wait for source I/O. */
+    val INIT_IF_NEEDED_SCRIPT: String =
+        """
+        if (globalThis.__veneraSourceInitialized !== true) {
+          $INIT_SCRIPT
+          globalThis.__veneraSourceInitialized = true;
         }
         """.trimIndent()
 

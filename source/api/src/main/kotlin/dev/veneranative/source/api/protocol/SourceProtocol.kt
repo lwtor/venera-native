@@ -39,6 +39,9 @@ data class SourceProtocolCall(
  */
 object SourceProtocol {
 
+    /** Internal source-shape inspection; this call must not trigger optional source initialization. */
+    const val MEMBER_PROBE = "__venera.probe"
+
     // Details and pages live under `comic`, not at the top level: upstream calls
     // `ComicSource.sources[key].comic.loadInfo(id)` (ADR-0007 §4.4).
     const val MEMBER_LOAD_INFO = "comic.loadInfo"

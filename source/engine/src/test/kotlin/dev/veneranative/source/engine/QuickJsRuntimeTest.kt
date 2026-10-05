@@ -11,6 +11,7 @@ import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.SourceRuntimeError
 import dev.veneranative.source.api.SourceScriptRuntime
+import dev.veneranative.source.api.protocol.SourceProtocol
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
@@ -141,7 +142,7 @@ class QuickJsRuntimeTest {
     }
 
     @Test
-    fun `init runs while the source is installed`() = runBlocking {
+    fun `init runs once before the first real source call`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(
                 fixtureSource(
@@ -166,7 +167,7 @@ class QuickJsRuntimeTest {
     fun `init host calls carry an installation invocation id`() = runBlocking {
         val host = RecordingHostApi { request -> respondWithBody(request.requestId, 200, "{}") }
         withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
-            runtime.installSource(
+            val sourceId = runtime.installSource(
                 fixtureSource(
                     """
                     async init() { await fetch("https://example.com/init"); }
@@ -174,8 +175,37 @@ class QuickJsRuntimeTest {
                     """.trimIndent(),
                 ),
             )
+            assertTrue("install must not execute network-backed init", host.requests.isEmpty())
+            assertEquals("true", runtime.invokeSuccess(sourceId, "known", "[]"))
         }
         assertEquals("source-install", host.requests.single().invocationId)
+    }
+
+    @Test
+    fun `capability probe does not run network-backed source initialization`() = runBlocking {
+        val host = RecordingHostApi { request -> respondWithBody(request.requestId, 200, "{}") }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    async init() { await fetch("https://example.com/optional-discovery"); }
+                    search = { load: async () => [] };
+                    initialized() { return true; }
+                    """.trimIndent(),
+                ),
+            )
+
+            assertTrue("install must be local", host.requests.isEmpty())
+            runtime.invokeSuccess(
+                sourceId,
+                SourceProtocol.MEMBER_PROBE,
+                "[\"[\\\"search\\\"]\"]",
+            )
+            assertTrue("capability discovery must not run init", host.requests.isEmpty())
+
+            assertEquals("true", runtime.invokeSuccess(sourceId, "initialized", "[]"))
+            assertEquals(1, host.requests.size)
+        }
     }
 
     @Test
@@ -304,6 +334,7 @@ class QuickJsRuntimeTest {
             )
 
             assertTrue("expected init to complete, got $install", install is SourceInstallResult.Installed)
+            assertTrue("network refresh must be deferred until this source is used", host.requests.isEmpty())
             assertEquals("\"ready\"", runtime.invokeSuccess(sourceId, "currentDomain"))
         }
         assertEquals(1, host.requests.size)

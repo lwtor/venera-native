@@ -6,10 +6,10 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-10-04 |
+| 最后更新 | 2026-10-05 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00W Komiic 与禁漫天堂搜索兼容性 |
-| 当前任务状态 | 用户已确认 Komiic 搜索恢复可用。继续处理禁漫天堂报错 `ReferenceError: Comic is not defined`：对照上游 `venera-configs/jm.js` 与 `_venera_.js` 确认 JM 的 `parseComic()` 通过 `new Comic({...})` 创建搜索/推荐卡片，而 Native 的 QuickJS 兼容基础脚本缺少这个全局值对象。已在 `SourceBaseScript` 加入与上游字段一致的纯 JavaScript `Comic` 构造器，并新增定向回归模拟 JM `parseComic()`→`search.load` 返回漫画对象；定向测试及 App Debug 编译通过。尚未安装新 APK 或真机验证，按用户工作方式等待用户验证。S3-00W IN_PROGRESS（Komiic DONE；JM 代码修复 DONE、设备验收待完成）。Komiic 诊断日志仅 debug、仅该源，自动写入应用私有目录 `files/diagnostics/komiic-network.log`，轮转两份、单份 512 KiB，不记录 URL 路径/查询词、Header、Cookie、Token 或正文。验证：JDK 17 `:source:engine:testDebugUnitTest --tests 'dev.veneranative.source.engine.QuickJsRuntimeTest.JM parseComic can construct and return upstream Comic values' :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。 |
+| 当前任务 | S3-01E 搜索进入耗时与列表位置恢复 |
+| 当前任务状态 | 列表恢复已由用户确认正常。先前改动只把搜索表单提前显示并后台预热，没有消除真正耗时。已定位根因：`SourceRepository.installed()` 串行安装来源，QuickJS 安装时同步等待每个来源可能联网的 `init()`；能力探测也曾通过普通调用触发初始化。现改为安装仅实例化脚本、结构探测不运行 init、首次真实来源调用时再初始化对应来源，避免进入搜索页等待所有来源联网。新增回归覆盖安装/探测不触发 init 和首次实际调用执行 init。Debug-only 有界本地日志 `files/diagnostics/search-startup.log` 保留，记录来源预热与发现分段耗时，不记录搜索词、网络内容或凭据。验证：JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :source:core:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装/运行真机，实际时间改善仍待用户验收。先前 S3-00W/S3-00W1 仍有设备验收未完成，见下方任务记录。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
