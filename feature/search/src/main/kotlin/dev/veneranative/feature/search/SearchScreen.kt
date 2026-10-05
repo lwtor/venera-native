@@ -6,6 +6,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -123,12 +124,12 @@ fun SearchResultScreen(
 private fun SearchForm(state: SearchUiState, onAction: (SearchAction) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.search_in), style = MaterialTheme.typography.labelLarge)
-        LazyRow(
-            modifier = Modifier.fillMaxWidth().height(48.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            items(state.sources, key = { it.sourceId.value }) { source ->
+            state.sources.forEach { source ->
                 val selected = state.aggregateSearch || source.sourceId == state.selectedSourceId
                 FilterChip(
                     selected = selected,

@@ -548,6 +548,7 @@ S3-01 小任务：
 | S3-01A | 对齐原版搜索：首页支持单源选择、按来源能力动态显示 select/multi-select/dropdown 选项、可持久化搜索历史；聚合搜索按来源并发受限地加载预览、分别展示失败/空/结果，进入来源完整分页结果；结果使用独立页面，漫画标题区域固定两行 | DONE（聚合即全部可搜索来源：保留来源芯片列表并在聚合态显示全部选中，单源切换无效；ViewModel 忽略聚合态单源切换并有回归覆盖。编译及 `git diff --check` 通过；真机由用户验收） |
 | S3-01B | 探索页分类筛选与排行入口按来源能力呈现，分页/错误状态与用户流程覆盖 | TODO |
 | S3-01C | 跨页面记住用户选择：书架最后选择的 tab/收藏夹/排序；搜索来源、聚合开关及各来源有效筛选项；详情按作品记住章节排序/版本。新增数据库迁移与恢复回归；失效选项安全回退 | IN_PROGRESS（`:feature:library:testDebugUnitTest --tests LibraryViewModelTest :feature:search:testDebugUnitTest --tests SearchViewModelTest :feature:details:testDebugUnitTest --tests DetailsViewModelTest` 均通过；`:core:database:compileDebugAndroidTestKotlin :app:assembleDebug` 通过；Android migration test 源码未在设备运行，真机验收由用户执行） |
+| S3-01D | 搜索来源选择器在来源数量增加时仍直接展示每个来源，不要求用户猜测横向滚动 | DONE（来源芯片改为自动换行；`:feature:search:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。JM 是否已启用且被能力探测收录，需在新 APK 上确认） |
 | S3-01E | 缩短反复进入搜索页的等待；对所有会打开漫画详情/阅读器的根列表，返回时恢复离开前的滚动位置。搜索来源能力探测并行执行，成功结果按来源版本与短期 TTL 缓存；应用启动时预热已安装源；能力读取不等待网络初始化；加载期立即显示可交互搜索页；列表状态由路由级 SaveableStateHolder 保存 | IN_PROGRESS（根因是 QuickJS 安装串行等待各源网络型 `init()`，且能力探测走普通调用。现改为安装只实例化脚本、能力探测不触发初始化，首次真实调用时才初始化该源；新增回归覆盖安装/探测无网络调用、真实调用前执行 init。JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :source:core:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。搜索耗时改善仍待用户验收） |
 
 S3-00 小任务：
