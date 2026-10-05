@@ -73,8 +73,16 @@ class SourcePageProvider(
         val references = retrySourceCall { catalog.pages(key) }
         if (references.isEmpty()) throw IllegalStateException("Source returned no pages")
         val pages = references.mapIndexed { index, reference ->
-            ComicPage(index, reference.imageRef, 1080, 1440, key.comicKey.sourceId,
-                dev.veneranative.core.model.PageSizeState.Pending)
+            ComicPage(
+                index = index,
+                imageRef = reference.imageRef,
+                widthPx = 1080,
+                heightPx = 1440,
+                sourceId = key.comicKey.sourceId,
+                sizeState = dev.veneranative.core.model.PageSizeState.Pending,
+                imageHeaders = reference.headers,
+                reverseHorizontalBands = reference.reverseHorizontalBands,
+            )
         }
         val detail = try {
             retrySourceCall { catalog.detail(key.comicKey) }
@@ -120,7 +128,7 @@ class SourcePageProvider(
 
     override suspend fun resolve(page: ComicPage): ComicPage {
         val sourceId = requireNotNull(page.sourceId)
-        val size = sizer.sizeOf(page.imageRef, sourceId)
+        val size = sizer.sizeOf(page.imageRef, sourceId, page.imageHeaders)
             ?: throw java.io.IOException("Page image unavailable")
         return page.copy(widthPx = size.widthPx, heightPx = size.heightPx,
             sizeState = dev.veneranative.core.model.PageSizeState.Ready)

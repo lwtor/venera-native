@@ -244,6 +244,37 @@ class SearchViewModelTest {
         assertEquals(SourceId("a"), viewModel.state.value.selectedSourceId)
     }
 
+    @Test
+    fun `view all from aggregate results returns to aggregate without changing the saved form`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"), source("b"))
+        val preferences = FakeScreenPreferences(mutableMapOf("search.source" to "b"))
+        val viewModel = SearchViewModel(catalog, screenPreferences = preferences)
+        advanceUntilIdle()
+        viewModel.onAction(SearchAction.KeywordChanged("kagurabachi"))
+        viewModel.onAction(SearchAction.AggregateToggled)
+        viewModel.onAction(SearchAction.Submit)
+        advanceUntilIdle()
+
+        viewModel.onAction(SearchAction.AggregatedSourceSelected(SourceId("a")))
+        advanceUntilIdle()
+        assertEquals(SourceId("a"), viewModel.state.value.aggregateSourceResultsId)
+        assertTrue(viewModel.state.value.aggregateSearch)
+        assertEquals(SourceId("b"), viewModel.state.value.selectedSourceId)
+        assertEquals("b", preferences.get("search.source"))
+        assertEquals("true", preferences.get("search.aggregate"))
+
+        viewModel.onAction(SearchAction.AggregateSourceResultsBack)
+        assertNull(viewModel.state.value.aggregateSourceResultsId)
+        assertTrue(viewModel.state.value.hasSubmitted)
+        assertEquals(2, viewModel.aggregateResults.value.size)
+
+        viewModel.onAction(SearchAction.EditSearch)
+        assertTrue(!viewModel.state.value.hasSubmitted)
+        assertTrue(viewModel.state.value.aggregateSearch)
+        assertEquals(SourceId("b"), viewModel.state.value.selectedSourceId)
+        assertEquals("kagurabachi", viewModel.state.value.keyword)
+    }
+
     private fun capabilities(
         filters: List<SourceFilter> = emptyList(),
     ) = SourceOutcome.Success(

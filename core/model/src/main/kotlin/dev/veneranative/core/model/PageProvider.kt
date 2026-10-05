@@ -57,6 +57,10 @@ interface PageImageSizer {
 
     /** The size, or null when the reference could not be resolved and the caller should skip it. */
     suspend fun sizeOf(imageRef: String, sourceId: SourceId): ImageSize?
+
+    /** Source-declared headers must be used both for sizing and subsequent image decoding. */
+    suspend fun sizeOf(imageRef: String, sourceId: SourceId, headers: Map<String, String>): ImageSize? =
+        sizeOf(imageRef, sourceId)
 }
 
 /** A chapter-bound persistence session. Recording only queues immutable data; it must not block UI. */

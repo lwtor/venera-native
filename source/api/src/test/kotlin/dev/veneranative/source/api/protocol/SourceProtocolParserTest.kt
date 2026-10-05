@@ -186,6 +186,15 @@ class SourceProtocolParserTest {
     }
 
     @Test
+    fun `image load config preserves headers and recognizes the safe reverse band transform`() {
+        val config = """{"headers":{"Referer":"https://reader.example/"},"modifyImage":"let modifyImage = (image) => { const num = 10; let blocks = []; for(let i = blocks.length - 1; i >= 0; i--) { res.fillImageRangeAt(0, 0, image, 0, 0, image.width, image.height); } }"}"""
+
+        assertEquals(mapOf("Referer" to "https://reader.example/"), SourceProtocolParser.parseImageHeaders(config))
+        assertEquals(10, SourceProtocolParser.parseReverseHorizontalBands(config))
+        assertNull(SourceProtocolParser.parseReverseHorizontalBands("""{"modifyImage":"return image"}"""))
+    }
+
+    @Test
     fun `a chapter without images yields no pages`() {
         assertTrue(SourceProtocolParser.parseImages("{}").isEmpty())
     }

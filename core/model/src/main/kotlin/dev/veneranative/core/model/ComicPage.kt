@@ -13,6 +13,8 @@ data class ComicPage(
     val heightPx: Int,
     val sourceId: SourceId? = null,
     val sizeState: PageSizeState = PageSizeState.Ready,
+    val imageHeaders: Map<String, String> = emptyMap(),
+    val reverseHorizontalBands: Int? = null,
 ) {
     init {
         require(index >= 0) { "index must be >= 0" }

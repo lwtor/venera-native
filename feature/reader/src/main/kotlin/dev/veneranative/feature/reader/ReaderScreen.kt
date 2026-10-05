@@ -649,8 +649,12 @@ private suspend fun predecodeAdjacentPages(
                                 sourceId = page.sourceId,
                                 targetWidthPx = tile.displayWidthPx,
                                 targetHeightPx = tile.displayHeightPx,
+                                pageIndex = page.index,
                                 region = tile.region,
                                 fitWidthOnly = tile.fitWidthOnly,
+                                headers = page.imageHeaders,
+                                reverseHorizontalBands = page.reverseHorizontalBands,
+                                sourceImageHeightPx = page.heightPx,
                             ),
                         )
                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -784,8 +788,12 @@ private fun PageTile(
                     sourceId = item.page.sourceId,
                     targetWidthPx = tile.displayWidthPx,
                     targetHeightPx = tile.displayHeightPx,
+                    pageIndex = item.page.index,
                     region = tile.region,
                     fitWidthOnly = tile.fitWidthOnly,
+                    headers = item.page.imageHeaders,
+                    reverseHorizontalBands = item.page.reverseHorizontalBands,
+                    sourceImageHeightPx = item.page.heightPx,
                 ),
             )
             PageImageState.Decoded(decoded)

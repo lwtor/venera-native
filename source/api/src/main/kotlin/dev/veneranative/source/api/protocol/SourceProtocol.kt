@@ -66,6 +66,14 @@ object SourceProtocol {
         JsonPrimitive(chapterKey.remoteId.value),
     )
 
+    /** Optional source image request configuration: `comic.onImageLoad(url, comicId, epId)`. */
+    fun onImageLoad(url: String, chapterKey: ChapterKey): SourceProtocolCall = call(
+        "comic.onImageLoad",
+        JsonPrimitive(url),
+        JsonPrimitive(chapterKey.comicKey.remoteId.value),
+        JsonPrimitive(chapterKey.remoteId.value),
+    )
+
     /**
      * Page-numbered search: `search.load(keyword, options, page)`.
      *

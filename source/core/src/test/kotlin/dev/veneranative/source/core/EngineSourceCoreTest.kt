@@ -74,6 +74,31 @@ class EngineSourceCoreTest {
         assertTrue(runtime.calls.filter { it.functionName == "__venera.probe" }.all { it.timeoutMillis == 10_000L })
     }
 
+    @Test
+    fun `page loading applies source declared image headers to every returned page`() = runBlocking {
+        withCore(
+            """
+            class HeaderSource extends ComicSource {
+              constructor() { super(); this.key = "fixture"; }
+              comic = {
+                loadEp: async () => ({ images: ["https://images.example/1.jpg", "https://images.example/2.jpg"] }),
+                onImageLoad: (url, comicId, epId) => ({ headers: {
+                  Referer: `https://reader.example/${'$'}{comicId}/${'$'}{epId}`,
+                  "X-Image-Path": url
+                } })
+              };
+            }
+            """.trimIndent(),
+        ) { core ->
+            val key = ChapterKey(ComicKey(sourceId, RemoteComicId("comic-7")), RemoteChapterId("chapter-2"))
+            val pages = (core.pages(key) as SourceOutcome.Success).value
+
+            assertEquals(2, pages.size)
+            assertEquals("https://reader.example/comic-7/chapter-2", pages.first().headers["Referer"])
+            assertEquals("https://images.example/2.jpg", pages.last().headers["X-Image-Path"])
+        }
+    }
+
     private class RecordingRuntime : SourceScriptRuntime {
         val calls = mutableListOf<SourceCall.InvokeFunction>()
 

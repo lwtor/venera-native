@@ -22,6 +22,9 @@ sealed interface SearchAction {
 
     data class AggregatedSourceSelected(val sourceId: SourceId) : SearchAction
 
+    /** Returns from a source's full results to the still-open aggregate results. */
+    data object AggregateSourceResultsBack : SearchAction
+
     /** Starts a search with the current source, keyword and filters. */
     data object Submit : SearchAction
 

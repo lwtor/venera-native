@@ -23,4 +23,9 @@ class CoilPageImageSizer(
      */
     override suspend fun sizeOf(imageRef: String, sourceId: SourceId): ImageSize? =
         pipeline.sizeOf(requestFor(imageRef, sourceId))
+
+    override suspend fun sizeOf(imageRef: String, sourceId: SourceId, headers: Map<String, String>): ImageSize? {
+        val request = requestFor(imageRef, sourceId)
+        return pipeline.sizeOf(request.copy(headers = request.headers + headers))
+    }
 }

@@ -100,6 +100,36 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `JM loadInfo can construct upstream ComicDetails values`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val script = buildString {
+                appendLine("class JM extends ComicSource {")
+                appendLine("  constructor() { super(); this.name = \"禁漫天堂\"; this.key = \"jm\"; }")
+                appendLine("  comic = { loadInfo: async (id) => new ComicDetails({")
+                appendLine("    title: \"作品 \" + id, subTitle: \"作者\", cover: \"https://images.example/cover.jpg\",")
+                appendLine("    description: \"简介\", tags: { Author: [\"作者\"], Tag: [\"短篇\"] },")
+                appendLine("    chapters: { \"ep-1\": \"第1话\" }, recommend: [new Comic({ id: \"related\", title: \"相关\" })],")
+                appendLine("    updateTime: \"2026-10-04\", likesCount: 12")
+                appendLine("  }) };")
+                appendLine("}")
+            }
+            val sourceId = SourceId("jm")
+            val install = runtime.install(
+                SourcePackage(sourceId, version = "1.4.0", script = script, sha256 = sha256(script)),
+            )
+            assertTrue("expected install, got $install", install is SourceInstallResult.Installed)
+
+            val detail = JSONObject(runtime.invokeSuccess(sourceId, "comic.loadInfo", "[\"123\"]"))
+            assertEquals("作品 123", detail.getString("title"))
+            assertEquals("作者", detail.getString("subtitle"))
+            assertEquals("https://images.example/cover.jpg", detail.getString("cover"))
+            assertEquals("第1话", detail.getJSONObject("chapters").getString("ep-1"))
+            assertEquals("相关", detail.getJSONArray("recommend").getJSONObject(0).getString("title"))
+            assertEquals("2026-10-04", detail.getString("updateTime"))
+        }
+    }
+
+    @Test
     fun `source fallback servers initialize api domains before async init`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(

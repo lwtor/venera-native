@@ -33,7 +33,6 @@ fun DetailsRoute(
     modifier: Modifier = Modifier,
     downloads: DownloadRepository? = null,
     onScheduleDownloads: () -> Unit = {},
-    onOpenComic: (ComicKey) -> Unit = {},
     history: HistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
 ) {
@@ -57,7 +56,6 @@ fun DetailsRoute(
         onOpenChapter = onOpenChapter,
         onBack = onBack,
         modifier = modifier,
-        onOpenComic = onOpenComic,
     )
 }
 

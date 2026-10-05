@@ -57,9 +57,14 @@ data class PageDecodeRequest(
     val sourceId: dev.veneranative.core.model.SourceId? = null,
     val targetWidthPx: Int,
     val targetHeightPx: Int,
+    /** Stable chapter-local page index used by local diagnostics; never identifies the comic. */
+    val pageIndex: Int = -1,
     /** Null means "the whole page", which only the sampled strategy uses. */
     val region: PageRegion? = null,
     val fitWidthOnly: Boolean = false,
+    val headers: Map<String, String> = emptyMap(),
+    val reverseHorizontalBands: Int? = null,
+    val sourceImageHeightPx: Int? = null,
 )
 
 /** Result of one decode. Holds the bitmap so the probe can account for its bytes. */

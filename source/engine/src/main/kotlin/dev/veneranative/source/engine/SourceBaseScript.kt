@@ -41,6 +41,43 @@ internal object SourceBaseScript {
             this.stars = stars;
           }
 
+          // Detail sources such as JM return `new ComicDetails({...})`. Keep this constructor a
+          // plain value object, matching the upstream host contract so QuickJS can serialize it.
+          function ComicDetails({title, subtitle, subTitle, cover, description, tags, chapters, isFavorite, subId, thumbnails, recommend, commentCount, likesCount, isLiked, uploader, updateTime, uploadTime, url, stars, maxPage, comments}) {
+            this.title = title;
+            this.subtitle = subtitle == null ? subTitle : subtitle;
+            this.cover = cover;
+            this.description = description;
+            this.tags = tags;
+            this.chapters = chapters;
+            this.isFavorite = isFavorite;
+            this.subId = subId;
+            this.thumbnails = thumbnails;
+            this.recommend = recommend;
+            this.commentCount = commentCount;
+            this.likesCount = likesCount;
+            this.isLiked = isLiked;
+            this.uploader = uploader;
+            this.updateTime = updateTime;
+            this.uploadTime = uploadTime;
+            this.url = url;
+            this.stars = stars;
+            this.maxPage = maxPage;
+            this.comments = comments;
+          }
+
+          function Comment({userName, avatar, content, time, replyCount, id, isLiked, score, voteStatus}) {
+            this.userName = userName;
+            this.avatar = avatar;
+            this.content = content;
+            this.time = time;
+            this.replyCount = replyCount;
+            this.id = id;
+            this.isLiked = isLiked;
+            this.score = score;
+            this.voteStatus = voteStatus;
+          }
+
           class ComicSource {
             constructor() {
               this.name = "";
@@ -117,6 +154,8 @@ internal object SourceBaseScript {
 
           ComicSource.sources = {};
           globalThis.Comic = Comic;
+          globalThis.ComicDetails = ComicDetails;
+          globalThis.Comment = Comment;
           globalThis.ComicSource = ComicSource;
         })();
         """.trimIndent()

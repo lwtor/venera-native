@@ -100,7 +100,7 @@ class SearchViewModel(
                 aggregateJob?.cancel()
                 query.value = null
                 _aggregateResults.value = emptyList()
-                _state.update { it.copy(hasSubmitted = false) }
+                _state.update { it.copy(hasSubmitted = false, aggregateSourceResultsId = null) }
             }
 
             is SearchAction.KeywordChanged -> _state.update { it.copy(keyword = action.value) }
@@ -128,6 +128,11 @@ class SearchViewModel(
             }
 
             is SearchAction.AggregatedSourceSelected -> openSourceResults(action.sourceId)
+
+            SearchAction.AggregateSourceResultsBack -> {
+                _state.update { it.copy(aggregateSourceResultsId = null) }
+                query.value = null
+            }
 
             SearchAction.Submit -> submit()
 
@@ -291,7 +296,7 @@ class SearchViewModel(
     private fun submit() {
         val state = _state.value
         val request = state.toRequest() ?: return
-        _state.update { it.copy(hasSubmitted = true) }
+        _state.update { it.copy(hasSubmitted = true, aggregateSourceResultsId = null) }
         historyRepository?.let { repository -> viewModelScope.launch { repository.record(request.keyword) } }
         if (state.aggregateSearch) {
             query.value = null
@@ -304,15 +309,11 @@ class SearchViewModel(
     }
 
     private fun openSourceResults(sourceId: SourceId) {
-        userChangedSelection = true
         val current = _state.value
-        val request = current.copy(selectedSourceId = sourceId, aggregateSearch = false, filterSelection = FilterSelection.Empty).toRequest()
-            ?: return
-        aggregateJob?.cancel()
-        _aggregateResults.value = emptyList()
-        _state.update { it.copy(selectedSourceId = sourceId, aggregateSearch = false, filterSelection = FilterSelection.Empty, hasSubmitted = true) }
-        persistSelection(sourceId, aggregate = false)
-        loadFilters(sourceId)
+        if (!current.aggregateSearch || sourceId !in current.sources.map { it.sourceId }) return
+        val keyword = current.keyword.trim().takeIf(String::isNotEmpty) ?: return
+        val request = SearchRequest(sourceId = sourceId, keyword = keyword, filters = FilterSelection.Empty)
+        _state.update { it.copy(aggregateSourceResultsId = sourceId) }
         query.value = request
     }
 

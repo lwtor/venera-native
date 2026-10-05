@@ -189,7 +189,19 @@ class EngineSourceCore(
 
         return when (val payload = invoke(sourceId, SourceProtocol.loadEp(chapterKey))) {
             is SourceOutcome.Failure -> payload
-            is SourceOutcome.Success -> SourceOutcome.Success(SourceProtocolParser.parseImages(payload.value))
+            is SourceOutcome.Success -> {
+                val pages = SourceProtocolParser.parseImages(payload.value)
+                if (!description.usesImageLoadConfig) return SourceOutcome.Success(pages)
+                SourceOutcome.Success(pages.map { page ->
+                    when (val config = invoke(sourceId, SourceProtocol.onImageLoad(page.imageRef, chapterKey))) {
+                        is SourceOutcome.Success -> page.copy(
+                            headers = SourceProtocolParser.parseImageHeaders(config.value),
+                            reverseHorizontalBands = SourceProtocolParser.parseReverseHorizontalBands(config.value),
+                        )
+                        is SourceOutcome.Failure -> page
+                    }
+                })
+            }
         }
     }
 
@@ -243,6 +255,7 @@ class EngineSourceCore(
                 ),
                 explorePages = declaredPages,
                 searchUsesLoad = searchUsesLoad,
+                usesImageLoadConfig = comic.entry("onImageLoad").isCallable(),
             )
         return SourceOutcome.Success(description)
     }
@@ -352,6 +365,7 @@ class EngineSourceCore(
         val capabilities: SourceCapabilities,
         val explorePages: Map<String, ExplorePageRuntime>,
         val searchUsesLoad: Boolean,
+        val usesImageLoadConfig: Boolean,
     )
 
     private data class ExplorePageRuntime(val index: Int, val usesLoadNext: Boolean)

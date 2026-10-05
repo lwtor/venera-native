@@ -94,7 +94,10 @@ fun SearchResultScreen(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBackToSearch)
-    val title = if (state.aggregateSearch) {
+    val showingSourceResults = state.aggregateSourceResultsId != null
+    val title = if (showingSourceResults) {
+        "${state.aggregateSourceResultsSource?.name.orEmpty()} · ${state.keyword}"
+    } else if (state.aggregateSearch) {
         stringResource(R.string.aggregate_results)
     } else {
         "${state.selectedSource?.name.orEmpty()} · ${state.keyword}"
@@ -109,7 +112,8 @@ fun SearchResultScreen(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (state.aggregateSearch) AggregateResults(aggregateResults, onAction, onOpenComic)
+            if (showingSourceResults) Results(results, onOpenComic)
+            else if (state.aggregateSearch) AggregateResults(aggregateResults, onAction, onOpenComic)
             else Results(results, onOpenComic)
         }
     }

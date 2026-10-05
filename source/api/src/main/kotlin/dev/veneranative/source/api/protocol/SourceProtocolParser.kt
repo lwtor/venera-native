@@ -165,6 +165,34 @@ object SourceProtocolParser {
         return root["images"].stringList().mapIndexed { index, url -> SourcePage(index = index, imageRef = url) }
     }
 
+    /** Reads only the request headers from an optional `comic.onImageLoad` result. */
+    fun parseImageHeaders(payload: String): Map<String, String> {
+        val config = payload.objectOrNull() ?: return emptyMap()
+        val headers = config["headers"].objectOrNull() ?: return emptyMap()
+        return headers.mapNotNull { (name, value) ->
+            (value as? JsonPrimitive)?.contentOrNull?.let { name to it }
+        }.toMap()
+    }
+
+    /**
+     * Recognizes the declarative reverse-strip operation used by image scripts that split a page
+     * into horizontal bands and draw those bands in reverse order. Arbitrary source JavaScript is
+     * never evaluated by the Android image decoder.
+     */
+    fun parseReverseHorizontalBands(payload: String): Int? {
+        val config = payload.objectOrNull() ?: return null
+        val script = config["modifyImage"].stringOrNull() ?: return null
+        if (!script.contains("fillImageRangeAt") ||
+            !Regex("for\\s*\\(\\s*let\\s+i\\s*=\\s*blocks\\.length\\s*-\\s*1").containsMatchIn(script)
+        ) return null
+        return Regex("const\\s+num\\s*=\\s*(\\d+)")
+            .find(script)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?.takeIf { it in 2..64 }
+    }
+
     fun parseExplorePage(
         sourceId: SourceId,
         page: ExplorePage,

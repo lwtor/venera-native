@@ -22,6 +22,8 @@ data class SearchUiState(
     val filterSelection: FilterSelection = FilterSelection.Empty,
     val aggregateSearch: Boolean = false,
     val hasSubmitted: Boolean = false,
+    /** Source whose full result list is temporarily opened from an aggregate preview. */
+    val aggregateSourceResultsId: SourceId? = null,
     val searchHistory: List<String> = emptyList(),
     /** Product copy for the last failure; never a lower layer's wording. */
     val message: String? = null,
@@ -31,6 +33,9 @@ data class SearchUiState(
     val canSubmit: Boolean get() = selectedSourceId != null && keyword.isNotBlank()
 
     val selectedSource: InstalledSource? get() = sources.firstOrNull { it.sourceId == selectedSourceId }
+
+    val aggregateSourceResultsSource: InstalledSource?
+        get() = sources.firstOrNull { it.sourceId == aggregateSourceResultsId }
 }
 
 data class AggregateSearchResult(

@@ -43,7 +43,13 @@ fun SearchRoute(
             aggregateResults = aggregateResults,
             onAction = viewModel::onAction,
             onOpenComic = onOpenComic,
-            onBackToSearch = { viewModel.onAction(SearchAction.EditSearch) },
+            onBackToSearch = {
+                if (state.aggregateSourceResultsId != null) {
+                    viewModel.onAction(SearchAction.AggregateSourceResultsBack)
+                } else {
+                    viewModel.onAction(SearchAction.EditSearch)
+                }
+            },
             modifier = modifier,
         )
     } else {
