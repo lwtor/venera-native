@@ -43,10 +43,31 @@ class VeneraApplication : Application() {
 
     val authProvider: SourceCookieImageAuth = SourceCookieImageAuth(cookieJars)
 
+    private val debugJmReaderLog: LocalJmReaderLog? by lazy {
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            LocalJmReaderLog(filesDir)
+        } else {
+            null
+        }
+    }
+
     val diskCache: DiskCache by lazy { comicImageDiskCache(this) }
 
     val imagePipeline: ComicImagePipeline by lazy {
-        CoilComicImagePipeline(httpClient, diskCache, authProvider)
+        CoilComicImagePipeline(
+            httpClient,
+            diskCache,
+            authProvider,
+            onDiagnostic = { request, event ->
+                if (request.sourceId?.value.equals("jm", ignoreCase = true)) {
+                    debugJmReaderLog?.append("stage=image_pipeline $event")
+                }
+            },
+        )
+    }
+
+    internal fun logJmReaderDecodeFailure(event: String) {
+        debugJmReaderLog?.append("stage=decode $event")
     }
 
     val imageLoader: ImageLoader by lazy {

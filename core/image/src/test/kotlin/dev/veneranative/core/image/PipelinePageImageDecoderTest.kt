@@ -15,10 +15,12 @@ class PipelinePageImageDecoderTest {
     @Test fun remoteReferenceBecomesLeasedFileAndClosesOnDecoderFailure() = runTest {
         val file = temp.newFile().apply { writeText("pixels") }
         var closed = false
+        val requestHeaders = mapOf("Referer" to "https://reader.example/chapter", "X-Requested-With" to "fixture")
         val pipeline = object : ComicImagePipeline {
             override suspend fun cachedFileOf(request: ComicImageRequest): ComicImageFile {
                 assertEquals(SourceId("source"), request.sourceId)
                 assertEquals("https://image/page", request.url)
+                assertEquals(requestHeaders, request.headers)
                 return ComicImageFile(file, null) { closed = true }
             }
             override suspend fun sizeOf(request: ComicImageRequest): ImageSize? = null
@@ -34,7 +36,9 @@ class PipelinePageImageDecoderTest {
             }
         }
         val failure = runCatching {
-            PipelinePageImageDecoder(pipeline, delegate).decode(PageDecodeRequest("https://image/page", SourceId("source"), 10, 10))
+            PipelinePageImageDecoder(pipeline, delegate).decode(
+                PageDecodeRequest("https://image/page", SourceId("source"), 10, 10, headers = requestHeaders),
+            )
         }.exceptionOrNull()
         assertEquals("decode failure", failure?.message)
         assertTrue(closed)

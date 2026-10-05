@@ -31,7 +31,8 @@ class RegionPageImageDecoder(
 ) : PageImageDecoder {
 
     private val lock = Any()
-    private val openDecoders = linkedMapOf<String, BitmapRegionDecoder>()
+    private val openDecoders = linkedMapOf<String, DecoderEntry>()
+    private var closed = false
 
     override val strategy: DecodeStrategy = DecodeStrategy.Region
 
@@ -89,36 +90,45 @@ class RegionPageImageDecoder(
     override suspend fun decode(request: PageDecodeRequest): DecodedPageImage = withContext(Dispatchers.IO) {
         val startedAtMillis = clock()
         val region = requireNotNull(request.region) { "Region decoding requires a region" }
-        val decoder = decoderFor(request.path)
-        val rect = Rect(
-            region.leftPx,
-            region.topPx,
-            (region.leftPx + region.widthPx).coerceAtMost(decoder.width),
-            (region.topPx + region.heightPx).coerceAtMost(decoder.height),
-        )
-        val inSampleSize = PageTiling.regionInSampleSize(
-            regionWidthPx = rect.width(),
-            regionHeightPx = rect.height(),
-            targetWidthPx = request.targetWidthPx,
-            targetHeightPx = request.targetHeightPx,
-            budgetBytes = budgetBytes,
-        )
-        val options = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
-        val bitmap = decoder.decodeRegion(rect, options)
-            ?: throw IllegalStateException("Page region is not decodable")
+        val decoded = withDecoder(request.path) { decoder ->
+            val rect = Rect(
+                region.leftPx,
+                region.topPx,
+                (region.leftPx + region.widthPx).coerceAtMost(decoder.width),
+                (region.topPx + region.heightPx).coerceAtMost(decoder.height),
+            )
+            val inSampleSize = PageTiling.regionInSampleSize(
+                regionWidthPx = rect.width(),
+                regionHeightPx = rect.height(),
+                targetWidthPx = request.targetWidthPx,
+                targetHeightPx = request.targetHeightPx,
+                budgetBytes = budgetBytes,
+            )
+            val options = BitmapFactory.Options().apply { this.inSampleSize = inSampleSize }
+            val bitmap = decoder.decodeRegion(rect, options)
+                ?: throw IllegalStateException("Page region is not decodable")
+            bitmap to inSampleSize
+        }
         DecodedPageImage(
-            bitmap = bitmap,
-            byteCount = bitmap.allocationByteCount,
+            bitmap = decoded.first,
+            byteCount = decoded.first.allocationByteCount,
             decodeMillis = clock() - startedAtMillis,
-            inSampleSize = inSampleSize,
+            inSampleSize = decoded.second,
             strategy = strategy,
         )
     }
 
     override fun close() {
         synchronized(lock) {
-            openDecoders.values.forEach { it.recycle() }
-            openDecoders.clear()
+            closed = true
+            val iterator = openDecoders.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next().value
+                if (entry.activeDecodes == 0) {
+                    iterator.remove()
+                    entry.decoder.recycle()
+                }
+            }
         }
     }
 
@@ -140,21 +150,46 @@ class RegionPageImageDecoder(
         return PageTiling.decodedByteCount(decoded.widthPx, decoded.heightPx) <= budgetBytes
     }
 
+    private class DecoderEntry(val decoder: BitmapRegionDecoder, var activeDecodes: Int = 0)
+
+    /** Keep a decoder leased until its native decode finishes so LRU eviction cannot recycle it. */
+    private inline fun <T> withDecoder(path: String, block: (BitmapRegionDecoder) -> T): T {
+        val entry = synchronized(lock) {
+            check(!closed) { "Region decoder is closed" }
+            val existing = openDecoders.remove(path)
+            val selected = existing ?: DecoderEntry(createDecoder(path))
+            selected.activeDecodes++
+            openDecoders[path] = selected
+            trimLocked()
+            selected
+        }
+        try {
+            return block(entry.decoder)
+        } finally {
+            synchronized(lock) {
+                entry.activeDecodes--
+                if (closed && entry.activeDecodes == 0) {
+                    openDecoders.entries.removeAll { it.value === entry }
+                    entry.decoder.recycle()
+                } else {
+                    trimLocked()
+                }
+            }
+        }
+    }
+
+    private fun trimLocked() {
+        while (openDecoders.size > maxOpenDecoders) {
+            val oldestIdle = openDecoders.entries.firstOrNull { it.value.activeDecodes == 0 } ?: return
+            openDecoders.remove(oldestIdle.key)?.decoder?.recycle()
+        }
+    }
+
     // Path-based creation is deprecated in favour of descriptor-based creation; the descriptor form
     // is decided when the pipeline moves to :core:image, together with the source abstraction.
     @Suppress("DEPRECATION")
-    private fun decoderFor(path: String): BitmapRegionDecoder = synchronized(lock) {
-        val existing = openDecoders.remove(path)
-        if (existing != null) {
-            openDecoders[path] = existing
-            return@synchronized existing
-        }
-        while (openDecoders.size >= maxOpenDecoders) {
-            openDecoders.keys.firstOrNull()?.let { oldest -> openDecoders.remove(oldest)?.recycle() }
-                ?: break
-        }
-        BitmapRegionDecoder.newInstance(path, false).also { openDecoders[path] = it }
-    }
+    private fun createDecoder(path: String): BitmapRegionDecoder =
+        BitmapRegionDecoder.newInstance(path, false)
 
     private companion object {
         const val DEFAULT_MAX_OPEN_DECODERS = 3

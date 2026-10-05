@@ -75,9 +75,9 @@ class ReaderVerticalRenderingTest {
                     onAction = {},
                     onBack = {},
                     decoderFactory = {
-                        PipelinePageImageDecoder(
-                            imagePipeline,
-                            CachingPageImageDecoder(RegionPageImageDecoder(), PageImageCache(1_000_000)),
+                        CachingPageImageDecoder(
+                            PipelinePageImageDecoder(imagePipeline, RegionPageImageDecoder()),
+                            PageImageCache(1_000_000),
                         )
                     },
                 )

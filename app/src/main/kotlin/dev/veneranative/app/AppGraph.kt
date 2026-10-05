@@ -188,9 +188,37 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             DecodeStrategy.Sampled -> SampledPageImageDecoder()
             DecodeStrategy.Region -> RegionPageImageDecoder()
         }
-        dev.veneranative.core.image.decode.PipelinePageImageDecoder(
-            imagePipeline, CachingPageImageDecoder(decoder, imageCache),
+        val pipelineDecoder = dev.veneranative.core.image.decode.PipelinePageImageDecoder(
+            imagePipeline,
+            decoder,
+            onDecodeFailure = { request, failure ->
+                if (request.sourceId?.value.equals("jm", ignoreCase = true)) {
+                    val region = request.region
+                    val codeLocation = failure.stackTrace
+                        .asSequence()
+                        .filter {
+                            it.className.startsWith("dev.veneranative.") ||
+                                it.className.startsWith("android.graphics.")
+                        }
+                        .take(6)
+                        .joinToString(">") { frame ->
+                            "${frame.className.substringAfterLast('.')}.${frame.methodName}:${frame.lineNumber}"
+                        }.ifBlank { "unavailable" }
+                    host.logJmReaderDecodeFailure(
+                        "page=${request.pageIndex} strategy=${strategy.name} " +
+                            "target=${request.targetWidthPx}x${request.targetHeightPx} " +
+                            "region=${region?.let { "${it.leftPx},${it.topPx},${it.widthPx}x${it.heightPx}" } ?: "whole"} " +
+                            "bands=${request.reverseHorizontalBands ?: 0} " +
+                            "errorType=${failure.javaClass.simpleName} " +
+                            "causeType=${failure.cause?.javaClass?.simpleName ?: "none"} " +
+                            "codeLocation=$codeLocation",
+                    )
+                }
+            },
         )
+        // Cache completed pages/tiles outside the transform. Intermediate strips are recycled
+        // immediately after drawing and must never be retained by the bitmap cache.
+        CachingPageImageDecoder(pipelineDecoder, imageCache)
     }
     private val _history = kotlinx.coroutines.flow.MutableStateFlow<HistoryRepository?>(null)
     val history: kotlinx.coroutines.flow.StateFlow<HistoryRepository?> = _history

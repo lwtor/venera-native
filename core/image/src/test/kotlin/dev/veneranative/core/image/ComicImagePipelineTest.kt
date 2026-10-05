@@ -97,6 +97,27 @@ class ComicImagePipelineTest {
         }
     }
 
+    @Test fun sourceAcceptEncodingDoesNotDisableOkHttpImageDecoding() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val cache = DiskCache.Builder().directory(temp.newFolder().toOkioPath()).maxSizeBytes(1024 * 1024).build()
+            try {
+                val pipeline = CoilComicImagePipeline(OkHttpClient(), cache, ComicImageAuthProvider { _, _ -> emptyMap() })
+                server.enqueue(MockResponse.Builder().body("page bytes").build())
+
+                pipeline.cachedFileOf(
+                    ComicImageRequest(
+                        server.url("/page.webp").toString(),
+                        SourceId("jm"),
+                        headers = mapOf("Accept-Encoding" to "gzip, deflate, br, zstd"),
+                    ),
+                )!!.use { assertEquals("page bytes", it.file.readText()) }
+
+                assertEquals("gzip", server.takeRequest().headers["Accept-Encoding"])
+            } finally { cache.shutdown() }
+        }
+    }
+
     @Test fun copyMangaRetriesForbiddenImageWithItsSourceUserAgent() = runBlocking {
         MockWebServer().use { server ->
             server.start()

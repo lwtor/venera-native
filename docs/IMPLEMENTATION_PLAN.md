@@ -581,6 +581,8 @@ S3-00 小任务：
 | S3-00V | 拷贝漫画图片请求在浏览器 UA 收到拒绝响应时，以来源官方脚本 UA 兜底；尊重单图显式 UA，新增 HTTP 回归，编译 App | IN_PROGRESS（403/406 回退与显式 UA 回归通过；`:core:image:testDebugUnitTest --tests ComicImagePipelineTest :app:assembleDebug` 通过；神乐钵真机验证待用户执行，服务端拒绝状态尚未由设备日志确认） |
 | S3-00W | 修复 Komiic 与禁漫天堂的搜索、详情和阅读链路；遵循官方脚本请求契约与宿主 API，覆盖聚合结果返回状态、详情值对象、图片请求头/安全图像变换并编译 App | IN_PROGRESS（Komiic 搜索已由用户确认恢复；本轮修正“查看全部”嵌套返回，移除详情相关推荐，补齐 JM `ComicDetails` 构造器，并接通两源 `comic.onImageLoad` 图片请求头与 JM 反向水平条带变换。图片管道忽略来源自带 `Accept-Encoding` 以保留 OkHttp 透明解压，新增回归。聚合偏好、JM 详情值对象、来源图片配置/请求头和压缩协商均有回归；JDK 17 `:feature:search:testDebugUnitTest :source:engine:testDebugUnitTest :source:api:testDebugUnitTest :source:core:testDebugUnitTest :core:image:testDebugUnitTest :feature:details:compileDebugKotlin :feature:reader:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。尚未安装新 APK，设备验证由用户执行，当前不标记完成） |
 
+**S3-00W1 IN_PROGRESS：修复禁漫天堂纵向阅读滑动后页面变成重试按钮。** 真机调用位置日志确认 `Canvas.drawBitmap` 收到了此前被条带合成器回收、但仍留在 `PageImageCache` 的中间 bitmap。缓存现移到 `PipelinePageImageDecoder` 外，只保留完成变换后的整页/tile；新增重复反条带解码后最终 bitmap 未被回收的 Android 回归。日志还记录了独立的网络 reset/transport 错误，不能与 Canvas 崩溃混为一因。JDK 17 `:app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。用户真机复验后再完成该任务。
+
 ## 8. Stage 4：同步、体验与发布
 
 | ID | 任务 | 关键交付物与验收 | 前置 | 状态 |

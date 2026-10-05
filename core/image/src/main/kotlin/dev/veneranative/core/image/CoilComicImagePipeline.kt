@@ -32,6 +32,7 @@ class CoilComicImagePipeline(
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
     private val headerBytes: Int = DEFAULT_HEADER_BYTES,
     private val callTimeoutMillis: Long = DEFAULT_CALL_TIMEOUT_MILLIS,
+    private val onDiagnostic: (ComicImageRequest, String) -> Unit = { _, _ -> },
 ) : ComicImagePipeline {
 
     init {
@@ -80,10 +81,14 @@ class CoilComicImagePipeline(
         } catch (_: IOException) { return null }
     }
 
-    override suspend fun sizeOf(request: ComicImageRequest): ImageSize? =
-        cachedFileOf(request)?.use { file ->
-            withContext(Dispatchers.IO) { headerParserSizeOf(file) ?: boundsSizeOf(file.file) }
+    override suspend fun sizeOf(request: ComicImageRequest): ImageSize? {
+        val image = cachedFileOf(request) ?: return null
+        return image.use { file ->
+            val size = withContext(Dispatchers.IO) { headerParserSizeOf(file) ?: boundsSizeOf(file.file) }
+            if (size == null) diagnostic(request, "outcome=image_dimensions_unreadable")
+            size
         }
+    }
 
     private fun readSnapshot(key: String): ComicImageFile? = diskCache.openSnapshot(key)?.asFile()
 
@@ -93,7 +98,10 @@ class CoilComicImagePipeline(
     private data class DownloadResult(val file: ComicImageFile?, val statusCode: Int? = null)
 
     private suspend fun download(request: ComicImageRequest, headers: Map<String, String>, key: String): DownloadResult {
-        val http = httpRequest(request, headers) ?: return DownloadResult(null)
+        val http = httpRequest(request, headers) ?: run {
+            diagnostic(request, "outcome=invalid_http_url")
+            return DownloadResult(null)
+        }
         return kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
             val call = client.newCall(http)
             // OkHttp's connect/read timeouts are phase/individual-read limits. A peer that keeps
@@ -103,13 +111,23 @@ class CoilComicImagePipeline(
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : okhttp3.Callback {
                 override fun onFailure(call: okhttp3.Call, e: IOException) {
+                    diagnostic(request, "outcome=transport_error errorType=${e.javaClass.simpleName}")
                     if (continuation.isActive) continuation.resumeWith(Result.success(DownloadResult(null)))
                 }
                 override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
                     val result = try { response.use { executed ->
-                        if (!executed.isSuccessful) return@use DownloadResult(null, executed.code)
-                        if (executed.body.contentLength() > maxBytes) return@use DownloadResult(null)
-                        val editor = diskCache.openEditor(key) ?: return@use DownloadResult(null)
+                        if (!executed.isSuccessful) {
+                            diagnostic(request, "outcome=http_status status=${executed.code}")
+                            return@use DownloadResult(null, executed.code)
+                        }
+                        if (executed.body.contentLength() > maxBytes) {
+                            diagnostic(request, "outcome=response_too_large")
+                            return@use DownloadResult(null)
+                        }
+                        val editor = diskCache.openEditor(key) ?: run {
+                            diagnostic(request, "outcome=disk_cache_unavailable")
+                            return@use DownloadResult(null)
+                        }
                         var committed = false
                         try {
                             diskCache.fileSystem.sink(editor.data).buffer().use { sink ->
@@ -129,7 +147,10 @@ class CoilComicImagePipeline(
                             committed = true
                             DownloadResult(snapshot?.asFile(executed.header("Content-Type")))
                         } finally { if (!committed) editor.abort() }
-                    } } catch (_: IOException) { DownloadResult(null) }
+                    } } catch (failure: IOException) {
+                        diagnostic(request, "outcome=response_read_error errorType=${failure.javaClass.simpleName}")
+                        DownloadResult(null)
+                    }
                     continuation.resume(result) { _, value, _ -> value.file?.close() }
                 }
             })
@@ -183,7 +204,14 @@ class CoilComicImagePipeline(
             authHeaders +
             (request.referer?.let { referer -> mapOf("Referer" to referer) } ?: emptyMap())
         val builder = Request.Builder().url(url)
-        headers.forEach { (name, value) -> builder.header(name, value) }
+        headers.forEach { (name, value) ->
+            // Let OkHttp negotiate compression itself. Forwarding source-configured values such as
+            // `gzip, deflate, br, zstd` disables its transparent gzip handling and can leave the
+            // reader trying to decode compressed bytes (or encodings this client cannot decode).
+            if (!name.equals("Accept-Encoding", ignoreCase = true)) {
+                builder.header(name, value)
+            }
+        }
         // Image CDNs commonly reject library-default user agents even when a source API accepts
         // them. Sources may still provide an explicit User-Agent on the individual image request.
         if (headers.keys.none { it.equals("User-Agent", ignoreCase = true) }) {
@@ -194,6 +222,12 @@ class CoilComicImagePipeline(
             ComicImageMethod.POST -> builder.post(request.body.toRequestBody())
         }
         return builder.build()
+    }
+
+    private fun diagnostic(request: ComicImageRequest, event: String) {
+        if (request.sourceId?.value.equals("jm", ignoreCase = true)) {
+            runCatching { onDiagnostic(request, event) }
+        }
     }
 
     private fun ComicImageBody?.toRequestBody(): RequestBody = when (this) {
