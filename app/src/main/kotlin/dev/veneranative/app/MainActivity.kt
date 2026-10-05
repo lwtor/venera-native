@@ -16,6 +16,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -200,6 +201,7 @@ private fun AppNavHost(
     progressTracker: AtomicReference<ReadingProgressTracker?>,
 ) {
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
+    val routeStateHolder = rememberSaveableStateHolder()
     val onBack: () -> Unit = {
         val destination = backRoute ?: AppRoute.Home
         if (route is AppRoute.Reader) {
@@ -276,6 +278,7 @@ private fun AppNavHost(
         },
     ) { contentPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            routeStateHolder.SaveableStateProvider(route.encode()) {
             when (val current = route) {
         AppRoute.Home -> HomeRoute(
             history = historyRepository,
@@ -300,7 +303,8 @@ private fun AppNavHost(
                     localRepository = localRepository,
                     onRequestLocalImport = { consume -> pendingLocalImport = consume; localTreePicker.launch(null) },
                     onRequestArchiveImport = { consume -> pendingArchiveImport = consume; localArchivePicker.launch(arrayOf("application/zip", "application/x-7z-compressed", "application/octet-stream")) },
-                            onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
+                    onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
+                    onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
                     downloads = downloadRepository,
                     screenPreferences = screenPreferences,
                     onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
@@ -342,7 +346,6 @@ private fun AppNavHost(
             onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it.key, it.group))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
             onBack = onBack,
-            onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
         )
 
         is AppRoute.Reader -> {
@@ -370,6 +373,7 @@ private fun AppNavHost(
             }
         }
             }
+        }
         }
     }
 }

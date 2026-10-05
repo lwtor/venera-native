@@ -108,6 +108,8 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
     private val localKomiicNetworkLog =
         if (debugNetworkTraceEnabled) LocalKomiicNetworkLog(getApplication<android.app.Application>().filesDir) else null
+    private val localSearchStartupLog =
+        if (debugNetworkTraceEnabled) LocalSearchStartupLog(getApplication<android.app.Application>().filesDir) else null
     init {
         if (debugNetworkTraceEnabled) {
             val selectedProxy = runCatching {
@@ -150,7 +152,19 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         EngineSourceCore(runtime, onCallFailure = { source, member, error ->
             android.util.Log.w("VeneraSource", "Source call failed: source=${source.value} member=$member error=$error")
         }),
+        onDiscoveryTiming = { sourceCount, installMillis, capabilityMillis ->
+            localSearchStartupLog?.append(
+                "stage=source_discovery sources=$sourceCount installedMs=$installMillis capabilitiesMs=$capabilityMillis",
+            )
+        },
     )
+    private val sourceRuntimeWarmup = scope.launch {
+        val startedAt = android.os.SystemClock.elapsedRealtime()
+        val installed = runCatching { sourceRepository.installed() }.getOrDefault(emptyList())
+        localSearchStartupLog?.append(
+            "stage=source_runtime_warmup sources=${installed.size} elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}",
+        )
+    }
     private val sourcePageProvider: PageProvider = SourcePageProvider(
         catalog, CoilPageImageSizer(imagePipeline), prefetchScope = scope,
     )

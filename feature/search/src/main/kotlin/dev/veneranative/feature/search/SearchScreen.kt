@@ -63,7 +63,20 @@ fun SearchScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             when (state.status) {
-                SearchStatus.Loading -> Centered { CircularProgressIndicator() }
+                SearchStatus.Loading -> {
+                    SearchForm(state, onAction, sourcesLoading = true)
+                    Column(Modifier.weight(1f).fillMaxWidth()) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Text("正在准备漫画源…", style = MaterialTheme.typography.bodyMedium)
+                        }
+                        Box(Modifier.weight(1f).fillMaxWidth()) { SearchHistory(state, onAction) }
+                    }
+                }
                 SearchStatus.Failed -> Centered {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(stringResource(R.string.error_source_list))
@@ -121,25 +134,33 @@ fun SearchResultScreen(
 }
 
 @Composable
-private fun SearchForm(state: SearchUiState, onAction: (SearchAction) -> Unit) {
+private fun SearchForm(
+    state: SearchUiState,
+    onAction: (SearchAction) -> Unit,
+    sourcesLoading: Boolean = false,
+) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stringResource(R.string.search_in), style = MaterialTheme.typography.labelLarge)
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            state.sources.forEach { source ->
-                val selected = state.aggregateSearch || source.sourceId == state.selectedSourceId
-                FilterChip(
-                    selected = selected,
-                    onClick = {
-                        if (!state.aggregateSearch) onAction(SearchAction.SourceSelected(source.sourceId))
-                    },
-                    modifier = Modifier.height(40.dp),
-                    leadingIcon = { SelectionMark(selected) },
-                    label = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                )
+        if (sourcesLoading && state.sources.isEmpty()) {
+            Text("正在读取可用来源…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                state.sources.forEach { source ->
+                    val selected = state.aggregateSearch || source.sourceId == state.selectedSourceId
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            if (!state.aggregateSearch) onAction(SearchAction.SourceSelected(source.sourceId))
+                        },
+                        modifier = Modifier.height(40.dp),
+                        leadingIcon = { SelectionMark(selected) },
+                        label = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    )
+                }
             }
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

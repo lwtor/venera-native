@@ -147,6 +147,34 @@ class ComicCatalogTest {
     }
 
     @Test
+    fun `successful source capabilities are reused and invalidated by version and ttl`() = runTest {
+        var now = 1_000L
+        val source = source("searchable")
+        val repository = FakeSourceRepository(mutableListOf(source))
+        val core = FakeSourceCore(
+            declaredCapabilities = mapOf(source.sourceId to capabilities(SourceCapability.SEARCH)),
+        )
+        val catalog = DefaultComicCatalog(
+            sources = repository,
+            core = core,
+            capabilityCacheTtlMillis = 1_000,
+            nowMillis = { now },
+        )
+
+        catalog.searchableSources()
+        catalog.searchableSources()
+        assertEquals(1, core.capabilityCalls)
+
+        repository.sources[0] = source.copy(version = "2")
+        catalog.searchableSources()
+        assertEquals(2, core.capabilityCalls)
+
+        now += 1_001
+        catalog.searchableSources()
+        assertEquals(3, core.capabilityCalls)
+    }
+
+    @Test
     fun `details are passed through unchanged`() = runTest {
         val detail = ComicDetail(comic = comic("c1"), description = "desc")
         val core = FakeSourceCore().apply { detailResponse = SourceOutcome.Success(detail) }
@@ -262,7 +290,9 @@ class ComicCatalogTest {
         placeholdersEnabled = false,
     )
 
-    private class FakeSourceRepository(private val sources: List<InstalledSource>) : SourceRepository {
+    private class FakeSourceRepository(sources: List<InstalledSource>) : SourceRepository {
+        val sources: MutableList<InstalledSource> = sources.toMutableList()
+
         override suspend fun installed(): List<InstalledSource> = sources
 
         override suspend fun install(location: String): InstallOutcome =
@@ -285,10 +315,13 @@ class ComicCatalogTest {
         var error: SourceRuntimeError? = null
         var detailResponse: SourceOutcome<ComicDetail>? = null
         var detailCalls: Int = 0
+        var capabilityCalls: Int = 0
 
-        override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
-            declaredCapabilities[sourceId]
+        override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> {
+            capabilityCalls++
+            return declaredCapabilities[sourceId]
                 ?: SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(sourceId))
+        }
 
         override suspend fun explore(request: ExploreRequest): SourceOutcome<PagedResult<ExploreItem>> {
             exploreRequests += request
