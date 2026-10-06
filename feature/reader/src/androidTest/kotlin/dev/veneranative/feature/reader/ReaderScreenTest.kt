@@ -145,7 +145,7 @@ class ReaderScreenTest {
         composeRule.onNodeWithTag("reader-canvas").performTouchInput {
             down(center)
             up()
-            advanceEventTime(240)
+            advanceEventTime(360)
             down(center)
             advanceEventTime(120)
             up()

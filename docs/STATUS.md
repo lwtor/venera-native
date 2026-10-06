@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务 | S3-00X2 阅读器缩放手势与图像布局重构 |
-| 当前任务状态 | 已按用户录屏改为整列表变换，修复横向平移并加入双击缩放动画；现处理双击首击误触发工具栏，加入时序回归并编译，之后待用户真机复验。 |
+| 当前任务状态 | 已按用户录屏改为整列表变换，修复横向平移并加入双击缩放动画；加宽单击/双击仲裁窗口以避免首击误触发工具栏，时序回归、测试源码编译和 App 编译通过，待用户真机复验。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -21,7 +21,7 @@
 
 **S3-00X1 DONE：修复阅读器缩放手势冲突与放大定位。** 用户实测发现 Reader 父层 `detectTapGestures` 消费了双指事件，导致子层 `transformable` 无法识别捏合；此前焦点偏移公式方向相反，且缩放时重新划分长图瓦片、改变列表索引，造成焦点跳动/内容裁切。本轮以 Initial pass 的非消费式点击识别让捏合继续到达 `transformable`，修正 focal translation 符号；长图缩放时保持源瓦片分段和 key 不变、将解码目标尺寸按缩放放大，并通过 `LazyListState` 锚住被双击瓦片。纵向阅读保留单指上下滚动并由捏合控制放大。新增双击放大/还原与双指捏合 Compose 回归。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机运行 UI 手势测试，待用户复验。
 
-**S3-00X2 IN_PROGRESS：按参照录屏重做阅读器全画布缩放并稳定单击/双击判定。** 用户录屏显示缩放作用于整个阅读列表，围绕双指中心连续变换，过程中图片不重新加载。此前缩放修改每个瓦片的解码尺寸；`PageTile.produceState` 因解码请求 key 改变而重新显示 loading。现保持列表瓦片、尺寸和解码请求稳定，仅变换整个 LazyColumn 的 graphics layer；双指及双击共用整画布缩放状态，不重排瓦片。新增 Android UI 回归源码，检查缩放不触发新的瓦片解码。缩放后横向平移边界按未缩放宽度计算、使 X 位移被夹为 0 的问题已修正。双击缩放/还原采用 260ms FastOutSlowIn 缓动，捏合和拖动即时跟手。用户反馈双击首击会误触工具层，排查发现单击定时器要到第二次抬手才取消；现第二次有效按下即取消定时器，并以第二次按下时间窗确认双击，新增第二次按下在时限内、但抬手越过时限仍不误触工具层的 Compose 回归。JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。Android UI 回归源码已编译但未在设备运行；真机手势待用户复验。
+**S3-00X2 IN_PROGRESS：按参照录屏重做阅读器全画布缩放并稳定单击/双击判定。** 用户录屏显示缩放作用于整个阅读列表，围绕双指中心连续变换，过程中图片不重新加载。此前缩放修改每个瓦片的解码尺寸；`PageTile.produceState` 因解码请求 key 改变而重新显示 loading。现保持列表瓦片、尺寸和解码请求稳定，仅变换整个 LazyColumn 的 graphics layer；双指及双击共用整画布缩放状态，不重排瓦片。新增 Android UI 回归源码，检查缩放不触发新的瓦片解码。缩放后横向平移边界按未缩放宽度计算、使 X 位移被夹为 0 的问题已修正。双击缩放/还原采用 260ms FastOutSlowIn 缓动，捏合和拖动即时跟手。用户反馈双击首击会误触工具层；上一版在设备事件调度偏慢时仍可能先执行首击，且无效双击会在第二次抬手时立即补发首击，可能加重误触。现第二次相近按下先拦截首击回调，双击按下窗口比系统配置多 120ms，单击回调另留 80ms 调度余量；只有第二次手势不构成双击时才提交单击。新增时序回归覆盖第二次按下在平台时限内、但抬手晚于时限。JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。Android UI 回归源码未在真机/仪器环境运行；设备手势待用户复验。
 
 **S3-01A DONE：搜索页按 Venera 逻辑对齐。** 搜索首页提交后切换至独立结果页面；页面返回及系统返回均回到保留关键词/来源/筛选的搜索表单。单源和聚合结果的漫画标题固定占两行。来源选择按可搜索能力列出；筛选区用固定高度的芯片与稳定选择标记，筛选数量/高度变化平滑过渡。聚合即全部可搜索来源，开启后保留原来源芯片列表并全部显示为选中，点击单个来源不能取消选中或切回单源，状态层也拒绝单源切换。搜索历史最多 30 条，支持复用、单项删除和清空；聚合模式点击历史词仍向所有来源搜索。针对用户反馈的历史不显示修复初始 Flow 订阅，并覆盖聚合历史搜索和禁止聚合态切换来源。最终 JDK 17 `:feature:search:compileDebugKotlin :feature:search:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码编译通过，未执行；`git diff --check` — PASS。新 APK 由用户安装验收。
 

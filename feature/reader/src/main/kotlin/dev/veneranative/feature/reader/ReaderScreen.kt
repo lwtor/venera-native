@@ -127,12 +127,16 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
     coroutineScope {
         var pendingTap: Pair<Offset, Long>? = null
         var pendingTapJob: Job? = null
+        val doubleTapWindowMillis = viewConfiguration.doubleTapTimeoutMillis + DOUBLE_TAP_EVENT_GRACE_MILLIS
+        val singleTapSettleMillis = doubleTapWindowMillis + SINGLE_TAP_CALLBACK_GRACE_MILLIS
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
             val firstTapCandidate = pendingTap?.takeIf { (position, releasedAt) ->
-                down.uptimeMillis - releasedAt in 0..viewConfiguration.doubleTapTimeoutMillis &&
+                down.uptimeMillis - releasedAt in 0..singleTapSettleMillis &&
                     (down.position - position).getDistance() <= viewConfiguration.touchSlop
             }
+            val isDoubleTapCandidate = firstTapCandidate != null &&
+                down.uptimeMillis - firstTapCandidate.second <= doubleTapWindowMillis
             if (firstTapCandidate != null) {
                 // A valid second down owns the pending first tap. Do not let its single-tap
                 // timeout show the controls while the second tap is still being released.
@@ -215,7 +219,7 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
             val releasedAt = upPosition
             if (!canceled && releasedAt != null) {
                 val previousTap = pendingTap
-                val isDoubleTap = firstTapCandidate != null && previousTap != null &&
+                val isDoubleTap = isDoubleTapCandidate && previousTap != null &&
                     (releasedAt - previousTap.first).getDistance() <= viewConfiguration.touchSlop
                 if (isDoubleTap) {
                     pendingTapJob?.cancel()
@@ -231,7 +235,7 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
                     pendingTap = releasedAt to upTime
                     val tapTime = upTime
                     pendingTapJob = launch {
-                        delay(viewConfiguration.doubleTapTimeoutMillis)
+                        delay(singleTapSettleMillis)
                         if (pendingTap?.second == tapTime) {
                             pendingTap = null
                             onTap(releasedAt)
@@ -251,6 +255,9 @@ private fun averagePosition(points: List<Offset>): Offset =
 
 private fun averageDistance(points: List<Offset>, center: Offset): Float =
     points.sumOf { (it - center).getDistance().toDouble() }.toFloat() / points.size.coerceAtLeast(1).toFloat()
+
+private const val DOUBLE_TAP_EVENT_GRACE_MILLIS = 120L
+private const val SINGLE_TAP_CALLBACK_GRACE_MILLIS = 80L
 
 
 /**
