@@ -104,6 +104,10 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 
+private class ReaderDoubleTapZoomHandler {
+    var onDoubleTap: ((Offset) -> Unit)? = null
+}
+
 
 /**
  * Stateless reader rendering. Every input comes from [state]; every intent leaves as [onAction].
@@ -123,6 +127,7 @@ fun ReaderScreen(
 ) {
     var strategy by rememberSaveable { mutableStateOf(DecodeStrategy.Region) }
     var controlsVisible by rememberSaveable { mutableStateOf(false) }
+    val doubleTapZoomHandler = remember { ReaderDoubleTapZoomHandler() }
     var sliderPage by remember(state.currentPageNumber) { mutableStateOf(state.currentPageNumber.toFloat()) }
     val view = LocalView.current
     val window = remember(view) { view.context.findActivity()?.window }
@@ -162,13 +167,16 @@ fun ReaderScreen(
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier.fillMaxSize().testTag("reader-canvas").pointerInput(state.status) {
-                detectTapGestures { tap ->
-                    val width = size.width.toFloat()
-                    val height = size.height.toFloat()
-                    if (tap.x in width * 0.28f..width * 0.72f && tap.y in height * 0.25f..height * 0.75f) {
-                        controlsVisible = !controlsVisible
-                    }
-                }
+                detectTapGestures(
+                    onTap = { tap ->
+                        val width = size.width.toFloat()
+                        val height = size.height.toFloat()
+                        if (tap.x in width * 0.28f..width * 0.72f && tap.y in height * 0.25f..height * 0.75f) {
+                            controlsVisible = !controlsVisible
+                        }
+                    },
+                    onDoubleTap = { tap -> doubleTapZoomHandler.onDoubleTap?.invoke(tap) },
+                )
             },
             contentAlignment = Alignment.Center,
         ) {
@@ -190,6 +198,7 @@ fun ReaderScreen(
                     state = state,
                     onAction = onAction,
                     decoder = decoder,
+                    doubleTapZoomHandler = doubleTapZoomHandler,
                     onChapterEndChange = { chapterEndReached = it },
                 )
             }
@@ -436,6 +445,7 @@ private fun PageContent(
     state: ReaderUiState,
     onAction: (ReaderAction) -> Unit,
     decoder: PageImageDecoder?,
+    doubleTapZoomHandler: ReaderDoubleTapZoomHandler,
     onChapterEndChange: (Boolean) -> Unit,
 ) {
     if (state.pageCount == 0) {
@@ -460,6 +470,7 @@ private fun PageContent(
                 decoder = decoder,
                 onChapterEndChange = onChapterEndChange,
                 onAction = onAction,
+                doubleTapZoomHandler = doubleTapZoomHandler,
             )
 
             ReadingDirection.LeftToRight,
@@ -470,6 +481,7 @@ private fun PageContent(
                 decoder = decoder,
                 onChapterEndChange = onChapterEndChange,
                 onAction = onAction,
+                doubleTapZoomHandler = doubleTapZoomHandler,
             )
         }
     }
@@ -483,6 +495,7 @@ private fun ContinuousPages(
     decoder: PageImageDecoder?,
     onChapterEndChange: (Boolean) -> Unit,
     onAction: (ReaderAction) -> Unit,
+    doubleTapZoomHandler: ReaderDoubleTapZoomHandler,
 ) {
     val zoomState = rememberReaderZoomState()
     val items = remember(state.pages, viewport, zoomState.scale, decoder) {
@@ -530,6 +543,11 @@ private fun ContinuousPages(
     }
     val contentWidthPx = items.maxOfOrNull { it.tile.displayWidthPx }?.toFloat() ?: viewport.widthPx.toFloat()
     val contentHeightPx = items.sumOf { it.tile.displayHeightPx }.toFloat()
+    SideEffect {
+        doubleTapZoomHandler.onDoubleTap = { point ->
+            zoomState.toggleZoomAt(point, viewport, contentWidthPx, contentHeightPx)
+        }
+    }
     LaunchedEffect(listState, items, viewport, decoder) {
         if (decoder == null) return@LaunchedEffect
         snapshotFlow { items.getOrNull(listState.firstVisibleItemIndex)?.page?.index }
@@ -538,8 +556,9 @@ private fun ContinuousPages(
                 if (index != null) predecodeAdjacentPages(index, state.pages, viewport, decoder)
             }
     }
-    val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
+    val transformState = rememberTransformableState { centroid, zoomFactor, pan, _ ->
         zoomState.applyGesture(
+            centroid = centroid,
             pan = pan,
             zoomFactor = zoomFactor,
             viewport = viewport,
@@ -582,6 +601,7 @@ private fun SinglePagePager(
     decoder: PageImageDecoder?,
     onChapterEndChange: (Boolean) -> Unit,
     onAction: (ReaderAction) -> Unit,
+    doubleTapZoomHandler: ReaderDoubleTapZoomHandler,
 ) {
     val pagerState = rememberPagerState(
         initialPage = state.currentPageIndex,
@@ -619,6 +639,8 @@ private fun SinglePagePager(
                 if (index == pagerState.currentPage) onChapterEndChange(reached)
             },
             onRetry = { onAction(ReaderAction.RetryPage(index)) },
+            isCurrentPage = index == pagerState.currentPage,
+            doubleTapZoomHandler = doubleTapZoomHandler,
         )
     }
 }
@@ -676,6 +698,8 @@ private fun PagedPage(
     isLastChapterPage: Boolean,
     onChapterEndChange: (Boolean) -> Unit,
     onRetry: () -> Unit = {},
+    isCurrentPage: Boolean = false,
+    doubleTapZoomHandler: ReaderDoubleTapZoomHandler,
 ) {
     val zoomState = rememberReaderZoomState()
     val tiles = remember(page, viewport, decoder, zoomState.scale) {
@@ -695,8 +719,16 @@ private fun PagedPage(
     }
     val contentWidthPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.widthPx * zoomState.scale
     val contentHeightPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.heightPx * zoomState.scale
-    val transformState = rememberTransformableState { _, zoomFactor, pan, _ ->
+    SideEffect {
+        if (isCurrentPage) {
+            doubleTapZoomHandler.onDoubleTap = { point ->
+                zoomState.toggleZoomAt(point, viewport, contentWidthPx, contentHeightPx)
+            }
+        }
+    }
+    val transformState = rememberTransformableState { centroid, zoomFactor, pan, _ ->
         zoomState.applyGesture(
+            centroid = centroid,
             pan = pan,
             zoomFactor = zoomFactor,
             viewport = viewport,

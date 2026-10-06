@@ -56,7 +56,7 @@ immutable UiState
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
-| `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度 | Design System、`:core:model`、`:core:image` |
+| `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |
 | `:feature:sources` | 来源管理：分开展示可用目录和已安装来源；安装、启停、卸载，以及加载 / 空 / 失败 / 成功页面状态 | Design System、`:core:model`、`:data:source` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |

@@ -32,6 +32,7 @@ class ReaderZoomState {
     val isZoomed: Boolean get() = scale > MIN_SCALE + SCALE_EPSILON
 
     fun applyGesture(
+        centroid: Offset,
         pan: Offset,
         zoomFactor: Float,
         viewport: PageViewport,
@@ -45,12 +46,57 @@ class ReaderZoomState {
             return
         }
         val scaleChange = scale / previousScale
+        applyAnchoredScale(
+            scaleChange = scaleChange,
+            centroid = centroid,
+            pan = pan,
+            viewport = viewport,
+            contentWidthPx = contentWidthPx,
+            contentHeightPx = contentHeightPx,
+        )
+    }
+
+    /** Toggles between fitted size and 2x zoom, keeping the tapped point under the finger. */
+    fun toggleZoomAt(
+        centroid: Offset,
+        viewport: PageViewport,
+        contentWidthPx: Float,
+        contentHeightPx: Float,
+    ) {
+        val previousScale = scale
+        scale = if (isZoomed) MIN_SCALE else DOUBLE_TAP_SCALE
+        if (!isZoomed) {
+            resetOffset()
+            return
+        }
+        applyAnchoredScale(
+            scaleChange = scale / previousScale,
+            centroid = centroid,
+            pan = Offset.Zero,
+            viewport = viewport,
+            contentWidthPx = contentWidthPx,
+            contentHeightPx = contentHeightPx,
+        )
+    }
+
+    private fun applyAnchoredScale(
+        scaleChange: Float,
+        centroid: Offset,
+        pan: Offset,
+        viewport: PageViewport,
+        contentWidthPx: Float,
+        contentHeightPx: Float,
+    ) {
         val nextWidthPx = contentWidthPx * scaleChange
         val nextHeightPx = contentHeightPx * scaleChange
         val limitXPx = ((nextWidthPx - viewport.widthPx) / 2f).coerceAtLeast(0f)
         val limitYPx = ((nextHeightPx - viewport.heightPx) / 2f).coerceAtLeast(0f)
-        offsetX = (offsetX + pan.x).coerceIn(-limitXPx, limitXPx)
-        offsetY = (offsetY + pan.y).coerceIn(-limitYPx, limitYPx)
+        val anchorX = centroid.x - viewport.widthPx / 2f
+        val anchorY = centroid.y - viewport.heightPx / 2f
+        offsetX = ((offsetX + anchorX) * scaleChange - anchorX + pan.x)
+            .coerceIn(-limitXPx, limitXPx)
+        offsetY = ((offsetY + anchorY) * scaleChange - anchorY + pan.y)
+            .coerceIn(-limitYPx, limitYPx)
     }
 
     private fun resetOffset() {
@@ -60,6 +106,7 @@ class ReaderZoomState {
 
     companion object {
         const val MIN_SCALE = 1f
+        const val DOUBLE_TAP_SCALE = 2f
         const val MAX_SCALE = 5f
         private const val SCALE_EPSILON = 0.01f
     }

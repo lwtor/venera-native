@@ -8,14 +8,16 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S4-09A2 首页最近阅读按漫画去重 |
-| 当前任务状态 | 历史记录按漫画/章节保存，因此原来的“最近 N 条”可能包含同一漫画不同章节。Room 最近记录查询现按 `source_id + comic_id` 只返回最新章节，并在去重后应用条数限制；HomeViewModel 再按 `ComicKey` 排序、去重作防护；章节历史仍保留完整。验证：`:data:history:testDebugUnitTest :feature:home:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。 |
+| 当前任务 | S3-00U 阅读器章节导航按版本组隔离 |
+| 当前任务状态 | 路由和阅读器内章节加载已保留所选版本组；相关测试源码编译通过。该项还待用户真机验收，不得记录为已通过。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
 | 工作基线 | AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20（AGP 内置）、JDK 17、SDK 37、minSdk 26、KSP 2.3.12、Coil 3.6.3、QuickJS 1.0.15、Room 2.8.5 |
 
 **S3-00S DONE：阅读器沉浸式控制层与章节/页码快速导航。** 阅读器默认隐藏系统栏；点页面中央后显示状态栏和工具层，导航栏仍隐藏。详情折叠栏和阅读器顶部标题栏使用 safeDrawing 顶部 inset 避让状态栏及挖孔区；阅读器标题栏从屏幕上方滑入（向下出现），底部工具区从屏幕下方向上滑入，两处均带淡入并独立收起。页码滑块为自绘窄轨道与圆形滑块，支持点击和拖动定位；上一话/下一话图标置于滑块两侧，翻页与解码方式分组等宽。最近修改验证：JDK 17 `:feature:details:compileDebugKotlin :feature:reader:compileDebugKotlin :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或操作真机，挖孔屏避让、状态栏显示及动画方向由用户复验。
+
+**S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 
 **S3-01A DONE：搜索页按 Venera 逻辑对齐。** 搜索首页提交后切换至独立结果页面；页面返回及系统返回均回到保留关键词/来源/筛选的搜索表单。单源和聚合结果的漫画标题固定占两行。来源选择按可搜索能力列出；筛选区用固定高度的芯片与稳定选择标记，筛选数量/高度变化平滑过渡。聚合即全部可搜索来源，开启后保留原来源芯片列表并全部显示为选中，点击单个来源不能取消选中或切回单源，状态层也拒绝单源切换。搜索历史最多 30 条，支持复用、单项删除和清空；聚合模式点击历史词仍向所有来源搜索。针对用户反馈的历史不显示修复初始 Flow 订阅，并覆盖聚合历史搜索和禁止聚合态切换来源。最终 JDK 17 `:feature:search:compileDebugKotlin :feature:search:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码编译通过，未执行；`git diff --check` — PASS。新 APK 由用户安装验收。
 
