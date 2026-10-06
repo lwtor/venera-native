@@ -45,6 +45,7 @@ import dev.veneranative.core.image.tiling.PageRegion
 import dev.veneranative.core.image.tiling.PageTile
 import dev.veneranative.core.image.tiling.PageViewport
 import kotlinx.coroutines.awaitCancellation
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -125,7 +126,7 @@ class ReaderScreenTest {
     }
 
     @Test
-    fun pinchZoomIsNotConsumedByReaderTapRecognition() {
+    fun pinchZoomIsAppliedByReaderCanvasWithoutScrolling() {
         composeRule.setContent {
             ReaderScreen(
                 state = ReaderUiState(
@@ -150,6 +151,54 @@ class ReaderScreenTest {
             up(pointerId = 1)
         }
         composeRule.onNodeWithTag("reader-zoomed").assertIsDisplayed()
+    }
+
+    @Test
+    fun zoomDoesNotStartAnotherTileDecode() {
+        val decodeCount = AtomicInteger()
+        val decoder = object : PageImageDecoder {
+            override val strategy = DecodeStrategy.Region
+            override fun plan(page: ComicPage, viewport: PageViewport, zoom: Float, continuous: Boolean) = listOf(
+                PageTile(PageRegion(0, 0, page.widthPx, page.heightPx), viewport.widthPx, viewport.heightPx),
+            )
+            override suspend fun decode(request: PageDecodeRequest): DecodedPageImage {
+                decodeCount.incrementAndGet()
+                val bitmap = Bitmap.createBitmap(
+                    request.targetWidthPx.coerceAtLeast(1),
+                    request.targetHeightPx.coerceAtLeast(1),
+                    Bitmap.Config.ARGB_8888,
+                )
+                return DecodedPageImage(bitmap, bitmap.byteCount, 1, 1, strategy)
+            }
+        }
+
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = listOf(pages.first()),
+                    currentChapterPageCount = 1,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+                decoderFactory = { decoder },
+            )
+        }
+        composeRule.waitUntil(5_000) { decodeCount.get() > 0 }
+        val initialDecodeCount = decodeCount.get()
+
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(80)
+            down(center)
+            up()
+        }
+
+        composeRule.onNodeWithTag("reader-zoomed").assertIsDisplayed()
+        composeRule.waitForIdle()
+        assertEquals(initialDecodeCount, decodeCount.get())
     }
 
     @Test

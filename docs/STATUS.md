@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00U 阅读器章节导航按版本组隔离 |
-| 当前任务状态 | 路由和阅读器内章节加载已保留所选版本组；相关测试源码编译通过。该项还待用户真机验收，不得记录为已通过。 |
+| 当前任务 | S3-00X2 阅读器缩放手势与图像布局重构 |
+| 当前任务状态 | 已按用户录屏改为整列表变换并保持图片解码参数不变；Reader 测试与 App 编译通过，待用户真机复验。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -20,6 +20,8 @@
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 
 **S3-00X1 DONE：修复阅读器缩放手势冲突与放大定位。** 用户实测发现 Reader 父层 `detectTapGestures` 消费了双指事件，导致子层 `transformable` 无法识别捏合；此前焦点偏移公式方向相反，且缩放时重新划分长图瓦片、改变列表索引，造成焦点跳动/内容裁切。本轮以 Initial pass 的非消费式点击识别让捏合继续到达 `transformable`，修正 focal translation 符号；长图缩放时保持源瓦片分段和 key 不变、将解码目标尺寸按缩放放大，并通过 `LazyListState` 锚住被双击瓦片。纵向阅读保留单指上下滚动并由捏合控制放大。新增双击放大/还原与双指捏合 Compose 回归。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机运行 UI 手势测试，待用户复验。
+
+**S3-00X2 IN_PROGRESS：按参照录屏重做阅读器全画布缩放。** 用户录屏显示缩放作用于整个阅读列表，围绕双指中心连续变换，过程中图片不重新加载。此前缩放修改每个瓦片的解码尺寸；`PageTile.produceState` 因解码请求 key 改变而重新显示 loading。现保持列表瓦片、尺寸和解码请求稳定，仅变换整个 LazyColumn 的 graphics layer；双指及双击共用整画布缩放状态，不重排瓦片。新增 Android UI 回归源码，检查缩放不触发新的瓦片解码。用户随后反馈放大后只能上下滑，排查发现平移边界输入仍是未缩放宽度，使水平偏移被夹到 0；现修正连续纵向与分页画布的平移调用，传入当前缩放后的内容尺寸，双击初始缩放仍使用基准尺寸。用户再要求双击缩放时加入动画；现仅双击/还原采用 260ms FastOutSlowIn 缓动，捏合和拖动维持即时跟手，开始新手势会中断动画。JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行 UI instrumentation/真机手势，待用户复验。
 
 **S3-01A DONE：搜索页按 Venera 逻辑对齐。** 搜索首页提交后切换至独立结果页面；页面返回及系统返回均回到保留关键词/来源/筛选的搜索表单。单源和聚合结果的漫画标题固定占两行。来源选择按可搜索能力列出；筛选区用固定高度的芯片与稳定选择标记，筛选数量/高度变化平滑过渡。聚合即全部可搜索来源，开启后保留原来源芯片列表并全部显示为选中，点击单个来源不能取消选中或切回单源，状态层也拒绝单源切换。搜索历史最多 30 条，支持复用、单项删除和清空；聚合模式点击历史词仍向所有来源搜索。针对用户反馈的历史不显示修复初始 Flow 订阅，并覆盖聚合历史搜索和禁止聚合态切换来源。最终 JDK 17 `:feature:search:compileDebugKotlin :feature:search:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码编译通过，未执行；`git diff --check` — PASS。新 APK 由用户安装验收。
 
