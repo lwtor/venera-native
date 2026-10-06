@@ -129,6 +129,16 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
         var pendingTapJob: Job? = null
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            val firstTapCandidate = pendingTap?.takeIf { (position, releasedAt) ->
+                down.uptimeMillis - releasedAt in 0..viewConfiguration.doubleTapTimeoutMillis &&
+                    (down.position - position).getDistance() <= viewConfiguration.touchSlop
+            }
+            if (firstTapCandidate != null) {
+                // A valid second down owns the pending first tap. Do not let its single-tap
+                // timeout show the controls while the second tap is still being released.
+                pendingTapJob?.cancel()
+                pendingTapJob = null
+            }
             var canceled = false
             var transforming = false
             var panning = false
@@ -143,7 +153,7 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
                     if (!transforming) {
                         pendingTapJob?.cancel()
                         pendingTapJob = null
-                        pendingTap = null
+                        if (firstTapCandidate == null) pendingTap = null
                         handler.onTransformStart?.invoke(averagePosition(activePointers.map { it.position }))
                         transforming = true
                     }
@@ -205,8 +215,7 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
             val releasedAt = upPosition
             if (!canceled && releasedAt != null) {
                 val previousTap = pendingTap
-                val isDoubleTap = previousTap != null &&
-                    upTime - previousTap.second <= viewConfiguration.doubleTapTimeoutMillis &&
+                val isDoubleTap = firstTapCandidate != null && previousTap != null &&
                     (releasedAt - previousTap.first).getDistance() <= viewConfiguration.touchSlop
                 if (isDoubleTap) {
                     pendingTapJob?.cancel()
@@ -214,6 +223,10 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
                     pendingTap = null
                     handler.onDoubleTap?.invoke(releasedAt)
                 } else {
+                    if (firstTapCandidate != null) {
+                        pendingTap = null
+                        onTap(firstTapCandidate.first)
+                    }
                     pendingTapJob?.cancel()
                     pendingTap = releasedAt to upTime
                     val tapTime = upTime
@@ -225,6 +238,9 @@ private suspend fun PointerInputScope.detectReaderTapGestures(
                         }
                     }
                 }
+            } else if (firstTapCandidate != null) {
+                pendingTap = null
+                onTap(firstTapCandidate.first)
             }
         }
     }
@@ -391,7 +407,8 @@ private fun ReaderToolOverlay(
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Surface(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
+                .testTag("reader-tool-overlay"),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.97f),
             shape = MaterialTheme.shapes.extraLarge,
             tonalElevation = 4.dp,

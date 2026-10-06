@@ -15,11 +15,13 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
@@ -123,6 +125,34 @@ class ReaderScreenTest {
             up()
         }
         composeRule.onNodeWithTag("reader-not-zoomed").assertIsDisplayed()
+    }
+
+    @Test
+    fun secondTapDownCancelsSingleTapEvenWhenReleasePassesDoubleTapTimeout() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(240)
+            down(center)
+            advanceEventTime(120)
+            up()
+        }
+
+        composeRule.onNodeWithTag("reader-zoomed").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("reader-tool-overlay").assertCountEquals(0)
     }
 
     @Test
