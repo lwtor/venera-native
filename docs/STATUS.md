@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S4-09A4 书架收藏夹交互与入口整理 |
-| 当前任务状态 | S4-09A3 已完成收藏多对多数据迁移与仓库契约；正在改书架入口和长按多选。阅读器 S3-00X2 仍待用户真机复验。 |
+| 当前任务 | S4-09A5 详情页收藏与取消收藏交互 |
+| 当前任务状态 | S4-09A3/A4 已完成数据迁移、书架常驻收藏视图与长按多选，正在实现详情页收藏选择及移除确认。阅读器 S3-00X2 仍待用户真机复验。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -34,6 +34,8 @@
 **S4-09A 修订（用户反馈后）**：书架内层 Scaffold 和 TopAppBar 明确使用零 WindowInsets，避免与根 Scaffold 的状态栏 inset 重复叠加；收藏漫画按用户给的界面参考恢复为三列封面网格；长按后通过底部弹窗提供移动到其他文件夹、标记更新已读和从书架移除。弹窗所选漫画由 ViewModel 状态驱动。JDK 17 `:feature:library:compileDebugKotlin :feature:library:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；未安装真机，顶部留白与长按菜单由用户复验。
 
 **S4-09A3 DONE：收藏夹数据语义改造。** `favorite_entry` 是隐式“全部”视图；新增 `favorite_membership` 保存一部漫画到多个自建收藏夹的归属。版本 7 迁移保留原有漫画和自建目录的归属，旧 Default 中的漫画仅留在“全部”，旧 Default 行移除；删自建收藏夹只删归属，移出书架则级联删所有归属。旧 `favorite_entry.folder_id` 暂作为不再使用的兼容列保留，后续若清理需新迁移。JDK 17 `:data:collection:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；迁移 AndroidTest 仅编译，未在用户手机运行。下一项 S4-09A4：书架 UI 与多选归属。
+
+**S4-09A4 DONE：书架入口与收藏夹交互。** 书架固定以收藏视图打开，下载与本地漫画保留在右上菜单，进入后返回图标和系统返回均回到书架；收藏夹和排序仍按用户上次选择恢复。长按漫画显示“全部”自动归属与自建收藏夹复选列表，支持多选、清空可选归属并保存；可在面板中新建收藏夹，移出书架需二次确认且说明阅读记录不受影响。界面中相关“文件夹/目录”文案改为“收藏夹”，本地导入目录仍保留文件系统含义。JDK 17 `:feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；设备视觉与操作留给用户复验。下一项 S4-09A5：详情页收藏选择和移除确认。
 
 **S4-09A2 DONE：最近阅读按漫画去重。** 之前 `observeRecent(5)` 直接限制最近五条章节位置；阅读不同章节会在首页重复出现同一部漫画。Room DAO 现在用每个来源/漫画的最新更新时间选一条记录，并在去重后应用数量限制；同一漫画仍按章节保留在历史表，详情页已读状态不受影响。HomeViewModel 按更新时间排序并按 `ComicKey` 去重，防止重复项进入首页。新增 Room DAO 查询源码及 HomeViewModel 回归测试。验证：JDK 17 `:data:history:testDebugUnitTest :feature:home:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。Room AndroidTest 源码已编译，未在设备上执行。
 

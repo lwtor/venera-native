@@ -52,7 +52,7 @@ immutable UiState
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
 | `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索、来源管理和书架入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
-| `:feature:library` | 书架页：收藏、下载队列与本地目录 tab；收藏支持文件夹筛选、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的 tab、收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
+| `:feature:library` | 书架页：收藏常驻主视图，下载队列与本地漫画从菜单进入；收藏支持用户收藏夹筛选、多选归属、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |

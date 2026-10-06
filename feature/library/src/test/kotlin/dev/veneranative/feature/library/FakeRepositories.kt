@@ -44,6 +44,7 @@ internal class FakeCollectionRepository : CollectionRepository {
     val deletedFolders = mutableListOf<String>()
     val removed = mutableListOf<ComicRef>()
     val moved = mutableListOf<Pair<ComicRef, String>>()
+    val assignedFolders = mutableListOf<Pair<ComicRef, Set<String>>>()
     val clearedUpdates = mutableListOf<ComicRef>()
 
     override fun observeFolders(): Flow<List<FavoriteFolder>> = folders
@@ -52,7 +53,7 @@ internal class FakeCollectionRepository : CollectionRepository {
         observeItemQueries += folderId to sort
         val error = observeItemsError
         if (error != null) throw error
-        emitAll(items.map { rows -> if (folderId == null) rows else rows.filter { it.folderId == folderId } })
+        emitAll(items.map { rows -> if (folderId == null) rows else rows.filter { folderId in it.folderIds } })
     }
 
     override fun observeItem(ref: ComicRef): Flow<FavoriteItem?> =
@@ -76,6 +77,13 @@ internal class FakeCollectionRepository : CollectionRepository {
     }
 
     override suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot) = Unit
+
+    override suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot) = Unit
+
+    override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) {
+        assignedFolders += ref to folderIds
+        items.value = items.value.map { if (it.ref == ref) it.copy(folderIds = folderIds) else it }
+    }
 
     override suspend fun remove(ref: ComicRef) {
         removed += ref

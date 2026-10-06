@@ -62,7 +62,7 @@ class LibraryViewModelTest {
         assertEquals(listOf("default", "reading"), viewModel.state.value.folders.map { it.id })
     }
 
-    @Test fun `the shelf restores its last tab folder and sort`() = runTest(dispatcher) {
+    @Test fun `the shelf opens favorites while restoring its collection and sort`() = runTest(dispatcher) {
         repository.folders.value = listOf(
             favoriteFolder("default", "Default", removable = false),
             favoriteFolder("reading", "Reading"),
@@ -76,7 +76,7 @@ class LibraryViewModelTest {
         val viewModel = LibraryViewModel(repository, screenPreferences = preferences)
         advanceUntilIdle()
 
-        assertEquals(LibraryTab.Downloads, viewModel.state.value.tab)
+        assertEquals(LibraryTab.Favorites, viewModel.state.value.tab)
         assertEquals("reading", viewModel.state.value.selectedFolderId)
         assertEquals(ShelfSort.Title, viewModel.state.value.sort)
         assertTrue(repository.observeItemQueries.contains("reading" to ShelfSort.Title))
@@ -212,7 +212,7 @@ class LibraryViewModelTest {
         advanceUntilIdle()
 
         assertTrue(repository.createdFolders.isEmpty())
-        assertEquals("请输入文件夹名称。", viewModel.state.value.message)
+        assertEquals("请输入收藏夹名称。", viewModel.state.value.message)
         assertNotNull(viewModel.state.value.folderEditor)
     }
 
@@ -260,18 +260,30 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `removing, moving and clearing an update reach the repository`() = runTest(dispatcher) {
-        repository.items.value = listOf(favoriteItem("comic-1", hasUpdate = true))
+    fun `multi selection saves memberships and removal waits for confirmation`() = runTest(dispatcher) {
+        repository.folders.value = listOf(favoriteFolder("reading"), favoriteFolder("later"))
+        repository.items.value = listOf(favoriteItem("comic-1", hasUpdate = true).copy(folderIds = setOf("reading")))
         val viewModel = LibraryViewModel(repository)
         advanceUntilIdle()
 
+        viewModel.onAction(LibraryAction.ShowFavoriteActions(comicRef("comic-1")))
+        viewModel.onAction(LibraryAction.ToggleFavoriteFolder("later"))
+        viewModel.onAction(LibraryAction.SaveFavoriteFolders)
+        advanceUntilIdle()
+        assertEquals(listOf(comicRef("comic-1") to setOf("reading", "later")), repository.assignedFolders)
+
+        viewModel.onAction(LibraryAction.ShowFavoriteActions(comicRef("comic-1")))
         viewModel.onAction(LibraryAction.ClearUpdate(comicRef("comic-1")))
-        viewModel.onAction(LibraryAction.MoveItem(comicRef("comic-1"), "reading"))
-        viewModel.onAction(LibraryAction.RemoveItem(comicRef("comic-1")))
+        viewModel.onAction(LibraryAction.ShowFavoriteActions(comicRef("comic-1")))
+        viewModel.onAction(LibraryAction.RequestRemoveFavorite)
+        assertTrue(repository.removed.isEmpty())
+        viewModel.onAction(LibraryAction.DismissRemoveFavorite)
+        assertTrue(repository.removed.isEmpty())
+        viewModel.onAction(LibraryAction.RequestRemoveFavorite)
+        viewModel.onAction(LibraryAction.ConfirmRemoveFavorite)
         advanceUntilIdle()
 
         assertEquals(listOf(comicRef("comic-1")), repository.clearedUpdates)
-        assertEquals(listOf(comicRef("comic-1") to "reading"), repository.moved)
         assertEquals(listOf(comicRef("comic-1")), repository.removed)
     }
 

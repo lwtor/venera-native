@@ -72,22 +72,36 @@ class LibraryViewModel(
             LibraryAction.DismissFolderEditor -> _state.update { it.copy(folderEditor = null) }
             is LibraryAction.DeleteFolder -> runSafely { repository.deleteFolder(action.folderId) }
 
-            is LibraryAction.RemoveItem -> {
-                _state.update { it.copy(selectedFavorite = null) }
-                runSafely { repository.remove(action.ref) }
+            LibraryAction.RequestRemoveFavorite -> _state.update { it.copy(confirmRemoveFavorite = it.selectedFavorite != null) }
+            LibraryAction.DismissRemoveFavorite -> _state.update { it.copy(confirmRemoveFavorite = false) }
+            LibraryAction.ConfirmRemoveFavorite -> {
+                val ref = _state.value.selectedFavorite?.ref ?: return
+                _state.update { it.copy(selectedFavorite = null, selectedFavoriteFolders = emptySet(), confirmRemoveFavorite = false) }
+                runSafely { repository.remove(ref) }
             }
-            is LibraryAction.MoveItem -> {
-                _state.update { it.copy(selectedFavorite = null) }
-                runSafely { repository.moveTo(action.ref, action.folderId) }
+            is LibraryAction.ToggleFavoriteFolder -> _state.update { current ->
+                if (current.folders.none { it.id == action.folderId }) current
+                else current.copy(selectedFavoriteFolders = current.selectedFavoriteFolders.let { ids ->
+                    if (action.folderId in ids) ids - action.folderId else ids + action.folderId
+                })
+            }
+            LibraryAction.SaveFavoriteFolders -> {
+                val ref = _state.value.selectedFavorite?.ref ?: return
+                val ids = _state.value.selectedFavoriteFolders
+                _state.update { it.copy(selectedFavorite = null, selectedFavoriteFolders = emptySet()) }
+                runSafely { repository.setFolders(ref, ids) }
             }
             is LibraryAction.ClearUpdate -> {
                 _state.update { it.copy(selectedFavorite = null) }
                 runSafely { repository.clearUpdate(action.ref) }
             }
             is LibraryAction.ShowFavoriteActions -> _state.update { state ->
-                state.copy(selectedFavorite = state.items.firstOrNull { it.ref == action.ref })
+                val item = state.items.firstOrNull { it.ref == action.ref }
+                state.copy(selectedFavorite = item, selectedFavoriteFolders = item?.folderIds.orEmpty(), confirmRemoveFavorite = false)
             }
-            LibraryAction.DismissFavoriteActions -> _state.update { it.copy(selectedFavorite = null) }
+            LibraryAction.DismissFavoriteActions -> _state.update {
+                it.copy(selectedFavorite = null, selectedFavoriteFolders = emptySet(), confirmRemoveFavorite = false)
+            }
 
             LibraryAction.RefreshUpdates -> refreshUpdates()
             LibraryAction.ToggleFavoriteSearch -> _state.update {
@@ -105,7 +119,6 @@ class LibraryViewModel(
                     favoriteQuery = "",
                     selectedFavorite = null,
                 ) }
-                persist(PREF_TAB, action.tab.name)
             }
             LibraryAction.RequestLocalImport -> Unit
             LibraryAction.RequestArchiveImport -> Unit
@@ -215,11 +228,8 @@ class LibraryViewModel(
             val sort = runCatching { preferences?.get(PREF_SORT) }.getOrNull()?.let { value ->
                 ShelfSort.entries.firstOrNull { it.name == value }
             } ?: ShelfSort.AddedAt
-            val tab = runCatching { preferences?.get(PREF_TAB) }.getOrNull()?.let { value ->
-                LibraryTab.entries.firstOrNull { it.name == value }
-            } ?: LibraryTab.Favorites
             selection.value = LibrarySelection(folderId, sort)
-            _state.update { it.copy(tab = tab, selectedFolderId = folderId, sort = sort) }
+            _state.update { it.copy(tab = LibraryTab.Favorites, selectedFolderId = folderId, sort = sort) }
             observeFolders()
             startItems()
         }
@@ -280,13 +290,16 @@ class LibraryViewModel(
         val editor = _state.value.folderEditor ?: return
         val name = editor.draft.trim()
         if (name.isEmpty()) {
-            _state.update { it.copy(message = "请输入文件夹名称。") }
+            _state.update { it.copy(message = "请输入收藏夹名称。") }
             return
         }
         _state.update { it.copy(folderEditor = null) }
         runSafely {
             if (editor.folderId == null) {
-                repository.createFolder(name)
+                val id = repository.createFolder(name)
+                if (_state.value.selectedFavorite != null) {
+                    _state.update { it.copy(selectedFavoriteFolders = it.selectedFavoriteFolders + id) }
+                }
             } else {
                 repository.renameFolder(editor.folderId, name)
             }
@@ -335,7 +348,6 @@ class LibraryViewModel(
     )
 
     private companion object {
-        const val PREF_TAB = "library.tab"
         const val PREF_FOLDER = "library.favorite.folder"
         const val PREF_SORT = "library.favorite.sort"
         const val ALL_FOLDERS = "@all"

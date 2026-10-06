@@ -1,5 +1,6 @@
 package dev.veneranative.feature.library
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,9 +37,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -78,6 +79,9 @@ internal fun LibraryScreen(
     onOpenLocalChapter: (LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
 ) {
     val selectedFolder = state.folders.firstOrNull { it.id == state.selectedFolderId }
+    BackHandler(enabled = state.tab != LibraryTab.Favorites) {
+        onAction(LibraryAction.SelectTab(LibraryTab.Favorites))
+    }
 
     Scaffold(
         modifier = modifier,
@@ -85,8 +89,15 @@ internal fun LibraryScreen(
         topBar = {
             Column {
                 TopAppBar(
-                    title = { Text(state.tab.title()) },
+                    title = { Text(if (state.tab == LibraryTab.Favorites) "书架" else state.tab.title()) },
                     windowInsets = WindowInsets(0.dp),
+                    navigationIcon = {
+                        if (state.tab != LibraryTab.Favorites) {
+                            IconButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Favorites)) }) {
+                                Icon(Icons.Filled.ArrowBack, contentDescription = "返回书架")
+                            }
+                        }
+                    },
                     actions = {
                         if (state.tab == LibraryTab.Favorites) {
                             IconButton(onClick = { onAction(LibraryAction.ToggleFavoriteSearch) }) {
@@ -118,22 +129,35 @@ internal fun LibraryScreen(
                                 }
                             }
                         }
+                        if (state.tab == LibraryTab.Favorites) {
+                            var libraryMenuExpanded by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { libraryMenuExpanded = true }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = "书架其他内容")
+                                }
+                                DropdownMenu(
+                                    expanded = libraryMenuExpanded,
+                                    onDismissRequest = { libraryMenuExpanded = false },
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("下载 · ${state.downloads.size}") },
+                                        onClick = {
+                                            libraryMenuExpanded = false
+                                            onAction(LibraryAction.SelectTab(LibraryTab.Downloads))
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("本地漫画 · ${state.localComics.size}") },
+                                        onClick = {
+                                            libraryMenuExpanded = false
+                                            onAction(LibraryAction.SelectTab(LibraryTab.Local))
+                                        },
+                                    )
+                                }
+                            }
+                        }
                     }
                 )
-                PrimaryTabRow(selectedTabIndex = state.tab.ordinal) {
-                    LibraryTab.entries.forEach { tab ->
-                        val count = when (tab) {
-                            LibraryTab.Favorites -> state.items.size
-                            LibraryTab.Downloads -> state.downloads.size
-                            LibraryTab.Local -> state.localComics.size
-                        }
-                        Tab(
-                            selected = state.tab == tab,
-                            onClick = { onAction(LibraryAction.SelectTab(tab)) },
-                            text = { Text("${tab.title()}  $count", maxLines = 1) },
-                        )
-                    }
-                }
             }
         },
     ) { contentPadding ->
@@ -165,11 +189,11 @@ internal fun LibraryScreen(
                     var folderMenuExpanded by remember { mutableStateOf(false) }
                     Box {
                         IconButton(onClick = { folderMenuExpanded = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "文件夹管理")
+                            Icon(Icons.Filled.MoreVert, contentDescription = "收藏夹管理")
                         }
                         DropdownMenu(expanded = folderMenuExpanded, onDismissRequest = { folderMenuExpanded = false }) {
                             DropdownMenuItem(
-                                text = { Text("新建文件夹") },
+                                text = { Text("新建收藏夹") },
                                 onClick = {
                                     folderMenuExpanded = false
                                     onAction(LibraryAction.EditFolder(null))
@@ -177,7 +201,7 @@ internal fun LibraryScreen(
                             )
                             DropdownMenuItem(
                                 enabled = selectedFolder != null,
-                                text = { Text("重命名当前文件夹") },
+                                text = { Text("重命名当前收藏夹") },
                                 onClick = {
                                     folderMenuExpanded = false
                                     selectedFolder?.let { onAction(LibraryAction.EditFolder(it.id)) }
@@ -185,7 +209,7 @@ internal fun LibraryScreen(
                             )
                             DropdownMenuItem(
                                 enabled = selectedFolder?.removable == true,
-                                text = { Text("删除当前文件夹") },
+                                text = { Text("删除当前收藏夹") },
                                 onClick = {
                                     folderMenuExpanded = false
                                     selectedFolder?.let { onAction(LibraryAction.DeleteFolder(it.id)) }
@@ -218,7 +242,11 @@ internal fun LibraryScreen(
                     state.status == LibraryStatus.Loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                    state.status == LibraryStatus.Empty -> EmptyLibraryState("书架还是空的。", "收藏的漫画会显示在这里。", Modifier.weight(1f))
+                    state.status == LibraryStatus.Empty -> EmptyLibraryState(
+                        if (state.selectedFolderId == null) "书架还是空的。" else "这个收藏夹还没有漫画。",
+                        if (state.selectedFolderId == null) "收藏的漫画会显示在这里。" else "长按书架中的漫画，可以加入这个收藏夹。",
+                        Modifier.weight(1f),
+                    )
                     state.status == LibraryStatus.Failed -> Column(
                         modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -285,20 +313,29 @@ internal fun LibraryScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(item.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text("移动到目录", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                val destinations = state.folders.filterNot { it.id == item.folderId }
-                if (destinations.isEmpty()) {
-                    Text("还没有其他目录，请先新建目录。", style = MaterialTheme.typography.bodyMedium)
+                Text("加入收藏夹", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("全部 · 始终包含这部漫画", style = MaterialTheme.typography.bodyMedium)
+                if (state.folders.isEmpty()) {
+                    Text("还没有其他收藏夹，可以新建一个。", style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    destinations.forEach { folder ->
-                        TextButton(
-                            onClick = { onAction(LibraryAction.MoveItem(item.ref, folder.id)) },
-                            modifier = Modifier.fillMaxWidth(),
+                    state.folders.forEach { folder ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().clickable { onAction(LibraryAction.ToggleFavoriteFolder(folder.id)) },
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("移至 ${folder.name}", modifier = Modifier.weight(1f))
+                            Checkbox(
+                                checked = folder.id in state.selectedFavoriteFolders,
+                                onCheckedChange = { onAction(LibraryAction.ToggleFavoriteFolder(folder.id)) },
+                            )
+                            Text(folder.name)
                         }
                     }
                 }
+                TextButton(onClick = { onAction(LibraryAction.EditFolder(null)) }) { Text("新建收藏夹") }
+                Button(
+                    onClick = { onAction(LibraryAction.SaveFavoriteFolders) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("保存收藏夹") }
                 HorizontalDivider()
                 if (item.hasUpdate) {
                     TextButton(
@@ -309,7 +346,7 @@ internal fun LibraryScreen(
                     }
                 }
                 TextButton(
-                    onClick = { onAction(LibraryAction.RemoveItem(item.ref)) },
+                    onClick = { onAction(LibraryAction.RequestRemoveFavorite) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("从书架移除", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.error)
@@ -318,10 +355,24 @@ internal fun LibraryScreen(
         }
     }
 
+    if (state.confirmRemoveFavorite) {
+        AlertDialog(
+            onDismissRequest = { onAction(LibraryAction.DismissRemoveFavorite) },
+            title = { Text("从书架移除？") },
+            text = { Text("这部漫画将从全部和所有收藏夹中移除，阅读记录不会删除。") },
+            confirmButton = {
+                TextButton(onClick = { onAction(LibraryAction.ConfirmRemoveFavorite) }) { Text("移出书架") }
+            },
+            dismissButton = {
+                TextButton(onClick = { onAction(LibraryAction.DismissRemoveFavorite) }) { Text("取消") }
+            },
+        )
+    }
+
     state.folderEditor?.let { editor ->
         AlertDialog(
             onDismissRequest = { onAction(LibraryAction.DismissFolderEditor) },
-            title = { Text(if (editor.folderId == null) "新建文件夹" else "重命名文件夹") },
+            title = { Text(if (editor.folderId == null) "新建收藏夹" else "重命名收藏夹") },
             text = {
                 OutlinedTextField(
                     value = editor.draft,
@@ -499,7 +550,6 @@ private fun LibraryScreenPreview() {
             state = LibraryUiState(
                 status = LibraryStatus.Ready,
                 folders = listOf(
-                    FavoriteFolder(id = "default", name = "Default", sortOrder = 0, removable = false),
                     FavoriteFolder(id = "reading", name = "Reading", sortOrder = 1, removable = true),
                 ),
                 items = listOf(

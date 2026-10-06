@@ -43,6 +43,9 @@ data class LibraryUiState(
     val favoriteQuery: String = "",
     /** Comic whose contextual bottom sheet is currently open. */
     val selectedFavorite: FavoriteItem? = null,
+    /** Draft memberships in the contextual sheet; All is automatic. */
+    val selectedFavoriteFolders: Set<String> = emptySet(),
+    val confirmRemoveFavorite: Boolean = false,
     /** Set while the create/rename dialog is open. */
     val folderEditor: FolderEditor? = null,
     /** Product copy for the last outcome; never a lower layer's wording. */
@@ -77,9 +80,11 @@ sealed interface LibraryAction {
 
     data class DeleteFolder(val folderId: String) : LibraryAction
 
-    data class RemoveItem(val ref: ComicRef) : LibraryAction
-
-    data class MoveItem(val ref: ComicRef, val folderId: String) : LibraryAction
+    data object RequestRemoveFavorite : LibraryAction
+    data object ConfirmRemoveFavorite : LibraryAction
+    data object DismissRemoveFavorite : LibraryAction
+    data class ToggleFavoriteFolder(val folderId: String) : LibraryAction
+    data object SaveFavoriteFolders : LibraryAction
 
     data class ClearUpdate(val ref: ComicRef) : LibraryAction
 
