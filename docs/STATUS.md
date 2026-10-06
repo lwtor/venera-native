@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-09A9 区分书架低频入口与收藏夹管理菜单 |
-| 当前任务状态 | S4-09A8 封面失败重试已实现并通过图片模块及 App 编译；随后完成书架菜单图标区分。两项代码交付后，S4-09A7 仍待用户真机验收收藏交互、封面恢复及菜单观感。阅读器 S3-00X2 仍待用户真机复验。 |
+| 当前任务（唯一下一任务） | S4-09A7 用户真机验收书架、封面恢复与详情收藏交互 |
+| 当前任务状态 | S4-09A8/A9 已完成并推送；图片、书架模块和 App Debug 编译通过。待用户真机检查收藏交互、临时失败封面恢复/手动重试及菜单观感。阅读器 S3-00X2 仍待用户真机复验。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -18,6 +18,8 @@
 **S3-00S DONE：阅读器沉浸式控制层与章节/页码快速导航。** 阅读器默认隐藏系统栏；点页面中央后显示状态栏和工具层，导航栏仍隐藏。详情折叠栏和阅读器顶部标题栏使用 safeDrawing 顶部 inset 避让状态栏及挖孔区；阅读器标题栏从屏幕上方滑入（向下出现），底部工具区从屏幕下方向上滑入，两处均带淡入并独立收起。页码滑块为自绘窄轨道与圆形滑块，支持点击和拖动定位；上一话/下一话图标置于滑块两侧，翻页与解码方式分组等宽。最近修改验证：JDK 17 `:feature:details:compileDebugKotlin :feature:reader:compileDebugKotlin :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或操作真机，挖孔屏避让、状态栏显示及动画方向由用户复验。
 
 **S4-09A8 DONE：列表封面失败后可自动恢复并手动重试。** 公共 `ComicImage` 在请求错误后 600ms 自动重新发起一次；仍失败时显示“点击重试”，只重载该图片请求，不要求进入详情页或离开列表。JDK 17 `:core:image:compileDebugKotlin :feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试或真机验证，封面短暂网络失败恢复和持久失败手动重试由用户验收。
+
+**S4-09A9 DONE：区分书架低频入口与收藏夹管理。** 顶部下载/本地漫画菜单图标改为下拉箭头，收藏夹管理继续使用三点菜单，避免相邻入口使用相同图标。JDK 17 `:core:image:compileDebugKotlin :feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机视觉验收待用户。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 

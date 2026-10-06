@@ -133,7 +133,7 @@ internal fun LibraryScreen(
                             var libraryMenuExpanded by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { libraryMenuExpanded = true }) {
-                                    Icon(Icons.Filled.MoreVert, contentDescription = "书架其他内容")
+                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "下载和本地漫画")
                                 }
                                 DropdownMenu(
                                     expanded = libraryMenuExpanded,

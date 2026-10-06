@@ -614,7 +614,7 @@ S4-09 页面对照子任务：
 | S4-09A6 | 收藏夹管理收尾：删除收藏夹二次确认，避免重名造成选择歧义；不影响“全部”及阅读历史。 | DONE（数据与 Library JVM 测试、Details/App Debug 编译通过；设备操作待用户验收） |
 | S4-09A7 | 用户真机验收本轮书架/详情交互：迁移后旧收藏、自建收藏夹、多重归属、删除/取消确认及低频入口；按反馈修复差异。 | TODO（代码已交付，待用户真机检查） |
 | S4-09A8 | 修复列表封面请求失败后占位状态无法恢复：加入一次有界自动重试，并在仍失败时提供当前封面的手动重试入口；编译图片模块和 App。 | DONE（公共 `ComicImage` 请求失败后延迟 600ms 重试一次，持续失败时显示“点击重试”；JDK 17 `:core:image:compileDebugKotlin :feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；未运行测试或真机验收） |
-| S4-09A9 | 区分书架顶部下载/本地漫画入口与收藏夹管理菜单，使用不同且语义清楚的图标；编译书架模块和 App。 | IN_PROGRESS |
+| S4-09A9 | 区分书架顶部下载/本地漫画入口与收藏夹管理菜单，使用不同且语义清楚的图标；编译书架模块和 App。 | DONE（顶部入口改用下拉箭头，收藏夹管理保留三点菜单；JDK 17 `:core:image:compileDebugKotlin :feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；真机视觉验收待用户） |
 | S4-09B | 逐项按固定上游源码核实书架语义并补齐适用的批量选择/操作、阅读完成筛选、拖动排序；每项拆分可编译并独立提交。 | TODO（受 S3-00B2 上游源码可访问性影响；仅在源码/行为确认后实现） |
 | S4-09C | 评估远端收藏/追更与现有来源 API 的契约差距，按 S3-05 等前置任务决定实现范围，不以本地收藏页代替。 | TODO |
 
