@@ -33,6 +33,7 @@ class ReaderZoomState {
 
     fun applyGesture(
         centroid: Offset,
+        pivot: Offset,
         pan: Offset,
         zoomFactor: Float,
         viewport: PageViewport,
@@ -49,6 +50,7 @@ class ReaderZoomState {
         applyAnchoredScale(
             scaleChange = scaleChange,
             centroid = centroid,
+            pivot = pivot,
             pan = pan,
             viewport = viewport,
             contentWidthPx = contentWidthPx,
@@ -59,6 +61,7 @@ class ReaderZoomState {
     /** Toggles between fitted size and 2x zoom, keeping the tapped point under the finger. */
     fun toggleZoomAt(
         centroid: Offset,
+        pivot: Offset,
         viewport: PageViewport,
         contentWidthPx: Float,
         contentHeightPx: Float,
@@ -72,6 +75,7 @@ class ReaderZoomState {
         applyAnchoredScale(
             scaleChange = scale / previousScale,
             centroid = centroid,
+            pivot = pivot,
             pan = Offset.Zero,
             viewport = viewport,
             contentWidthPx = contentWidthPx,
@@ -82,6 +86,7 @@ class ReaderZoomState {
     private fun applyAnchoredScale(
         scaleChange: Float,
         centroid: Offset,
+        pivot: Offset,
         pan: Offset,
         viewport: PageViewport,
         contentWidthPx: Float,
@@ -91,11 +96,9 @@ class ReaderZoomState {
         val nextHeightPx = contentHeightPx * scaleChange
         val limitXPx = ((nextWidthPx - viewport.widthPx) / 2f).coerceAtLeast(0f)
         val limitYPx = ((nextHeightPx - viewport.heightPx) / 2f).coerceAtLeast(0f)
-        val anchorX = centroid.x - viewport.widthPx / 2f
-        val anchorY = centroid.y - viewport.heightPx / 2f
-        offsetX = ((offsetX + anchorX) * scaleChange - anchorX + pan.x)
+        offsetX = (offsetX * scaleChange + (centroid.x - pivot.x) * (1f - scaleChange) + pan.x)
             .coerceIn(-limitXPx, limitXPx)
-        offsetY = ((offsetY + anchorY) * scaleChange - anchorY + pan.y)
+        offsetY = (offsetY * scaleChange + (centroid.y - pivot.y) * (1f - scaleChange) + pan.y)
             .coerceIn(-limitYPx, limitYPx)
     }
 

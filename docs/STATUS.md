@@ -19,6 +19,8 @@
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 
+**S3-00X1 DONE：修复阅读器缩放手势冲突与放大定位。** 用户实测发现 Reader 父层 `detectTapGestures` 消费了双指事件，导致子层 `transformable` 无法识别捏合；此前焦点偏移公式方向相反，且缩放时重新划分长图瓦片、改变列表索引，造成焦点跳动/内容裁切。本轮以 Initial pass 的非消费式点击识别让捏合继续到达 `transformable`，修正 focal translation 符号；长图缩放时保持源瓦片分段和 key 不变、将解码目标尺寸按缩放放大，并通过 `LazyListState` 锚住被双击瓦片。纵向阅读保留单指上下滚动并由捏合控制放大。新增双击放大/还原与双指捏合 Compose 回归。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机运行 UI 手势测试，待用户复验。
+
 **S3-01A DONE：搜索页按 Venera 逻辑对齐。** 搜索首页提交后切换至独立结果页面；页面返回及系统返回均回到保留关键词/来源/筛选的搜索表单。单源和聚合结果的漫画标题固定占两行。来源选择按可搜索能力列出；筛选区用固定高度的芯片与稳定选择标记，筛选数量/高度变化平滑过渡。聚合即全部可搜索来源，开启后保留原来源芯片列表并全部显示为选中，点击单个来源不能取消选中或切回单源，状态层也拒绝单源切换。搜索历史最多 30 条，支持复用、单项删除和清空；聚合模式点击历史词仍向所有来源搜索。针对用户反馈的历史不显示修复初始 Flow 订阅，并覆盖聚合历史搜索和禁止聚合态切换来源。最终 JDK 17 `:feature:search:compileDebugKotlin :feature:search:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码编译通过，未执行；`git diff --check` — PASS。新 APK 由用户安装验收。
 
 **S3-01D DONE：避免搜索来源选择器把后续来源藏在横向滚动区。** 之前来源 chip 使用固定高度的 `LazyRow`，手机宽度不足时禁漫天堂等后续来源只在右侧横向滚动后可见；现在改为 `FlowRow` 自动换行，已加载的来源会直接显示。当前来源数据仍只包含已安装、已启用且能力探测到 `search.load`/`search.loadNext` 的源；官方 JM 声明 `search.load`，按契约应被列出。JDK 17 `:feature:search:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装新 APK；若新版本仍完全没有 JM 芯片，则原因在来源未启用/安装或运行时能力探测，不能由布局问题解释，需继续沿本地诊断追查。

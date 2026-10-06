@@ -12,7 +12,7 @@ class ReaderZoomStateTest {
 
     @Test fun `pan is ignored at minimum scale so parent scrolling stays available`() {
         val state = ReaderZoomState()
-        state.applyGesture(Offset(50f, 50f), Offset(40f, 50f), 1f, viewport, 100f, 300f)
+        state.applyGesture(Offset(50f, 50f), Offset(50f, 50f), Offset(40f, 50f), 1f, viewport, 100f, 300f)
         assertFalse(state.isZoomed)
         assertEquals(0f, state.offsetX)
         assertEquals(0f, state.offsetY)
@@ -20,8 +20,8 @@ class ReaderZoomStateTest {
 
     @Test fun `zoomed content pans within its current bounds`() {
         val state = ReaderZoomState()
-        state.applyGesture(Offset(50f, 50f), Offset.Zero, 2f, viewport, 100f, 100f)
-        state.applyGesture(Offset(50f, 50f), Offset(500f, -500f), 1f, viewport, 200f, 200f)
+        state.applyGesture(Offset(50f, 50f), Offset(50f, 50f), Offset.Zero, 2f, viewport, 100f, 100f)
+        state.applyGesture(Offset(50f, 50f), Offset(50f, 50f), Offset(500f, -500f), 1f, viewport, 200f, 200f)
         assertTrue(state.isZoomed)
         assertEquals(50f, state.offsetX)
         assertEquals(-50f, state.offsetY)
@@ -29,9 +29,9 @@ class ReaderZoomStateTest {
 
     @Test fun `zooming back to minimum resets translation`() {
         val state = ReaderZoomState()
-        state.applyGesture(Offset(50f, 50f), Offset.Zero, 2f, viewport, 100f, 100f)
-        state.applyGesture(Offset(50f, 50f), Offset(20f, 20f), 1f, viewport, 200f, 200f)
-        state.applyGesture(Offset(50f, 50f), Offset.Zero, 0.1f, viewport, 200f, 200f)
+        state.applyGesture(Offset(50f, 50f), Offset(50f, 50f), Offset.Zero, 2f, viewport, 100f, 100f)
+        state.applyGesture(Offset(50f, 50f), Offset(50f, 50f), Offset(20f, 20f), 1f, viewport, 200f, 200f)
+        state.applyGesture(Offset(50f, 50f), Offset(50f, 50f), Offset.Zero, 0.1f, viewport, 200f, 200f)
         assertEquals(1f, state.scale)
         assertEquals(0f, state.offsetX)
         assertEquals(0f, state.offsetY)
@@ -41,14 +41,14 @@ class ReaderZoomStateTest {
         val state = ReaderZoomState()
         val tap = Offset(75f, 50f)
 
-        state.toggleZoomAt(tap, viewport, 100f, 100f)
+        state.toggleZoomAt(tap, Offset(50f, 50f), viewport, 100f, 100f)
 
         assertEquals(2f, state.scale)
-        assertEquals(25f, state.offsetX)
+        assertEquals(-25f, state.offsetX)
         assertEquals(0f, state.offsetY)
         assertTrue(state.isZoomed)
 
-        state.toggleZoomAt(tap, viewport, 200f, 200f)
+        state.toggleZoomAt(tap, Offset(50f, 50f), viewport, 200f, 200f)
 
         assertEquals(1f, state.scale)
         assertEquals(0f, state.offsetX)
@@ -60,6 +60,7 @@ class ReaderZoomStateTest {
         val state = ReaderZoomState()
         state.applyGesture(
             centroid = Offset(75f, 50f),
+            pivot = Offset(50f, 50f),
             pan = Offset.Zero,
             zoomFactor = 2f,
             viewport = viewport,
@@ -67,11 +68,12 @@ class ReaderZoomStateTest {
             contentHeightPx = 100f,
         )
 
-        assertEquals(25f, state.offsetX)
+        assertEquals(-25f, state.offsetX)
         assertEquals(0f, state.offsetY)
 
         state.applyGesture(
             centroid = Offset(75f, 50f),
+            pivot = Offset(50f, 50f),
             pan = Offset(500f, 0f),
             zoomFactor = 1f,
             viewport = viewport,
@@ -79,5 +81,18 @@ class ReaderZoomStateTest {
             contentHeightPx = 200f,
         )
         assertEquals(50f, state.offsetX)
+    }
+
+    @Test fun `double tap uses the current tile origin for vertical anchoring`() {
+        val state = ReaderZoomState()
+        state.toggleZoomAt(
+            centroid = Offset(50f, 75f),
+            pivot = Offset(50f, 10f),
+            viewport = viewport,
+            contentWidthPx = 100f,
+            contentHeightPx = 300f,
+        )
+
+        assertEquals(-65f, state.offsetY)
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -87,6 +88,68 @@ class ReaderScreenTest {
         composeRule.onNodeWithContentDescription("上一话").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("下一话").assertIsDisplayed()
         composeRule.onNodeWithText("1 / 3 页").assertIsDisplayed()
+    }
+
+    @Test
+    fun doubleTapTogglesReaderZoom() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(80)
+            down(center)
+            up()
+        }
+        composeRule.onNodeWithTag("reader-zoomed").assertIsDisplayed()
+
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(80)
+            down(center)
+            up()
+        }
+        composeRule.onNodeWithTag("reader-not-zoomed").assertIsDisplayed()
+    }
+
+    @Test
+    fun pinchZoomIsNotConsumedByReaderTapRecognition() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            val first = center - Offset(40f, 0f)
+            val second = center + Offset(40f, 0f)
+            down(pointerId = 1, position = first)
+            down(pointerId = 2, position = second)
+            moveBy(pointerId = 1, delta = Offset(-24f, 0f))
+            moveBy(pointerId = 2, delta = Offset(24f, 0f))
+            up(pointerId = 2)
+            up(pointerId = 1)
+        }
+        composeRule.onNodeWithTag("reader-zoomed").assertIsDisplayed()
     }
 
     @Test

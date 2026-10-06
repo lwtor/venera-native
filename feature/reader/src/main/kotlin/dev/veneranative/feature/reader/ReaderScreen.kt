@@ -3,6 +3,8 @@ package dev.veneranative.feature.reader
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -63,6 +65,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -88,6 +92,7 @@ import dev.veneranative.core.model.PageSizeState
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import android.app.Activity
@@ -106,6 +111,66 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 
 private class ReaderDoubleTapZoomHandler {
     var onDoubleTap: ((Offset) -> Unit)? = null
+}
+
+/** Recognizes taps in the Initial pass without consuming events needed by transformable/scroll. */
+private suspend fun PointerInputScope.detectReaderTapGestures(
+    onTap: (Offset) -> Unit,
+    onDoubleTap: (Offset) -> Unit,
+) {
+    coroutineScope {
+        var pendingTap: Pair<Offset, Long>? = null
+        var pendingTapJob: Job? = null
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            var canceled = false
+            var upPosition: Offset? = null
+            var upTime = 0L
+            while (!canceled && upPosition == null) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                if (event.changes.count { it.pressed } > 1) {
+                    canceled = true
+                    pendingTapJob?.cancel()
+                    pendingTapJob = null
+                    pendingTap = null
+                    break
+                }
+                val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                    canceled = true
+                    break
+                }
+                if (!change.pressed) {
+                    upPosition = change.position
+                    upTime = change.uptimeMillis
+                }
+            }
+            val releasedAt = upPosition
+            if (!canceled && releasedAt != null) {
+                val previousTap = pendingTap
+                val isDoubleTap = previousTap != null &&
+                    upTime - previousTap.second <= viewConfiguration.doubleTapTimeoutMillis &&
+                    (releasedAt - previousTap.first).getDistance() <= viewConfiguration.touchSlop
+                if (isDoubleTap) {
+                    pendingTapJob?.cancel()
+                    pendingTapJob = null
+                    pendingTap = null
+                    onDoubleTap(releasedAt)
+                } else {
+                    pendingTapJob?.cancel()
+                    pendingTap = releasedAt to upTime
+                    val tapTime = upTime
+                    pendingTapJob = launch {
+                        delay(viewConfiguration.doubleTapTimeoutMillis)
+                        if (pendingTap?.second == tapTime) {
+                            pendingTap = null
+                            onTap(releasedAt)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -167,7 +232,7 @@ fun ReaderScreen(
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier.fillMaxSize().testTag("reader-canvas").pointerInput(state.status) {
-                detectTapGestures(
+                detectReaderTapGestures(
                     onTap = { tap ->
                         val width = size.width.toFloat()
                         val height = size.height.toFloat()
@@ -500,9 +565,18 @@ private fun ContinuousPages(
     val zoomState = rememberReaderZoomState()
     val items = remember(state.pages, viewport, zoomState.scale, decoder) {
         state.pages.flatMap { page ->
-            val tiles = decoder?.plan(page, viewport, zoomState.scale, continuous = true)
+            val tiles = decoder?.plan(page, viewport, zoom = 1f, continuous = true)
                 ?: listOf(placeholderTile(page, viewport, continuous = true))
-            tiles.mapIndexed { index, tile -> TileItem(page, index, tile) }
+            tiles.mapIndexed { index, tile ->
+                TileItem(
+                    page = page,
+                    tileIndex = index,
+                    tile = tile.copy(
+                        displayWidthPx = (tile.displayWidthPx * zoomState.scale).roundToInt().coerceAtLeast(1),
+                        displayHeightPx = (tile.displayHeightPx * zoomState.scale).roundToInt().coerceAtLeast(1),
+                    ),
+                )
+            }
         }
     }
     val listState = rememberLazyListState(
@@ -528,9 +602,16 @@ private fun ContinuousPages(
             page?.let { onAction(ReaderAction.PageShown(it)) }
         }
     }
-    LaunchedEffect(state.currentPageIndex, items) {
+    LaunchedEffect(state.currentPageIndex) {
         val targetItem = items.indexOfFirst { it.page.index == state.currentPageIndex }.coerceAtLeast(0)
         if (targetItem != listState.firstVisibleItemIndex) listState.scrollToItem(targetItem)
+    }
+    var pendingZoomAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(zoomState.scale, items) {
+        pendingZoomAnchor?.let { (index, offset) ->
+            listState.scrollToItem(index, -offset)
+            pendingZoomAnchor = null
+        }
     }
     val lastPageReady = state.pages.lastOrNull()?.sizeState == PageSizeState.Ready
     LaunchedEffect(listState, items.size, lastPageReady) {
@@ -541,11 +622,26 @@ private fun ContinuousPages(
                 lastPageReady
         }.distinctUntilChanged().collect(onChapterEndChange)
     }
-    val contentWidthPx = items.maxOfOrNull { it.tile.displayWidthPx }?.toFloat() ?: viewport.widthPx.toFloat()
-    val contentHeightPx = items.sumOf { it.tile.displayHeightPx }.toFloat()
+    val tilePaddingPx = with(LocalDensity.current) { 4.dp.roundToPx() }
+    val contentHeightPx = items.sumOf { it.tile.displayHeightPx.toLong() + tilePaddingPx * 2L }.toFloat()
     SideEffect {
         doubleTapZoomHandler.onDoubleTap = { point ->
-            zoomState.toggleZoomAt(point, viewport, contentWidthPx, contentHeightPx)
+            val visibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull {
+                point.y >= it.offset && point.y <= it.offset + it.size
+            } ?: listState.layoutInfo.visibleItemsInfo.firstOrNull()
+            visibleItem?.let { pendingZoomAnchor = it.index to it.offset }
+            val page = visibleItem?.let { items.getOrNull(it.index)?.page }
+            val contentWidthPx = visibleItem?.let { items.getOrNull(it.index)?.tile?.displayWidthPx?.toFloat() }
+                ?: viewport.widthPx.toFloat()
+            val pageScale = page?.let { PageTiling.fitWidthScale(it.widthPx, viewport.widthPx) } ?: 1f
+            zoomState.toggleZoomAt(
+                centroid = point,
+                pivot = Offset(viewport.widthPx / 2f, (visibleItem?.offset ?: 0) + tilePaddingPx.toFloat()),
+                viewport = viewport,
+                contentWidthPx = contentWidthPx,
+                contentHeightPx = page?.let { it.heightPx * pageScale * zoomState.scale }
+                    ?: viewport.heightPx.toFloat(),
+            )
         }
     }
     LaunchedEffect(listState, items, viewport, decoder) {
@@ -557,13 +653,24 @@ private fun ContinuousPages(
             }
     }
     val transformState = rememberTransformableState { centroid, zoomFactor, pan, _ ->
+        val currentItem = listState.layoutInfo.visibleItemsInfo.firstOrNull {
+            centroid.y >= it.offset && centroid.y <= it.offset + it.size
+        }
+        val page = currentItem?.let { items.getOrNull(it.index)?.page }
+        val pageScale = page?.let { PageTiling.fitWidthScale(it.widthPx, viewport.widthPx) } ?: 1f
         zoomState.applyGesture(
             centroid = centroid,
+            pivot = Offset(
+                viewport.widthPx / 2f,
+                (currentItem?.offset ?: 0) + tilePaddingPx.toFloat(),
+            ),
             pan = pan,
             zoomFactor = zoomFactor,
             viewport = viewport,
-            contentWidthPx = contentWidthPx,
-            contentHeightPx = contentHeightPx,
+            contentWidthPx = currentItem?.let { items.getOrNull(it.index)?.tile?.displayWidthPx?.toFloat() }
+                ?: viewport.widthPx.toFloat(),
+            contentHeightPx = page?.let { it.heightPx * pageScale * zoomState.scale }
+                ?: viewport.heightPx.toFloat(),
         )
     }
     LazyColumn(
@@ -574,9 +681,10 @@ private fun ContinuousPages(
                 translationX = zoomState.offsetX
                 translationY = zoomState.offsetY
             }
+            .testTag(if (zoomState.isZoomed) "reader-zoomed" else "reader-not-zoomed")
             .transformable(
                 state = transformState,
-                canPan = { zoomState.isZoomed },
+                canPan = { pan -> zoomState.isZoomed && pan.x != 0f },
                 lockRotationOnZoomPan = true,
             ),
         userScrollEnabled = true,
@@ -703,10 +811,22 @@ private fun PagedPage(
 ) {
     val zoomState = rememberReaderZoomState()
     val tiles = remember(page, viewport, decoder, zoomState.scale) {
-        decoder?.plan(page, viewport, zoom = zoomState.scale, continuous = true)
-            ?: listOf(placeholderTile(page, viewport, continuous = true))
+        (decoder?.plan(page, viewport, zoom = 1f, continuous = true)
+            ?: listOf(placeholderTile(page, viewport, continuous = true))).map { tile ->
+            tile.copy(
+                displayWidthPx = (tile.displayWidthPx * zoomState.scale).roundToInt().coerceAtLeast(1),
+                displayHeightPx = (tile.displayHeightPx * zoomState.scale).roundToInt().coerceAtLeast(1),
+            )
+        }
     }
     val listState = rememberLazyListState()
+    var pendingZoomAnchor by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(zoomState.scale, tiles) {
+        pendingZoomAnchor?.let { (index, offset) ->
+            listState.scrollToItem(index, -offset)
+            pendingZoomAnchor = null
+        }
+    }
     val pageReady = page.sizeState == PageSizeState.Ready
     LaunchedEffect(listState, tiles.size, isLastChapterPage, pageReady) {
         if (!isLastChapterPage) return@LaunchedEffect
@@ -719,16 +839,36 @@ private fun PagedPage(
     }
     val contentWidthPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.widthPx * zoomState.scale
     val contentHeightPx = PageTiling.fitWidthScale(page.widthPx, viewport.widthPx) * page.heightPx * zoomState.scale
+    val tilePaddingPx = with(LocalDensity.current) { 4.dp.toPx() }
     SideEffect {
         if (isCurrentPage) {
             doubleTapZoomHandler.onDoubleTap = { point ->
-                zoomState.toggleZoomAt(point, viewport, contentWidthPx, contentHeightPx)
+                val visibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull {
+                    point.y >= it.offset && point.y <= it.offset + it.size
+                } ?: listState.layoutInfo.visibleItemsInfo.firstOrNull()
+                visibleItem?.let { pendingZoomAnchor = it.index to it.offset }
+                zoomState.toggleZoomAt(
+                    centroid = point,
+                    pivot = Offset(
+                        viewport.widthPx / 2f,
+                        (visibleItem?.offset ?: 0) + tilePaddingPx,
+                    ),
+                    viewport = viewport,
+                    contentWidthPx = contentWidthPx,
+                    contentHeightPx = contentHeightPx,
+                )
             }
         }
     }
     val transformState = rememberTransformableState { centroid, zoomFactor, pan, _ ->
         zoomState.applyGesture(
             centroid = centroid,
+            pivot = Offset(
+                viewport.widthPx / 2f,
+                (listState.layoutInfo.visibleItemsInfo.firstOrNull {
+                    centroid.y >= it.offset && centroid.y <= it.offset + it.size
+                }?.offset ?: 0).toFloat() + tilePaddingPx,
+            ),
             pan = pan,
             zoomFactor = zoomFactor,
             viewport = viewport,
@@ -747,6 +887,7 @@ private fun PagedPage(
                 translationX = zoomState.offsetX
                 translationY = zoomState.offsetY
             }
+            .testTag(if (zoomState.isZoomed) "reader-zoomed" else "reader-not-zoomed")
             .transformable(
                 state = transformState,
                 canPan = { zoomState.isZoomed },
