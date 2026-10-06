@@ -5,22 +5,17 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
- * Id of the folder every comic falls back to.
- *
- * Seeded together with the table by the migration and by the first-open callback, so a favourite
- * always has somewhere to live even before the user creates a folder.
- */
+/** Id of the former default folder, retained for old migration steps. */
 const val DEFAULT_FOLDER_ID: String = "default"
 
-/** Display name of [DEFAULT_FOLDER_ID] at creation time; the user may rename it. */
+/** Former default name, retained for old migration steps. */
 const val DEFAULT_FOLDER_NAME: String = "Default"
 
 /**
  * A folder the user sorts favourites into.
  *
- * [removable] marks the seeded default folder: it is the only one that cannot be deleted, because
- * comics the user never filed anywhere still have to live somewhere.
+ * All is an implicit view over favorite entries. This table now holds only user collections;
+ * [removable] remains in the schema for existing data.
  *
  * This module does not depend on `:core:model`, so every field is a plain column and callers map to
  * and from domain types in `:data:collection`.

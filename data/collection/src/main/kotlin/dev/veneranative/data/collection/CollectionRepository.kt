@@ -4,13 +4,7 @@ import dev.veneranative.core.database.DEFAULT_FOLDER_ID
 import dev.veneranative.core.model.ComicRef
 import kotlinx.coroutines.flow.Flow
 
-/**
- * The folder a comic goes into when the caller has no folder to name.
- *
- * Every install has one — the migration and the first-open callback both seed it — so a screen that
- * only offers "keep this comic" does not have to ask which folder. Choosing a folder is the shelf's
- * job, not every screen's.
- */
+/** Legacy id accepted for callers upgrading from the former single-folder model. */
 const val DEFAULT_SHELF_FOLDER_ID: String = DEFAULT_FOLDER_ID
 
 /** A folder the user files favourites into. */
@@ -18,7 +12,7 @@ data class FavoriteFolder(
     val id: String,
     val name: String,
     val sortOrder: Int,
-    /** False only for the seeded default folder, which is what keeps comics from being orphaned. */
+    /** Existing user collections are removable; All is implicit and not a folder row. */
     val removable: Boolean,
 )
 
@@ -29,7 +23,9 @@ data class FavoriteItem(
     val subtitle: String? = null,
     /** Remote cover URL, or the local reference of an imported comic's cover. */
     val coverRef: String? = null,
+    /** Legacy single-folder field retained for old snapshots; use [folderIds] for current membership. */
     val folderId: String,
+    val folderIds: Set<String> = emptySet(),
     val addedAtEpochMillis: Long,
     val lastReadAtEpochMillis: Long? = null,
     /** Chapter count of the last snapshot an update check took. */
@@ -71,7 +67,7 @@ interface CollectionRepository {
     /** All folders, in their display order. */
     fun observeFolders(): Flow<List<FavoriteFolder>>
 
-    /** Favourites of one folder, or of every folder when [folderId] is null, already sorted. */
+    /** Favourites of one user collection, or the implicit All view when [folderId] is null. */
     fun observeItems(folderId: String?, sort: ShelfSort): Flow<List<FavoriteItem>>
 
     /** One comic's row, or null while it is not on the shelf: how a screen knows a comic is kept. */
@@ -82,15 +78,21 @@ interface CollectionRepository {
 
     suspend fun renameFolder(id: String, name: String)
 
-    /** Deleting a folder keeps its comics: they fall back to the default folder. */
+    /** Deleting a collection removes only its memberships; comics remain in All. */
     suspend fun deleteFolder(id: String)
 
     /** Adds a comic, or refreshes its metadata when it is already on the shelf. */
     suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot)
 
+    /** Adds a comic to All and selected user collections in one operation. */
+    suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot)
+
     suspend fun remove(ref: ComicRef)
 
     suspend fun moveTo(ref: ComicRef, folderId: String)
+
+    /** Replaces optional memberships without removing the comic from All. */
+    suspend fun setFolders(ref: ComicRef, folderIds: Set<String>)
 
     suspend fun clearUpdate(ref: ComicRef)
 

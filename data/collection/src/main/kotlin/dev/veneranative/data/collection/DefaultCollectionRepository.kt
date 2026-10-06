@@ -5,10 +5,12 @@ import dev.veneranative.core.database.DEFAULT_FOLDER_ID
 import dev.veneranative.core.database.FavoriteDao
 import dev.veneranative.core.database.FavoriteEntryEntity
 import dev.veneranative.core.database.FavoriteFolderEntity
+import dev.veneranative.core.database.FavoriteMembershipEntity
 import dev.veneranative.core.database.VeneraDatabase
 import dev.veneranative.core.model.ComicRef
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import java.util.UUID
 
 /**
@@ -18,10 +20,8 @@ import java.util.UUID
  * is no in-memory copy of the collection that could disagree with it: a folder renamed here is
  * visible to the shelf immediately, and survives the process being recreated.
  *
- * Two rules shape the writes. Adding a comic twice is idempotent and keeps the original "added at",
- * because re-adding is how the UI refreshes metadata and must not reorder the shelf. Deleting a
- * folder moves its comics to the default folder instead of dropping them, because a folder is
- * organisation the user can rebuild and a lost favourite is not.
+ * Re-adding a comic keeps the original timestamp. All is represented by the favorite row itself;
+ * optional user collections are memberships, so deleting a collection never loses a favorite.
  */
 class DefaultCollectionRepository internal constructor(
     private val dao: FavoriteDao,
@@ -52,10 +52,19 @@ class DefaultCollectionRepository internal constructor(
             ShelfSort.Title -> dao.observeByTitle(folderId)
             ShelfSort.LastRead -> dao.observeByLastRead(folderId)
             ShelfSort.Updated -> dao.observeByUpdate(folderId)
-        }.map { rows -> rows.mapNotNull { it.toDomainOrNull() } }
+        }.combine(dao.observeMemberships()) { rows, memberships ->
+            val grouped = memberships.groupBy { it.refSource to it.refComic }
+            rows.mapNotNull { row -> row.toDomainOrNull()?.copy(
+                folderIds = grouped[row.refSource to row.refComic]?.map { it.folderId }?.toSet().orEmpty(),
+            ) }
+        }
 
     override fun observeItem(ref: ComicRef): Flow<FavoriteItem?> =
-        dao.observeEntry(ref.refSource(), ref.refComic()).map { row -> row?.toDomainOrNull() }
+        dao.observeEntry(ref.refSource(), ref.refComic()).combine(dao.observeMemberships()) { row, memberships ->
+            row?.toDomainOrNull()?.copy(folderIds = memberships.asSequence()
+                .filter { it.refSource == ref.refSource() && it.refComic == ref.refComic() }
+                .map { it.folderId }.toSet())
+        }
 
     override suspend fun createFolder(name: String): String {
         val trimmed = name.trim()
@@ -78,24 +87,23 @@ class DefaultCollectionRepository internal constructor(
 
     override suspend fun deleteFolder(id: String) {
         val folder = dao.folder(id) ?: return
-        // The default folder is where comics with no folder live; removing it would orphan them.
+        // Old callers may still pass the former default id; All itself is never a folder row.
         if (!folder.removable) return
-        transaction {
-            dao.moveEntriesTo(fromFolderId = id, toFolderId = DEFAULT_FOLDER_ID)
-            dao.deleteFolder(id)
-        }
+        dao.deleteFolder(id)
     }
 
     override suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot) {
-        // A comic filed into a folder that no longer exists goes to the default one rather than
-        // disappearing: the row is what the user asked to keep.
-        val target = dao.folder(folderId)?.folderId ?: DEFAULT_FOLDER_ID
-        val existing = dao.entry(ref.refSource(), ref.refComic())
-        dao.upsertEntry(
+        addToFolders(ref, setOf(folderId), snapshot)
+    }
+
+    override suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot) {
+        transaction {
+            val existing = dao.entry(ref.refSource(), ref.refComic())
+            dao.upsertEntry(
             FavoriteEntryEntity(
                 refSource = ref.refSource(),
                 refComic = ref.refComic(),
-                folderId = target,
+                folderId = "", // Historical column; membership now lives in favorite_membership.
                 title = snapshot.title,
                 subtitle = snapshot.subtitle,
                 coverRef = snapshot.coverRef,
@@ -106,7 +114,9 @@ class DefaultCollectionRepository internal constructor(
                 hasUpdate = existing?.hasUpdate ?: false,
                 updatedAt = existing?.updatedAt,
             ),
-        )
+            )
+            setFolders(ref, folderIds)
+        }
     }
 
     override suspend fun remove(ref: ComicRef) {
@@ -115,7 +125,15 @@ class DefaultCollectionRepository internal constructor(
 
     override suspend fun moveTo(ref: ComicRef, folderId: String) {
         if (dao.folder(folderId) == null) return
-        dao.moveEntry(refSource = ref.refSource(), refComic = ref.refComic(), folderId = folderId)
+        setFolders(ref, setOf(folderId))
+    }
+
+    override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) {
+        transaction {
+            val valid = folderIds.filter { it != DEFAULT_FOLDER_ID && dao.folder(it) != null }
+            dao.deleteMemberships(ref.refSource(), ref.refComic())
+            valid.forEach { id -> dao.insertMembership(FavoriteMembershipEntity(ref.refSource(), ref.refComic(), id)) }
+        }
     }
 
     override suspend fun clearUpdate(ref: ComicRef) {

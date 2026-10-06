@@ -3,6 +3,7 @@ package dev.veneranative.data.collection
 import dev.veneranative.core.database.FavoriteDao
 import dev.veneranative.core.database.FavoriteEntryEntity
 import dev.veneranative.core.database.FavoriteFolderEntity
+import dev.veneranative.core.database.FavoriteMembershipEntity
 import dev.veneranative.core.model.ComicKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ internal class FakeFavoriteDao : FavoriteDao {
 
     val folders = MutableStateFlow<List<FavoriteFolderEntity>>(emptyList())
     val entries = MutableStateFlow<List<FavoriteEntryEntity>>(emptyList())
+    val memberships = MutableStateFlow<List<FavoriteMembershipEntity>>(emptyList())
 
     override fun observeFolders(): Flow<List<FavoriteFolderEntity>> = folders.map { rows ->
         rows.sortedWith(compareBy<FavoriteFolderEntity> { it.sortOrder }.thenBy { it.name })
@@ -40,6 +42,7 @@ internal class FakeFavoriteDao : FavoriteDao {
 
     override suspend fun deleteFolder(folderId: String) {
         folders.value = folders.value.filterNot { it.folderId == folderId }
+        memberships.value = memberships.value.filterNot { it.folderId == folderId }
     }
 
     override fun observeByAddedAt(folderId: String?): Flow<List<FavoriteEntryEntity>> =
@@ -68,6 +71,19 @@ internal class FakeFavoriteDao : FavoriteDao {
             )
         }
 
+    override fun observeMemberships(): Flow<List<FavoriteMembershipEntity>> = memberships
+
+    override suspend fun folderIds(refSource: String, refComic: String): List<String> =
+        memberships.value.filter { it.refSource == refSource && it.refComic == refComic }.map { it.folderId }
+
+    override suspend fun insertMembership(membership: FavoriteMembershipEntity) {
+        memberships.value = (memberships.value + membership).distinct()
+    }
+
+    override suspend fun deleteMemberships(refSource: String, refComic: String) {
+        memberships.value = memberships.value.filterNot { it.refSource == refSource && it.refComic == refComic }
+    }
+
     override suspend fun upsertEntry(entry: FavoriteEntryEntity) {
         entries.value = entries.value.filterNot { it.isSameComicAs(entry) } + entry
     }
@@ -82,18 +98,7 @@ internal class FakeFavoriteDao : FavoriteDao {
 
     override suspend fun deleteEntry(refSource: String, refComic: String) {
         entries.value = entries.value.filterNot { it.refSource == refSource && it.refComic == refComic }
-    }
-
-    override suspend fun moveEntry(refSource: String, refComic: String, folderId: String) {
-        entries.value = entries.value.map { row ->
-            if (row.refSource == refSource && row.refComic == refComic) row.copy(folderId = folderId) else row
-        }
-    }
-
-    override suspend fun moveEntriesTo(fromFolderId: String, toFolderId: String) {
-        entries.value = entries.value.map { row ->
-            if (row.folderId == fromFolderId) row.copy(folderId = toFolderId) else row
-        }
+        deleteMemberships(refSource, refComic)
     }
 
     override suspend fun clearUpdate(refSource: String, refComic: String) {
@@ -125,7 +130,9 @@ internal class FakeFavoriteDao : FavoriteDao {
     }
 
     private fun List<FavoriteEntryEntity>.visible(folderId: String?): List<FavoriteEntryEntity> =
-        if (folderId == null) this else filter { it.folderId == folderId }
+        if (folderId == null) this else filter { row ->
+            memberships.value.any { it.refSource == row.refSource && it.refComic == row.refComic && it.folderId == folderId }
+        }
 
     private fun FavoriteEntryEntity.isSameComicAs(other: FavoriteEntryEntity) =
         refSource == other.refSource && refComic == other.refComic

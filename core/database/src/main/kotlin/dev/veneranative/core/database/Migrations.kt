@@ -142,4 +142,24 @@ val MIGRATION_5_6: Migration = object : Migration(5, 6) {
 }
 
 /** Every migration the database knows about, in order. */
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+/** Make All an implicit view; preserve old assignments to user-created folders. */
+val MIGRATION_6_7: Migration = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `favorite_membership` (" +
+                "`ref_source` TEXT NOT NULL, `ref_comic` TEXT NOT NULL, `folder_id` TEXT NOT NULL, " +
+                "PRIMARY KEY(`ref_source`, `ref_comic`, `folder_id`), " +
+                "FOREIGN KEY(`ref_source`, `ref_comic`) REFERENCES `favorite_entry`(`ref_source`, `ref_comic`) ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                "FOREIGN KEY(`folder_id`) REFERENCES `favorite_folder`(`folder_id`) ON UPDATE NO ACTION ON DELETE CASCADE)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_favorite_membership_folder_id` ON `favorite_membership` (`folder_id`)")
+        db.execSQL(
+            "INSERT INTO favorite_membership (ref_source, ref_comic, folder_id) " +
+                "SELECT ref_source, ref_comic, folder_id FROM favorite_entry " +
+                "WHERE folder_id != '$DEFAULT_FOLDER_ID' AND folder_id IN (SELECT folder_id FROM favorite_folder)",
+        )
+        db.execSQL("DELETE FROM favorite_folder WHERE folder_id = '$DEFAULT_FOLDER_ID'")
+    }
+}
+
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)

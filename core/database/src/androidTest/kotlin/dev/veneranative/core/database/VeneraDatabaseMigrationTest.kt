@@ -226,6 +226,23 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migratingFromSixToSevenKeepsFavoritesAndUserCollections() {
+        helper.createDatabase(TEST_DB, 6).apply {
+            execSQL("INSERT INTO favorite_folder VALUES('default','Default',0,0)")
+            execSQL("INSERT INTO favorite_folder VALUES('reading','阅读',1,1)")
+            execSQL("INSERT INTO favorite_entry VALUES('source-a','comic-1','reading','One',NULL,NULL,1000,NULL,NULL,NULL,0,NULL)")
+            execSQL("INSERT INTO favorite_entry VALUES('source-a','comic-2','default','Two',NULL,NULL,2000,NULL,NULL,NULL,0,NULL)")
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 7, true, MIGRATION_6_7).use { db ->
+            assertEquals(2, db.query("SELECT COUNT(*) FROM favorite_entry").use { it.moveToFirst(); it.getInt(0) })
+            assertEquals("reading", db.query("SELECT folder_id FROM favorite_membership WHERE ref_comic = 'comic-1'").use { it.moveToFirst(); it.getString(0) })
+            assertEquals(0, db.query("SELECT COUNT(*) FROM favorite_membership WHERE ref_comic = 'comic-2'").use { it.moveToFirst(); it.getInt(0) })
+            assertEquals(0, db.query("SELECT COUNT(*) FROM favorite_folder WHERE folder_id = 'default'").use { it.moveToFirst(); it.getInt(0) })
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

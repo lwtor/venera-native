@@ -35,15 +35,5 @@ object VeneraDatabaseFactory {
         DATABASE_NAME,
     )
         .addMigrations(*VENERA_DATABASE_MIGRATIONS.toTypedArray())
-        // A fresh install never runs a migration, so the fallback folder is seeded here as well —
-        // otherwise the shelf would have nowhere to put a comic until the user creates a folder.
-        .addCallback(SeedDefaultFolder)
         .build()
-
-    private object SeedDefaultFolder : RoomDatabase.Callback() {
-
-        override fun onCreate(db: SupportSQLiteDatabase) {
-            db.execSQL(INSERT_DEFAULT_FOLDER)
-        }
-    }
 }

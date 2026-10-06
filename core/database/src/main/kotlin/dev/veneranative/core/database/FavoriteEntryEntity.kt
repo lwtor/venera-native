@@ -7,6 +7,8 @@ import androidx.room.Index
 /**
  * One comic on the shelf.
  *
+ * The row itself is membership in the implicit All view. Optional collection memberships live in
+ * `favorite_membership`; `folder_id` remains as an unused legacy column for schema compatibility.
  * The identity is (source, comic) rather than a synthetic row id because the pair is what the rest
  * of the app addresses a comic by: a remote comic is its source plus its remote id, and an imported
  * comic is written with the reserved `@local` source namespace so both fit in the same columns.

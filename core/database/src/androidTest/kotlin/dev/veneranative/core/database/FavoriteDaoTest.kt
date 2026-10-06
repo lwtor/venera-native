@@ -82,7 +82,12 @@ class FavoriteDaoTest {
 
     private suspend fun insert(vararg entries: FavoriteEntryEntity) {
         insertFolders()
-        entries.forEach { dao.upsertEntry(it) }
+        entries.forEach { entry ->
+            dao.upsertEntry(entry)
+            if (entry.folderId != DEFAULT_FOLDER_ID) {
+                dao.insertMembership(FavoriteMembershipEntity(entry.refSource, entry.refComic, entry.folderId))
+            }
+        }
     }
 
     @Test fun foldersAreObservedInTheirSortOrder() = runTest {
@@ -157,14 +162,14 @@ class FavoriteDaoTest {
         assertEquals("comic-1", dao.observeByLastRead(null).first().first().refComic)
     }
 
-    @Test fun deletingAFolderMovesItsComicsInsteadOfDroppingThem() = runTest {
+    @Test fun deletingACollectionLeavesItsComicsInAll() = runTest {
         insert(entry("comic-1", folderId = "folder-2"))
 
-        dao.moveEntriesTo(fromFolderId = "folder-2", toFolderId = DEFAULT_FOLDER_ID)
         dao.deleteFolder("folder-2")
 
         assertNull(dao.folder("folder-2"))
-        assertEquals(listOf("comic-1"), dao.observeByAddedAt(DEFAULT_FOLDER_ID).first().map { it.refComic })
+        assertEquals(listOf("comic-1"), dao.observeByAddedAt(null).first().map { it.refComic })
+        assertEquals(emptyList<String>(), dao.folderIds("source-a", "comic-1"))
     }
 
     @Test fun clearingAnUpdateKeepsTheChapterSnapshot() = runTest {
@@ -191,12 +196,12 @@ class FavoriteDaoTest {
         assertEquals(listOf("comic-2"), dao.entries().map { it.refComic })
     }
 
-    @Test fun movingAComicChangesOnlyItsFolder() = runTest {
+    @Test fun aComicCanBeInTwoCollections() = runTest {
         insert(entry("comic-1", folderId = "folder-1"))
 
-        dao.moveEntry(refSource = "source-a", refComic = "comic-1", folderId = "folder-2")
+        dao.insertMembership(FavoriteMembershipEntity("source-a", "comic-1", "folder-2"))
 
-        assertEquals(emptyList<String>(), dao.observeByAddedAt("folder-1").first().map { it.refComic })
+        assertEquals(listOf("comic-1"), dao.observeByAddedAt("folder-1").first().map { it.refComic })
         assertEquals(listOf("comic-1"), dao.observeByAddedAt("folder-2").first().map { it.refComic })
     }
 }

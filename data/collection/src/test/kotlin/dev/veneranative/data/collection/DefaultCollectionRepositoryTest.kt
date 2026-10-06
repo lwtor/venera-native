@@ -59,7 +59,7 @@ class DefaultCollectionRepositoryTest {
         lastReadAt: Long? = null,
         hasUpdate: Boolean = false,
         updatedAt: Long? = null,
-        folderId: String = DEFAULT_FOLDER_ID,
+        folderId: String = "",
     ) = FavoriteEntryEntity(
         refSource = "source-a",
         refComic = refComic,
@@ -81,7 +81,6 @@ class DefaultCollectionRepositoryTest {
     ): List<FavoriteItem> = repository.observeItems(folderId, sort).first()
 
     private suspend fun seedFolders() {
-        dao.insertFolder(folder(DEFAULT_FOLDER_ID, "Default", 0, removable = false))
         dao.insertFolder(folder("reading", "Reading", 1))
         dao.insertFolder(folder("later", "Later", 2))
     }
@@ -96,7 +95,7 @@ class DefaultCollectionRepositoryTest {
 
         repository.add(comic("comic-1"), "reading", snapshot("Comic One"))
 
-        assertEquals("reading", shelf("reading").single().folderId)
+        assertEquals(setOf("reading"), shelf("reading").single().folderIds)
         assertEquals("Comic One", shelf("reading").single().title)
     }
 
@@ -111,16 +110,16 @@ class DefaultCollectionRepositoryTest {
         val item = shelf().single()
         assertEquals(1_000L, item.addedAtEpochMillis)
         assertEquals("Comic One v2", item.title)
-        assertEquals("later", item.folderId)
+        assertEquals(setOf("later"), item.folderIds)
         assertEquals(3, item.chapterCount)
     }
 
-    @Test fun `a comic filed into a folder that is gone falls back to the default one`() = runTest {
+    @Test fun `a comic filed into a folder that is gone remains in All`() = runTest {
         seedFolders()
 
         repository.add(comic("comic-1"), "deleted-earlier", snapshot("Comic One"))
 
-        assertEquals(DEFAULT_FOLDER_ID, shelf().single().folderId)
+        assertTrue(shelf().single().folderIds.isEmpty())
     }
 
     @Test fun `removing a comic drops it from the shelf`() = runTest {
@@ -139,7 +138,7 @@ class DefaultCollectionRepositoryTest {
         repository.moveTo(comic("comic-1"), "later")
 
         assertTrue(shelf("reading").isEmpty())
-        assertEquals("later", shelf("later").single().folderId)
+        assertEquals(setOf("later"), shelf("later").single().folderIds)
     }
 
     @Test fun `moving a comic into a folder that is gone changes nothing`() = runTest {
@@ -148,7 +147,7 @@ class DefaultCollectionRepositoryTest {
 
         repository.moveTo(comic("comic-1"), "deleted-earlier")
 
-        assertEquals("reading", shelf("reading").single().folderId)
+        assertEquals(setOf("reading"), shelf("reading").single().folderIds)
     }
 
     @Test fun `renaming a folder is visible to observers`() = runTest {
@@ -162,27 +161,41 @@ class DefaultCollectionRepositoryTest {
         )
     }
 
-    @Test fun `deleting a folder moves its comics to the default folder`() = runTest {
+    @Test fun `deleting a collection keeps its comics in All`() = runTest {
         seedFolders()
         repository.add(comic("comic-1"), "later", snapshot("Comic One"))
 
         repository.deleteFolder("later")
 
         assertTrue(shelf("later").isEmpty())
-        assertEquals(DEFAULT_FOLDER_ID, shelf(DEFAULT_FOLDER_ID).single().folderId)
+        assertEquals(1, shelf().size)
+        assertTrue(shelf().single().folderIds.isEmpty())
     }
 
-    @Test fun `the default folder cannot be deleted`() = runTest {
+    @Test fun `All is implicit and cannot be deleted`() = runTest {
         seedFolders()
         repository.add(comic("comic-1"), DEFAULT_FOLDER_ID, snapshot("Comic One"))
-
         repository.deleteFolder(DEFAULT_FOLDER_ID)
+        assertEquals(listOf("reading", "later"), repository.observeFolders().first().map { it.id })
+        assertEquals(1, shelf().size)
+    }
 
-        assertEquals(
-            listOf(DEFAULT_FOLDER_ID, "reading", "later"),
-            repository.observeFolders().first().map { it.id },
-        )
-        assertEquals(1, shelf(DEFAULT_FOLDER_ID).size)
+    @Test fun `a comic can belong to multiple collections and never disappears from All`() = runTest {
+        seedFolders()
+        val ref = comic("comic-1")
+        repository.addToFolders(ref, setOf("reading", "later"), snapshot("Comic One"))
+        assertEquals(setOf("reading", "later"), shelf().single().folderIds)
+        assertEquals(1, shelf("reading").size)
+        assertEquals(1, shelf("later").size)
+
+        repository.setFolders(ref, setOf("later"))
+        assertTrue(shelf("reading").isEmpty())
+        assertEquals(1, shelf("later").size)
+        assertEquals(1, shelf().size)
+
+        repository.remove(ref)
+        assertTrue(shelf().isEmpty())
+        assertTrue(dao.memberships.value.isEmpty())
     }
 
     @Test fun `creating a folder appends it to the end`() = runTest {

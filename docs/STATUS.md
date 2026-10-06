@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-00X2 阅读器缩放手势与图像布局重构 |
-| 当前任务状态 | 已按用户录屏改为整列表变换，修复横向平移并加入双击缩放动画；加宽单击/双击仲裁窗口以避免首击误触发工具栏，时序回归、测试源码编译和 App 编译通过，待用户真机复验。 |
+| 当前任务 | S4-09A4 书架收藏夹交互与入口整理 |
+| 当前任务状态 | S4-09A3 已完成收藏多对多数据迁移与仓库契约；正在改书架入口和长按多选。阅读器 S3-00X2 仍待用户真机复验。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -32,6 +32,8 @@
 **S4-09A DONE：书架页首轮对照改造。** 根导航已经提供书架入口，页面移除重复返回栏，改用“收藏 / 下载 / 本地”带数量的 Material 3 标签页；收藏区把文件夹管理和排序收纳到菜单，加入漫画标题/副标题的本地忽略大小写搜索与明确的空结果态；收藏卡片保留更新标记，长按后的底部面板提供单项移动/移除操作。本地漫画按作品卡片折叠章节，下载项展示章节、状态、进度和暂停/继续/重试/移除操作。新增收藏检索状态回归测试源码。验证：JDK 17 `:feature:library:compileDebugKotlin :feature:library:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；未安装或操作真机，交由用户验收。对照记录见 [`library-comparison-2026-10-03.md`](reviews/library-comparison-2026-10-03.md)。此为书架页面首轮 UI/既有能力呈现优化，不代表全局对齐达标；批量选择、批量操作、阅读完成筛选、拖动排序和远端收藏/追更仍是差距，需按上游固定源码可读性和项目后续任务拆分处理。S4-09 Stage 审查与 90% 门槛不变。
 
 **S4-09A 修订（用户反馈后）**：书架内层 Scaffold 和 TopAppBar 明确使用零 WindowInsets，避免与根 Scaffold 的状态栏 inset 重复叠加；收藏漫画按用户给的界面参考恢复为三列封面网格；长按后通过底部弹窗提供移动到其他文件夹、标记更新已读和从书架移除。弹窗所选漫画由 ViewModel 状态驱动。JDK 17 `:feature:library:compileDebugKotlin :feature:library:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；未安装真机，顶部留白与长按菜单由用户复验。
+
+**S4-09A3 DONE：收藏夹数据语义改造。** `favorite_entry` 是隐式“全部”视图；新增 `favorite_membership` 保存一部漫画到多个自建收藏夹的归属。版本 7 迁移保留原有漫画和自建目录的归属，旧 Default 中的漫画仅留在“全部”，旧 Default 行移除；删自建收藏夹只删归属，移出书架则级联删所有归属。旧 `favorite_entry.folder_id` 暂作为不再使用的兼容列保留，后续若清理需新迁移。JDK 17 `:data:collection:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；迁移 AndroidTest 仅编译，未在用户手机运行。下一项 S4-09A4：书架 UI 与多选归属。
 
 **S4-09A2 DONE：最近阅读按漫画去重。** 之前 `observeRecent(5)` 直接限制最近五条章节位置；阅读不同章节会在首页重复出现同一部漫画。Room DAO 现在用每个来源/漫画的最新更新时间选一条记录，并在去重后应用数量限制；同一漫画仍按章节保留在历史表，详情页已读状态不受影响。HomeViewModel 按更新时间排序并按 `ComicKey` 去重，防止重复项进入首页。新增 Room DAO 查询源码及 HomeViewModel 回归测试。验证：JDK 17 `:data:history:testDebugUnitTest :feature:home:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。Room AndroidTest 源码已编译，未在设备上执行。
 

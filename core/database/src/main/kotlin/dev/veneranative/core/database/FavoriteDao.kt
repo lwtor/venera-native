@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.Flow
  * mistake this layer exists to avoid. The repository picks the query, so no caller ever sorts rows
  * in memory and the order the user sees is the order the database returns.
  *
- * A null [folderId] means "every folder", which is how the shelf shows the whole collection.
+ * A null [folderId] means the implicit All view; a non-null id filters via membership.
  */
 @Dao
 interface FavoriteDao {
@@ -39,20 +39,20 @@ interface FavoriteDao {
     suspend fun deleteFolder(folderId: String)
 
     @Query(
-        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR folder_id = :folderId) " +
+        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR EXISTS (SELECT 1 FROM favorite_membership m WHERE m.ref_source = favorite_entry.ref_source AND m.ref_comic = favorite_entry.ref_comic AND m.folder_id = :folderId)) " +
             "ORDER BY added_at DESC",
     )
     fun observeByAddedAt(folderId: String?): Flow<List<FavoriteEntryEntity>>
 
     @Query(
-        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR folder_id = :folderId) " +
+        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR EXISTS (SELECT 1 FROM favorite_membership m WHERE m.ref_source = favorite_entry.ref_source AND m.ref_comic = favorite_entry.ref_comic AND m.folder_id = :folderId)) " +
             "ORDER BY title COLLATE NOCASE ASC",
     )
     fun observeByTitle(folderId: String?): Flow<List<FavoriteEntryEntity>>
 
     @Query(
         "SELECT favorite_entry.* FROM favorite_entry " +
-            "WHERE (:folderId IS NULL OR favorite_entry.folder_id = :folderId) " +
+            "WHERE (:folderId IS NULL OR EXISTS (SELECT 1 FROM favorite_membership m WHERE m.ref_source = favorite_entry.ref_source AND m.ref_comic = favorite_entry.ref_comic AND m.folder_id = :folderId)) " +
             "ORDER BY COALESCE((SELECT MAX(reading_history.updated_at) FROM reading_history " +
             "WHERE reading_history.source_id = favorite_entry.ref_source " +
             "AND reading_history.comic_id = favorite_entry.ref_comic), favorite_entry.last_read_at) " +
@@ -64,13 +64,25 @@ interface FavoriteDao {
     fun observeByLastRead(folderId: String?): Flow<List<FavoriteEntryEntity>>
 
     @Query(
-        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR folder_id = :folderId) " +
+        "SELECT * FROM favorite_entry WHERE (:folderId IS NULL OR EXISTS (SELECT 1 FROM favorite_membership m WHERE m.ref_source = favorite_entry.ref_source AND m.ref_comic = favorite_entry.ref_comic AND m.folder_id = :folderId)) " +
             "ORDER BY has_update DESC, updated_at DESC, added_at DESC",
     )
     fun observeByUpdate(folderId: String?): Flow<List<FavoriteEntryEntity>>
 
     @Upsert
     suspend fun upsertEntry(entry: FavoriteEntryEntity)
+
+    @Query("SELECT * FROM favorite_membership")
+    fun observeMemberships(): Flow<List<FavoriteMembershipEntity>>
+
+    @Query("SELECT folder_id FROM favorite_membership WHERE ref_source = :refSource AND ref_comic = :refComic")
+    suspend fun folderIds(refSource: String, refComic: String): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMembership(membership: FavoriteMembershipEntity)
+
+    @Query("DELETE FROM favorite_membership WHERE ref_source = :refSource AND ref_comic = :refComic")
+    suspend fun deleteMemberships(refSource: String, refComic: String)
 
     @Query("SELECT * FROM favorite_entry WHERE ref_source = :refSource AND ref_comic = :refComic")
     suspend fun entry(refSource: String, refComic: String): FavoriteEntryEntity?
@@ -90,19 +102,6 @@ interface FavoriteDao {
 
     @Query("DELETE FROM favorite_entry WHERE ref_source = :refSource AND ref_comic = :refComic")
     suspend fun deleteEntry(refSource: String, refComic: String)
-
-    @Query(
-        "UPDATE favorite_entry SET folder_id = :folderId " +
-            "WHERE ref_source = :refSource AND ref_comic = :refComic",
-    )
-    suspend fun moveEntry(refSource: String, refComic: String, folderId: String)
-
-    /**
-     * Moves a whole folder's comics somewhere else before the folder itself is deleted: dropping a
-     * folder must never drop the comics inside it.
-     */
-    @Query("UPDATE favorite_entry SET folder_id = :toFolderId WHERE folder_id = :fromFolderId")
-    suspend fun moveEntriesTo(fromFolderId: String, toFolderId: String)
 
     @Query(
         "UPDATE favorite_entry SET has_update = 0 " +

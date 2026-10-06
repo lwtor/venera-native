@@ -11,7 +11,8 @@ import androidx.room.RoomDatabase
  * against, and a version bump without one is a database Room silently cannot open on upgrade.
  *
  * Version 2 adds the shelf, version 3 the download queue, version 4 the local library (S2-05),
- * version 5 the persisted search history (S3-01), and version 6 screen preferences.
+ * version 5 the persisted search history (S3-01), version 6 screen preferences, and version 7
+ * optional many-to-many favorite collections.
  * Each task adds one migration rather than editing an existing step.
  */
 @Database(
@@ -20,6 +21,7 @@ import androidx.room.RoomDatabase
         ReadingProgressEntity::class,
         FavoriteFolderEntity::class,
         FavoriteEntryEntity::class,
+        FavoriteMembershipEntity::class,
         DownloadTaskEntity::class,
         DownloadPageEntity::class,
         LocalGrantEntity::class,
@@ -29,7 +31,7 @@ import androidx.room.RoomDatabase
         SearchHistoryEntity::class,
         ScreenPreferenceEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class VeneraDatabase : RoomDatabase() {
