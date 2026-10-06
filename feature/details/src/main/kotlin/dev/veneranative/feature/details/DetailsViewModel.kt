@@ -9,7 +9,6 @@ import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.ComicSnapshot
-import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.history.HistoryRepository
@@ -103,6 +102,18 @@ class DetailsViewModel(
             DetailsAction.DownloadSelectedChapters -> downloadChapters(_state.value.selectedChapters)
 
             DetailsAction.ToggleFavorite -> toggleFavorite()
+            is DetailsAction.FavoriteFolderToggled -> _state.update { current ->
+                if (current.favoriteFolders.none { it.id == action.folderId }) current
+                else current.copy(favoriteFolderSelection = current.favoriteFolderSelection.let { ids ->
+                    if (action.folderId in ids) ids - action.folderId else ids + action.folderId
+                })
+            }
+            DetailsAction.ConfirmFavorite -> confirmFavorite()
+            DetailsAction.DismissFavoriteDialog -> _state.update { it.copy(favoriteDialog = null, newFavoriteFolderDraft = null) }
+            DetailsAction.NewFavoriteFolderRequested -> _state.update { it.copy(newFavoriteFolderDraft = "") }
+            is DetailsAction.NewFavoriteFolderDraftChanged -> _state.update { it.copy(newFavoriteFolderDraft = action.draft) }
+            DetailsAction.CreateFavoriteFolder -> createFavoriteFolder()
+            DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null) }
         }
     }
 
@@ -150,6 +161,13 @@ class DetailsViewModel(
                 }
             }.onFailure { failure -> failUnlessCancelled(failure) }
         }
+        viewModelScope.launch {
+            runCatching {
+                repository.observeFolders().collect { folders ->
+                    _state.update { current -> current.copy(favoriteFolders = folders) }
+                }
+            }.onFailure { failure -> failUnlessCancelled(failure) }
+        }
     }
 
     private fun observeReadChapters() {
@@ -171,21 +189,57 @@ class DetailsViewModel(
     }
 
     private fun toggleFavorite() {
-        val repository = collection ?: return
+        collection ?: return
         // Nothing to keep before the source answered: a title is the least a shelf row must have.
+        _state.value.detail ?: return
+        if (_state.value.favoriteSaving) return
+        _state.update { current -> current.copy(
+            favoriteDialog = if (current.isFavorite) FavoriteDialog.Remove else FavoriteDialog.Add,
+            favoriteFolderSelection = emptySet(),
+            newFavoriteFolderDraft = null,
+            shelfMessage = null,
+        ) }
+    }
+
+    private fun confirmFavorite() {
+        val repository = collection ?: return
         val detail = _state.value.detail ?: return
+        val dialog = _state.value.favoriteDialog ?: return
+        if (_state.value.favoriteSaving) return
+        val selected = _state.value.favoriteFolderSelection
+        _state.update { it.copy(favoriteSaving = true, shelfMessage = null) }
         viewModelScope.launch {
-            _state.update { it.copy(shelfMessage = null) }
             runCatching {
-                if (_state.value.isFavorite) {
+                if (dialog == FavoriteDialog.Remove) {
                     repository.remove(comicRef)
                 } else {
-                    repository.add(comicRef, DEFAULT_SHELF_FOLDER_ID, detail.toSnapshot())
+                    repository.addToFolders(comicRef, selected, detail.toSnapshot())
                 }
+            }.onSuccess {
+                _state.update { it.copy(favoriteDialog = null, favoriteSaving = false) }
             }.onFailure { failure ->
                 failUnlessCancelled(failure)
-                _state.update { it.copy(shelfMessage = "无法保存此更改。") }
+                _state.update { it.copy(favoriteSaving = false, shelfMessage = "无法保存此更改。") }
             }
+        }
+    }
+
+    private fun createFavoriteFolder() {
+        val repository = collection ?: return
+        val draft = _state.value.newFavoriteFolderDraft?.trim() ?: return
+        if (draft.isEmpty()) {
+            _state.update { it.copy(shelfMessage = "请输入收藏夹名称。") }
+            return
+        }
+        viewModelScope.launch {
+            runCatching { repository.createFolder(draft) }
+                .onSuccess { id -> _state.update {
+                    it.copy(newFavoriteFolderDraft = null, favoriteFolderSelection = it.favoriteFolderSelection + id)
+                } }
+                .onFailure { failure ->
+                    failUnlessCancelled(failure)
+                    _state.update { it.copy(shelfMessage = "无法创建收藏夹。") }
+                }
         }
     }
 

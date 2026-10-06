@@ -163,8 +163,10 @@ class HomeViewModelTest {
         override suspend fun renameFolder(id: String, name: String) = error("Not used in this test")
         override suspend fun deleteFolder(id: String) = error("Not used in this test")
         override suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot) = error("Not used in this test")
+        override suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot) = error("Not used in this test")
         override suspend fun remove(ref: ComicRef) = error("Not used in this test")
         override suspend fun moveTo(ref: ComicRef, folderId: String) = error("Not used in this test")
+        override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) = error("Not used in this test")
         override suspend fun clearUpdate(ref: ComicRef) = error("Not used in this test")
         override suspend fun refreshUpdates(): Int = error("Not used in this test")
     }

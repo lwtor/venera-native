@@ -26,11 +26,13 @@ sealed interface DetailsAction {
 
     data object DownloadSelectedChapters : DetailsAction
 
-    /**
-     * Keep the comic, or stop keeping it.
-     *
-     * One action rather than a folder picker: which folder a comic lives in is the shelf's job, and a
-     * screen that only ever sees one comic has nothing to choose between.
-     */
+    /** Opens a collection picker or an explicit removal confirmation. */
     data object ToggleFavorite : DetailsAction
+    data class FavoriteFolderToggled(val folderId: String) : DetailsAction
+    data object ConfirmFavorite : DetailsAction
+    data object DismissFavoriteDialog : DetailsAction
+    data object NewFavoriteFolderRequested : DetailsAction
+    data class NewFavoriteFolderDraftChanged(val draft: String) : DetailsAction
+    data object CreateFavoriteFolder : DetailsAction
+    data object DismissNewFavoriteFolder : DetailsAction
 }

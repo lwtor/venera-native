@@ -17,7 +17,7 @@ import dev.veneranative.core.model.SourcePage
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.chaptersOf
 import dev.veneranative.core.model.groupedChaptersOf
-import dev.veneranative.data.collection.DEFAULT_SHELF_FOLDER_ID
+import dev.veneranative.data.collection.FavoriteFolder
 import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
@@ -282,15 +282,25 @@ class DetailsViewModelTest {
         val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
         assertFalse(viewModel.state.value.isFavorite)
+        collection.folders.value = listOf(
+            FavoriteFolder("reading", "在读", 0, true),
+            FavoriteFolder("later", "稍后", 1, true),
+        )
+        advanceUntilIdle()
 
         viewModel.onAction(DetailsAction.ToggleFavorite)
+        assertEquals(FavoriteDialog.Add, viewModel.state.value.favoriteDialog)
+        assertTrue(collection.added.isEmpty())
+        viewModel.onAction(DetailsAction.FavoriteFolderToggled("reading"))
+        viewModel.onAction(DetailsAction.FavoriteFolderToggled("later"))
+        viewModel.onAction(DetailsAction.ConfirmFavorite)
         advanceUntilIdle()
 
         // What the screen shows and what the shelf holds are the same fact: the flag is read back
         // from the shelf, not remembered from the tap.
         assertTrue(viewModel.state.value.isFavorite)
         assertTrue(collection.contains(ComicRef.Remote(comicKey)))
-        assertEquals(DEFAULT_SHELF_FOLDER_ID, collection.added.single().folderId)
+        assertEquals(setOf("reading", "later"), collection.added.single().folderIds)
     }
 
     @Test
@@ -301,7 +311,7 @@ class DetailsViewModelTest {
             FavoriteItem(
                 ref = ComicRef.Remote(comicKey),
                 title = "Frieren",
-                folderId = DEFAULT_SHELF_FOLDER_ID,
+                folderId = "",
                 addedAtEpochMillis = 1_000L,
             ),
         )
@@ -310,11 +320,36 @@ class DetailsViewModelTest {
         assertTrue(viewModel.state.value.isFavorite)
 
         viewModel.onAction(DetailsAction.ToggleFavorite)
+        assertEquals(FavoriteDialog.Remove, viewModel.state.value.favoriteDialog)
+        assertTrue(collection.removed.isEmpty())
+        viewModel.onAction(DetailsAction.DismissFavoriteDialog)
+        assertTrue(collection.removed.isEmpty())
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        viewModel.onAction(DetailsAction.ConfirmFavorite)
         advanceUntilIdle()
 
         assertFalse(viewModel.state.value.isFavorite)
         assertFalse(collection.contains(ComicRef.Remote(comicKey)))
         assertEquals(listOf(ComicRef.Remote(comicKey)), collection.removed)
+    }
+
+    @Test
+    fun `a new collection created while favoriting is selected before saving`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        viewModel.onAction(DetailsAction.NewFavoriteFolderRequested)
+        viewModel.onAction(DetailsAction.NewFavoriteFolderDraftChanged("在读"))
+        viewModel.onAction(DetailsAction.CreateFavoriteFolder)
+        advanceUntilIdle()
+
+        assertEquals(setOf("folder-1"), viewModel.state.value.favoriteFolderSelection)
+        viewModel.onAction(DetailsAction.ConfirmFavorite)
+        advanceUntilIdle()
+        assertEquals(setOf("folder-1"), collection.added.single().folderIds)
     }
 
     @Test
@@ -325,6 +360,7 @@ class DetailsViewModelTest {
         advanceUntilIdle()
 
         viewModel.onAction(DetailsAction.ToggleFavorite)
+        viewModel.onAction(DetailsAction.ConfirmFavorite)
         advanceUntilIdle()
 
         // An update check can only compare against what the source said now, so this is the baseline
@@ -346,6 +382,7 @@ class DetailsViewModelTest {
             advanceUntilIdle()
 
             viewModel.onAction(DetailsAction.ToggleFavorite)
+            viewModel.onAction(DetailsAction.ConfirmFavorite)
             advanceUntilIdle()
 
             // Zero would mean "empty", which the next real answer would read as an update.
@@ -362,12 +399,14 @@ class DetailsViewModelTest {
         advanceUntilIdle()
 
         viewModel.onAction(DetailsAction.ToggleFavorite)
+        viewModel.onAction(DetailsAction.ConfirmFavorite)
         advanceUntilIdle()
 
         val message = viewModel.state.value.shelfMessage.orEmpty()
         assertTrue(message.isNotEmpty())
         assertFalse("storage diagnostics must not reach the screen", message.contains("disk on fire"))
         assertFalse(viewModel.state.value.isFavorite)
+        assertEquals(FavoriteDialog.Add, viewModel.state.value.favoriteDialog)
     }
 
     @Test

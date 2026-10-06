@@ -33,8 +33,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -191,6 +194,73 @@ fun DetailsScreen(
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
+    }
+
+    if (state.newFavoriteFolderDraft != null) {
+        AlertDialog(
+            onDismissRequest = { onAction(DetailsAction.DismissNewFavoriteFolder) },
+            title = { Text("新建收藏夹") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = state.newFavoriteFolderDraft,
+                        onValueChange = { onAction(DetailsAction.NewFavoriteFolderDraftChanged(it)) },
+                        label = { Text("收藏夹名称") },
+                        singleLine = true,
+                    )
+                    state.shelfMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { onAction(DetailsAction.CreateFavoriteFolder) }) { Text("创建并勾选") } },
+            dismissButton = { TextButton(onClick = { onAction(DetailsAction.DismissNewFavoriteFolder) }) { Text("取消") } },
+        )
+    } else if (state.favoriteDialog != null) {
+        val removing = state.favoriteDialog == FavoriteDialog.Remove
+        AlertDialog(
+            onDismissRequest = { if (!state.favoriteSaving) onAction(DetailsAction.DismissFavoriteDialog) },
+            title = { Text(if (removing) "取消收藏？" else "加入书架") },
+            text = {
+                if (removing) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("这部漫画会从全部和所有收藏夹中移除，阅读记录不会删除。")
+                        state.shelfMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("全部 · 自动加入", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        state.favoriteFolders.forEach { folder ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { onAction(DetailsAction.FavoriteFolderToggled(folder.id)) },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = folder.id in state.favoriteFolderSelection,
+                                    onCheckedChange = { onAction(DetailsAction.FavoriteFolderToggled(folder.id)) },
+                                )
+                                Text(folder.name)
+                            }
+                        }
+                        TextButton(onClick = { onAction(DetailsAction.NewFavoriteFolderRequested) }) { Text("新建收藏夹") }
+                        state.shelfMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !state.favoriteSaving,
+                    onClick = { onAction(DetailsAction.ConfirmFavorite) },
+                ) { Text(if (removing) "取消收藏" else "加入书架") }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !state.favoriteSaving,
+                    onClick = { onAction(DetailsAction.DismissFavoriteDialog) },
+                ) { Text("返回") }
+            },
+        )
     }
 }
 

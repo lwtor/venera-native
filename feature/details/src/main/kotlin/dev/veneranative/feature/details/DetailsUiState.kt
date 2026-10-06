@@ -4,6 +4,9 @@ import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.data.collection.FavoriteFolder
+
+enum class FavoriteDialog { Add, Remove }
 
 /**
  * Everything the details screen renders.
@@ -33,6 +36,11 @@ data class DetailsUiState(
      * last tap, so removing it there shows up here.
      */
     val isFavorite: Boolean = false,
+    val favoriteFolders: List<FavoriteFolder> = emptyList(),
+    val favoriteDialog: FavoriteDialog? = null,
+    val favoriteFolderSelection: Set<String> = emptySet(),
+    val newFavoriteFolderDraft: String? = null,
+    val favoriteSaving: Boolean = false,
     /** False until the assembly layer hands the screen a shelf: until then there is none to use. */
     val hasShelf: Boolean = false,
     /** Product copy when keeping or removing the comic failed; never a lower layer's wording. */

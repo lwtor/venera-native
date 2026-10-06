@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.map
 internal class FakeCollectionRepository : CollectionRepository {
 
     private val entries = MutableStateFlow<Map<ComicRef, FavoriteItem>>(emptyMap())
+    val folders = MutableStateFlow<List<FavoriteFolder>>(emptyList())
 
     var addError: Throwable? = null
     var removeError: Throwable? = null
@@ -26,29 +27,38 @@ internal class FakeCollectionRepository : CollectionRepository {
     val added = mutableListOf<AddedToShelf>()
     val removed = mutableListOf<ComicRef>()
 
-    override fun observeFolders(): Flow<List<FavoriteFolder>> = MutableStateFlow(emptyList())
+    override fun observeFolders(): Flow<List<FavoriteFolder>> = folders
 
     override fun observeItems(folderId: String?, sort: ShelfSort): Flow<List<FavoriteItem>> =
         MutableStateFlow(emptyList())
 
     override fun observeItem(ref: ComicRef): Flow<FavoriteItem?> = entries.map { it[ref] }
 
-    override suspend fun createFolder(name: String): String = error("not used by the details screen")
+    override suspend fun createFolder(name: String): String {
+        val id = "folder-${folders.value.size + 1}"
+        folders.value = folders.value + FavoriteFolder(id, name, folders.value.size, true)
+        return id
+    }
 
     override suspend fun renameFolder(id: String, name: String) = Unit
 
     override suspend fun deleteFolder(id: String) = Unit
 
     override suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot) {
+        addToFolders(ref, setOf(folderId), snapshot)
+    }
+
+    override suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot) {
         addError?.let { throw it }
-        added += AddedToShelf(ref, folderId, snapshot)
+        added += AddedToShelf(ref, folderIds, snapshot)
         entries.value = entries.value + (
             ref to FavoriteItem(
                 ref = ref,
                 title = snapshot.title,
                 subtitle = snapshot.subtitle,
                 coverRef = snapshot.coverRef,
-                folderId = folderId,
+                folderId = "",
+                folderIds = folderIds,
                 addedAtEpochMillis = 1_000L,
                 chapterCount = snapshot.chapterCount,
                 latestChapterId = snapshot.latestChapterId,
@@ -63,6 +73,10 @@ internal class FakeCollectionRepository : CollectionRepository {
     }
 
     override suspend fun moveTo(ref: ComicRef, folderId: String) = Unit
+
+    override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) {
+        entries.value = entries.value.mapValues { (key, item) -> if (key == ref) item.copy(folderIds = folderIds) else item }
+    }
 
     override suspend fun clearUpdate(ref: ComicRef) = Unit
 
@@ -79,6 +93,6 @@ internal class FakeCollectionRepository : CollectionRepository {
 
 internal data class AddedToShelf(
     val ref: ComicRef,
-    val folderId: String,
+    val folderIds: Set<String>,
     val snapshot: ComicSnapshot,
 )
