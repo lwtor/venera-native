@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S4-08E 首页与漫画源管理体验优化 |
-| 当前任务状态 | 用户要求主导航仅保留首页/书架，并精简首页重复内容、重做来源页布局及统一返回图标/顶部留白。实现完成；JDK 17 `:feature:home:compileDebugKotlin :feature:search:compileDebugKotlin :feature:explore:compileDebugKotlin :feature:sources:compileDebugKotlin :feature:sources:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；设备视觉验收由用户执行。 |
+| 当前任务 | S4-09A2 首页最近阅读按漫画去重 |
+| 当前任务状态 | 历史记录按漫画/章节保存，因此原来的“最近 N 条”可能包含同一漫画不同章节。Room 最近记录查询现按 `source_id + comic_id` 只返回最新章节，并在去重后应用条数限制；HomeViewModel 再按 `ComicKey` 排序、去重作防护；章节历史仍保留完整。验证：`:data:history:testDebugUnitTest :feature:home:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -26,6 +26,8 @@
 **S4-09A DONE：书架页首轮对照改造。** 根导航已经提供书架入口，页面移除重复返回栏，改用“收藏 / 下载 / 本地”带数量的 Material 3 标签页；收藏区把文件夹管理和排序收纳到菜单，加入漫画标题/副标题的本地忽略大小写搜索与明确的空结果态；收藏卡片保留更新标记，长按后的底部面板提供单项移动/移除操作。本地漫画按作品卡片折叠章节，下载项展示章节、状态、进度和暂停/继续/重试/移除操作。新增收藏检索状态回归测试源码。验证：JDK 17 `:feature:library:compileDebugKotlin :feature:library:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；未安装或操作真机，交由用户验收。对照记录见 [`library-comparison-2026-10-03.md`](reviews/library-comparison-2026-10-03.md)。此为书架页面首轮 UI/既有能力呈现优化，不代表全局对齐达标；批量选择、批量操作、阅读完成筛选、拖动排序和远端收藏/追更仍是差距，需按上游固定源码可读性和项目后续任务拆分处理。S4-09 Stage 审查与 90% 门槛不变。
 
 **S4-09A 修订（用户反馈后）**：书架内层 Scaffold 和 TopAppBar 明确使用零 WindowInsets，避免与根 Scaffold 的状态栏 inset 重复叠加；收藏漫画按用户给的界面参考恢复为三列封面网格；长按后通过底部弹窗提供移动到其他文件夹、标记更新已读和从书架移除。弹窗所选漫画由 ViewModel 状态驱动。JDK 17 `:feature:library:compileDebugKotlin :feature:library:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；未安装真机，顶部留白与长按菜单由用户复验。
+
+**S4-09A2 DONE：最近阅读按漫画去重。** 之前 `observeRecent(5)` 直接限制最近五条章节位置；阅读不同章节会在首页重复出现同一部漫画。Room DAO 现在用每个来源/漫画的最新更新时间选一条记录，并在去重后应用数量限制；同一漫画仍按章节保留在历史表，详情页已读状态不受影响。HomeViewModel 按更新时间排序并按 `ComicKey` 去重，防止重复项进入首页。新增 Room DAO 查询源码及 HomeViewModel 回归测试。验证：JDK 17 `:data:history:testDebugUnitTest :feature:home:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。Room AndroidTest 源码已编译，未在设备上执行。
 
 **S4-10A4 DONE：把详情中部基本信息整体并入封面区。** 作者、题材/标签等 `tagGroups` 与上传者、更新时间、评分等 `metadata` 都放在封面底部，使用双列半透明信息卡与浅色标签；原封面下方不再重复占位。封面高度按元数据行数和标签数量估算并适配，标题/信息随封面上滑淡出，简介、预览、推荐和目录仍在下方。JDK 17 验证：`:feature:details:compileDebugKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装真机，实际信息密度与封面高度待用户目视确认。
 

@@ -24,6 +24,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -96,7 +97,27 @@ class HomeViewModelTest {
                     coverUrl = null,
                     pageIndex = 2,
                     pageCount = 10,
+                    updatedAtEpochMillis = 90,
+                ),
+                ReadingHistoryEntry(
+                    comicKey = key,
+                    comicTitle = "Fixture comic",
+                    chapterId = RemoteChapterId("chapter-2"),
+                    chapterTitle = "Chapter 2",
+                    coverUrl = null,
+                    pageIndex = 1,
+                    pageCount = 10,
                     updatedAtEpochMillis = 100,
+                ),
+                ReadingHistoryEntry(
+                    comicKey = ComicKey(SourceId("fixture"), RemoteComicId("comic-2")),
+                    comicTitle = "Another comic",
+                    chapterId = RemoteChapterId("chapter-3"),
+                    chapterTitle = "Chapter 3",
+                    coverUrl = null,
+                    pageIndex = 0,
+                    pageCount = 10,
+                    updatedAtEpochMillis = 80,
                 ),
             )
             favorites.value = listOf(
@@ -110,7 +131,8 @@ class HomeViewModelTest {
             )
             runCurrent()
 
-            assertEquals("Fixture comic", observed.last().recentReading.single().comicTitle)
+            assertEquals(listOf("chapter-2", "chapter-3"), observed.last().recentReading.map { it.chapterId.value })
+            assertEquals(listOf("Fixture comic", "Another comic"), observed.last().recentReading.map { it.comicTitle })
             assertEquals("Fixture comic", observed.last().favorites.single().title)
             assertTrue(observed.last().favorites.single().hasUpdate)
             subscription.cancelAndJoin()

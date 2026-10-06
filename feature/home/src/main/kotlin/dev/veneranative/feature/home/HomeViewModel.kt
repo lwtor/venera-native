@@ -25,7 +25,9 @@ class HomeViewModel(
 
     val state = combine(recent, favorites, localComics) { recentItems, favoriteItems, localItems ->
         HomeUiState(
-            recentReading = recentItems,
+            recentReading = recentItems
+                .sortedByDescending { it.updatedAtEpochMillis }
+                .distinctBy { it.comicKey },
             favorites = favoriteItems,
             localComics = localItems,
             historyAvailable = history != null,

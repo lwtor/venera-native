@@ -141,11 +141,13 @@ class DefaultHistoryRepositoryTest {
     @Test fun `recents are newest first and honour the limit`() = runTest {
         repository.record(entry(chapterId = "c1", updatedAt = 1_000L))
         repository.record(entry(chapterId = "c2", updatedAt = 3_000L))
-        repository.record(entry(chapterId = "c3", updatedAt = 2_000L))
+        val comicTwo = key.copy(remoteId = RemoteComicId("comic-2"))
+        repository.record(entry(chapterId = "c3", updatedAt = 2_000L).copy(comicKey = comicTwo))
 
         val recent = repository.observeRecent(limit = 2).first()
 
         assertEquals(listOf("c2", "c3"), recent.map { it.chapterId.value })
+        assertEquals(listOf(key, comicTwo), recent.map { it.comicKey })
     }
 
     @Test fun `removing drops every chapter row of that comic`() = runTest {

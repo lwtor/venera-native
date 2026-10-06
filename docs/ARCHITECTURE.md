@@ -44,7 +44,7 @@ immutable UiState
 | `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |
 | `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
 | `:core:database` | Room 持久化：阅读历史/进度、收藏、下载、本地库索引、搜索历史和轻量页面偏好实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
-| `:data:history` | 阅读历史与恢复：`HistoryRepository` 契约、按漫画观察章节进度、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
+| `:data:history` | 阅读历史与恢复：保存每漫画/章节进度、最近阅读按漫画返回最新章节、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:data:search` | 最近搜索词仓库：规范化查询词、去重置顶、有界保留及单项删除/清空；数据保存在 Room | `:core:database`、Coroutines |
 | `:data:settings` | 轻量页面选择偏好的类型无关持久化仓库；为 S4-01 设置模块前的页面状态切片提供 Room 存储 | `:core:database` |
 | `:data:collection` | 书架收藏：文件夹增删改名、条目加入/移出/移动、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |

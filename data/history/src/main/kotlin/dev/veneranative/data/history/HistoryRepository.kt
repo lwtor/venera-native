@@ -32,7 +32,7 @@ data class ReadingHistoryEntry(
  */
 interface HistoryRepository {
 
-    /** Newest positions first. */
+    /** One latest chapter position per comic, ordered by the comics most recently read. */
     fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>>
 
     /** Every persisted chapter position for one comic, used for chapter read-state presentation. */

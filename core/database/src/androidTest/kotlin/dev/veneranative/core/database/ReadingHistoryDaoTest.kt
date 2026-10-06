@@ -68,13 +68,15 @@ class ReadingHistoryDaoTest {
         assertEquals(2, historyDao.observeRecent(limit = 10).first().size)
     }
 
-    @Test fun recentsComeBackNewestFirst() = runTest {
+    @Test fun recentsReturnOnlyTheLatestChapterForEachComicAndApplyLimitAfterDeduplication() = runTest {
         historyDao.upsert(history(chapterId = "old", updatedAt = 1_000L))
         historyDao.upsert(history(chapterId = "new", updatedAt = 9_000L))
+        historyDao.upsert(history(comicId = "comic-2", chapterId = "other", updatedAt = 5_000L))
+        historyDao.upsert(history(comicId = "comic-3", chapterId = "third", updatedAt = 3_000L))
 
         assertEquals(
-            listOf("new", "old"),
-            historyDao.observeRecent(limit = 10).first().map { it.chapterId },
+            listOf("new", "other"),
+            historyDao.observeRecent(limit = 2).first().map { it.chapterId },
         )
     }
 

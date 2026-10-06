@@ -11,16 +11,19 @@ import kotlinx.coroutines.flow.map
 /**
  * In-memory stand-ins for the Room DAOs, so.repository and tracker logic can run on the JVM.
  *
- * They reproduce what the real queries do — including the fact that history allows one row per
- * chapter while progress keeps only one per comic — because those semantics are exactly what the
- * throttling and mapping tests need to observe.
+ * They reproduce what the real queries do — history stores one row per chapter, while the recent
+ * list returns only each comic's newest chapter and progress keeps one row per comic.
  */
 internal class FakeReadingHistoryDao : ReadingHistoryDao {
 
     val rows = MutableStateFlow<List<ReadingHistoryEntity>>(emptyList())
 
     override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntity>> =
-        rows.map { list -> list.sortedByDescending { it.updatedAtEpochMillis }.take(limit) }
+        rows.map { list ->
+            list.sortedByDescending { it.updatedAtEpochMillis }
+                .distinctBy { it.sourceId to it.comicId }
+                .take(limit)
+        }
 
     override fun observeComic(sourceId: String, comicId: String): Flow<List<ReadingHistoryEntity>> =
         rows.map { list -> list.filter { it.sourceId == sourceId && it.comicId == comicId } }
