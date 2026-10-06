@@ -212,7 +212,7 @@ internal fun LibraryScreen(
                                 text = { Text("删除当前收藏夹") },
                                 onClick = {
                                     folderMenuExpanded = false
-                                    selectedFolder?.let { onAction(LibraryAction.DeleteFolder(it.id)) }
+                                    selectedFolder?.let { onAction(LibraryAction.RequestDeleteFolder(it.id)) }
                                 },
                             )
                         }
@@ -369,22 +369,42 @@ internal fun LibraryScreen(
         )
     }
 
+    state.pendingDeleteFolderId?.let { folderId ->
+        val name = state.folders.firstOrNull { it.id == folderId }?.name.orEmpty()
+        AlertDialog(
+            onDismissRequest = { onAction(LibraryAction.DismissDeleteFolder) },
+            title = { Text("删除收藏夹？") },
+            text = { Text("“$name”将被删除，里面的漫画仍保留在“全部”和其他已加入的收藏夹中。") },
+            confirmButton = { TextButton(onClick = { onAction(LibraryAction.ConfirmDeleteFolder) }) { Text("删除收藏夹") } },
+            dismissButton = { TextButton(onClick = { onAction(LibraryAction.DismissDeleteFolder) }) { Text("取消") } },
+        )
+    }
+
     state.folderEditor?.let { editor ->
         AlertDialog(
             onDismissRequest = { onAction(LibraryAction.DismissFolderEditor) },
             title = { Text(if (editor.folderId == null) "新建收藏夹" else "重命名收藏夹") },
             text = {
-                OutlinedTextField(
-                    value = editor.draft,
-                    onValueChange = { draft -> onAction(LibraryAction.FolderDraftChanged(draft)) },
-                    singleLine = true,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editor.draft,
+                        onValueChange = { draft -> onAction(LibraryAction.FolderDraftChanged(draft)) },
+                        singleLine = true,
+                    )
+                    state.message?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                }
             },
             confirmButton = {
-                TextButton(onClick = { onAction(LibraryAction.ConfirmFolderEditor) }) { Text("保存") }
+                TextButton(
+                    enabled = !state.folderSaving,
+                    onClick = { onAction(LibraryAction.ConfirmFolderEditor) },
+                ) { Text("保存") }
             },
             dismissButton = {
-                TextButton(onClick = { onAction(LibraryAction.DismissFolderEditor) }) { Text("取消") }
+                TextButton(
+                    enabled = !state.folderSaving,
+                    onClick = { onAction(LibraryAction.DismissFolderEditor) },
+                ) { Text("取消") }
             },
         )
     }

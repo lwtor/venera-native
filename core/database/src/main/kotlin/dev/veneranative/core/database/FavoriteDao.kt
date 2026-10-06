@@ -26,6 +26,9 @@ interface FavoriteDao {
     @Query("SELECT * FROM favorite_folder WHERE folder_id = :folderId")
     suspend fun folder(folderId: String): FavoriteFolderEntity?
 
+    @Query("SELECT * FROM favorite_folder")
+    suspend fun folders(): List<FavoriteFolderEntity>
+
     @Query("SELECT MAX(sort_order) FROM favorite_folder")
     suspend fun maxFolderSortOrder(): Int?
 

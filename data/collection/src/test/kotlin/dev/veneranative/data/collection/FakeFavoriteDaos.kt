@@ -30,6 +30,8 @@ internal class FakeFavoriteDao : FavoriteDao {
     override suspend fun folder(folderId: String): FavoriteFolderEntity? =
         folders.value.firstOrNull { it.folderId == folderId }
 
+    override suspend fun folders(): List<FavoriteFolderEntity> = folders.value
+
     override suspend fun maxFolderSortOrder(): Int? = folders.value.maxOfOrNull { it.sortOrder }
 
     override suspend fun insertFolder(folder: FavoriteFolderEntity) {

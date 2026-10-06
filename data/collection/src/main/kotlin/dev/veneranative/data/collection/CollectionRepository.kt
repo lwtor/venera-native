@@ -16,6 +16,9 @@ data class FavoriteFolder(
     val removable: Boolean,
 )
 
+/** A collection name is already in use or would be confused with the implicit All view. */
+class CollectionNameConflictException : IllegalArgumentException()
+
 /** One comic on the shelf. */
 data class FavoriteItem(
     val ref: ComicRef,

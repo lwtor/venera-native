@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S4-09A6 收藏夹管理收尾 |
-| 当前任务状态 | S4-09A3–A5 已完成数据迁移、书架长按多选及详情收藏确认；正在处理删除收藏夹与重名保护。阅读器 S3-00X2 仍待用户真机复验。 |
+| 当前任务（唯一下一任务） | S4-09A7 用户真机验收书架与详情收藏交互 |
+| 当前任务状态 | S4-09A3–A6 的代码、测试和编译已完成；待用户在真机检查界面及既有收藏迁移，随后按反馈修复。阅读器 S3-00X2 仍待用户真机复验。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -38,6 +38,8 @@
 **S4-09A4 DONE：书架入口与收藏夹交互。** 书架固定以收藏视图打开，下载与本地漫画保留在右上菜单，进入后返回图标和系统返回均回到书架；收藏夹和排序仍按用户上次选择恢复。长按漫画显示“全部”自动归属与自建收藏夹复选列表，支持多选、清空可选归属并保存；可在面板中新建收藏夹，移出书架需二次确认且说明阅读记录不受影响。界面中相关“文件夹/目录”文案改为“收藏夹”，本地导入目录仍保留文件系统含义。JDK 17 `:feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；设备视觉与操作留给用户复验。下一项 S4-09A5：详情页收藏选择和移除确认。
 
 **S4-09A5 DONE：详情页收藏选择与取消确认。** 点收藏图标先打开选择弹窗，“全部”自动加入，可勾选多个自建收藏夹，也可在此新建并自动勾选；确认后一次写入收藏与归属。已收藏时点击图标先确认从全部和所有收藏夹中移除，并说明阅读记录独立保留。失败时弹窗保留并显示产品文案，保存中阻止重复触发。JDK 17 `:feature:details:testDebugUnitTest :feature:home:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；设备操作待用户复验。下一项 S4-09A6：删除收藏夹确认及重名保护。
+
+**S4-09A6 DONE：收藏夹管理保护。** 删除自建收藏夹前显示二次确认，明确漫画仍在“全部”和其他收藏夹；新建/重命名拒绝忽略大小写的重名和保留名“全部/All”，页面显示可理解的错误文案。JDK 17 `:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。没有安装或操作用户真机；S4-09A7 由用户验证实际布局、迁移后的旧收藏和各弹窗操作。
 
 **S4-09A2 DONE：最近阅读按漫画去重。** 之前 `observeRecent(5)` 直接限制最近五条章节位置；阅读不同章节会在首页重复出现同一部漫画。Room DAO 现在用每个来源/漫画的最新更新时间选一条记录，并在去重后应用数量限制；同一漫画仍按章节保留在历史表，详情页已读状态不受影响。HomeViewModel 按更新时间排序并按 `ComicKey` 去重，防止重复项进入首页。新增 Room DAO 查询源码及 HomeViewModel 回归测试。验证：JDK 17 `:data:history:testDebugUnitTest :feature:home:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。Room AndroidTest 源码已编译，未在设备上执行。
 

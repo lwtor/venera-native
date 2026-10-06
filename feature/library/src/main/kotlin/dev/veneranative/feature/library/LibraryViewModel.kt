@@ -3,6 +3,7 @@ package dev.veneranative.feature.library
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.veneranative.data.collection.CollectionRepository
+import dev.veneranative.data.collection.CollectionNameConflictException
 import dev.veneranative.data.collection.ShelfSort
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.local.LocalImportResult
@@ -69,8 +70,20 @@ class LibraryViewModel(
                 _state.update { it.copy(folderEditor = it.folderEditor?.copy(draft = action.draft)) }
 
             LibraryAction.ConfirmFolderEditor -> confirmFolderEditor()
-            LibraryAction.DismissFolderEditor -> _state.update { it.copy(folderEditor = null) }
-            is LibraryAction.DeleteFolder -> runSafely { repository.deleteFolder(action.folderId) }
+            LibraryAction.DismissFolderEditor -> _state.update {
+                if (it.folderSaving) it else it.copy(folderEditor = null)
+            }
+            is LibraryAction.RequestDeleteFolder -> _state.update { current ->
+                current.copy(pendingDeleteFolderId = action.folderId.takeIf { id ->
+                    current.folders.any { it.id == id && it.removable }
+                })
+            }
+            LibraryAction.DismissDeleteFolder -> _state.update { it.copy(pendingDeleteFolderId = null) }
+            LibraryAction.ConfirmDeleteFolder -> {
+                val id = _state.value.pendingDeleteFolderId ?: return
+                _state.update { it.copy(pendingDeleteFolderId = null) }
+                runSafely { repository.deleteFolder(id) }
+            }
 
             LibraryAction.RequestRemoveFavorite -> _state.update { it.copy(confirmRemoveFavorite = it.selectedFavorite != null) }
             LibraryAction.DismissRemoveFavorite -> _state.update { it.copy(confirmRemoveFavorite = false) }
@@ -282,26 +295,50 @@ class LibraryViewModel(
     }
 
     private fun openFolderEditor(folderId: String?) {
+        if (_state.value.folderSaving) return
         val draft = _state.value.folders.firstOrNull { it.id == folderId }?.name.orEmpty()
-        _state.update { it.copy(folderEditor = FolderEditor(folderId = folderId, draft = draft)) }
+        _state.update { it.copy(folderEditor = FolderEditor(folderId = folderId, draft = draft), message = null) }
     }
 
     private fun confirmFolderEditor() {
         val editor = _state.value.folderEditor ?: return
+        if (_state.value.folderSaving) return
         val name = editor.draft.trim()
         if (name.isEmpty()) {
             _state.update { it.copy(message = "请输入收藏夹名称。") }
             return
         }
-        _state.update { it.copy(folderEditor = null) }
-        runSafely {
-            if (editor.folderId == null) {
-                val id = repository.createFolder(name)
-                if (_state.value.selectedFavorite != null) {
-                    _state.update { it.copy(selectedFavoriteFolders = it.selectedFavoriteFolders + id) }
+        _state.update { it.copy(folderSaving = true, message = null) }
+        viewModelScope.launch {
+            runCatching {
+                if (editor.folderId == null) repository.createFolder(name)
+                else {
+                    repository.renameFolder(editor.folderId, name)
+                    null
                 }
-            } else {
-                repository.renameFolder(editor.folderId, name)
+            }.onSuccess { createdId ->
+                _state.update { current ->
+                    current.copy(
+                        folderEditor = null,
+                        folderSaving = false,
+                        message = null,
+                        selectedFavoriteFolders = if (createdId != null && current.selectedFavorite != null) {
+                            current.selectedFavoriteFolders + createdId
+                        } else current.selectedFavoriteFolders,
+                    )
+                }
+            }.onFailure { failure ->
+                failUnlessCancelled(failure)
+                _state.update { current ->
+                    current.copy(
+                        folderSaving = false,
+                        message = if (failure is CollectionNameConflictException) {
+                            "已有同名收藏夹，请换个名称。"
+                        } else {
+                            "无法保存此更改。"
+                        },
+                    )
+                }
             }
         }
     }
@@ -329,7 +366,15 @@ class LibraryViewModel(
             runCatching { block() }
                 .onFailure { failure ->
                     failUnlessCancelled(failure)
-                    _state.update { current -> current.copy(message = "无法保存此更改。") }
+                    _state.update { current ->
+                        current.copy(
+                            message = if (failure is CollectionNameConflictException) {
+                                "已有同名收藏夹，请换个名称。"
+                            } else {
+                                "无法保存此更改。"
+                            },
+                        )
+                    }
                 }
         }
     }

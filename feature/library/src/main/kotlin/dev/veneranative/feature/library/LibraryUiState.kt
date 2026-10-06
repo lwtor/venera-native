@@ -48,6 +48,8 @@ data class LibraryUiState(
     val confirmRemoveFavorite: Boolean = false,
     /** Set while the create/rename dialog is open. */
     val folderEditor: FolderEditor? = null,
+    val folderSaving: Boolean = false,
+    val pendingDeleteFolderId: String? = null,
     /** Product copy for the last outcome; never a lower layer's wording. */
     val message: String? = null,
 ) {
@@ -78,7 +80,9 @@ sealed interface LibraryAction {
 
     data object DismissFolderEditor : LibraryAction
 
-    data class DeleteFolder(val folderId: String) : LibraryAction
+    data class RequestDeleteFolder(val folderId: String) : LibraryAction
+    data object ConfirmDeleteFolder : LibraryAction
+    data object DismissDeleteFolder : LibraryAction
 
     data object RequestRemoveFavorite : LibraryAction
     data object ConfirmRemoveFavorite : LibraryAction

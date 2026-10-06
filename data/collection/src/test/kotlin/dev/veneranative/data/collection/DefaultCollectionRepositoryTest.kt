@@ -209,6 +209,14 @@ class DefaultCollectionRepositoryTest {
         assertTrue(folders.last().removable)
     }
 
+    @Test fun `collection names are unique and All is reserved`() = runTest {
+        seedFolders()
+        assertTrue(runCatching { repository.createFolder("  READING  ") }.exceptionOrNull() is CollectionNameConflictException)
+        assertTrue(runCatching { repository.createFolder("全部") }.exceptionOrNull() is CollectionNameConflictException)
+        assertTrue(runCatching { repository.renameFolder("later", "Reading") }.exceptionOrNull() is CollectionNameConflictException)
+        assertEquals(listOf("Reading", "Later"), repository.observeFolders().first().map { it.name })
+    }
+
     @Test fun `each shelf order puts a different comic first`() = runTest {
         dao.entries.value = listOf(
             row("c1", "Zeta", addedAt = 4_000L, lastReadAt = 1_000L),

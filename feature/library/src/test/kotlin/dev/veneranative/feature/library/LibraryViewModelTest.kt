@@ -247,16 +247,34 @@ class LibraryViewModelTest {
     }
 
     @Test
-    fun `deleting a folder forwards only its id`() = runTest(dispatcher) {
+    fun `deleting a collection requires confirmation`() = runTest(dispatcher) {
         repository.folders.value = listOf(favoriteFolder("reading", "Reading"))
         val viewModel = LibraryViewModel(repository)
         advanceUntilIdle()
 
-        viewModel.onAction(LibraryAction.DeleteFolder("reading"))
+        viewModel.onAction(LibraryAction.RequestDeleteFolder("reading"))
+        assertEquals("reading", viewModel.state.value.pendingDeleteFolderId)
+        assertTrue(repository.deletedFolders.isEmpty())
+        viewModel.onAction(LibraryAction.DismissDeleteFolder)
+        assertTrue(repository.deletedFolders.isEmpty())
+        viewModel.onAction(LibraryAction.RequestDeleteFolder("reading"))
+        viewModel.onAction(LibraryAction.ConfirmDeleteFolder)
         advanceUntilIdle()
 
         assertEquals(listOf("reading"), repository.deletedFolders)
         assertTrue(repository.observeItemQueries.isNotEmpty())
+    }
+
+    @Test fun `duplicate collection name gets actionable copy`() = runTest(dispatcher) {
+        repository.createFolderError = dev.veneranative.data.collection.CollectionNameConflictException()
+        val viewModel = LibraryViewModel(repository)
+        advanceUntilIdle()
+        viewModel.onAction(LibraryAction.EditFolder(null))
+        viewModel.onAction(LibraryAction.FolderDraftChanged("在读"))
+        viewModel.onAction(LibraryAction.ConfirmFolderEditor)
+        advanceUntilIdle()
+        assertEquals("已有同名收藏夹，请换个名称。", viewModel.state.value.message)
+        assertEquals("在读", viewModel.state.value.folderEditor?.draft)
     }
 
     @Test

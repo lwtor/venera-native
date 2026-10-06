@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
 import java.util.UUID
+import java.util.Locale
 
 /**
  * The shelf over Room.
@@ -69,20 +70,36 @@ class DefaultCollectionRepository internal constructor(
     override suspend fun createFolder(name: String): String {
         val trimmed = name.trim()
         require(trimmed.isNotEmpty()) { "folder name must not be blank" }
-        val folder = FavoriteFolderEntity(
-            folderId = "folder-${UUID.randomUUID()}",
-            name = trimmed,
-            sortOrder = (dao.maxFolderSortOrder() ?: -1) + 1,
-            removable = true,
-        )
-        dao.insertFolder(folder)
-        return folder.folderId
+        var id = ""
+        transaction {
+            requireAvailableName(trimmed)
+            val folder = FavoriteFolderEntity(
+                folderId = "folder-${UUID.randomUUID()}",
+                name = trimmed,
+                sortOrder = (dao.maxFolderSortOrder() ?: -1) + 1,
+                removable = true,
+            )
+            dao.insertFolder(folder)
+            id = folder.folderId
+        }
+        return id
     }
 
     override suspend fun renameFolder(id: String, name: String) {
         val trimmed = name.trim()
-        if (trimmed.isEmpty()) return
-        dao.renameFolder(id, trimmed)
+        require(trimmed.isNotEmpty()) { "folder name must not be blank" }
+        transaction {
+            if (dao.folder(id) == null) return@transaction
+            requireAvailableName(trimmed, exceptId = id)
+            dao.renameFolder(id, trimmed)
+        }
+    }
+
+    private suspend fun requireAvailableName(name: String, exceptId: String? = null) {
+        val normalized = name.lowercase(Locale.ROOT)
+        if (normalized == "全部" || normalized == "all" ||
+            dao.folders().any { it.folderId != exceptId && it.name.lowercase(Locale.ROOT) == normalized }
+        ) throw CollectionNameConflictException()
     }
 
     override suspend fun deleteFolder(id: String) {

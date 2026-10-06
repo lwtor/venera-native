@@ -37,6 +37,7 @@ internal class FakeCollectionRepository : CollectionRepository {
     var observeItemsError: Throwable? = null
     var refreshUpdatesResult: Int = 0
     var refreshUpdatesError: Throwable? = null
+    var createFolderError: Throwable? = null
 
     val observeItemQueries = mutableListOf<Pair<String?, ShelfSort>>()
     val createdFolders = mutableListOf<String>()
@@ -60,6 +61,7 @@ internal class FakeCollectionRepository : CollectionRepository {
         items.map { rows -> rows.firstOrNull { it.ref == ref } }
 
     override suspend fun createFolder(name: String): String {
+        createFolderError?.let { throw it }
         createdFolders += name
         val id = "folder-${createdFolders.size}"
         folders.value = folders.value + FavoriteFolder(id = id, name = name, sortOrder = folders.value.size, removable = true)

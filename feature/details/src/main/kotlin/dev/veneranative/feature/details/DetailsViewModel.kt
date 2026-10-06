@@ -8,6 +8,7 @@ import dev.veneranative.core.model.ComicRef
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.CollectionRepository
+import dev.veneranative.data.collection.CollectionNameConflictException
 import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
@@ -238,7 +239,15 @@ class DetailsViewModel(
                 } }
                 .onFailure { failure ->
                     failUnlessCancelled(failure)
-                    _state.update { it.copy(shelfMessage = "无法创建收藏夹。") }
+                    _state.update {
+                        it.copy(
+                            shelfMessage = if (failure is CollectionNameConflictException) {
+                                "已有同名收藏夹，请换个名称。"
+                            } else {
+                                "无法创建收藏夹。"
+                            },
+                        )
+                    }
                 }
         }
     }
