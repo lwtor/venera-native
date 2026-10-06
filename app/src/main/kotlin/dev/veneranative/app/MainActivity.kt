@@ -230,17 +230,14 @@ private fun AppNavHost(
         uri?.toString()?.let { scriptSelection?.invoke(it) }
         scriptSelection = null
     }
-    val isMainTab = route == AppRoute.Home ||
-        route == AppRoute.Library ||
-        route == AppRoute.Sources ||
-        route is AppRoute.Explore
+    val isMainTab = route == AppRoute.Home || route == AppRoute.Library
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = if (route is AppRoute.ComicDetails || route is AppRoute.Reader) {
-            WindowInsets(0.dp)
-        } else {
+        contentWindowInsets = if (isMainTab) {
             ScaffoldDefaults.contentWindowInsets
+        } else {
+            WindowInsets(0.dp)
         },
         bottomBar = {
             if (isMainTab) {
@@ -253,25 +250,11 @@ private fun AppNavHost(
                         modifier = Modifier.testTag("root_tab_home"),
                     )
                     NavigationBarItem(
-                        selected = route is AppRoute.Explore,
-                        onClick = { onRouteChange(AppRoute.Explore(null)) },
-                        icon = { Text("◉") },
-                        label = { Text("探索") },
-                        modifier = Modifier.testTag("root_tab_explore"),
-                    )
-                    NavigationBarItem(
                         selected = route == AppRoute.Library,
                         onClick = { onRouteChange(AppRoute.Library) },
                         icon = { Text("▤") },
                         label = { Text("书架") },
                         modifier = Modifier.testTag("root_tab_library"),
-                    )
-                    NavigationBarItem(
-                        selected = route == AppRoute.Sources,
-                        onClick = { onRouteChange(AppRoute.Sources) },
-                        icon = { Text("＋") },
-                        label = { Text("来源") },
-                        modifier = Modifier.testTag("root_tab_sources"),
                     )
                 }
             }
@@ -288,7 +271,6 @@ private fun AppNavHost(
                 onRouteChange(AppRoute.Reader(entry.toChapterRef()))
             },
             onOpenSources = { onRouteChange(AppRoute.Sources) },
-            onOpenExplore = { onRouteChange(AppRoute.Explore(null)) },
             onOpenSearch = { onRouteChange(AppRoute.Search(null)) },
             onOpenLibrary = { onRouteChange(AppRoute.Library) },
         )

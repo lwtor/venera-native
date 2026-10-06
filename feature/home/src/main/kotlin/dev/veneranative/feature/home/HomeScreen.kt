@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -27,17 +27,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.designsystem.VeneraNativeTheme
@@ -58,7 +61,6 @@ fun HomeRoute(
     localRepository: LocalComicRepository?,
     onResumeReading: (ReadingHistoryEntry) -> Unit,
     onOpenSources: () -> Unit,
-    onOpenExplore: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
 ) {
@@ -72,7 +74,6 @@ fun HomeRoute(
         state = state,
         onResumeReading = onResumeReading,
         onOpenSources = onOpenSources,
-        onOpenExplore = onOpenExplore,
         onOpenSearch = onOpenSearch,
         onOpenLibrary = onOpenLibrary,
     )
@@ -83,13 +84,13 @@ internal fun HomeScreen(
     state: HomeUiState,
     onResumeReading: (ReadingHistoryEntry) -> Unit,
     onOpenSources: () -> Unit,
-    onOpenExplore: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets(0.dp),
         containerColor = MaterialTheme.colorScheme.background,
     ) { contentPadding ->
         LazyColumn(
@@ -100,32 +101,32 @@ internal fun HomeScreen(
             item {
                 Column(
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     HomeHeader(onOpenSources = onOpenSources)
                     SearchEntry(onOpenSearch = onOpenSearch)
-                    WelcomeCard(onOpenExplore = onOpenExplore, onOpenSearch = onOpenSearch)
                 }
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(
-                        title = "接着阅读",
-                        action = null,
+                        title = "最近阅读",
+                        action = if (state.recentReading.isNotEmpty()) "全部" else null,
                         onClick = onOpenLibrary,
                     )
-                    val latest = state.recentReading.firstOrNull()
-                    if (latest == null) {
+                    if (state.recentReading.isEmpty()) {
                         EmptyResumeCard(
                             waitingForData = !state.historyAvailable,
-                            onOpenExplore = onOpenExplore,
+                            onOpenSearch = onOpenSearch,
                         )
                     } else {
-                        ResumeCard(entry = latest, onClick = { onResumeReading(latest) })
+                        state.recentReading.take(3).forEach { entry ->
+                            ResumeCard(entry = entry, onClick = { onResumeReading(entry) })
+                        }
                     }
                 }
             }
-            item {
+            if (state.favorites.any { it.hasUpdate }) item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     val updated = state.favorites.filter { it.hasUpdate }
                     SectionHeader(
@@ -133,39 +134,26 @@ internal fun HomeScreen(
                         action = "书架",
                         onClick = onOpenLibrary,
                     )
-                    if (updated.isEmpty()) {
-                        EmptySectionCard(
-                            title = when {
-                                !state.favoritesAvailable -> "正在读取收藏"
-                                state.favorites.isEmpty() -> "收藏的漫画会出现在这里"
-                                else -> "有新章节时会在这里提醒你"
-                            },
-                            subtitle = if (state.favorites.isEmpty()) "先去探索，收藏喜欢的作品" else "检查更新后，你追的作品会显示在这里",
-                            action = if (state.favorites.isEmpty()) "去探索" else "打开书架",
-                            onClick = if (state.favorites.isEmpty()) onOpenExplore else onOpenLibrary,
-                        )
-                    } else {
-                        Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Spacer(Modifier.width(8.dp))
-                            updated.take(8).forEach { favorite ->
-                                FavoriteUpdateCard(
-                                    item = favorite,
-                                    onClick = onOpenLibrary,
-                                )
-                            }
-                            Spacer(Modifier.width(8.dp))
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Spacer(Modifier.width(8.dp))
+                        updated.take(8).forEach { favorite ->
+                            FavoriteUpdateCard(
+                                item = favorite,
+                                onClick = onOpenLibrary,
+                            )
                         }
+                        Spacer(Modifier.width(8.dp))
                     }
                 }
             }
-            item {
+            if (state.localComics.isNotEmpty()) item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SectionHeader(
                         title = "本地漫画",
-                        action = "管理",
+                        action = "书架",
                         onClick = onOpenLibrary,
                     )
                     LocalLibraryCard(
@@ -175,18 +163,7 @@ internal fun HomeScreen(
                     )
                 }
             }
-            item {
-                Column(
-                    modifier = Modifier.padding(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    SectionHeader(title = "发现更多", action = null, onClick = {})
-                    DiscoveryCard(
-                        onExplore = onOpenExplore,
-                        onAddSource = onOpenSources,
-                    )
-                }
-            }
+            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 }
@@ -211,7 +188,9 @@ private fun HomeHeader(onOpenSources: () -> Unit) {
             Text("漫画，随时继续", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.weight(1f))
-        TextButton(onClick = onOpenSources) { Text("来源") }
+        IconButton(onClick = onOpenSources, modifier = Modifier.clip(CircleShape)) {
+            Icon(Icons.Filled.MoreVert, contentDescription = "管理漫画源", tint = MaterialTheme.colorScheme.primary)
+        }
     }
 }
 
@@ -240,41 +219,6 @@ private fun SearchEntry(onOpenSearch: () -> Unit) {
 }
 
 @Composable
-private fun WelcomeCard(onOpenExplore: () -> Unit, onOpenSearch: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF38234E)),
-    ) {
-        Box {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 18.dp, top = 20.dp)
-                    .size(112.dp)
-                    .background(Color.White.copy(alpha = 0.07f), CircleShape),
-            )
-            Column(
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("你的下一段漫画旅程", style = MaterialTheme.typography.labelLarge, color = Color(0xFFDCC7F1))
-                Text(
-                    "打开书架，\n也发现新故事。",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Button(onClick = onOpenExplore) { Text("开始探索") }
-                    TextButton(onClick = onOpenSearch) { Text("搜索漫画", color = Color.White) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun SectionHeader(title: String, action: String?, onClick: () -> Unit) {
     Row(
         modifier = Modifier
@@ -289,7 +233,7 @@ private fun SectionHeader(title: String, action: String?, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmptyResumeCard(waitingForData: Boolean, onOpenExplore: () -> Unit) {
+private fun EmptyResumeCard(waitingForData: Boolean, onOpenSearch: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -318,7 +262,7 @@ private fun EmptyResumeCard(waitingForData: Boolean, onOpenExplore: () -> Unit) 
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text("从喜欢的故事开始，进度会自动保存在这里。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = onOpenExplore) { Text("去发现漫画  ›") }
+                TextButton(onClick = onOpenSearch) { Text("搜索漫画  ›") }
             }
         }
     }
@@ -358,30 +302,6 @@ private fun ResumeCard(entry: ReadingHistoryEntry, onClick: () -> Unit) {
                 Text("第 ${entry.pageIndex + 1} / ${entry.pageCount.coerceAtLeast(1)} 页", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("继续阅读  ›", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             }
-        }
-    }
-}
-
-@Composable
-private fun EmptySectionCard(title: String, subtitle: String, action: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-        shape = RoundedCornerShape(20.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Text(action, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -477,46 +397,6 @@ private fun LocalLibraryCard(count: Int, isAvailable: Boolean, onClick: () -> Un
     }
 }
 
-@Composable
-private fun DiscoveryCard(onExplore: () -> Unit, onAddSource: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            title = "按来源探索",
-            subtitle = "逛逛漫画源",
-            glyph = "◉",
-            onClick = onExplore,
-        )
-        QuickActionCard(
-            modifier = Modifier.weight(1f),
-            title = "添加来源",
-            subtitle = "连接你的漫画源",
-            glyph = "+",
-            onClick = onAddSource,
-        )
-    }
-}
-
-@Composable
-private fun QuickActionCard(modifier: Modifier = Modifier, title: String, subtitle: String, glyph: String, onClick: () -> Unit) {
-    Card(
-        modifier = modifier.clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(glyph, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f), maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
 @Preview(showBackground = true, widthDp = 393, heightDp = 852)
 @Composable
 private fun HomeScreenPreview() {
@@ -525,7 +405,6 @@ private fun HomeScreenPreview() {
             state = HomeUiState(historyAvailable = true, favoritesAvailable = true, localLibraryAvailable = true),
             onResumeReading = {},
             onOpenSources = {},
-            onOpenExplore = {},
             onOpenSearch = {},
             onOpenLibrary = {},
         )

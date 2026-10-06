@@ -36,6 +36,7 @@ class SourcesScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
         composeRule.onNodeWithTag(LOADING_TAG).assertIsDisplayed()
     }
 
@@ -51,7 +52,8 @@ class SourcesScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("尚未安装漫画源。请从上方选择，或安装本地脚本。").assertIsDisplayed()
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
+        composeRule.onNodeWithText("还没有安装漫画源。你可以从“可用来源”安装，或从文件导入脚本。").assertIsDisplayed()
     }
 
     @Test
@@ -70,6 +72,7 @@ class SourcesScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
         composeRule.onNodeWithText("无法读取已安装的漫画源。").assertIsDisplayed()
         composeRule.onNodeWithText("重试").performClick()
 
@@ -88,6 +91,7 @@ class SourcesScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
         composeRule.onNodeWithText("Demo Source").assertIsDisplayed()
         composeRule.onNodeWithText("版本 1.2.3").assertIsDisplayed()
     }
@@ -104,7 +108,8 @@ class SourcesScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("已安装").assertIsNotEnabled()
+        composeRule.onNodeWithText("手动安装").performClick()
+        composeRule.onNodeWithTag(MANUAL_INSTALL_TAG).assertIsNotEnabled()
     }
 
     @Test
@@ -129,6 +134,22 @@ class SourcesScreenTest {
         composeRule.onNodeWithTag(CATALOG_INSTALL_TAG).performClick()
 
         assertEquals(listOf(SourcesAction.InstallCatalogEntry(entry)), actions)
+    }
+
+    @Test
+    fun `installed sources live in their own full-height section`() {
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(status = SourcesStatus.Ready, sources = listOf(SOURCE)),
+                    onAction = {},
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
+        composeRule.onNodeWithText("Demo Source").assertIsDisplayed()
     }
 
     private companion object {

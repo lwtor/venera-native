@@ -18,20 +18,13 @@ class RootTabNavigationTest {
     fun rootTabsSwitchContentAndKeepTheBottomBarVisible() {
         composeRule.onNodeWithTag("root_tab_home").assertIsSelected()
 
-        composeRule.onNodeWithTag("root_tab_explore").performClick()
-        composeRule.onNodeWithTag("root_tab_explore").assertIsSelected()
-        composeRule.onNodeWithTag("root_tab_home").assertIsDisplayed()
 
         composeRule.onNodeWithTag("root_tab_library").performClick()
         composeRule.onNodeWithTag("root_tab_library").assertIsSelected()
         composeRule.onNodeWithText("收藏").assertIsDisplayed()
 
-        composeRule.onNodeWithTag("root_tab_sources").performClick()
-        composeRule.onNodeWithTag("root_tab_sources").assertIsSelected()
-        composeRule.onNodeWithTag("root_tab_library").assertIsDisplayed()
-
         composeRule.onNodeWithTag("root_tab_home").performClick()
         composeRule.onNodeWithTag("root_tab_home").assertIsSelected()
-        composeRule.onNodeWithText("你的下一段漫画旅程").assertIsDisplayed()
+        composeRule.onNodeWithText("搜索漫画、作者或来源").assertIsDisplayed()
     }
 }

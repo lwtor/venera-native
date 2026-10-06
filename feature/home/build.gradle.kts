@@ -7,6 +7,7 @@ android {
 }
 
 dependencies {
+    implementation("androidx.compose.material:material-icons-core")
     implementation(project(":core:designsystem"))
     implementation(project(":core:image"))
     implementation(project(":core:model"))

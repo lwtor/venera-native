@@ -6,10 +6,10 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-10-05 |
+| 最后更新 | 2026-10-06 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务 | S3-01E 搜索进入耗时与列表位置恢复 |
-| 当前任务状态 | 列表恢复已由用户确认正常。先前改动只把搜索表单提前显示并后台预热，没有消除真正耗时。已定位根因：`SourceRepository.installed()` 串行安装来源，QuickJS 安装时同步等待每个来源可能联网的 `init()`；能力探测也曾通过普通调用触发初始化。现改为安装仅实例化脚本、结构探测不运行 init、首次真实来源调用时再初始化对应来源，避免进入搜索页等待所有来源联网。新增回归覆盖安装/探测不触发 init 和首次实际调用执行 init。Debug-only 有界本地日志 `files/diagnostics/search-startup.log` 保留，记录来源预热与发现分段耗时，不记录搜索词、网络内容或凭据。验证：JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :source:core:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装/运行真机，实际时间改善仍待用户验收。先前 S3-00W/S3-00W1 仍有设备验收未完成，见下方任务记录。 |
+| 当前任务 | S4-08E 首页与漫画源管理体验优化 |
+| 当前任务状态 | 用户要求主导航仅保留首页/书架，并精简首页重复内容、重做来源页布局及统一返回图标/顶部留白。实现完成；JDK 17 `:feature:home:compileDebugKotlin :feature:search:compileDebugKotlin :feature:explore:compileDebugKotlin :feature:sources:compileDebugKotlin :feature:sources:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；设备视觉验收由用户执行。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -95,7 +95,7 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 
 **S4-10B DONE：接入来源详情页的附加只读内容。** `ComicDetail` 与来源协议解析现在保留可选推荐作品、评论预览、评论回复/评分/投票状态、来源网页 URL 与不展示的 source subId；缺字段或单条坏数据不会让整页解析失败。详情页显示来源评分等中文信息、评论预览与推荐作品横向卡片；点推荐进入对应详情，来源网页只开放 HTTP(S) URL。JDK 17 验证：`:source:api:testDebugUnitTest :feature:details:testDebugUnitTest :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。上游契约另列了可选点赞、评分、评论加载/发送/投票函数，但 Native `SourceCore`/`ComicCatalog` 目前没有类型化写操作，归 S4-10C；当前评论仅展示 `loadInfo` 已带回的只读预览，不宣称支持分页、回复或提交。真机视觉和来源实际字段验收待做。
 
-**S4-08D DONE：修复主页面四个底部 Tab 被当作独立页面打开的问题。** 根导航统一承载首页、探索、书架、来源四个 Tab 的底栏，点击后切换对应根页面并更新选中态；搜索、详情和阅读器仍走内部页面导航。新增根 Tab AndroidTest 源码。JDK 17 验证：`:app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。按用户工作流程，未运行设备测试，等待用户真机验收。
+**S4-08D 修订：主导航只保留首页与书架。** 用户在后续反馈中明确探索和来源作为主 Tab 显得多余；来源管理由首页标题栏入口进入，搜索由首页搜索入口进入，探索页面保留在功能路由中但不占底部导航。根 Tab 测试随本次 S4-08E 更新。
 
 **S4-04A DONE：核心 App 界面简体中文支持。** 首页、搜索、探索、详情、阅读器、书架、本地漫画、下载、漫画源管理及下载通知中的自有产品文案已中文化；App 名称、搜索和探索界面提供 Android 简体中文资源（`zh` 与 `zh-rCN`）。来源返回的漫画/章节/来源名称、动态元数据和用户自建文件夹名保留原文。同步更新受影响的 UI/状态测试文案。JDK 17 验证：`:data:download:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug :feature:explore:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。按普通任务验证策略仅编译测试源码，未运行设备 UI 测试；S4-04 后续仍需覆盖 TalkBack、字体缩放、键盘及繁体/英文。
 
@@ -113,6 +113,13 @@ S3-00A 已冻结版本并完成适用项矩阵、代码证据、初始分数与�
 - 真机：在已连接的 Xiaomi 设备上用 `adb install -r` 覆盖更新并启动，保留原应用及数据；已查看首屏，当前有一条本地阅读记录，能够呈现在首页。MIUI 拒绝 shell 手势注入（缺少 `INJECT_EVENTS`），因此滚动到底部和首页点击导航未做设备验收，不记为已验证。临时截图 `/tmp/venera-home-preview-final.png` 仅用于本次目视检查，未放入仓库（画面包含用户自己的阅读记录）。
 - 验证：`:feature:home:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；回归覆盖仓库 Flow 更新和本地/远端续读身份映射。`git diff --check` — PASS。
 - 该首版先按现有产品计划和本地设计系统实现。由于上游 GitHub 源码访问仍受 DNS 限制，不能声称已经逐屏复刻 Venera；后续 S4-08C 仍需源码对照、完整信息结构与视觉验收。
+
+### S4-08E 首页与漫画源管理体验优化 — DONE（设备验收待用户）
+
+- 根级底部栏收敛为“首页 / 书架”。首页移除重复的探索宣传卡和无数据时空占位，只保留搜索、最近阅读；收藏更新与本地漫画仅在存在对应数据时出现，最近阅读最多展示三条。
+- 来源页改为“可用来源 / 已安装”两种独立列表视图，在线目录列表获得主要空间；目录 URL 刷新使用图标操作，手动 URL 安装折叠为次要操作，从文件导入在标题栏提供图标。安装来源可跳到已安装列表。
+- 搜索、探索和来源页面的返回操作使用返回图标。非根页面不再从外层根 Scaffold 继承状态栏 inset；首页使用根 Scaffold 已提供的安全区域，减少内外 Scaffold 重复留白。
+- 验收：JDK 17 `:feature:home:compileDebugKotlin :feature:search:compileDebugKotlin :feature:explore:compileDebugKotlin :feature:sources:compileDebugKotlin :feature:sources:compileDebugAndroidTestKotlin :app:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` PASS。未在真机安装/验证，交由用户确认视觉与交互。
 
 S3-00 基线冻结本身是文档审查；首页/启动页首版的编译与真机查看结果分别记录在 S4-08A / S4-08B。
 

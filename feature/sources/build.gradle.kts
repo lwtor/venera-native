@@ -13,6 +13,7 @@ dependencies {
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.foundation)
+    implementation("androidx.compose.material:material-icons-core")
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.tooling.preview)
