@@ -30,8 +30,16 @@ fun LibraryRoute(
     onOpenDownloadedChapter: (dev.veneranative.core.model.ChapterRef) -> Unit = {},
     onScheduleDownloads: () -> Unit = {},
     screenPreferences: ScreenPreferenceRepository? = null,
+    standaloneDownloads: Boolean = false,
+    onOpenDownloads: () -> Unit = {},
+    onBackFromDownloads: () -> Unit = {},
 ) {
-    val viewModel: LibraryViewModel = viewModel { LibraryViewModel(collection, localRepository, downloads, screenPreferences) }
+    val viewModel: LibraryViewModel = viewModel(key = if (standaloneDownloads) "library-downloads" else "library") {
+        LibraryViewModel(
+            collection, localRepository, downloads, screenPreferences,
+            initialTab = if (standaloneDownloads) LibraryTab.Downloads else LibraryTab.Favorites,
+        )
+    }
     val state by viewModel.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(screenPreferences) {
         screenPreferences?.let(viewModel::attachScreenPreferences)
@@ -52,6 +60,9 @@ fun LibraryRoute(
         onOpenComic = onOpenComic,
         onOpenLocalChapter = onOpenLocalChapter,
         onOpenDownloadedChapter = onOpenDownloadedChapter,
+        standaloneDownloads = standaloneDownloads,
+        onOpenDownloads = onOpenDownloads,
+        onBackFromDownloads = onBackFromDownloads,
         modifier = modifier,
     )
 }

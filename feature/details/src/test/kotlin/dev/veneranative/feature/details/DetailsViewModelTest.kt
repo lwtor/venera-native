@@ -22,6 +22,7 @@ import dev.veneranative.data.collection.FavoriteItem
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.PageKey
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.download.DownloadChapterState
 import dev.veneranative.data.download.DownloadTask
 import dev.veneranative.data.download.DownloadPage
 import dev.veneranative.data.download.DownloadError
@@ -41,6 +42,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
@@ -139,6 +141,30 @@ class DetailsViewModelTest {
 
         assertEquals(setOf(RemoteChapterId("1")), viewModel.state.value.readChapterIds)
         assertEquals(RemoteChapterId("2"), viewModel.state.value.lastReadChapterId)
+    }
+
+    @Test fun `only completed downloads of this comic and exact version are marked downloaded`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren", grouped = true))
+        val downloads = RecordingDownloadRepository()
+        val jpChapter = ChapterRef.Remote(
+            ChapterKey(comicKey, RemoteChapterId("jp1")),
+            group = "JP",
+        )
+        val otherComic = ChapterRef.Remote(
+            ChapterKey(ComicKey(SourceId("s"), RemoteComicId("other")), RemoteChapterId("en1")),
+            group = "EN",
+        )
+        downloads.tasks.value = listOf(
+            DownloadTask(jpChapter, "第1話", "Frieren", 10, 10, DownloadChapterState.Completed, 1L, 1L),
+            DownloadTask(ChapterRef.Remote(ChapterKey(comicKey, RemoteChapterId("en1")), "EN"), "Chapter 1", "Frieren", 10, 4, DownloadChapterState.Running, 1L, 1L),
+            DownloadTask(otherComic, "Chapter 1", "Other", 10, 10, DownloadChapterState.Completed, 1L, 1L),
+        )
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        advanceUntilIdle()
+
+        assertEquals(setOf(jpChapter), viewModel.state.value.downloadedChapters)
     }
 
     @Test fun `selected chapters are queued in source order`() = runTest(dispatcher) {
@@ -491,9 +517,10 @@ class DetailsViewModelTest {
     }
 
     private class RecordingDownloadRepository : DownloadRepository {
+        val tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
         var enqueuedPages: List<SourcePage> = emptyList()
         val enqueuedChapters = mutableListOf<ChapterRef>()
-        override fun observeTasks(): Flow<List<DownloadTask>> = emptyFlow()
+        override fun observeTasks(): Flow<List<DownloadTask>> = tasks
         override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = emptyFlow()
         override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?, chapterIndex: Int?) {
             enqueuedPages = pages

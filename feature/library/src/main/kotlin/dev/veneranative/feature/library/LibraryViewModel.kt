@@ -36,11 +36,12 @@ class LibraryViewModel(
     private val localRepository: LocalComicRepository? = null,
     private val downloads: DownloadRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
+    private val initialTab: LibraryTab = LibraryTab.Favorites,
 ) : ViewModel() {
 
     private var screenPreferences: ScreenPreferenceRepository? = screenPreferences
 
-    private val _state = MutableStateFlow(LibraryUiState())
+    private val _state = MutableStateFlow(LibraryUiState(tab = initialTab))
     val state: StateFlow<LibraryUiState> = _state.asStateFlow()
 
     /** The current query. Distinct values only, so re-selecting the same folder costs nothing. */
@@ -316,7 +317,7 @@ class LibraryViewModel(
                 ShelfSort.entries.firstOrNull { it.name == value }
             } ?: ShelfSort.AddedAt
             selection.value = LibrarySelection(folderId, sort)
-            _state.update { it.copy(tab = LibraryTab.Favorites, selectedFolderId = folderId, sort = sort) }
+            _state.update { it.copy(tab = initialTab, selectedFolderId = folderId, sort = sort) }
             observeFolders()
             startItems()
         }

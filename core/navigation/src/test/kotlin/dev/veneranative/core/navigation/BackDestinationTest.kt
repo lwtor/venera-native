@@ -21,10 +21,11 @@ class BackDestinationTest {
         for (route in listOf(
             AppRoute.Sources,
             AppRoute.Library,
+            AppRoute.Downloads,
             AppRoute.Explore("source"),
             origin,
         )) {
-            assertEquals(AppRoute.Home, backDestination(route, origin))
+            assertEquals(if (route == AppRoute.Downloads) AppRoute.Library else AppRoute.Home, backDestination(route, origin))
         }
     }
 

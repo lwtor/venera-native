@@ -84,6 +84,9 @@ internal fun LibraryScreen(
     modifier: Modifier = Modifier,
     onOpenLocalChapter: (LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
     onOpenDownloadedChapter: (ChapterRef) -> Unit = {},
+    standaloneDownloads: Boolean = false,
+    onOpenDownloads: () -> Unit = {},
+    onBackFromDownloads: () -> Unit = {},
 ) {
     val selectedFolder = state.folders.firstOrNull { it.id == state.selectedFolderId }
     val currentDownloadComic = state.downloadComicKey?.let { key ->
@@ -95,6 +98,7 @@ internal fun LibraryScreen(
         when {
             state.tab == LibraryTab.Downloads && state.downloadSelectionMode -> onAction(LibraryAction.ToggleDownloadSelectionMode)
             state.tab == LibraryTab.Downloads && state.downloadComicKey != null -> onAction(LibraryAction.BackFromDownloadedComic)
+            state.tab == LibraryTab.Downloads && standaloneDownloads -> onBackFromDownloads()
             else -> onAction(LibraryAction.SelectTab(LibraryTab.Favorites))
         }
     }
@@ -123,6 +127,7 @@ internal fun LibraryScreen(
                                 when {
                                     state.tab == LibraryTab.Downloads && state.downloadSelectionMode -> onAction(LibraryAction.ToggleDownloadSelectionMode)
                                     state.tab == LibraryTab.Downloads && state.downloadComicKey != null -> onAction(LibraryAction.BackFromDownloadedComic)
+                                    state.tab == LibraryTab.Downloads && standaloneDownloads -> onBackFromDownloads()
                                     else -> onAction(LibraryAction.SelectTab(LibraryTab.Favorites))
                                 }
                             }) {
@@ -181,7 +186,7 @@ internal fun LibraryScreen(
                                 it.state != dev.veneranative.data.download.DownloadChapterState.Completed &&
                                     it.state != dev.veneranative.data.download.DownloadChapterState.Canceled
                             }
-                            TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Downloads)) }) {
+                            TextButton(onClick = onOpenDownloads) {
                                 Text("下载任务 $activeDownloads", maxLines = 1)
                             }
                             var libraryMenuExpanded by remember { mutableStateOf(false) }

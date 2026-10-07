@@ -10,6 +10,7 @@ fun backDestination(
 ): AppRoute? = when (route) {
     AppRoute.Home -> null
     AppRoute.Library, AppRoute.Sources -> AppRoute.Home
+    AppRoute.Downloads -> AppRoute.Library
     is AppRoute.Explore, is AppRoute.Search -> AppRoute.Home
     is AppRoute.ComicDetails -> detailsOrigin
     is AppRoute.Reader -> readerOrigin ?: when (val chapter = route.chapter) {

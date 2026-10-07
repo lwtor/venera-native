@@ -4,6 +4,7 @@ import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.FavoriteFolder
 
 enum class FavoriteDialog { Add, Remove }
@@ -23,6 +24,8 @@ data class DetailsUiState(
     val lastReadChapterId: RemoteChapterId? = null,
     /** Chapters whose persisted position reached the final page. */
     val readChapterIds: Set<RemoteChapterId> = emptySet(),
+    /** Chapters whose full download has completed for this exact source version. */
+    val downloadedChapters: Set<ChapterRef.Remote> = emptySet(),
     /** The group the list is narrowed to; null shows every group. */
     val selectedGroup: String? = null,
     val order: ChapterOrder = ChapterOrder.SourceOrder,

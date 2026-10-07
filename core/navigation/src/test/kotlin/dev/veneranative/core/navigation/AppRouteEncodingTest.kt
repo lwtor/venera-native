@@ -22,6 +22,7 @@ class AppRouteEncodingTest {
         AppRoute.Home,
         AppRoute.Sources,
         AppRoute.Library,
+        AppRoute.Downloads,
         AppRoute.Explore(null),
         AppRoute.Search(null),
         AppRoute.Explore("manga_dex"),
@@ -59,6 +60,8 @@ class AppRouteEncodingTest {
     fun `the library route encodes to its own string`() {
         assertEquals("library", AppRoute.Library.encode())
         assertEquals(AppRoute.Library, decodeAppRoute("library"))
+        assertEquals("downloads", AppRoute.Downloads.encode())
+        assertEquals(AppRoute.Downloads, decodeAppRoute("downloads"))
     }
 
     @Test

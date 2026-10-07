@@ -134,6 +134,12 @@ class LibraryViewModelTest {
         assertEquals(listOf(chapter), downloads.canceled)
     }
 
+    @Test fun `standalone downloads route starts directly in downloads`() = runTest(dispatcher) {
+        val viewModel = LibraryViewModel(repository, initialTab = LibraryTab.Downloads)
+
+        assertEquals(LibraryTab.Downloads, viewModel.state.value.tab)
+    }
+
     @Test fun `download comic navigation and confirmed bulk removal retain the selected comic state`() = runTest(dispatcher) {
         val downloads = FakeDownloadRepository()
         val comicKey = ComicKey(SourceId("source"), RemoteComicId("comic"))

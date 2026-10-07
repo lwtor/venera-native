@@ -12,6 +12,7 @@ import dev.veneranative.data.collection.CollectionNameConflictException
 import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.download.DownloadRepository
+import dev.veneranative.data.download.DownloadChapterState
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.source.api.SourceOutcome
@@ -61,6 +62,21 @@ class DetailsViewModel(
         }
         observeShelf()
         observeReadChapters()
+        observeDownloadedChapters()
+    }
+
+    private fun observeDownloadedChapters() {
+        val repository = downloads ?: return
+        viewModelScope.launch {
+            repository.observeTasks().collect { tasks ->
+                val downloaded = tasks.asSequence()
+                    .filter { it.state == DownloadChapterState.Completed }
+                    .mapNotNull { it.chapter as? ChapterRef.Remote }
+                    .filter { it.key.comicKey == comicKey }
+                    .toSet()
+                _state.update { it.copy(downloadedChapters = downloaded) }
+            }
+        }
     }
 
     fun onAction(action: DetailsAction) {

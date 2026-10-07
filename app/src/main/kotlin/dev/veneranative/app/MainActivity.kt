@@ -234,7 +234,7 @@ private fun AppNavHost(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = if (isMainTab) {
+        contentWindowInsets = if (isMainTab || route == AppRoute.Downloads) {
             ScaffoldDefaults.contentWindowInsets
         } else {
             WindowInsets(0.dp)
@@ -290,6 +290,27 @@ private fun AppNavHost(
                     onOpenDownloadedChapter = { chapter -> onRouteChange(AppRoute.Reader(chapter)) },
                     downloads = downloadRepository,
                     screenPreferences = screenPreferences,
+                    onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
+                    onOpenDownloads = { onRouteChange(AppRoute.Downloads) },
+                )
+            }
+        }
+
+        AppRoute.Downloads -> {
+            val collection = collectionRepository
+            if (collection == null || localRepository == null || downloadRepository == null) {
+                androidx.compose.material3.CircularProgressIndicator()
+            } else {
+                LibraryRoute(
+                    collection = collection,
+                    localRepository = localRepository,
+                    downloads = downloadRepository,
+                    screenPreferences = screenPreferences,
+                    standaloneDownloads = true,
+                    onBackFromDownloads = { onRouteChange(AppRoute.Library) },
+                    onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
+                    onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
+                    onOpenDownloadedChapter = { chapter -> onRouteChange(AppRoute.Reader(chapter)) },
                     onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                 )
             }

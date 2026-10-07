@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import dev.veneranative.core.model.ChapterRef
 import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -448,6 +449,7 @@ private fun Content(
                                 selected = chapter.key in state.selectedChapters,
                                 current = chapter.key.remoteId == state.lastReadChapterId,
                                 read = chapter.key.remoteId in state.readChapterIds,
+                                downloaded = ChapterRef.Remote(chapter.key, chapter.group) in state.downloadedChapters,
                                 selectionMode = state.isChapterSelectionMode,
                                 modifier = Modifier.weight(1f),
                                 onOpen = { onOpenChapter(chapter) },
@@ -1041,6 +1043,7 @@ private fun ChapterRow(
     selected: Boolean,
     current: Boolean,
     read: Boolean,
+    downloaded: Boolean,
     selectionMode: Boolean,
     modifier: Modifier = Modifier,
     onOpen: () -> Unit,
@@ -1059,10 +1062,15 @@ private fun ChapterRow(
             containerColor = when {
                 selected -> MaterialTheme.colorScheme.secondaryContainer
                 current -> MaterialTheme.colorScheme.primaryContainer
+                downloaded -> MaterialTheme.colorScheme.tertiaryContainer
                 else -> MaterialTheme.colorScheme.surfaceContainerLow
             },
         ),
-        border = if (current && !selected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+        border = when {
+            current && !selected -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            downloaded && !selected && !current -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f))
+            else -> null
+        },
     ) {
         Row(
             modifier = Modifier
@@ -1099,6 +1107,7 @@ private fun ChapterRow(
                 color = when {
                     selected -> MaterialTheme.colorScheme.onSecondaryContainer
                     current -> MaterialTheme.colorScheme.onPrimaryContainer
+                    downloaded -> MaterialTheme.colorScheme.onTertiaryContainer
                     read -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f)
                     else -> MaterialTheme.colorScheme.onSurface
                 },

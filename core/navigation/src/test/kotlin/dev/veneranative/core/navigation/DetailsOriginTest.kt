@@ -15,7 +15,7 @@ class DetailsOriginTest {
     private val reader = AppRoute.Reader(ChapterRef.Remote(ChapterKey(comic, RemoteChapterId("chapter"))))
 
     @Test fun detailsBackReturnsToTheListThatOpenedIt() {
-        for (origin in listOf(AppRoute.Library, AppRoute.Explore("source"), AppRoute.Search("source"))) {
+        for (origin in listOf(AppRoute.Library, AppRoute.Downloads, AppRoute.Explore("source"), AppRoute.Search("source"))) {
             assertEquals(origin, detailsOriginAfterNavigation(origin, details, AppRoute.Home))
         }
     }

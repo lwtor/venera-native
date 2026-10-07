@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务（唯一下一任务） | S4-10A3K 用户真机验收下载两层列表、批量移除及离线章节连续阅读 |
-| 当前任务状态 | S4-10A3I、A3J 已完成并分别提交：离线阅读按来源版本顺序切换；下载页改成按作品版本汇总、点入话列表、顶栏选择/批量移除，已完成话可直接阅读。JVM 回归与 App Debug 编译通过；未安装真机，当前交用户验收。 |
+| 当前任务状态 | S4-10A3L 已完成：详情目录按来源版本标出已下载章节；下载管理改为独立路由并隐藏底部 tab；确认 Reader 装配为本地优先，已下载完整章节从磁盘打开且不请求来源。导航、详情、书架、下载回归及 App Debug 构建通过，未操作真机。下一项仍是 A3K 的设备验收。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -32,6 +32,8 @@
 **S4-10A3I DONE：保存章节版本与目录顺序，让离线阅读可连续切话。** 下载记录新增可空的来源版本组和章节目录索引，Room 8→9 保留旧任务并兼容旧的未分组路径；分组版本使用独立下载任务 ID、文件目录及恢复清单。详情下载入队时传递版本组和目录索引；离线阅读器只在同作品、同版本且文件完整的已下载话之间提供上一话/下一话，避免误跳到其他汉化版本。新增迁移数据保留和同版本离线导航回归。验证：JDK 17 `:data:download:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。迁移 AndroidTest 源码已编译，未在真机执行。
 
 **S4-10A3J DONE：重做下载页分层、密度、批量移除与离线阅读入口。** 下载首页按作品与来源版本汇总任务，显示完成/处理中/需处理话数和整体页进度；进入后展示紧凑章节行，不再逐项显示移除按钮。顶栏垃圾桶进入选择模式，可在首页勾选整组或在章节页勾选单话，删除前确认并删除对应文件与任务；章节页点已完成话直接进入阅读器，返回时保留当前章节列表。章节组按来源版本隔离，批量选择不会误选同漫画其他版本。新增 ViewModel 回归覆盖双层进入/返回、版本范围选择和确认批量删除。验证：JDK 17 `:feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装真机，等待用户验收下载列表密度、选择/移除、离线打开及上一话/下一话。
+
+**S4-10A3L DONE：标记详情中的已下载章节，并将下载管理设为独立页面。** 详情页订阅下载任务，只为当前漫画、精确来源版本且状态已完成的章节应用独立的 tertiary 色彩和边框。下载入口进入新的 `AppRoute.Downloads`，自身维护下载页状态，系统返回回到书架；根导航不为该路由绘制底部 tab，同时保留系统栏 inset。检查确认 AppGraph 的 Reader 使用 `LocalFirstPageProvider(OfflineFirstPageProvider(...))`；完整下载话先校验并从磁盘组装，不调用来源，已有下载层回归测试断言来源调用数为 0。新增详情版本精确匹配和下载独立路由状态/返回回归。验证：JDK 17 `:core:navigation:testDebugUnitTest :feature:details:testDebugUnitTest :feature:library:testDebugUnitTest :data:download:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装真机，颜色区分和隐藏 tab 的视觉验收由用户执行。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 
