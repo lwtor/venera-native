@@ -121,16 +121,30 @@ fun DetailsScreen(
         contentWindowInsets = WindowInsets(0.dp),
         bottomBar = {
             if (state.detail != null && state.hasChapters) {
-                val resumeChapter = state.detail.chapters.firstOrNull { it.key.remoteId == state.lastReadChapterId }
-                val primaryChapter = resumeChapter ?: state.detail.chapters.firstOrNull()
-                if (primaryChapter != null) {
-                    Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
-                        Button(
-                            onClick = { onOpenChapter(primaryChapter) },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                        ) {
+                Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
+                    Button(
+                        onClick = if (state.isChapterSelectionMode) {
+                            { onAction(DetailsAction.DownloadSelectedChapters) }
+                        } else {
+                            {
+                                val resumeChapter = state.detail.chapters.firstOrNull { it.key.remoteId == state.lastReadChapterId }
+                                (resumeChapter ?: state.detail.chapters.firstOrNull())?.let(onOpenChapter)
+                            }
+                        },
+                        enabled = if (state.isChapterSelectionMode) {
+                            state.selectedChapters.isNotEmpty() && !state.isBatchDownloading
+                        } else {
+                            state.detail.chapters.isNotEmpty()
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    ) {
+                        if (state.isChapterSelectionMode) {
+                            Text(if (state.isBatchDownloading) "正在加入下载…" else "下载所选 · ${state.selectedChapters.size} 话")
+                        } else {
+                            val resumeChapter = state.detail.chapters.firstOrNull { it.key.remoteId == state.lastReadChapterId }
+                            val primaryChapter = resumeChapter ?: state.detail.chapters.firstOrNull()
                             val action = if (resumeChapter != null) "继续阅读" else "开始阅读"
-                            Text("$action · ${primaryChapter.title}", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(primaryChapter?.let { "$action · ${it.title}" }.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -881,13 +895,6 @@ private fun ChapterControls(
                     Text(if (allVisibleSelected) "取消全选" else "全选当前结果")
                 }
                 Text("已选 ${state.selectedChapters.size} 话", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.weight(1f))
-                Button(
-                    onClick = { onAction(DetailsAction.DownloadSelectedChapters) },
-                    enabled = state.selectedChapters.isNotEmpty() && !state.isBatchDownloading,
-                ) {
-                    Text(if (state.isBatchDownloading) "正在加入…" else "下载所选")
-                }
             }
         }
     }

@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-10A3E 详情页多选后从底部直接发起下载 |
-| 当前任务状态 | S4-10A3D 下载链路已修复图片请求头丢失，并将 WorkManager 网络约束改为 CONNECTED；数据库迁移及 Debug 编译通过，待提交。接下来调整详情页底部操作、增加章节拖动选择，并给书架增加直接可见的下载任务入口。用户负责真机验收，不由 Codex 安装或操作设备。 |
+| 当前任务（唯一下一任务） | S4-10A3F 章节多选支持滑动范围选择 |
+| 当前任务状态 | S4-10A3E 已完成：多选时底部阅读操作切换为下载所选并移除章节区重复按钮。下一步加入拖动选择，再增加书架直接可见的下载任务入口。用户负责真机验收，不由 Codex 安装或操作设备。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -22,6 +22,8 @@
 **S4-09A9 DONE：区分书架低频入口与收藏夹管理。** 顶部下载/本地漫画菜单图标改为下拉箭头，收藏夹管理继续使用三点菜单，避免相邻入口使用相同图标。JDK 17 `:core:image:compileDebugKotlin :feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机视觉验收待用户。
 
 **S4-10A3D DONE：保留来源图片请求头并确保下载可调度。** 阅读器图片请求使用来源 `comic.onImageLoad` 返回的 headers，而下载计划此前只保存 URL，Worker 因此无法通过需 Referer/UA 等头部保护的图片源；现在 headers 会随页记录持久化，并进入 `ComicImagePipeline`、章节恢复清单和重新入队时的请求刷新。Room 7→8 为已有页面增加空对象默认头部；旧章节重新从详情页入队会刷新未完成页的图片地址与头部。WorkManager 网络条件从仅无限流 Wi-Fi 改为有网络连接即可运行，避免用户主动下载后在移动网络上永久排队。JDK 17 `:core:database:compileDebugKotlin :data:download:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试、未安装 APK；来源下载与旧库升级待用户真机验收。
+
+**S4-10A3E DONE：详情多选后在固定底部直接下载。** 多选模式下，固定主操作切换为“下载所选 · N 话”，入队时显示处理中状态且无选择/正在入队时不可重复点击；退出多选后恢复最近阅读/开始阅读操作。章节区下载按钮已移除，保留全选和选择计数。JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或执行真机操作，交由用户验收。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 

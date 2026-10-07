@@ -633,7 +633,7 @@ S4-10 小任务：
 | S4-10A2 | 详情页沉浸式封面折叠栏：移除“漫画详情”和刷新操作栏，使用无底色返回图标；封面铺满顶部并随滚动收起，作品名过渡到只含返回和标题的紧凑栏；以内容保留式下拉刷新替代按钮；信息项采用紧凑标签和值卡片，标签分组采用彩色 chips | DONE（详情 JVM 单测和 App Debug 构建通过；用户真机视觉确认通过） |
 | S4-10A3 | 收紧详情章节目录：搜索改为次要图标入口，章节改为每行三项网格、移除普通列表序号和逐行下载按钮；底部主按钮优先续读历史中最近章节及其已保存页码，无进度时才从首章开始 | IN_PROGRESS（详情测试源码编译与 App Debug 构建通过；等待用户真机验证） |
 | S4-10A3D | 修复下载源图片请求头在入队、持久化、Worker 获取和恢复清单间丢失的问题；用户显式入队后允许已连接网络启动；数据库迁移兼容旧任务。 | DONE（Room 7→8 迁移、下载请求头持久化/清单恢复和 CONNECTED 调度已实现；JDK 17 `:core:database:compileDebugKotlin :data:download:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试或真机验收。） |
-| S4-10A3E | 详情页进入章节多选后，将底部阅读主按钮替换为“下载所选”，移除上方重复下载按钮 | TODO |
+| S4-10A3E | 详情页进入章节多选后，将底部阅读主按钮替换为“下载所选”，移除上方重复下载按钮 | DONE（底部按钮根据多选状态切换并显示所选话数/排队状态；章节区保留全选和计数；JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。设备交互待用户验收。） |
 | S4-10A3F | 章节多选支持按拖动路径连续选择/取消选择，并保证跨网格行范围选择 | TODO |
 | S4-10A3G | 书架提供直接可发现的下载任务入口，页面显示活动任务数及每章实时页进度 | TODO |
 | S4-10A4 | 将详情中部作品信息与作者/题材标签组并入封面主视觉，以半透明信息卡片和标签呈现并随封面折叠；按内容量自适应封面高度 | DONE（`:feature:details:compileDebugKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` 通过；设备视觉确认由用户执行） |
