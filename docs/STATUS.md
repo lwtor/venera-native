@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务（唯一下一任务） | S4-10A3K 用户真机验收下载两层列表、批量移除及离线章节连续阅读 |
-| 当前任务状态 | S4-10A3R 已完成：按反馈将详情章节列表的已下载状态色调为低饱和灰绿色，背景、文字、边框都降低对比度。App Debug 构建通过，未操作真机。当前唯一下一任务仍为 A3K 真机验收。 |
+| 当前任务状态 | S4-10A3S 已完成：书架标题栏的下载入口已改为图标按钮，未完成任务数保留在无障碍描述中；点击行为不变。Library 模块和 App Debug 构建通过，未操作真机。当前唯一下一任务仍为 A3K 真机验收。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -44,6 +44,8 @@
 **S4-10A3Q DONE：详情每次重新进入清理编辑模式和下载提示。** ViewModel 按漫画键保留，因此离开详情后重进时，多选模式、已选择章节及上次下载成功提示仍留在状态里，并触发 Snackbar 重播。`DetailsRoute` 每次进入时调用 ViewModel 清理这些路由临时状态；队列版本和下载任务不变。新增回归覆盖已入队、再次选择、重新进入后清理 UI 且保留队列。验证：JDK 17 `:feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机。
 
 **S4-10A3R DONE：降低已下载章节状态标记的视觉强度。** 按用户反馈，将亮绿底色、文字及边框改为低饱和灰绿色：浅色主题使用浅灰绿底和中等灰绿字色，深色主题使用暗灰绿底和柔和灰绿字色，边框也降低透明度；保留“已下载”勾标及无障碍描述。验证：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机，视觉明暗由用户验收。
+
+**S4-10A3S DONE：书架下载入口改为图标。** 将书架标题栏可见的“下载任务 N”文字按钮换为下载图标按钮，避免文字占据标题操作区；无障碍描述仍包含下载任务和未完成数量，点击后仍进入独立下载任务页。验证：JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机，图标样式由用户验收。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 

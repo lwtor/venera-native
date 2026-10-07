@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
@@ -56,6 +57,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.ComicKey
@@ -186,8 +189,66 @@ internal fun LibraryScreen(
                                 it.state != dev.veneranative.data.download.DownloadChapterState.Completed &&
                                     it.state != dev.veneranative.data.download.DownloadChapterState.Canceled
                             }
-                            TextButton(onClick = onOpenDownloads) {
-                                Text("下载任务 $activeDownloads", maxLines = 1)
+                            val downloadIconColor = MaterialTheme.colorScheme.onSurface
+                            IconButton(
+                                onClick = onOpenDownloads,
+                                modifier = Modifier.semantics {
+                                    contentDescription = "下载任务，$activeDownloads 个未完成"
+                                },
+                            ) {
+                                androidx.compose.foundation.Canvas(Modifier.size(24.dp)) {
+                                    val stroke = 2.dp.toPx()
+                                    val cap = androidx.compose.ui.graphics.StrokeCap.Round
+                                    val left = size.width * 0.18f
+                                    val center = size.width * 0.5f
+                                    val right = size.width * 0.82f
+                                    val shaftTop = size.height * 0.12f
+                                    val arrowBottom = size.height * 0.61f
+                                    val trayTop = size.height * 0.61f
+                                    val trayBottom = size.height * 0.84f
+                                    drawLine(
+                                        downloadIconColor,
+                                        androidx.compose.ui.geometry.Offset(center, shaftTop),
+                                        androidx.compose.ui.geometry.Offset(center, arrowBottom),
+                                        stroke,
+                                        cap,
+                                    )
+                                    drawLine(
+                                        downloadIconColor,
+                                        androidx.compose.ui.geometry.Offset(size.width * 0.29f, size.height * 0.4f),
+                                        androidx.compose.ui.geometry.Offset(center, arrowBottom),
+                                        stroke,
+                                        cap,
+                                    )
+                                    drawLine(
+                                        downloadIconColor,
+                                        androidx.compose.ui.geometry.Offset(size.width * 0.71f, size.height * 0.4f),
+                                        androidx.compose.ui.geometry.Offset(center, arrowBottom),
+                                        stroke,
+                                        cap,
+                                    )
+                                    drawLine(
+                                        downloadIconColor,
+                                        androidx.compose.ui.geometry.Offset(left, trayTop),
+                                        androidx.compose.ui.geometry.Offset(left, trayBottom),
+                                        stroke,
+                                        cap,
+                                    )
+                                    drawLine(
+                                        downloadIconColor,
+                                        androidx.compose.ui.geometry.Offset(left, trayBottom),
+                                        androidx.compose.ui.geometry.Offset(right, trayBottom),
+                                        stroke,
+                                        cap,
+                                    )
+                                    drawLine(
+                                        downloadIconColor,
+                                        androidx.compose.ui.geometry.Offset(right, trayBottom),
+                                        androidx.compose.ui.geometry.Offset(right, trayTop),
+                                        stroke,
+                                        cap,
+                                    )
+                                }
                             }
                             var libraryMenuExpanded by remember { mutableStateOf(false) }
                             Box {
