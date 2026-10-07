@@ -130,22 +130,22 @@ internal fun LibraryScreen(
                             }
                         }
                         if (state.tab == LibraryTab.Favorites) {
+                            val activeDownloads = state.downloads.count {
+                                it.state != dev.veneranative.data.download.DownloadChapterState.Completed &&
+                                    it.state != dev.veneranative.data.download.DownloadChapterState.Canceled
+                            }
+                            TextButton(onClick = { onAction(LibraryAction.SelectTab(LibraryTab.Downloads)) }) {
+                                Text("下载任务 $activeDownloads", maxLines = 1)
+                            }
                             var libraryMenuExpanded by remember { mutableStateOf(false) }
                             Box {
                                 IconButton(onClick = { libraryMenuExpanded = true }) {
-                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "下载和本地漫画")
+                                    Icon(Icons.Filled.ArrowDropDown, contentDescription = "本地漫画")
                                 }
                                 DropdownMenu(
                                     expanded = libraryMenuExpanded,
                                     onDismissRequest = { libraryMenuExpanded = false },
                                 ) {
-                                    DropdownMenuItem(
-                                        text = { Text("下载 · ${state.downloads.size}") },
-                                        onClick = {
-                                            libraryMenuExpanded = false
-                                            onAction(LibraryAction.SelectTab(LibraryTab.Downloads))
-                                        },
-                                    )
                                     DropdownMenuItem(
                                         text = { Text("本地漫画 · ${state.localComics.size}") },
                                         onClick = {
@@ -283,19 +283,34 @@ internal fun LibraryScreen(
             } else {
                 if (state.downloads.isEmpty()) {
                     EmptyLibraryState("暂无下载任务。", "从漫画详情页选择章节即可开始下载。", Modifier.weight(1f))
-                } else LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(state.downloads, key = { it.chapter.toString() }) { task ->
-                        DownloadTaskCard(
-                            task = task,
-                            onPause = { onAction(LibraryAction.PauseDownload(task.chapter)) },
-                            onResume = { onAction(LibraryAction.ResumeDownload(task.chapter)) },
-                            onRetry = { onAction(LibraryAction.RetryDownload(task.chapter)) },
-                            onRemove = { onAction(LibraryAction.CancelDownload(task.chapter)) },
-                        )
+                } else {
+                    val running = state.downloads.count { it.state == dev.veneranative.data.download.DownloadChapterState.Running }
+                    val queued = state.downloads.count { it.state == dev.veneranative.data.download.DownloadChapterState.Queued }
+                    val failed = state.downloads.count {
+                        it.state == dev.veneranative.data.download.DownloadChapterState.Failed ||
+                            it.state == dev.veneranative.data.download.DownloadChapterState.Partial
+                    }
+                    val completed = state.downloads.count { it.state == dev.veneranative.data.download.DownloadChapterState.Completed }
+                    Text(
+                        "下载中 $running · 排队 $queued · 需处理 $failed · 已完成 $completed",
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(state.downloads, key = { it.chapter.toString() }) { task ->
+                            DownloadTaskCard(
+                                task = task,
+                                onPause = { onAction(LibraryAction.PauseDownload(task.chapter)) },
+                                onResume = { onAction(LibraryAction.ResumeDownload(task.chapter)) },
+                                onRetry = { onAction(LibraryAction.RetryDownload(task.chapter)) },
+                                onRemove = { onAction(LibraryAction.CancelDownload(task.chapter)) },
+                            )
+                        }
                     }
                 }
             }
@@ -548,7 +563,7 @@ private fun ShelfSort.label(): String = when (this) {
 
 private fun LibraryTab.title(): String = when (this) {
     LibraryTab.Favorites -> "收藏"
-    LibraryTab.Downloads -> "下载"
+    LibraryTab.Downloads -> "下载任务"
     LibraryTab.Local -> "本地"
 }
 

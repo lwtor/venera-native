@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-10A3G 书架增加直接可见的下载任务入口 |
-| 当前任务状态 | S4-10A3E 已完成并推送：详情多选时底部固定按钮切换为下载所选。S4-10A3F 已完成：在多选模式下可从一个章节拖至另一个章节，按列表顺序连续选择或取消，App 编译通过，待提交。接下来改善下载任务入口发现性。用户负责真机验收，不由 Codex 安装或操作设备。 |
+| 当前任务（唯一下一任务） | S4-10A3H 用户真机验收下载流程与章节拖动选择 |
+| 当前任务状态 | S4-10A3D–A3G 已完成并分别提交：修复下载请求头与网络约束、详情底部下载、章节拖动选择、书架直接下载任务入口。所有改动已通过 App Debug 编译，真机验证交由用户执行；之后如有问题按实际日志处理。其他待验收项仍见下文状态记录。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -26,6 +26,8 @@
 **S4-10A3E DONE：详情多选后在固定底部直接下载。** 多选模式下，固定主操作切换为“下载所选 · N 话”，入队时显示处理中状态且无选择/正在入队时不可重复点击；退出多选后恢复最近阅读/开始阅读操作。章节区下载按钮已移除，保留全选和选择计数。JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或执行真机操作，交由用户验收。
 
 **S4-10A3F DONE：章节多选支持拖动范围选择。** 仅在批量选择模式下，详情页识别章节卡片拖动轨迹，并按当前筛选/排序后的章节顺序一次选择或取消锚点至目标章节之间的范围；卡片坐标随滚动更新，离开列表时清理，普通单击仍切换单章，非多选时不启用手势。JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试或真机操作，拖选手感待用户验收。
+
+**S4-10A3G DONE：让下载任务页可直接发现并查看进度。** 书架顶栏直接显示“下载任务 N”，N 为尚未完成的任务数；下载入口从菜单移到顶栏，菜单仅保留本地漫画。下载页标题改为“下载任务”，列表上方统计下载中、排队、需处理及已完成数量，各章卡片显示页级进度条、页数与暂停/继续/重试/移除操作。JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或执行真机验证，交由用户检查下载进度及操作体验。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 
