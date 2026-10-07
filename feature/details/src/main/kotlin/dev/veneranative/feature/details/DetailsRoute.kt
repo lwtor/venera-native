@@ -41,6 +41,9 @@ fun DetailsRoute(
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(comicKey) {
+        viewModel.onScreenEntered()
+    }
     androidx.compose.runtime.LaunchedEffect(screenPreferences) {
         screenPreferences?.let(viewModel::attachScreenPreferences)
     }

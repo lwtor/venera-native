@@ -239,6 +239,32 @@ class DetailsViewModelTest {
         assertEquals(0, viewModel.state.value.downloadQueueVersion)
     }
 
+    @Test fun `reentering details clears selection mode and download result but keeps queued work`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        catalog.pagesResponse = SourceOutcome.Success(listOf(SourcePage(0, "https://page/1")))
+        val downloads = RecordingDownloadRepository()
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        advanceUntilIdle()
+        val chapters = viewModel.state.value.detail!!.chapters
+
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(chapters.first().key))
+        viewModel.onAction(DetailsAction.DownloadSelectedChapters)
+        advanceUntilIdle()
+        assertEquals("章节已加入下载队列。", viewModel.state.value.downloadMessage)
+
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(chapters.last().key))
+        viewModel.onScreenEntered()
+
+        assertFalse(viewModel.state.value.isChapterSelectionMode)
+        assertTrue(viewModel.state.value.selectedChapters.isEmpty())
+        assertNull(viewModel.state.value.downloadMessage)
+        assertEquals(1, viewModel.state.value.downloadQueueVersion)
+        assertEquals(listOf(ChapterRef.Remote(chapters.first().key, chapters.first().group)), downloads.enqueuedChapters)
+    }
+
     @Test
     fun `a comic whose source is gone is unavailable rather than failed`() = runTest(dispatcher) {
         // The source was uninstalled between the search result and opening the comic, so the engine

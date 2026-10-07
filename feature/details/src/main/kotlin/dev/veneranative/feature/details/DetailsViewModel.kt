@@ -51,6 +51,17 @@ class DetailsViewModel(
     private val _state = MutableStateFlow(DetailsUiState(hasShelf = collection != null))
     val state: StateFlow<DetailsUiState> = _state.asStateFlow()
 
+    /** Clears route-local editing and result UI when this details screen is opened again. */
+    fun onScreenEntered() {
+        _state.update {
+            it.copy(
+                isChapterSelectionMode = false,
+                selectedChapters = emptySet(),
+                downloadMessage = null,
+            )
+        }
+    }
+
     init {
         viewModelScope.launch {
             val order = runCatching { screenPreferences?.get(orderPreferenceKey()) }.getOrNull()
