@@ -134,6 +134,39 @@ class LibraryViewModelTest {
         assertEquals(listOf(chapter), downloads.canceled)
     }
 
+    @Test fun `download comic navigation and confirmed bulk removal retain the selected comic state`() = runTest(dispatcher) {
+        val downloads = FakeDownloadRepository()
+        val comicKey = ComicKey(SourceId("source"), RemoteComicId("comic"))
+        val key = DownloadComicGroupKey(comicKey, "版本A")
+        val first = ChapterRef.Remote(ChapterKey(comicKey, RemoteChapterId("one")), "版本A")
+        val second = ChapterRef.Remote(ChapterKey(comicKey, RemoteChapterId("two")), "版本A")
+        val otherVersion = ChapterRef.Remote(ChapterKey(comicKey, RemoteChapterId("three")), "版本B")
+        downloads.tasks.value = listOf(
+            DownloadTask(first, "第1话", "漫画", 10, 10, DownloadChapterState.Completed, 1, 2),
+            DownloadTask(second, "第2话", "漫画", 10, 4, DownloadChapterState.Running, 3, 4),
+            DownloadTask(otherVersion, "第1话", "漫画", 10, 10, DownloadChapterState.Completed, 5, 6),
+        )
+        val viewModel = LibraryViewModel(repository, downloads = downloads)
+        advanceUntilIdle()
+
+        viewModel.onAction(LibraryAction.OpenDownloadedComic(key))
+        assertEquals(key, viewModel.state.value.downloadComicKey)
+        viewModel.onAction(LibraryAction.BackFromDownloadedComic)
+        assertNull(viewModel.state.value.downloadComicKey)
+
+        viewModel.onAction(LibraryAction.ToggleDownloadSelectionMode)
+        viewModel.onAction(LibraryAction.ToggleDownloadComicSelection(key))
+        assertEquals(setOf(first, second), viewModel.state.value.selectedDownloadChapters)
+        viewModel.onAction(LibraryAction.RequestRemoveSelectedDownloads)
+        assertTrue(viewModel.state.value.confirmRemoveDownloads)
+        viewModel.onAction(LibraryAction.ConfirmRemoveSelectedDownloads)
+        advanceUntilIdle()
+
+        assertEquals(setOf(first, second), downloads.canceled.toSet())
+        assertTrue(!viewModel.state.value.downloadSelectionMode)
+        assertTrue(viewModel.state.value.selectedDownloadChapters.isEmpty())
+    }
+
     @Test fun `download worker is signalled only after resume is saved`() = runTest(dispatcher) {
         val downloads = FakeDownloadRepository()
         val gate = CompletableDeferred<Unit>()

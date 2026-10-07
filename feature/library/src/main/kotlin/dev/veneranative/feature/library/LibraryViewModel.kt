@@ -9,6 +9,7 @@ import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.local.LocalImportResult
 import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
+import dev.veneranative.core.model.ChapterRef
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -131,6 +132,10 @@ class LibraryViewModel(
                     favoriteSearchVisible = false,
                     favoriteQuery = "",
                     selectedFavorite = null,
+                    downloadComicKey = null,
+                    downloadSelectionMode = false,
+                    selectedDownloadChapters = emptySet(),
+                    confirmRemoveDownloads = false,
                 ) }
             }
             LibraryAction.RequestLocalImport -> Unit
@@ -142,6 +147,41 @@ class LibraryViewModel(
             is LibraryAction.ResumeDownload -> downloadTask(scheduleOnSuccess = true) { it.resume(action.chapter) }
             is LibraryAction.CancelDownload -> downloadTask { it.cancel(action.chapter) }
             is LibraryAction.RetryDownload -> downloadTask(scheduleOnSuccess = true) { it.retryFailed(action.chapter) }
+            is LibraryAction.OpenDownloadedComic -> _state.update { current ->
+                if (current.downloads.any { DownloadComicGroupKey.from(it.chapter) == action.comicKey }) {
+                    current.copy(downloadComicKey = action.comicKey, downloadSelectionMode = false, selectedDownloadChapters = emptySet())
+                } else current
+            }
+            LibraryAction.BackFromDownloadedComic -> _state.update {
+                it.copy(downloadComicKey = null, downloadSelectionMode = false, selectedDownloadChapters = emptySet())
+            }
+            LibraryAction.ToggleDownloadSelectionMode -> _state.update {
+                it.copy(
+                    downloadSelectionMode = !it.downloadSelectionMode,
+                    selectedDownloadChapters = emptySet(),
+                    confirmRemoveDownloads = false,
+                )
+            }
+            is LibraryAction.ToggleDownloadComicSelection -> _state.update { current ->
+                val chapters = current.downloads
+                    .filter { DownloadComicGroupKey.from(it.chapter) == action.comicKey }
+                    .map { it.chapter }
+                    .toSet()
+                current.copy(selectedDownloadChapters = current.selectedDownloadChapters.let { selected ->
+                    if (chapters.isNotEmpty() && chapters.all { it in selected }) selected - chapters else selected + chapters
+                })
+            }
+            is LibraryAction.ToggleDownloadChapterSelection -> _state.update { current ->
+                if (current.downloads.none { it.chapter == action.chapter }) current
+                else current.copy(selectedDownloadChapters = current.selectedDownloadChapters.let { selected ->
+                    if (action.chapter in selected) selected - action.chapter else selected + action.chapter
+                })
+            }
+            LibraryAction.RequestRemoveSelectedDownloads -> _state.update {
+                it.copy(confirmRemoveDownloads = it.selectedDownloadChapters.isNotEmpty())
+            }
+            LibraryAction.DismissRemoveSelectedDownloads -> _state.update { it.copy(confirmRemoveDownloads = false) }
+            LibraryAction.ConfirmRemoveSelectedDownloads -> removeSelectedDownloads()
             LibraryAction.DismissMessage -> _state.update { it.copy(message = null) }
         }
     }
@@ -179,6 +219,40 @@ class LibraryViewModel(
                 throw cancelled
             } catch (_: Exception) {
                 _state.update { it.copy(message = "无法更新下载任务。") }
+            }
+        }
+    }
+
+    private fun removeSelectedDownloads() {
+        val repo = downloads ?: return
+        val selected = _state.value.selectedDownloadChapters
+        if (selected.isEmpty()) return
+        _state.update { it.copy(confirmRemoveDownloads = false) }
+        viewModelScope.launch {
+            val failed = linkedSetOf<ChapterRef>()
+            for (chapter in selected) {
+                try {
+                    repo.cancel(chapter)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    failed += chapter
+                }
+            }
+            _state.update { current ->
+                if (failed.isEmpty()) {
+                    current.copy(
+                        downloadSelectionMode = false,
+                        selectedDownloadChapters = emptySet(),
+                        message = null,
+                    )
+                } else {
+                    current.copy(
+                        downloadSelectionMode = true,
+                        selectedDownloadChapters = failed,
+                        message = "${selected.size - failed.size} 项已移除，${failed.size} 项移除失败，请重试。",
+                    )
+                }
             }
         }
     }

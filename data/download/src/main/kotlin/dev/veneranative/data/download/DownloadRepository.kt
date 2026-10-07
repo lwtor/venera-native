@@ -37,7 +37,6 @@ enum class DownloadChapterState {
 /** One chapter the user asked to download, with the progress its pages add up to. */
 data class DownloadTask(
     val chapter: ChapterRef,
-    val chapterIndex: Int? = null,
     val title: String,
     val comicTitle: String?,
     val pageCount: Int,
@@ -45,6 +44,7 @@ data class DownloadTask(
     val state: DownloadChapterState,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+    val chapterIndex: Int? = null,
 )
 
 /** One page of a download. [relativePath] keeps device layout out of the database and the UI. */

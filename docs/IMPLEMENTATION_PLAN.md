@@ -637,7 +637,8 @@ S4-10 小任务：
 | S4-10A3F | 章节多选支持按拖动路径连续选择/取消选择，并保证跨网格行范围选择 | DONE（仅在多选模式下接管拖动；根据网格项根坐标映射章节并连续批量选择或取消，普通滚动/点击操作仍保留；JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。拖动手感由用户设备验收。） |
 | S4-10A3G | 书架提供直接可发现的下载任务入口，页面显示活动任务数及每章实时页进度 | DONE（书架顶栏直接显示下载任务及未完成数量，不再藏在下拉菜单；下载页显示下载中/排队/需处理/完成统计并保留逐话进度条和暂停/继续/重试/移除。JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。设备验收待用户。） |
 | S4-10A3I | 下载记录保留来源章节版本与目录顺序；离线阅读已完成下载话时可在同漫画、同版本的可用下载话之间切换 | DONE（Room 8→9 迁移保留旧任务；分组任务使用独立 ID、磁盘目录和恢复清单；详情下载传入版本组和目录索引；新增迁移与离线导航回归。JDK 17 `:data:download:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机验收待用户。） |
-| S4-10A3J | 下载页改为漫画列表→章节列表两层结构；压缩列表密度；右上角选择/移除；完成章节可直接阅读 | IN_PROGRESS |
+| S4-10A3J | 下载页改为漫画/版本列表→章节列表两层结构；压缩列表密度；右上角选择/批量移除；完成章节可直接阅读 | DONE（按漫画版本分组，顶栏选择/移除、完成章节阅读与返回状态保留已实现；JDK 17 `:feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；真机验收待用户。） |
+| S4-10A3K | 用户真机验收下载首页/章节页密度、整组与单话批量移除、已下载章节打开及同版本上一话/下一话 | TODO |
 | S4-10A4 | 将详情中部作品信息与作者/题材标签组并入封面主视觉，以半透明信息卡片和标签呈现并随封面折叠；按内容量自适应封面高度 | DONE（`:feature:details:compileDebugKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` 通过；设备视觉确认由用户执行） |
 | S4-10A5 | 将作品名/来源移到简介上方，封面收藏入口移至右下角并在完全折叠栏显示收藏图标；依据来源嵌套章节组提供版本切换；按阅读历史区分当前章高亮和已读章置灰 | DONE（补齐来源 `isAppVersionAfter` 兼容能力并以 1.3.1 兼容级触发拷贝漫画分组返回；封面内联收藏、交换更新/标签顺序以让变长标签行避开收藏按钮；收藏状态统一为未选中书签轮廓、选中实心书签；版本筛选标题及全量列表的组标题明确标识为版本；JDK 17 下 Source/History/Details 测试源码与 Room AndroidTest 源码编译、`:app:assembleDebug` 通过；设备视觉验收由用户执行） |
 | S4-10C | 接入源支持的详情操作与完整评论流程：漫画点赞/评分、评论分页/发送/回复、评论点赞/投票；按脚本能力显示入口并处理登录失效/不支持错误 | TODO（当前 `SourceCore` / `ComicCatalog` 尚无这些类型化操作契约） |

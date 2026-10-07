@@ -9,6 +9,16 @@ import dev.veneranative.data.local.LocalChapter
 import dev.veneranative.core.model.LocalComicId
 import dev.veneranative.data.download.DownloadTask
 import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.ChapterRef.Remote
+
+/** A downloaded comic edition; chapters from separate source groups must not be mixed. */
+data class DownloadComicGroupKey(val comicKey: ComicKey, val versionGroup: String?) {
+    companion object {
+        fun from(chapter: ChapterRef): DownloadComicGroupKey? =
+            (chapter as? Remote)?.let { DownloadComicGroupKey(it.key.comicKey, it.group) }
+    }
+}
 
 /** A folder the user is naming or renaming; [folderId] is null while creating a new one. */
 data class FolderEditor(
@@ -32,6 +42,11 @@ data class LibraryUiState(
     val localComics: List<LocalComic> = emptyList(),
     val localChapters: Map<LocalComicId, List<LocalChapter>> = emptyMap(),
     val downloads: List<DownloadTask> = emptyList(),
+    /** Null shows the comic overview; otherwise the second level shows this comic's chapters. */
+    val downloadComicKey: DownloadComicGroupKey? = null,
+    val downloadSelectionMode: Boolean = false,
+    val selectedDownloadChapters: Set<ChapterRef> = emptySet(),
+    val confirmRemoveDownloads: Boolean = false,
     /** Increments after a resume or retry has reached persistent storage. */
     val downloadQueueVersion: Int = 0,
     val folders: List<FavoriteFolder> = emptyList(),
@@ -112,6 +127,14 @@ sealed interface LibraryAction {
     data class ResumeDownload(val chapter: ChapterRef) : LibraryAction
     data class CancelDownload(val chapter: ChapterRef) : LibraryAction
     data class RetryDownload(val chapter: ChapterRef) : LibraryAction
+    data class OpenDownloadedComic(val comicKey: DownloadComicGroupKey) : LibraryAction
+    data object BackFromDownloadedComic : LibraryAction
+    data object ToggleDownloadSelectionMode : LibraryAction
+    data class ToggleDownloadComicSelection(val comicKey: DownloadComicGroupKey) : LibraryAction
+    data class ToggleDownloadChapterSelection(val chapter: ChapterRef) : LibraryAction
+    data object RequestRemoveSelectedDownloads : LibraryAction
+    data object ConfirmRemoveSelectedDownloads : LibraryAction
+    data object DismissRemoveSelectedDownloads : LibraryAction
 
     data class ImportTree(val uri: String) : LibraryAction
     data class ImportArchive(val uri: String) : LibraryAction

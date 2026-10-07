@@ -287,6 +287,7 @@ private fun AppNavHost(
                     onRequestArchiveImport = { consume -> pendingArchiveImport = consume; localArchivePicker.launch(arrayOf("application/zip", "application/x-7z-compressed", "application/octet-stream")) },
                     onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
                     onOpenLocalChapter = { comicId, chapterId -> onRouteChange(AppRoute.Reader(localReaderKey(comicId, chapterId))) },
+                    onOpenDownloadedChapter = { chapter -> onRouteChange(AppRoute.Reader(chapter)) },
                     downloads = downloadRepository,
                     screenPreferences = screenPreferences,
                     onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },

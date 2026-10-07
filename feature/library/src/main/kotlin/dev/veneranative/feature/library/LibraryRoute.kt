@@ -27,6 +27,7 @@ fun LibraryRoute(
     onRequestLocalImport: ((String) -> Unit) -> Unit = {},
     onRequestArchiveImport: ((String) -> Unit) -> Unit = {},
     onOpenLocalChapter: (dev.veneranative.core.model.LocalComicId, dev.veneranative.core.model.LocalChapterId) -> Unit = { _, _ -> },
+    onOpenDownloadedChapter: (dev.veneranative.core.model.ChapterRef) -> Unit = {},
     onScheduleDownloads: () -> Unit = {},
     screenPreferences: ScreenPreferenceRepository? = null,
 ) {
@@ -50,6 +51,7 @@ fun LibraryRoute(
         },
         onOpenComic = onOpenComic,
         onOpenLocalChapter = onOpenLocalChapter,
+        onOpenDownloadedChapter = onOpenDownloadedChapter,
         modifier = modifier,
     )
 }
