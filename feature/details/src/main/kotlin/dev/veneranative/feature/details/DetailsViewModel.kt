@@ -74,7 +74,14 @@ class DetailsViewModel(
                     .mapNotNull { it.chapter as? ChapterRef.Remote }
                     .filter { it.key.comicKey == comicKey }
                     .toSet()
-                _state.update { it.copy(downloadedChapters = downloaded) }
+                _state.update { current ->
+                    val updated = current.copy(downloadedChapters = downloaded)
+                    updated.copy(
+                        selectedChapters = updated.selectedChapters.filterNotTo(linkedSetOf()) { key ->
+                            updated.detail?.chapters.orEmpty().any { it.key == key && updated.isDownloaded(it) }
+                        },
+                    )
+                }
             }
         }
     }
@@ -104,6 +111,9 @@ class DetailsViewModel(
             }
 
             is DetailsAction.ChapterSelectionToggled -> _state.update { current ->
+                if (current.detail?.chapters.orEmpty().any { it.key == action.chapter && current.isDownloaded(it) }) {
+                    return@update current
+                }
                 val selected = current.selectedChapters
                 current.copy(selectedChapters = if (action.chapter in selected) selected - action.chapter else selected + action.chapter)
             }
@@ -115,7 +125,9 @@ class DetailsViewModel(
                 if (start < 0 || end < 0) current else {
                     val range = chapters.subList(minOf(start, end), maxOf(start, end) + 1).map { it.key }.toSet()
                     current.copy(
-                        selectedChapters = if (action.selected) current.selectedChapters + range
+                        selectedChapters = if (action.selected) current.selectedChapters + range.filter { key ->
+                            chapters.none { it.key == key && current.isDownloaded(it) }
+                        }
                         else current.selectedChapters - range,
                     )
                 }
@@ -123,8 +135,9 @@ class DetailsViewModel(
 
             is DetailsAction.VisibleChaptersSelected -> _state.update { current ->
                 val visibleKeys = current.filteredChapters.map { it.key }.toSet()
+                val selectableKeys = current.selectableChapters.map { it.key }.toSet()
                 current.copy(
-                    selectedChapters = if (action.selected) current.selectedChapters + visibleKeys
+                    selectedChapters = if (action.selected) current.selectedChapters + selectableKeys
                     else current.selectedChapters - visibleKeys,
                 )
             }
@@ -295,7 +308,19 @@ class DetailsViewModel(
                 _state.update { it.copy(isBatchDownloading = false) }
                 return@launch
             }
-            val ordered = detail.chapters.filter { it.key in chapters }
+            val current = _state.value
+            val ordered = detail.chapters.filter { it.key in chapters && !current.isDownloaded(it) }
+            if (ordered.isEmpty()) {
+                _state.update {
+                    it.copy(
+                        downloadMessage = "所选章节已经下载或没有待下载章节。",
+                        isBatchDownloading = false,
+                        selectedChapters = emptySet(),
+                        isChapterSelectionMode = false,
+                    )
+                }
+                return@launch
+            }
             ordered.forEach { item ->
                 try {
                     when (val outcome = catalog.pages(item.key)) {

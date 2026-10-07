@@ -90,6 +90,9 @@ data class DetailsUiState(
             visibleChapters.filter { it.title.contains(query, ignoreCase = true) }
         } ?: visibleChapters
 
+    val selectableChapters: List<Chapter>
+        get() = filteredChapters.filterNot(::isDownloaded)
+
     /** Legacy downloads had no version group; infer one only when this chapter key is unambiguous. */
     fun isDownloaded(chapter: Chapter): Boolean {
         val ref = ChapterRef.Remote(chapter.key, chapter.group)

@@ -165,6 +165,17 @@ class DetailsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(setOf(jpChapter), viewModel.state.value.downloadedChapters)
+
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.VisibleChaptersSelected(true))
+        val expectedSelectable = setOf(
+            ChapterKey(comicKey, RemoteChapterId("en1")),
+            ChapterKey(comicKey, RemoteChapterId("en2")),
+        )
+        assertEquals(expectedSelectable, viewModel.state.value.selectedChapters)
+
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(jpChapter.key))
+        assertEquals(expectedSelectable, viewModel.state.value.selectedChapters)
     }
 
     @Test fun `legacy ungrouped download is visible when the source now exposes one matching version`() = runTest(dispatcher) {
@@ -181,6 +192,9 @@ class DetailsViewModelTest {
         val groupedChapter = viewModel.state.value.detail!!.chapters.single { it.key.remoteId == RemoteChapterId("jp1") }
 
         assertTrue(viewModel.state.value.isDownloaded(groupedChapter))
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(groupedChapter.key))
+        assertTrue(viewModel.state.value.selectedChapters.isEmpty())
     }
 
     @Test fun `selected chapters are queued in source order`() = runTest(dispatcher) {

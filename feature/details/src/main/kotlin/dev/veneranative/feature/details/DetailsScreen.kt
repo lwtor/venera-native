@@ -78,6 +78,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -947,10 +948,20 @@ private fun ChapterControls(
         }
 
         if (state.isChapterSelectionMode) {
-            val allVisibleSelected = state.filteredChapters.isNotEmpty() && state.filteredChapters.all { it.key in state.selectedChapters }
+            val selectable = state.selectableChapters
+            val allVisibleSelected = selectable.isNotEmpty() && selectable.all { it.key in state.selectedChapters }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { onAction(DetailsAction.VisibleChaptersSelected(!allVisibleSelected)) }) {
-                    Text(if (allVisibleSelected) "取消全选" else "全选当前结果")
+                TextButton(
+                    enabled = selectable.isNotEmpty(),
+                    onClick = { onAction(DetailsAction.VisibleChaptersSelected(!allVisibleSelected)) },
+                ) {
+                    Text(
+                        when {
+                            selectable.isEmpty() -> "已全部下载"
+                            allVisibleSelected -> "取消全选"
+                            else -> "全选待下载"
+                        },
+                    )
                 }
                 Text("已选 ${state.selectedChapters.size} 话", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1066,7 +1077,12 @@ private fun ChapterRow(
     Card(
         modifier = modifier.fillMaxWidth().padding(vertical = 2.dp)
             .onGloballyPositioned { onBoundsChanged(it.boundsInRoot()) }
-            .clickable(onClick = if (selectionMode) onToggleSelection else onOpen),
+            .clickable(enabled = !selectionMode || !downloaded, onClick = if (selectionMode) onToggleSelection else onOpen)
+            .semantics {
+                if (downloaded) {
+                    stateDescription = if (selectionMode) "已下载，不可重复选择" else "已下载"
+                }
+            },
         shape = RoundedCornerShape(9.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {

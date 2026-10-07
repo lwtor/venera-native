@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务（唯一下一任务） | S4-10A3K 用户真机验收下载两层列表、批量移除及离线章节连续阅读 |
-| 当前任务状态 | S4-10A3N 已完成：原成功后退出多选会让底部按钮恢复阅读操作，且提示放在列表顶部；另发现来源成功但返回空页列表会创建零页任务，后台无内容可处理。现在用固定 Snackbar 显示结果并可直达下载任务页，空页响应不再入队，失败章节保留选择并显示重试提示。详情回归和 App Debug 构建通过，未操作真机。当前唯一下一任务仍为 A3K 真机验收。 |
+| 当前任务状态 | S4-10A3P 已完成：完成下载的章节此前只变色，没有从多选中排除。现在单选/拖选/全选和提交前都会过滤已下载章节，旧无分组记录仍使用唯一章节兼容判断。详情回归和 App Debug 构建通过，未操作真机。当前唯一下一任务仍为 A3K 真机验收。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -38,6 +38,8 @@
 **S4-10A3M DONE：修复旧下载记录匹配并增加本地诊断。** 用户实测指出详情仍未明显区分下载章，Reader 仍进入 loading。排查发现旧版下载记录的 `ChapterRef.Remote.group` 为空，而详情与阅读器使用来源版本组进行精确比较，因此这些已完成下载被漏掉。现在详情仅在该章节 ID 对当前漫画目录唯一时，将无分组旧记录映射为已下载，避免混淆同 ID 的不同版本；视觉使用绿色底色及“已下载”勾标识。阅读器精确版本匹配优先，其次兼容唯一的旧无分组下载并从现存本地文件读取；如果记录已完成但文件缺失/损坏，显示本地数据错误，不回退在线请求。Debug App 私有日志 `files/diagnostics/offline-reader.log`（最多 512 KiB，保留一份轮转文件）记录请求分组、离线/在线决策及本地文件判定。新增 Provider 回归断言旧无分组章节只读磁盘且来源调用为 0，以及详情唯一分组章节识别回归。验证：JDK 17 `:data:download:testDebugUnitTest --tests dev.veneranative.data.download.OfflineFirstPageProviderTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装/操作真机，视觉和设备既有下载数据复验由用户执行。
 
 **S4-10A3N DONE：让批量下载结果可见并阻止空任务入队。** 原流程成功后退出多选、底部按钮恢复“继续阅读”，结果消息只在列表顶部；此外，漫画源成功但返回空页列表时，代码会创建零页任务，Worker 没有内容可处理。现在结果显示为固定长时 Snackbar，提供“查看下载”动作直达独立下载任务页；空页响应不入队、保留章节选择并显示失败提示。新增回归验证零页章节不会写入队列。验证：JDK 17 `:feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装真机，Snackbar 实际位置与直达下载页待用户验收。
+
+**S4-10A3P DONE：已下载章节不可再次选择下载。** 详情之前仅给完成下载的章节换色，没有限制多选；用户仍能单选、全选或拖动选择这些章节，导致重复请求章节页并覆盖队列条目。现在已下载章节在批量模式下不可点击选择，全选文案明确为“全选待下载”并跳过已下载项；ViewModel 对点击、范围选择、下载状态变化和提交入队再做过滤，防止 UI 外或状态竞态重复加入。旧版无分组下载只在来源目录中的章节 ID 唯一时标记/排除，避免版本歧义。新增精确组和旧下载回归覆盖。验证：JDK 17 `:feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机，章节禁选状态视觉由用户验收。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 
