@@ -92,6 +92,19 @@ class DetailsViewModel(
                 current.copy(selectedChapters = if (action.chapter in selected) selected - action.chapter else selected + action.chapter)
             }
 
+            is DetailsAction.ChapterSelectionRangeChanged -> _state.update { current ->
+                val chapters = current.filteredChapters
+                val start = chapters.indexOfFirst { it.key == action.start }
+                val end = chapters.indexOfFirst { it.key == action.end }
+                if (start < 0 || end < 0) current else {
+                    val range = chapters.subList(minOf(start, end), maxOf(start, end) + 1).map { it.key }.toSet()
+                    current.copy(
+                        selectedChapters = if (action.selected) current.selectedChapters + range
+                        else current.selectedChapters - range,
+                    )
+                }
+            }
+
             is DetailsAction.VisibleChaptersSelected -> _state.update { current ->
                 val visibleKeys = current.filteredChapters.map { it.key }.toSet()
                 current.copy(

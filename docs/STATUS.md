@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-10A3F 章节多选支持滑动范围选择 |
-| 当前任务状态 | S4-10A3E 已完成：多选时底部阅读操作切换为下载所选并移除章节区重复按钮。下一步加入拖动选择，再增加书架直接可见的下载任务入口。用户负责真机验收，不由 Codex 安装或操作设备。 |
+| 当前任务（唯一下一任务） | S4-10A3G 书架增加直接可见的下载任务入口 |
+| 当前任务状态 | S4-10A3E 已完成并推送：详情多选时底部固定按钮切换为下载所选。S4-10A3F 已完成：在多选模式下可从一个章节拖至另一个章节，按列表顺序连续选择或取消，App 编译通过，待提交。接下来改善下载任务入口发现性。用户负责真机验收，不由 Codex 安装或操作设备。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -24,6 +24,8 @@
 **S4-10A3D DONE：保留来源图片请求头并确保下载可调度。** 阅读器图片请求使用来源 `comic.onImageLoad` 返回的 headers，而下载计划此前只保存 URL，Worker 因此无法通过需 Referer/UA 等头部保护的图片源；现在 headers 会随页记录持久化，并进入 `ComicImagePipeline`、章节恢复清单和重新入队时的请求刷新。Room 7→8 为已有页面增加空对象默认头部；旧章节重新从详情页入队会刷新未完成页的图片地址与头部。WorkManager 网络条件从仅无限流 Wi-Fi 改为有网络连接即可运行，避免用户主动下载后在移动网络上永久排队。JDK 17 `:core:database:compileDebugKotlin :data:download:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试、未安装 APK；来源下载与旧库升级待用户真机验收。
 
 **S4-10A3E DONE：详情多选后在固定底部直接下载。** 多选模式下，固定主操作切换为“下载所选 · N 话”，入队时显示处理中状态且无选择/正在入队时不可重复点击；退出多选后恢复最近阅读/开始阅读操作。章节区下载按钮已移除，保留全选和选择计数。JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或执行真机操作，交由用户验收。
+
+**S4-10A3F DONE：章节多选支持拖动范围选择。** 仅在批量选择模式下，详情页识别章节卡片拖动轨迹，并按当前筛选/排序后的章节顺序一次选择或取消锚点至目标章节之间的范围；卡片坐标随滚动更新，离开列表时清理，普通单击仍切换单章，非多选时不启用手势。JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试或真机操作，拖选手感待用户验收。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 

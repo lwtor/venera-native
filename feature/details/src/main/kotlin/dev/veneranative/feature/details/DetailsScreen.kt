@@ -3,6 +3,7 @@ package dev.veneranative.feature.details
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,15 +51,24 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
@@ -288,9 +298,44 @@ private fun Content(
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (Chapter) -> Unit,
 ) {
+    val chapterBounds = remember { mutableStateMapOf<ChapterKey, Rect>() }
+    var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val currentBounds by rememberUpdatedState(chapterBounds)
+    val currentListCoordinates by rememberUpdatedState(listCoordinates)
+    val currentSelected by rememberUpdatedState(state.selectedChapters)
     LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize().testTag(DETAILS_CONTENT_TAG),
+        modifier = Modifier.fillMaxSize()
+            .onGloballyPositioned { listCoordinates = it }
+            .pointerInput(state.isChapterSelectionMode, state.filteredChapters) {
+                if (!state.isChapterSelectionMode) return@pointerInput
+                var anchor: ChapterKey? = null
+                var lastEnd: ChapterKey? = null
+                var desiredSelection = false
+                fun chapterAt(position: Offset): ChapterKey? {
+                    val rootPosition = currentListCoordinates?.localToRoot(position) ?: return null
+                    return currentBounds.entries.firstOrNull { (_, bounds) -> bounds.contains(rootPosition) }?.key
+                }
+                detectDragGestures(
+                    onDragStart = { position ->
+                        anchor = chapterAt(position)
+                        lastEnd = anchor
+                        anchor?.let { desiredSelection = it !in currentSelected }
+                    },
+                    onDrag = { change, _ ->
+                        val start = anchor
+                        val end = chapterAt(change.position)
+                        if (start != null && end != null && end != lastEnd) {
+                            lastEnd = end
+                            onAction(DetailsAction.ChapterSelectionRangeChanged(start, end, desiredSelection))
+                            change.consume()
+                        }
+                    },
+                    onDragEnd = { anchor = null; lastEnd = null },
+                    onDragCancel = { anchor = null; lastEnd = null },
+                )
+            }
+            .testTag(DETAILS_CONTENT_TAG),
         contentPadding = PaddingValues(bottom = 20.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
@@ -407,6 +452,10 @@ private fun Content(
                                 modifier = Modifier.weight(1f),
                                 onOpen = { onOpenChapter(chapter) },
                                 onToggleSelection = { onAction(DetailsAction.ChapterSelectionToggled(chapter.key)) },
+                                onBoundsChanged = { bounds ->
+                                    if (bounds == null) chapterBounds.remove(chapter.key)
+                                    else chapterBounds[chapter.key] = bounds
+                                },
                             )
                         }
                         repeat(3 - entry.chapters.size) { Spacer(modifier = Modifier.weight(1f)) }
@@ -996,9 +1045,14 @@ private fun ChapterRow(
     modifier: Modifier = Modifier,
     onOpen: () -> Unit,
     onToggleSelection: () -> Unit,
+    onBoundsChanged: (Rect?) -> Unit,
 ) {
+    DisposableEffect(chapter.key) {
+        onDispose { onBoundsChanged(null) }
+    }
     Card(
         modifier = modifier.fillMaxWidth().padding(vertical = 2.dp)
+            .onGloballyPositioned { onBoundsChanged(it.boundsInRoot()) }
             .clickable(onClick = if (selectionMode) onToggleSelection else onOpen),
         shape = RoundedCornerShape(9.dp),
         colors = CardDefaults.cardColors(

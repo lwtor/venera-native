@@ -22,6 +22,12 @@ sealed interface DetailsAction {
 
     data class ChapterSelectionToggled(val chapter: dev.veneranative.core.model.ChapterKey) : DetailsAction
 
+    data class ChapterSelectionRangeChanged(
+        val start: dev.veneranative.core.model.ChapterKey,
+        val end: dev.veneranative.core.model.ChapterKey,
+        val selected: Boolean,
+    ) : DetailsAction
+
     data class VisibleChaptersSelected(val selected: Boolean) : DetailsAction
 
     data object DownloadSelectedChapters : DetailsAction
