@@ -167,6 +167,22 @@ class DetailsViewModelTest {
         assertEquals(setOf(jpChapter), viewModel.state.value.downloadedChapters)
     }
 
+    @Test fun `legacy ungrouped download is visible when the source now exposes one matching version`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren", grouped = true))
+        val downloads = RecordingDownloadRepository()
+        val legacyChapter = ChapterRef.Remote(ChapterKey(comicKey, RemoteChapterId("jp1")))
+        downloads.tasks.value = listOf(
+            DownloadTask(legacyChapter, "第1話", "Frieren", 10, 10, DownloadChapterState.Completed, 1L, 1L),
+        )
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        advanceUntilIdle()
+        val groupedChapter = viewModel.state.value.detail!!.chapters.single { it.key.remoteId == RemoteChapterId("jp1") }
+
+        assertTrue(viewModel.state.value.isDownloaded(groupedChapter))
+    }
+
     @Test fun `selected chapters are queued in source order`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))

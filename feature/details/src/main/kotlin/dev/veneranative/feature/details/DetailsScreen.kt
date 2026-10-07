@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import dev.veneranative.core.model.ChapterRef
 import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -77,6 +76,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
@@ -449,7 +449,7 @@ private fun Content(
                                 selected = chapter.key in state.selectedChapters,
                                 current = chapter.key.remoteId == state.lastReadChapterId,
                                 read = chapter.key.remoteId in state.readChapterIds,
-                                downloaded = ChapterRef.Remote(chapter.key, chapter.group) in state.downloadedChapters,
+                                downloaded = state.isDownloaded(chapter),
                                 selectionMode = state.isChapterSelectionMode,
                                 modifier = Modifier.weight(1f),
                                 onOpen = { onOpenChapter(chapter) },
@@ -1050,6 +1050,9 @@ private fun ChapterRow(
     onToggleSelection: () -> Unit,
     onBoundsChanged: (Rect?) -> Unit,
 ) {
+    val darkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+    val downloadedContainer = if (darkTheme) Color(0xFF183D2B) else Color(0xFFDDF3E5)
+    val downloadedContent = if (darkTheme) Color(0xFFB8F0C7) else Color(0xFF1B5E35)
     DisposableEffect(chapter.key) {
         onDispose { onBoundsChanged(null) }
     }
@@ -1062,13 +1065,13 @@ private fun ChapterRow(
             containerColor = when {
                 selected -> MaterialTheme.colorScheme.secondaryContainer
                 current -> MaterialTheme.colorScheme.primaryContainer
-                downloaded -> MaterialTheme.colorScheme.tertiaryContainer
+                downloaded -> downloadedContainer
                 else -> MaterialTheme.colorScheme.surfaceContainerLow
             },
         ),
         border = when {
             current && !selected -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-            downloaded && !selected && !current -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.6f))
+            downloaded && !selected && !current -> androidx.compose.foundation.BorderStroke(1.dp, downloadedContent.copy(alpha = 0.72f))
             else -> null
         },
     ) {
@@ -1107,11 +1110,20 @@ private fun ChapterRow(
                 color = when {
                     selected -> MaterialTheme.colorScheme.onSecondaryContainer
                     current -> MaterialTheme.colorScheme.onPrimaryContainer
-                    downloaded -> MaterialTheme.colorScheme.onTertiaryContainer
+                    downloaded -> downloadedContent
                     read -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f)
                     else -> MaterialTheme.colorScheme.onSurface
                 },
             )
+            if (downloaded) {
+                Text(
+                    text = "✓",
+                    modifier = Modifier.semantics { contentDescription = "已下载" },
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = downloadedContent,
+                )
+            }
         }
     }
 }

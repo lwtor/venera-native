@@ -89,6 +89,17 @@ data class DetailsUiState(
         get() = chapterQuery.trim().takeIf { it.isNotEmpty() }?.let { query ->
             visibleChapters.filter { it.title.contains(query, ignoreCase = true) }
         } ?: visibleChapters
+
+    /** Legacy downloads had no version group; infer one only when this chapter key is unambiguous. */
+    fun isDownloaded(chapter: Chapter): Boolean {
+        val ref = ChapterRef.Remote(chapter.key, chapter.group)
+        if (ref in downloadedChapters) return true
+        if (chapter.group == null || downloadedChapters.none {
+                it.key == chapter.key && it.group == null
+            }
+        ) return false
+        return chapters.count { it.key == chapter.key } == 1
+    }
 }
 
 enum class DetailsStatus {

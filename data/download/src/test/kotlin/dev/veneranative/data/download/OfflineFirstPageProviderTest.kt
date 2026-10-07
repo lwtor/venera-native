@@ -3,6 +3,7 @@ package dev.veneranative.data.download
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -48,6 +49,27 @@ class OfflineFirstPageProviderTest {
 
         assertEquals("Online", content.title)
         assertEquals(1, source.calls)
+    }
+
+    @Test fun `legacy ungrouped download is used for a grouped reader chapter`() = runTest {
+        val layout = DownloadFileLayout(folder.root)
+        val dao = FakeDownloadDao()
+        val legacyRef = remoteChapter()
+        val groupedRef = ChapterRef.Remote(chapter, group = "繁中")
+        val file = layout.pageFile(refSourceOf(legacyRef), refComicOf(legacyRef), refChapterOf(legacyRef), 0)
+        val bytes = pngBytes(640, 960)
+        layout.writeAtomically(file, bytes)
+        dao.tasks.value = listOf(taskEntity(legacyRef, state = DownloadChapterState.Completed, pageCount = 1))
+        dao.pages.value = listOf(pageEntity(legacyRef.taskId(), 0, DownloadPageState.Succeeded, layout.relativeOf(file), bytes.size.toLong()))
+        val source = RecordingPageProvider()
+        val diagnostics = mutableListOf<String>()
+        val provider = OfflineFirstPageProvider({ DefaultDownloadRepository(dao, layout) }, layout, source, diagnostics::add)
+
+        val content = provider.loadChapter(groupedRef)
+
+        assertEquals(file.absolutePath, content.pages.single().imageRef)
+        assertEquals(0, source.calls)
+        assertTrue(diagnostics.any { "decision=offline" in it && "taskGroup=<legacy-none>" in it })
     }
 
     @Test fun `offline next and previous chapters stay inside the downloaded version`() = runTest {

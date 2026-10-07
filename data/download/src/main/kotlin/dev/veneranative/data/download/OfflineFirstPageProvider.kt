@@ -17,23 +17,38 @@ class OfflineFirstPageProvider(
     private val downloads: suspend () -> DownloadRepository,
     private val layout: DownloadFileLayout,
     private val source: PageProvider,
+    private val onDiagnostic: (String) -> Unit = {},
 ) : PageProvider {
 
     override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
         val ref = chapter as? ChapterRef.Remote ?: return source.loadChapter(chapter)
         val key = ref.key
         val repository = downloads()
-        if (!repository.isCompleteOffline(ref)) return source.loadChapter(chapter)
-        val task = repository.observeTask(ref).first()
-            ?: return source.loadChapter(chapter)
-        val downloaded = repository.pagesOf(ref)
-        if (downloaded.isEmpty() || downloaded.any { it.state != DownloadPageState.Succeeded }) {
+        onDiagnostic("event=load source=${key.comicKey.sourceId.value} comic=${key.comicKey.remoteId.value} chapter=${key.remoteId.value} requestedGroup=${ref.group ?: "<none>"}")
+        val task = completedTaskFor(ref, repository)
+        if (task == null) {
+            onDiagnostic("event=decision chapter=${key.remoteId.value} decision=online reason=no-completed-download")
             return source.loadChapter(chapter)
         }
+        val offlineRef = task.chapter as? ChapterRef.Remote
+            ?: throw IOException("Downloaded chapter reference is not remote")
+        onDiagnostic("event=decision chapter=${key.remoteId.value} decision=offline taskGroup=${offlineRef.group ?: "<legacy-none>"} pages=${task.pageCount}")
+        if (!repository.isCompleteOffline(offlineRef)) {
+            onDiagnostic("event=offline-invalid chapter=${key.remoteId.value} reason=missing-or-corrupt-file")
+            throw IOException("Downloaded chapter files are missing or damaged")
+        }
+        val downloaded = repository.pagesOf(offlineRef)
+        if (downloaded.isEmpty() || downloaded.any { it.state != DownloadPageState.Succeeded }) {
+            onDiagnostic("event=offline-invalid chapter=${key.remoteId.value} reason=page-state")
+            throw IOException("Downloaded chapter has incomplete pages")
+        }
         val pages = downloaded.sortedBy { it.index }.map { page ->
-            val relative = page.relativePath ?: return source.loadChapter(chapter)
+            val relative = page.relativePath
+                ?: throw IOException("Downloaded page has no stored file")
             val file = layout.absoluteOf(relative)
-            if (!layout.isInsideRoot(file) || !file.isFile) return source.loadChapter(chapter)
+            if (!layout.isInsideRoot(file) || !file.isFile) {
+                throw IOException("Downloaded page file is unavailable")
+            }
             ComicPage(
                 index = page.index,
                 imageRef = file.absolutePath,
@@ -47,15 +62,16 @@ class OfflineFirstPageProvider(
             .filter { candidate ->
                 val candidateRef = candidate.chapter as? ChapterRef.Remote
                 candidateRef != null && candidateRef.key.comicKey == key.comicKey &&
-                    candidateRef.group == ref.group
+                    candidateRef.group == offlineRef.group
             }
             .filter { candidate ->
-                candidate.chapter == chapter ||
+                    candidate.chapter == offlineRef ||
                     candidate.state == DownloadChapterState.Completed && repository.isCompleteOffline(candidate.chapter)
             }
             .sortedWith(compareBy<DownloadTask>({ it.chapterIndex ?: Int.MAX_VALUE }, { it.createdAtEpochMillis }))
         val ordered = sameVersion.mapIndexed { index, candidate -> candidate.toReaderChapter(index) }
-        val position = ordered.indexOfFirst { it.key == key }
+        val position = ordered.indexOfFirst { it.key == key && it.group == offlineRef.group }
+        onDiagnostic("event=offline-ready chapter=${key.remoteId.value} pages=${pages.size} versionChapters=${ordered.size}")
         return ChapterContent(
             title = task.title,
             pages = pages,
@@ -66,9 +82,26 @@ class OfflineFirstPageProvider(
     }
 
     override suspend fun prefetchChapter(chapter: ChapterRef) {
-        val key = (chapter as? ChapterRef.Remote)?.key
-        if (key == null || !downloads().isCompleteOffline(chapter)) {
-            source.prefetchChapter(chapter)
+        val ref = chapter as? ChapterRef.Remote
+        if (ref == null) return source.prefetchChapter(chapter)
+        val repository = downloads()
+        if (completedTaskFor(ref, repository) == null) source.prefetchChapter(chapter)
+    }
+
+    /** Matches exact version identity first, then accepts a pre-versioning task with no group. */
+    private suspend fun completedTaskFor(
+        chapter: ChapterRef.Remote,
+        repository: DownloadRepository,
+    ): DownloadTask? {
+        val candidates = repository.observeTasks().first().filter { candidate ->
+            val ref = candidate.chapter as? ChapterRef.Remote
+            ref?.key == chapter.key
+        }
+        return candidates.firstOrNull {
+            it.chapter == chapter && it.state == DownloadChapterState.Completed
+        } ?: candidates.singleOrNull { candidate ->
+            val ref = candidate.chapter as? ChapterRef.Remote
+            chapter.group != null && ref?.group == null && candidate.state == DownloadChapterState.Completed
         }
     }
 

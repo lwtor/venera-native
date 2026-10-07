@@ -110,6 +110,8 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         if (debugNetworkTraceEnabled) LocalKomiicNetworkLog(getApplication<android.app.Application>().filesDir) else null
     private val localSearchStartupLog =
         if (debugNetworkTraceEnabled) LocalSearchStartupLog(getApplication<android.app.Application>().filesDir) else null
+    private val localOfflineReaderLog =
+        if (debugNetworkTraceEnabled) LocalOfflineReaderLog(getApplication<android.app.Application>().filesDir) else null
     init {
         if (debugNetworkTraceEnabled) {
             val selectedProxy = runCatching {
@@ -172,6 +174,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         downloads = { _download.value ?: _download.filterNotNull().first() },
         layout = DownloadEnvironment.get(getApplication()).layout(),
         source = sourcePageProvider,
+        onDiagnostic = { event -> localOfflineReaderLog?.append(event) },
     )
     private val localArchiveAccess = AndroidSafArchiveAccess(getApplication())
     private val localMaterializer = LocalPageMaterializer(
