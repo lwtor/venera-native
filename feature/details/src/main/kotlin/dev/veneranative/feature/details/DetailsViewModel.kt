@@ -285,10 +285,11 @@ class DetailsViewModel(
                     when (val outcome = catalog.pages(item.key)) {
                         is SourceOutcome.Success -> {
                             repository.enqueue(
-                                ChapterRef.Remote(item.key),
+                                ChapterRef.Remote(item.key, item.group),
                                 item.title,
                                 outcome.value,
                                 detail.comic.title,
+                                item.index,
                             )
                             queued++
                         }

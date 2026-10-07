@@ -24,21 +24,21 @@ class DownloadFileLayout(
     fun comicDir(sourceId: String, comicId: String): File =
         File(root, "${stableId(sourceId)}/${stableId(comicId)}")
 
-    fun chapterDir(sourceId: String, comicId: String, chapterId: String): File =
-        File(comicDir(sourceId, comicId), "chapters/${stableId(chapterId)}")
+    fun chapterDir(sourceId: String, comicId: String, chapterId: String, group: String? = null): File =
+        File(comicDir(sourceId, comicId), "chapters/${chapterDirectoryId(chapterId, group)}")
 
-    fun pagesDir(sourceId: String, comicId: String, chapterId: String): File =
-        File(chapterDir(sourceId, comicId, chapterId), PAGES_DIR)
+    fun pagesDir(sourceId: String, comicId: String, chapterId: String, group: String? = null): File =
+        File(chapterDir(sourceId, comicId, chapterId, group), PAGES_DIR)
 
-    fun manifestFile(sourceId: String, comicId: String, chapterId: String): File =
-        File(chapterDir(sourceId, comicId, chapterId), MANIFEST_NAME)
+    fun manifestFile(sourceId: String, comicId: String, chapterId: String, group: String? = null): File =
+        File(chapterDir(sourceId, comicId, chapterId, group), MANIFEST_NAME)
 
-    fun pageFile(sourceId: String, comicId: String, chapterId: String, index: Int): File =
-        File(pagesDir(sourceId, comicId, chapterId), pageFileName(index))
+    fun pageFile(sourceId: String, comicId: String, chapterId: String, index: Int, group: String? = null): File =
+        File(pagesDir(sourceId, comicId, chapterId, group), pageFileName(index))
 
     /** The path as stored: relative, so it survives the download root moving. */
-    fun relativePathOf(sourceId: String, comicId: String, chapterId: String, index: Int): String =
-        "${stableId(sourceId)}/${stableId(comicId)}/chapters/${stableId(chapterId)}" +
+    fun relativePathOf(sourceId: String, comicId: String, chapterId: String, index: Int, group: String? = null): String =
+        "${stableId(sourceId)}/${stableId(comicId)}/chapters/${chapterDirectoryId(chapterId, group)}" +
             "/$PAGES_DIR/${pageFileName(index)}"
 
     fun absoluteOf(relativePath: String): File = File(root, relativePath)
@@ -62,9 +62,12 @@ class DownloadFileLayout(
             .toList()
 
     /** Removes a chapter's directory: a cancelled download leaves nothing behind. */
-    fun deleteChapterFiles(sourceId: String, comicId: String, chapterId: String) {
-        chapterDir(sourceId, comicId, chapterId).deleteRecursively()
+    fun deleteChapterFiles(sourceId: String, comicId: String, chapterId: String, group: String? = null) {
+        chapterDir(sourceId, comicId, chapterId, group).deleteRecursively()
     }
+
+    private fun chapterDirectoryId(chapterId: String, group: String?): String =
+        stableId(if (group == null) chapterId else "$chapterId\u0000$group")
 
     /**
      * Writes [bytes] to [target] atomically and returns how many bytes landed.

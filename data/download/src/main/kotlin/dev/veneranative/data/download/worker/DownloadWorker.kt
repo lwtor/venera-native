@@ -118,6 +118,7 @@ class DownloadWorker(
             sourceId = refSourceOf(page.chapter),
             comicId = refComicOf(page.chapter),
             chapterId = refChapterOf(page.chapter),
+            group = (page.chapter as? dev.veneranative.core.model.ChapterRef.Remote)?.group,
             index = page.index,
             imageRef = page.imageRef,
             headers = page.headers,

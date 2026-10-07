@@ -243,6 +243,26 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migratingFromEightToNineAddsOptionalChapterVersionMetadata() {
+        helper.createDatabase(TEST_DB, 8).apply {
+            execSQL(
+                "INSERT INTO download_task (task_id, ref_source, ref_comic, ref_chapter, title, comic_title, " +
+                    "page_count, completed_pages, state, worker_id, heartbeat_at, created_at, updated_at) " +
+                    "VALUES ('task-1','source-a','comic-1','chapter-1','Chapter 1','Comic',1,0,'Queued',NULL,0,10,10)",
+            )
+            close()
+        }
+
+        helper.runMigrationsAndValidate(TEST_DB, 9, true, MIGRATION_8_9).use { db ->
+            assertEquals(
+                listOf(null to null),
+                db.query("SELECT ref_group, chapter_index FROM download_task WHERE task_id = 'task-1'").use { cursor ->
+                    buildList { while (cursor.moveToNext()) add(cursor.getString(0) to cursor.getString(1)) }
+                },
+            )
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

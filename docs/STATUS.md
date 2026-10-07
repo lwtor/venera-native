@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-07 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-10A3H 用户真机验收下载流程与章节拖动选择 |
-| 当前任务状态 | S4-10A3D–A3G 已完成并分别提交：修复下载请求头与网络约束、详情底部下载、章节拖动选择、书架直接下载任务入口。所有改动已通过 App Debug 编译，真机验证交由用户执行；之后如有问题按实际日志处理。其他待验收项仍见下文状态记录。 |
+| 当前任务（唯一下一任务） | S4-10A3J 下载页按漫画/章节分层、批量移除及完成章节阅读 |
+| 当前任务状态 | S4-10A3I 已完成：下载记录持久化来源版本与章节目录顺序，离线阅读可在同一版本的已下载章节间上一话/下一话导航。当前实施 A3J 下载界面重构；编译完成后交用户真机验收。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -28,6 +28,8 @@
 **S4-10A3F DONE：章节多选支持拖动范围选择。** 仅在批量选择模式下，详情页识别章节卡片拖动轨迹，并按当前筛选/排序后的章节顺序一次选择或取消锚点至目标章节之间的范围；卡片坐标随滚动更新，离开列表时清理，普通单击仍切换单章，非多选时不启用手势。JDK 17 `:feature:details:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未运行测试或真机操作，拖选手感待用户验收。
 
 **S4-10A3G DONE：让下载任务页可直接发现并查看进度。** 书架顶栏直接显示“下载任务 N”，N 为尚未完成的任务数；下载入口从菜单移到顶栏，菜单仅保留本地漫画。下载页标题改为“下载任务”，列表上方统计下载中、排队、需处理及已完成数量，各章卡片显示页级进度条、页数与暂停/继续/重试/移除操作。JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或执行真机验证，交由用户检查下载进度及操作体验。
+
+**S4-10A3I DONE：保存章节版本与目录顺序，让离线阅读可连续切话。** 下载记录新增可空的来源版本组和章节目录索引，Room 8→9 保留旧任务并兼容旧的未分组路径；分组版本使用独立下载任务 ID、文件目录及恢复清单。详情下载入队时传递版本组和目录索引；离线阅读器只在同作品、同版本且文件完整的已下载话之间提供上一话/下一话，避免误跳到其他汉化版本。新增迁移数据保留和同版本离线导航回归。验证：JDK 17 `:data:download:testDebugUnitTest :core:database:compileDebugAndroidTestKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。迁移 AndroidTest 源码已编译，未在真机执行。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 

@@ -24,7 +24,8 @@ import dev.veneranative.core.model.SourceId
 fun ChapterRef.taskId(): String = when (this) {
     is ChapterRef.Remote ->
         "r:${key.comicKey.sourceId.value.length}:${key.comicKey.sourceId.value}" +
-            ":${key.comicKey.remoteId.value}:${key.remoteId.value}"
+            ":${key.comicKey.remoteId.value}:${key.remoteId.value}" +
+            (group?.let { ":g:${it.length}:$it" } ?: "")
 
     is ChapterRef.Local -> "l:${comicId.value}:${chapterId.value}"
 }
@@ -45,7 +46,7 @@ fun refChapterOf(chapter: ChapterRef): String = when (chapter) {
 }
 
 /** Null when the columns do not describe a chapter, which only corrupt data could produce. */
-fun chapterRefOf(sourceId: String, comicId: String, chapterId: String): ChapterRef? =
+fun chapterRefOf(sourceId: String, comicId: String, chapterId: String, group: String? = null): ChapterRef? =
     if (sourceId == LOCAL_REF_NAMESPACE) {
         runCatching {
             ChapterRef.Local(LocalComicId(comicId), LocalChapterId(chapterId))
@@ -57,14 +58,16 @@ fun chapterRefOf(sourceId: String, comicId: String, chapterId: String): ChapterR
                     comicKey = ComicKey(SourceId(sourceId), RemoteComicId(comicId)),
                     remoteId = RemoteChapterId(chapterId),
                 ),
+                group = group,
             )
         }.getOrNull()
     }
 
 internal fun DownloadTaskEntity.toDomain(): DownloadTask? {
-    val chapter = chapterRefOf(refSource, refComic, refChapter) ?: return null
+    val chapter = chapterRefOf(refSource, refComic, refChapter, refGroup) ?: return null
     return DownloadTask(
         chapter = chapter,
+        chapterIndex = chapterIndex,
         title = title,
         comicTitle = comicTitle,
         pageCount = pageCount,
@@ -77,7 +80,7 @@ internal fun DownloadTaskEntity.toDomain(): DownloadTask? {
 }
 
 internal fun DownloadTaskEntity.chapterOrNull(): ChapterRef? =
-    chapterRefOf(refSource, refComic, refChapter)
+    chapterRefOf(refSource, refComic, refChapter, refGroup)
 
 internal fun DownloadPageEntity.toDomain(chapter: ChapterRef): DownloadPage = DownloadPage(
     chapter = chapter,

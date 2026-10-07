@@ -26,6 +26,7 @@ object DownloadPlanner {
         comicTitle: String?,
         pages: List<SourcePage>,
         nowEpochMillis: Long,
+        chapterIndex: Int? = null,
     ): DownloadPlan {
         val taskId = chapter.taskId()
         val ordered = pages.sortedBy { it.index }
@@ -35,6 +36,8 @@ object DownloadPlanner {
                 refSource = refSourceOf(chapter),
                 refComic = refComicOf(chapter),
                 refChapter = refChapterOf(chapter),
+                refGroup = (chapter as? ChapterRef.Remote)?.group,
+                chapterIndex = chapterIndex,
                 title = title,
                 comicTitle = comicTitle,
                 pageCount = ordered.size,

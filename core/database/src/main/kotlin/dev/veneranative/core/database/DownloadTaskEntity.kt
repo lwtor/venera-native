@@ -20,6 +20,8 @@ data class DownloadTaskEntity(
     @ColumnInfo(name = "ref_source") val refSource: String,
     @ColumnInfo(name = "ref_comic") val refComic: String,
     @ColumnInfo(name = "ref_chapter") val refChapter: String,
+    @ColumnInfo(name = "ref_group") val refGroup: String? = null,
+    @ColumnInfo(name = "chapter_index") val chapterIndex: Int? = null,
     @ColumnInfo(name = "title") val title: String,
     @ColumnInfo(name = "comic_title") val comicTitle: String?,
     @ColumnInfo(name = "page_count") val pageCount: Int,

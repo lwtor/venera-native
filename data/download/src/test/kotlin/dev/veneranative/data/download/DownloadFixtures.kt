@@ -60,6 +60,7 @@ internal fun taskEntity(
     refSource = refSourceOf(chapter),
     refComic = refComicOf(chapter),
     refChapter = refChapterOf(chapter),
+    refGroup = (chapter as? ChapterRef.Remote)?.group,
     title = "Chapter 1",
     comicTitle = "Frieren",
     pageCount = pageCount,

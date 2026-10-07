@@ -37,6 +37,7 @@ enum class DownloadChapterState {
 /** One chapter the user asked to download, with the progress its pages add up to. */
 data class DownloadTask(
     val chapter: ChapterRef,
+    val chapterIndex: Int? = null,
     val title: String,
     val comicTitle: String?,
     val pageCount: Int,
@@ -96,6 +97,7 @@ interface DownloadRepository {
         title: String,
         pages: List<SourcePage>,
         comicTitle: String? = null,
+        chapterIndex: Int? = null,
     )
 
     suspend fun pause(chapter: ChapterRef)

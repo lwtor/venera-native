@@ -42,9 +42,10 @@ class DefaultDownloadRepository(
         title: String,
         pages: List<SourcePage>,
         comicTitle: String?,
+        chapterIndex: Int?,
     ) = withContext(io) {
         val now = clock()
-        val plan = DownloadPlanner.plan(chapter, title, comicTitle, pages, now)
+        val plan = DownloadPlanner.plan(chapter, title, comicTitle, pages, now, chapterIndex)
         val existing = dao.task(plan.task.taskId)
 
         if (existing == null) {
@@ -56,6 +57,8 @@ class DefaultDownloadRepository(
                 existing.copy(
                     title = plan.task.title,
                     comicTitle = plan.task.comicTitle,
+                    refGroup = plan.task.refGroup,
+                    chapterIndex = plan.task.chapterIndex,
                     pageCount = plan.task.pageCount,
                     updatedAt = now,
                 ),
@@ -69,7 +72,7 @@ class DefaultDownloadRepository(
             dao.refreshPageRequest(plan.task.taskId, page.pageIndex, page.imageRef, page.headersJson)
         }
 
-        writeManifest(chapter, title, comicTitle, plan.pages)
+        writeManifest(chapter, title, comicTitle, plan.pages, chapterIndex)
         refreshProgress(plan.task.taskId)
     }
 
@@ -89,7 +92,7 @@ class DefaultDownloadRepository(
         val taskId = chapter.taskId()
         // Files first: the promise the repository makes is that cancelling leaves nothing behind,
         // and a row pointing at a deleted file is a lie the next recovery pass repairs anyway.
-        layout.deleteChapterFiles(refSourceOf(chapter), refComicOf(chapter), refChapterOf(chapter))
+        layout.deleteChapterFiles(refSourceOf(chapter), refComicOf(chapter), refChapterOf(chapter), (chapter as? ChapterRef.Remote)?.group)
         if (dao.task(taskId) != null) dao.deleteTask(taskId)
     }
 
@@ -195,11 +198,14 @@ class DefaultDownloadRepository(
         title: String,
         comicTitle: String?,
         pages: List<DownloadPageEntity>,
+        chapterIndex: Int?,
     ) {
         val manifest = ChapterManifest(
             sourceId = refSourceOf(chapter),
             comicId = refComicOf(chapter),
             chapterId = refChapterOf(chapter),
+            group = (chapter as? ChapterRef.Remote)?.group,
+            chapterIndex = chapterIndex,
             title = title,
             comicTitle = comicTitle,
             pages = pages.map { row ->
@@ -212,7 +218,7 @@ class DefaultDownloadRepository(
             },
         )
         layout.writeAtomically(
-            layout.manifestFile(refSourceOf(chapter), refComicOf(chapter), refChapterOf(chapter)),
+            layout.manifestFile(refSourceOf(chapter), refComicOf(chapter), refChapterOf(chapter), (chapter as? ChapterRef.Remote)?.group),
             ChapterManifestCodec.encode(manifest).toByteArray(Charsets.UTF_8),
         )
     }

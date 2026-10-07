@@ -169,4 +169,12 @@ val MIGRATION_7_8: Migration = object : Migration(7, 8) {
     }
 }
 
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+/** S4-10A3I: retain source version and directory position for offline chapter navigation. */
+val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `download_task` ADD COLUMN `ref_group` TEXT")
+        db.execSQL("ALTER TABLE `download_task` ADD COLUMN `chapter_index` INTEGER")
+    }
+}
+
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)

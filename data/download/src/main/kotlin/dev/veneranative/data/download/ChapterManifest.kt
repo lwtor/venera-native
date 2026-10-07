@@ -42,6 +42,8 @@ data class ChapterManifest(
     val sourceId: String,
     val comicId: String,
     val chapterId: String,
+    val group: String? = null,
+    val chapterIndex: Int? = null,
     val title: String,
     val comicTitle: String? = null,
     val pages: List<ManifestPage>,
@@ -56,6 +58,8 @@ object ChapterManifestCodec {
         put("source", JsonPrimitive(manifest.sourceId))
         put("comic", JsonPrimitive(manifest.comicId))
         put("chapter", JsonPrimitive(manifest.chapterId))
+        manifest.group?.let { put("group", JsonPrimitive(it)) }
+        manifest.chapterIndex?.let { put("chapterIndex", JsonPrimitive(it)) }
         put("title", JsonPrimitive(manifest.title))
         manifest.comicTitle?.let { put("comicTitle", JsonPrimitive(it)) }
         put("pages", pagesArray(manifest.pages))
@@ -77,6 +81,8 @@ object ChapterManifestCodec {
             sourceId = root.getValue("source").jsonPrimitive.content,
             comicId = root.getValue("comic").jsonPrimitive.content,
             chapterId = root.getValue("chapter").jsonPrimitive.content,
+            group = root["group"]?.jsonPrimitive?.contentOrNull,
+            chapterIndex = root["chapterIndex"]?.jsonPrimitive?.contentOrNull?.toIntOrNull(),
             title = root.getValue("title").jsonPrimitive.content,
             comicTitle = root["comicTitle"]?.jsonPrimitive?.contentOrNull,
             pages = pages,

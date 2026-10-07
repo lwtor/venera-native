@@ -114,7 +114,7 @@ internal class FakeDownloadRepository : DownloadRepository {
     val retried = mutableListOf<ChapterRef>()
     override fun observeTasks(): Flow<List<DownloadTask>> = tasks
     override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = MutableStateFlow(tasks.value.firstOrNull { it.chapter == chapter })
-    override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) = Unit
+    override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?, chapterIndex: Int?) = Unit
     override suspend fun pause(chapter: ChapterRef) { paused += chapter }
     override suspend fun resume(chapter: ChapterRef) { resumeGate?.await(); resumed += chapter }
     override suspend fun cancel(chapter: ChapterRef) { canceled += chapter }

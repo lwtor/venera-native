@@ -93,7 +93,7 @@ class DownloadRecovery(
         var adoptedPages = 0
         for (file in layout.manifestFiles()) {
             val manifest = ChapterManifestCodec.decode(file.readText()) ?: continue
-            val chapter = chapterRefOf(manifest.sourceId, manifest.comicId, manifest.chapterId)
+            val chapter = chapterRefOf(manifest.sourceId, manifest.comicId, manifest.chapterId, manifest.group)
                 ?: continue
             val taskId = chapter.taskId()
             if (dao.task(taskId) == null) {
@@ -103,6 +103,8 @@ class DownloadRecovery(
                         refSource = manifest.sourceId,
                         refComic = manifest.comicId,
                         refChapter = manifest.chapterId,
+                        refGroup = manifest.group,
+                        chapterIndex = manifest.chapterIndex,
                         title = manifest.title,
                         comicTitle = manifest.comicTitle,
                         pageCount = manifest.pages.size,
@@ -138,6 +140,7 @@ class DownloadRecovery(
             comicId = manifest.comicId,
             chapterId = manifest.chapterId,
             index = page.index,
+            group = manifest.group,
         )
         val file = layout.absoluteOf(relativePath)
         // A file that is already there counts as done: adopting it as queued would download it again.
@@ -159,7 +162,7 @@ class DownloadRecovery(
     private fun findOrphans(): List<String> {
         val claimed = layout.manifestFiles().mapNotNull { file ->
             ChapterManifestCodec.decode(file.readText())?.let { manifest ->
-                Triple(manifest.sourceId, manifest.comicId, manifest.chapterId) to
+                listOf(manifest.sourceId, manifest.comicId, manifest.chapterId, manifest.group.orEmpty()) to
                     manifest.pages.map { it.fileName }.toSet()
             }
         }.toMap()
@@ -171,10 +174,10 @@ class DownloadRecovery(
     }
 
     /** Which chapter a page file sits under, by walking back to its `pages` directory's chapter. */
-    private fun ownerOf(file: File): Triple<String, String, String>? {
+    private fun ownerOf(file: File): List<String>? {
         val manifest = File(file.parentFile?.parentFile, "chapter.json")
         val text = manifest.takeIf { it.isFile }?.readText() ?: return null
         val decoded = ChapterManifestCodec.decode(text) ?: return null
-        return Triple(decoded.sourceId, decoded.comicId, decoded.chapterId)
+        return listOf(decoded.sourceId, decoded.comicId, decoded.chapterId, decoded.group.orEmpty())
     }
 }

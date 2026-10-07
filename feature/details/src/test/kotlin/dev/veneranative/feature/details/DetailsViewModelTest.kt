@@ -156,7 +156,7 @@ class DetailsViewModelTest {
         viewModel.onAction(DetailsAction.DownloadSelectedChapters)
         advanceUntilIdle()
 
-        assertEquals(chapters.map { ChapterRef.Remote(it.key) }, downloads.enqueuedChapters)
+        assertEquals(chapters.map { ChapterRef.Remote(it.key, it.group) }, downloads.enqueuedChapters)
         assertEquals("已将 2 个章节加入下载队列。", viewModel.state.value.downloadMessage)
         assertFalse(viewModel.state.value.isChapterSelectionMode)
         assertEquals(2, viewModel.state.value.downloadQueueVersion)
@@ -495,7 +495,7 @@ class DetailsViewModelTest {
         val enqueuedChapters = mutableListOf<ChapterRef>()
         override fun observeTasks(): Flow<List<DownloadTask>> = emptyFlow()
         override fun observeTask(chapter: ChapterRef): Flow<DownloadTask?> = emptyFlow()
-        override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?) {
+        override suspend fun enqueue(chapter: ChapterRef, title: String, pages: List<SourcePage>, comicTitle: String?, chapterIndex: Int?) {
             enqueuedPages = pages
             enqueuedChapters += chapter
         }

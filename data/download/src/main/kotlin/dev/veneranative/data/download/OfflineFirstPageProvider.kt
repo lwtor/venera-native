@@ -2,6 +2,7 @@ package dev.veneranative.data.download
 
 import dev.veneranative.core.image.ImageSizeHeaderParser
 import dev.veneranative.core.model.ChapterContent
+import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
@@ -19,8 +20,8 @@ class OfflineFirstPageProvider(
 ) : PageProvider {
 
     override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
-        val key = (chapter as? ChapterRef.Remote)?.key ?: return source.loadChapter(chapter)
-        val ref = ChapterRef.Remote(key)
+        val ref = chapter as? ChapterRef.Remote ?: return source.loadChapter(chapter)
+        val key = ref.key
         val repository = downloads()
         if (!repository.isCompleteOffline(ref)) return source.loadChapter(chapter)
         val task = repository.observeTask(ref).first()
@@ -42,17 +43,41 @@ class OfflineFirstPageProvider(
                 sizeState = PageSizeState.Pending,
             )
         }
-        return ChapterContent(task.title, pages, task.comicTitle)
+        val sameVersion = repository.observeTasks().first()
+            .filter { candidate ->
+                val candidateRef = candidate.chapter as? ChapterRef.Remote
+                candidateRef != null && candidateRef.key.comicKey == key.comicKey &&
+                    candidateRef.group == ref.group
+            }
+            .filter { candidate ->
+                candidate.chapter == chapter ||
+                    candidate.state == DownloadChapterState.Completed && repository.isCompleteOffline(candidate.chapter)
+            }
+            .sortedWith(compareBy<DownloadTask>({ it.chapterIndex ?: Int.MAX_VALUE }, { it.createdAtEpochMillis }))
+        val ordered = sameVersion.mapIndexed { index, candidate -> candidate.toReaderChapter(index) }
+        val position = ordered.indexOfFirst { it.key == key }
+        return ChapterContent(
+            title = task.title,
+            pages = pages,
+            comicTitle = task.comicTitle,
+            nextChapter = ordered.getOrNull(position + 1),
+            previousChapter = ordered.getOrNull(position - 1),
+        )
     }
 
     override suspend fun prefetchChapter(chapter: ChapterRef) {
         val key = (chapter as? ChapterRef.Remote)?.key
-        if (key == null || !downloads().isCompleteOffline(ChapterRef.Remote(key))) {
+        if (key == null || !downloads().isCompleteOffline(chapter)) {
             source.prefetchChapter(chapter)
         }
     }
 
     suspend fun loadChapter(chapter: ChapterKey): ChapterContent = loadChapter(ChapterRef.Remote(chapter))
+
+    private fun DownloadTask.toReaderChapter(fallbackIndex: Int): Chapter {
+        val ref = chapter as ChapterRef.Remote
+        return Chapter(key = ref.key, title = title, index = chapterIndex ?: fallbackIndex, group = ref.group)
+    }
 
     override suspend fun resolve(page: ComicPage): ComicPage {
         if (page.sourceId != null) return source.resolve(page)

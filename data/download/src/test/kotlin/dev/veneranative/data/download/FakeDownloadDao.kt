@@ -63,6 +63,13 @@ internal class FakeDownloadDao : DownloadDao {
         this.pages.value = this.pages.value.filterNot { it.taskId to it.pageIndex in incoming } + pages
     }
 
+    override suspend fun refreshPageRequest(taskId: String, pageIndex: Int, imageRef: String, headersJson: String) {
+        replace(taskId, pageIndex) { row ->
+            if (row.state == DownloadPageState.Succeeded.name) row
+            else row.copy(imageRef = imageRef, headersJson = headersJson)
+        }
+    }
+
     override suspend fun page(taskId: String, pageIndex: Int): DownloadPageEntity? =
         pages.value.firstOrNull { it.taskId == taskId && it.pageIndex == pageIndex }
 

@@ -89,6 +89,7 @@ data class DownloadTarget(
     val index: Int,
     val imageRef: String,
     val headers: Map<String, String> = emptyMap(),
+    val group: String? = null,
 )
 
 /** How one page run ended. */
@@ -118,7 +119,7 @@ class PageDownloader(
 ) {
 
     suspend fun download(target: DownloadTarget): PageDownloadResult {
-        val file = layout.pageFile(target.sourceId, target.comicId, target.chapterId, target.index)
+        val file = layout.pageFile(target.sourceId, target.comicId, target.chapterId, target.index, target.group)
         val request = PageFetchRequest(imageRef = target.imageRef, sourceId = SourceId(target.sourceId), headers = target.headers)
 
         val written = try {
@@ -144,6 +145,7 @@ class PageDownloader(
                 comicId = target.comicId,
                 chapterId = target.chapterId,
                 index = target.index,
+                group = target.group,
             ),
             bytes = written,
             widthPx = size.widthPx,
