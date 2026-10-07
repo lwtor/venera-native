@@ -120,6 +120,7 @@ class DownloadWorker(
             chapterId = refChapterOf(page.chapter),
             index = page.index,
             imageRef = page.imageRef,
+            headers = page.headers,
         )
         var attempts = page.attempts + 1
         var lastError: DownloadError = DownloadError.NotResolvable

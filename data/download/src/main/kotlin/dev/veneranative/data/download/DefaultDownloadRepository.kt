@@ -65,6 +65,9 @@ class DefaultDownloadRepository(
         val known = dao.pages(plan.task.taskId).map { it.pageIndex }.toSet()
         val missing = plan.pages.filter { it.pageIndex !in known }
         if (missing.isNotEmpty()) dao.upsertPages(missing)
+        plan.pages.asSequence().filter { it.pageIndex in known }.forEach { page ->
+            dao.refreshPageRequest(plan.task.taskId, page.pageIndex, page.imageRef, page.headersJson)
+        }
 
         writeManifest(chapter, title, comicTitle, plan.pages)
         refreshProgress(plan.task.taskId)
@@ -203,6 +206,7 @@ class DefaultDownloadRepository(
                 ManifestPage(
                     index = row.pageIndex,
                     imageRef = row.imageRef,
+                    headers = decodeHeaders(row.headersJson),
                     fileName = layout.pageFileName(row.pageIndex),
                 )
             },

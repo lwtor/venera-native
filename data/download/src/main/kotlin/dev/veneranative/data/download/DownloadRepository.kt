@@ -51,6 +51,7 @@ data class DownloadPage(
     val chapter: ChapterRef,
     val index: Int,
     val imageRef: String,
+    val headers: Map<String, String> = emptyMap(),
     val state: DownloadPageState,
     val relativePath: String? = null,
     val bytes: Long = 0L,

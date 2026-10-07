@@ -146,6 +146,7 @@ class DownloadRecovery(
             taskId = taskId,
             pageIndex = page.index,
             imageRef = page.imageRef,
+            headersJson = encodeHeaders(page.headers),
             state = if (complete) DownloadPageState.Succeeded.name else DownloadPageState.Queued.name,
             relativePath = if (complete) relativePath else null,
             bytes = if (complete) file.length() else 0L,

@@ -60,6 +60,13 @@ interface DownloadDao {
     @Upsert
     suspend fun upsertPages(pages: List<DownloadPageEntity>)
 
+    /** Refresh request metadata when a user re-enqueues a page using current source data. */
+    @Query(
+        """UPDATE download_page SET image_ref = :imageRef, headers_json = :headersJson
+           WHERE task_id = :taskId AND page_index = :pageIndex AND state != 'Succeeded'""",
+    )
+    suspend fun refreshPageRequest(taskId: String, pageIndex: Int, imageRef: String, headersJson: String)
+
     @Query("SELECT * FROM download_page WHERE task_id = :taskId AND page_index = :pageIndex")
     suspend fun page(taskId: String, pageIndex: Int): DownloadPageEntity?
 

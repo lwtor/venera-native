@@ -162,4 +162,11 @@ val MIGRATION_6_7: Migration = object : Migration(6, 7) {
     }
 }
 
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+/** S4 download repair: preserve the image headers supplied by a source for background fetches. */
+val MIGRATION_7_8: Migration = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `download_page` ADD COLUMN `headers_json` TEXT NOT NULL DEFAULT '{}'")
+    }
+}
+
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)

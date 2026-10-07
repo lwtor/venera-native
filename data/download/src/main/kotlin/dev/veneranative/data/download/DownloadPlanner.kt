@@ -50,6 +50,7 @@ object DownloadPlanner {
                     taskId = taskId,
                     pageIndex = page.index,
                     imageRef = page.imageRef,
+                    headersJson = encodeHeaders(page.headers),
                     state = DownloadPageState.Queued.name,
                     relativePath = null,
                     bytes = 0L,

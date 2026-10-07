@@ -10,11 +10,25 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+/** Source-provided per-image headers must survive queue persistence and database recovery. */
+internal fun encodeHeaders(headers: Map<String, String>): String = headerObject(headers).toString()
+
+internal fun decodeHeaders(text: String): Map<String, String> = runCatching {
+    Json.parseToJsonElement(text).jsonObject.mapNotNull { (name, value) ->
+        value.jsonPrimitive.contentOrNull?.let { name to it }
+    }.toMap()
+}.getOrDefault(emptyMap())
+
+internal fun headerObject(headers: Map<String, String>) = buildJsonObject {
+    headers.forEach { (name, value) -> put(name, JsonPrimitive(value)) }
+}
+
 /** One page as recorded in `chapter.json`. */
 data class ManifestPage(
     val index: Int,
     val imageRef: String,
     val fileName: String,
+    val headers: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -56,6 +70,7 @@ object ChapterManifestCodec {
                 index = page.getValue("index").jsonPrimitive.content.toInt(),
                 imageRef = page.getValue("imageRef").jsonPrimitive.content,
                 fileName = page.getValue("file").jsonPrimitive.content,
+                headers = page["headers"]?.let { decodeHeaders(it.toString()) }.orEmpty(),
             )
         }.orEmpty()
         ChapterManifest(
@@ -75,6 +90,7 @@ object ChapterManifestCodec {
                     put("index", JsonPrimitive(page.index))
                     put("imageRef", JsonPrimitive(page.imageRef))
                     put("file", JsonPrimitive(page.fileName))
+                    put("headers", headerObject(page.headers))
                 },
             )
         }

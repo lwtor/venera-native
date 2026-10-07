@@ -13,6 +13,7 @@ import java.io.OutputStream
 data class PageFetchRequest(
     val imageRef: String,
     val sourceId: SourceId?,
+    val headers: Map<String, String> = emptyMap(),
     val variant: String = PAGE_VARIANT,
 )
 
@@ -39,6 +40,7 @@ class ComicImagePipelinePageSource(
             ComicImageRequest(
                 url = request.imageRef,
                 sourceId = request.sourceId,
+                headers = request.headers,
                 variant = request.variant,
             ),
         ) ?: return null
@@ -86,6 +88,7 @@ data class DownloadTarget(
     val chapterId: String,
     val index: Int,
     val imageRef: String,
+    val headers: Map<String, String> = emptyMap(),
 )
 
 /** How one page run ended. */
@@ -116,7 +119,7 @@ class PageDownloader(
 
     suspend fun download(target: DownloadTarget): PageDownloadResult {
         val file = layout.pageFile(target.sourceId, target.comicId, target.chapterId, target.index)
-        val request = PageFetchRequest(imageRef = target.imageRef, sourceId = SourceId(target.sourceId))
+        val request = PageFetchRequest(imageRef = target.imageRef, sourceId = SourceId(target.sourceId), headers = target.headers)
 
         val written = try {
             layout.writeAtomically(file) { sink ->

@@ -33,6 +33,7 @@ data class DownloadPageEntity(
     @ColumnInfo(name = "task_id") val taskId: String,
     @ColumnInfo(name = "page_index") val pageIndex: Int,
     @ColumnInfo(name = "image_ref") val imageRef: String,
+    @ColumnInfo(name = "headers_json", defaultValue = "'{}'") val headersJson: String = "{}",
     @ColumnInfo(name = "state") val state: String,
     @ColumnInfo(name = "relative_path") val relativePath: String?,
     @ColumnInfo(name = "bytes") val bytes: Long,

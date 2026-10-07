@@ -83,6 +83,7 @@ internal fun DownloadPageEntity.toDomain(chapter: ChapterRef): DownloadPage = Do
     chapter = chapter,
     index = pageIndex,
     imageRef = imageRef,
+    headers = decodeHeaders(headersJson),
     state = pageState(),
     relativePath = relativePath,
     bytes = bytes,

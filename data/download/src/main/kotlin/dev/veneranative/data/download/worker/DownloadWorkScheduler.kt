@@ -21,11 +21,11 @@ object DownloadWorkScheduler {
     const val WORK_NAME: String = "download"
 
     /**
-     * Unmetered network by default: a chapter is tens of megabytes and the user did not ask to spend
-     * mobile data on it. Storage-not-low keeps a run from filling the device to the brim.
+     * The user explicitly started a download, so waiting for Wi-Fi alone can leave it queued forever.
+     * Storage-not-low keeps a run from filling the device to the brim.
      */
     fun constraints(): Constraints = Constraints.Builder()
-        .setRequiredNetworkType(NetworkType.UNMETERED)
+        .setRequiredNetworkType(NetworkType.CONNECTED)
         .setRequiresStorageNotLow(true)
         .build()
 
