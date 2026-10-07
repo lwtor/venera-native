@@ -1069,8 +1069,8 @@ private fun ChapterRow(
     onBoundsChanged: (Rect?) -> Unit,
 ) {
     val darkTheme = androidx.compose.foundation.isSystemInDarkTheme()
-    val downloadedContainer = if (darkTheme) Color(0xFF183D2B) else Color(0xFFDDF3E5)
-    val downloadedContent = if (darkTheme) Color(0xFFB8F0C7) else Color(0xFF1B5E35)
+    val downloadedContainer = if (darkTheme) Color(0xFF26342B) else Color(0xFFE6ECE7)
+    val downloadedContent = if (darkTheme) Color(0xFFAAB9AD) else Color(0xFF526657)
     DisposableEffect(chapter.key) {
         onDispose { onBoundsChanged(null) }
     }
@@ -1094,7 +1094,7 @@ private fun ChapterRow(
         ),
         border = when {
             current && !selected -> androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-            downloaded && !selected && !current -> androidx.compose.foundation.BorderStroke(1.dp, downloadedContent.copy(alpha = 0.72f))
+            downloaded && !selected && !current -> androidx.compose.foundation.BorderStroke(1.dp, downloadedContent.copy(alpha = 0.52f))
             else -> null
         },
     ) {
