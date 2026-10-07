@@ -204,6 +204,27 @@ class DetailsViewModelTest {
         assertEquals(2, viewModel.state.value.downloadQueueVersion)
     }
 
+    @Test fun `empty source page list is not added as a zero page download`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        catalog.pagesResponse = SourceOutcome.Success(emptyList())
+        val downloads = RecordingDownloadRepository()
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, downloads)
+        advanceUntilIdle()
+
+        val chapter = viewModel.state.value.detail!!.chapters.first()
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.ChapterSelectionToggled(chapter.key))
+        viewModel.onAction(DetailsAction.DownloadSelectedChapters)
+        advanceUntilIdle()
+
+        assertTrue(downloads.enqueuedChapters.isEmpty())
+        assertEquals("所选章节暂时无法下载，请稍后重试。", viewModel.state.value.downloadMessage)
+        assertEquals(setOf(chapter.key), viewModel.state.value.selectedChapters)
+        assertTrue(viewModel.state.value.isChapterSelectionMode)
+        assertEquals(0, viewModel.state.value.downloadQueueVersion)
+    }
+
     @Test
     fun `a comic whose source is gone is unavailable rather than failed`() = runTest(dispatcher) {
         // The source was uninstalled between the search result and opening the comic, so the engine

@@ -47,11 +47,16 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
@@ -102,9 +107,21 @@ fun DetailsScreen(
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (Chapter) -> Unit,
     onBack: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.downloadMessage) {
+        val message = state.downloadMessage ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = message,
+            actionLabel = "查看下载",
+            withDismissAction = true,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) onOpenDownloads()
+    }
     val tagGroups = state.detail?.let { detail ->
         orderHeroTagGroups(detail.tagGroups.ifEmpty {
             detail.comic.tags.takeIf { it.isNotEmpty() }?.let { mapOf("Tags" to it) }.orEmpty()
@@ -130,6 +147,7 @@ fun DetailsScreen(
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0.dp),
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         bottomBar = {
             if (state.detail != null && state.hasChapters) {
                 Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
@@ -359,17 +377,6 @@ private fun Content(
                 )
             }
         }
-        state.downloadMessage?.let { message ->
-            item {
-                Text(
-                    message,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
-
         state.detail?.let { detail ->
             item {
                 Section {

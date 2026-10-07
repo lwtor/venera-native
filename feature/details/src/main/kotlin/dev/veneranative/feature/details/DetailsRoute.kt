@@ -35,6 +35,7 @@ fun DetailsRoute(
     onScheduleDownloads: () -> Unit = {},
     history: HistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
+    onOpenDownloads: () -> Unit = {},
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences)
@@ -55,6 +56,7 @@ fun DetailsRoute(
         onAction = viewModel::onAction,
         onOpenChapter = onOpenChapter,
         onBack = onBack,
+        onOpenDownloads = onOpenDownloads,
         modifier = modifier,
     )
 }

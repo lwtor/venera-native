@@ -349,6 +349,7 @@ private fun AppNavHost(
             screenPreferences = screenPreferences,
             onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it.key, it.group))) },
             onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
+            onOpenDownloads = { onRouteChange(AppRoute.Downloads) },
             onBack = onBack,
         )
 
