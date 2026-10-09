@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-09 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务（唯一下一任务） | S4-10A3K 用户真机验收下载两层列表、批量移除及离线章节连续阅读 |
-| 当前任务状态 | 用户指定提前完成 S4-07D1：Debug 构建已固定为项目专用签名身份，沿用当前已安装 App 的证书以兼容覆盖更新；私钥文件在本地且被 Git 忽略。App Debug 构建与 APK 证书核对通过，未安装或操作真机。原唯一下一任务仍为 S4-10A3K 真机验收下载双层列表、批量移除及离线章节连续阅读。 |
+| 当前任务状态 | 用户指定提前完成 S4-07D1：Debug 构建固定使用项目共享 keystore，证书沿用当前已安装 App 的签名以兼容覆盖更新；Debug keystore 已纳入 Git。Release 签名尚未创建。App Debug 构建与 APK 证书核对通过，未安装或操作真机。原唯一下一任务仍为 S4-10A3K 真机验收下载双层列表、批量移除及离线章节连续阅读。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -47,7 +47,7 @@
 
 **S4-10A3S DONE：书架下载入口改为图标。** 将书架标题栏可见的“下载任务 N”文字按钮换为下载图标按钮，避免文字占据标题操作区；无障碍描述仍包含下载任务和未完成数量，点击后仍进入独立下载任务页。验证：JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机，图标样式由用户验收。
 
-**S4-07D1 DONE：固定项目 Debug 签名身份。** `:app` Debug 构建显式使用本地 `signing/venera-native-debug.keystore`，不再依赖当前电脑的系统默认 debug.keystore。为避免影响已安装 App 的覆盖更新，此项目密钥从当前匹配的证书复制；新开发电脑必须安全取得同一密钥，不能自行生成替代。密钥被 `.gitignore` 排除，绝不提交。JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；生成 APK 的 SHA-256 证书指纹与已安装 App 相同；`git diff --check` — PASS。未安装或操作真机。正式 Release 签名仍须另行规划。
+**S4-07D1 DONE：固定项目 Debug 签名身份。** `:app` Debug 构建显式使用 `signing/venera-native-debug.keystore`，不再依赖每台电脑各自的系统默认 debug.keystore。该密钥沿用当前已安装 App 的证书以保持覆盖更新兼容性，并已纳入 Git，供其他开发电脑共享。它仅用于 Debug；Release 签名尚未创建，后续须单独管理。JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；生成 APK 的 SHA-256 证书指纹为 `91:CB:00:63:…:AD:9F:24:D8`；`git diff --check` — PASS。未安装或操作真机。
 
 **S3-00X DONE：阅读器双击和双指缩放。** 双击在适配大小与 2×缩放间切换，第二次双击还原；放大围绕双击位置保持内容锚定。双指捏合现在使用手势中心作为缩放锚点，既有最大/最小倍率及平移边界仍生效；未放大时页面滚动仍保持可用。新增缩放状态测试，覆盖双击放大/还原、捏合锚点与平移限界。验证：JDK 17 `:feature:reader:testDebugUnitTest :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未在真机上执行手势验收。
 

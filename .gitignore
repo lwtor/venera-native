@@ -19,6 +19,7 @@ local.properties
 # Signing and secrets
 *.jks
 *.keystore
+!signing/venera-native-debug.keystore
 keystore.properties
 secrets.properties
 
