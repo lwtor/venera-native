@@ -9,7 +9,7 @@
 | 最后更新 | 2026-10-09 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
 | 当前任务（唯一下一任务） | S4-02G2 完成 GitHub App Client ID 配置并走通 GitHub 账号授权、私有仓库创建、备份和恢复 |
-| 当前任务状态 | S4-02G1 快照 DTO、GZIP + PBKDF2/AES-GCM 加密包、Room 分类导出及事务化合并/替换恢复已完成。S4-02G2 的独立 `:feature:backup` Compose/MVI 页面、首页入口、GitHub App Device Flow、Keystore token 加密存储、固定私有仓库查找/创建及加密文件上传/按选择分类合并恢复已实现；项目 Client ID 已接入应用。JDK 17 `:app:assembleDebug` BUILD SUCCESSFUL，未运行测试或设备验证。接下来确认 GitHub App 已启用 Device Flow，且 Repository creation、Contents 权限为读写，再由用户实际授权验证线上闭环。上传数据仅为客户端加密快照，不包含下载媒体或来源凭据。 |
+| 当前任务状态 | S4-02G1 快照 DTO、GZIP + PBKDF2/AES-GCM 加密包、Room 分类导出及事务化合并/替换恢复已完成。S4-02G2 的独立 `:feature:backup` Compose/MVI 页面、首页入口、GitHub App Device Flow、Keystore token 加密存储、固定私有仓库查找/创建及加密文件上传/按选择分类合并恢复已实现；项目 Client ID 已接入应用。线上授权后仓库创建仍返回 “Resource not accessible by integration”，虽用户已调整 App 权限并重新授权，但未创建仓库。当前增加 GitHub 失败接口与 `X-Accepted-GitHub-Permissions` 显示，下一步用该诊断精确定位，不再重复盲改权限。JDK 17 `:app:assembleDebug` BUILD SUCCESSFUL，未运行测试或设备验证。上传数据仅为客户端加密快照，不包含下载媒体或来源凭据。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |

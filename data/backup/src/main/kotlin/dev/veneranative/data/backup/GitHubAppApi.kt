@@ -194,7 +194,7 @@ class GitHubAppApi(
         val response = request(request)
         return response.use {
             val body = it.body?.string().orEmpty()
-            if (!it.isSuccessful) throw apiError(it.code, body)
+            if (!it.isSuccessful) throw apiError(it, body)
             JSONObject(body)
         }
     }
@@ -215,13 +215,19 @@ class GitHubAppApi(
 
     private fun apiError(response: Response): GitHubApiException {
         val body = response.body?.string().orEmpty()
-        return apiError(response.code, body)
+        return apiError(response, body)
     }
 
-    private fun apiError(status: Int, body: String): GitHubApiException {
+    private fun apiError(response: Response, body: String): GitHubApiException {
         val message = runCatching { JSONObject(body).optString("message") }.getOrNull()
             ?.takeIf(String::isNotBlank) ?: "GitHub request failed"
-        return GitHubApiException(status, message)
+        val acceptedPermissions = response.header("X-Accepted-GitHub-Permissions")
+        val endpoint = "${response.request.method} ${response.request.url.encodedPath}"
+        val diagnostic = buildString {
+            append("$endpoint (${response.code}): $message")
+            if (!acceptedPermissions.isNullOrBlank()) append(". Required permission: $acceptedPermissions")
+        }
+        return GitHubApiException(response.code, diagnostic)
     }
 
     private fun contentUrl(repository: GitHubBackupRepositoryRef, path: String) =
