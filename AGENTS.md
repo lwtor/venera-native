@@ -99,6 +99,13 @@
 
 如果改动不经过 `:app`，可改为对应模块的 `assembleDebug`、`compileDebugKotlin` 或测试 APK 编译任务。默认不运行全量 Lint、全量单元测试、instrumentation test、压力测试、benchmark、安装 APK 或实机验证。
 
+### Debug 签名密钥
+
+- `:app` 的 Debug 构建显式使用项目签名文件 `signing/venera-native-debug.keystore`，不得回退到每台电脑各自生成的 `$HOME/.android/debug.keystore`。
+- 该 keystore 是本项目的本地私钥，已由 `.gitignore` 忽略，严禁提交、上传或放入构建产物。新开发电脑必须通过安全渠道取得同一文件并放到上述相对路径；不得自行重新生成，否则签名会变化，已安装 App 将无法直接覆盖更新。
+- 此项目密钥目前沿用现有已安装 App 的证书以保留更新兼容性。丢失时不能通过生成新 key 恢复原签名；应从可信备份恢复，或先规划应用数据迁移再更换证书。
+- Debug key 的本地别名/密码配置仅用于开发签名，不可用于 Release。正式发布签名须另行创建、单独保管，并且绝不能提交到仓库。
+
 编写测试代码属于实现工作，但普通节点只要求测试源码能够编译；除非用户明确要求，不因为新增了测试就自动执行完整测试。
 
 提交前最低检查：

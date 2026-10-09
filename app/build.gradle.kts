@@ -5,6 +5,15 @@ plugins {
 android {
     namespace = "dev.veneranative.app"
 
+    signingConfigs {
+        create("projectDebug") {
+            storeFile = rootProject.file("signing/venera-native-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     sourceSets.getByName("androidTest").assets.directories.add(rootProject.file("tools/test-sources").path)
 
     defaultConfig {
@@ -13,6 +22,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("projectDebug")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
