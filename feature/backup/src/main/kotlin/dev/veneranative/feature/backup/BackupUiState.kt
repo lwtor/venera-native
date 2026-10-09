@@ -4,7 +4,6 @@ import dev.veneranative.core.backup.BackupCategory
 import dev.veneranative.data.backup.GitHubDeviceAuthorization
 
 data class BackupUiState(
-    val clientId: String = "",
     val password: String = "",
     val categories: Set<BackupCategory> = setOf(BackupCategory.Favorites, BackupCategory.ReadingHistory),
     val authorization: GitHubDeviceAuthorization? = null,

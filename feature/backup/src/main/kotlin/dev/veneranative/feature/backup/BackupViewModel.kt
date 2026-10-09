@@ -17,17 +17,13 @@ import kotlinx.coroutines.launch
 
 class BackupViewModel(private val factory: GitHubBackupGatewayFactory?) : ViewModel() {
     private val mutableState = MutableStateFlow(
-        BackupUiState(clientId = factory?.savedClientId().orEmpty(), connected = factory?.hasAuthorization() == true),
+        BackupUiState(connected = factory?.hasAuthorization() == true),
     )
     val state: StateFlow<BackupUiState> = mutableState.asStateFlow()
     private var gateway: GitHubBackupGateway? = null
 
     fun onAction(action: BackupAction) {
         when (action) {
-            is BackupAction.ClientIdChanged -> {
-                factory?.saveClientId(action.value)
-                mutableState.update { it.copy(clientId = action.value, error = null) }
-            }
             is BackupAction.PasswordChanged -> mutableState.update { it.copy(password = action.value, error = null) }
             is BackupAction.CategoryToggled -> mutableState.update { state ->
                 state.copy(categories = state.categories.toMutableSet().apply {
@@ -47,8 +43,8 @@ class BackupViewModel(private val factory: GitHubBackupGatewayFactory?) : ViewMo
                 finally { password.fill('\u0000') }
             }
             BackupAction.Disconnect -> {
-                if (gateway == null && factory != null && mutableState.value.clientId.isNotBlank()) {
-                    gateway = factory.create(mutableState.value.clientId)
+                if (gateway == null && factory != null) {
+                    gateway = factory.create()
                 }
                 gateway?.disconnect()
                 gateway = null
@@ -60,9 +56,7 @@ class BackupViewModel(private val factory: GitHubBackupGatewayFactory?) : ViewMo
     private fun gateway(): GitHubBackupGateway {
         gateway?.let { return it }
         checkNotNull(factory) { "本地备份数据库尚未准备完成，请稍后重试" }
-        val clientId = mutableState.value.clientId.trim()
-        require(clientId.isNotEmpty()) { "请填写 GitHub App Client ID" }
-        return factory.create(clientId).also { service ->
+        return factory.create().also { service ->
             gateway = service
             if (service.isAuthorized) mutableState.update { it.copy(connected = true) }
         }

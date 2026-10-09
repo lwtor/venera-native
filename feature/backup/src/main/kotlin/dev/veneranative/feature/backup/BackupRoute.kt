@@ -44,14 +44,6 @@ fun BackupRoute(factory: GitHubBackupGatewayFactory?, onBack: () -> Unit) {
         Text("只备份你勾选的结构化数据，不会上传漫画图片、下载文件或缓存。备份在上传前会使用你的密码加密；忘记密码后无法恢复。GitHub App 需要启用 Device Flow，并授予私有仓库创建权限和 Contents 读写权限。")
 
         OutlinedTextField(
-            value = state.clientId,
-            onValueChange = { screenViewModel.onAction(BackupAction.ClientIdChanged(it)) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("GitHub App Client ID") },
-            supportingText = { Text("需要先配置 GitHub App；这里只填写公开的 Client ID，不要填写密码或 token。") },
-            singleLine = true,
-        )
-        OutlinedTextField(
             value = state.password,
             onValueChange = { screenViewModel.onAction(BackupAction.PasswordChanged(it)) },
             modifier = Modifier.fillMaxWidth(),
@@ -106,7 +98,7 @@ fun BackupRoute(factory: GitHubBackupGatewayFactory?, onBack: () -> Unit) {
         } else {
             Button(
                 onClick = { screenViewModel.onAction(BackupAction.Connect) },
-                enabled = !state.busy && factory != null && state.clientId.isNotBlank(),
+                enabled = !state.busy && factory != null,
                 modifier = Modifier.fillMaxWidth(),
             ) { Text("连接 GitHub") }
             if (factory == null) Text("正在准备本地数据……")

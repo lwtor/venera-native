@@ -243,7 +243,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         scope.launch {
             val db = VeneraDatabaseFactory.get(getApplication())
             _backupFactory.value = GitHubBackupGatewayFactory(
-                getApplication(), httpClient, RoomBackupRepository(db),
+                getApplication(), httpClient, RoomBackupRepository(db), GitHubBackupConfiguration.CLIENT_ID,
             )
             val repository = DefaultHistoryRepository(db)
             _searchHistory.value = DefaultSearchHistoryRepository(db.searchHistoryDao())

@@ -69,16 +69,14 @@ class GitHubBackupGatewayFactory(
     context: Context,
     private val httpClient: OkHttpClient,
     private val repository: BackupRepository,
+    private val clientId: String,
 ) {
     private val tokenStore = AndroidGitHubTokenStore(context.applicationContext)
-    private val preferences = context.applicationContext.getSharedPreferences("github_backup_config", Context.MODE_PRIVATE)
 
-    fun savedClientId(): String = preferences.getString("client_id", "").orEmpty()
-    fun saveClientId(value: String) { preferences.edit().putString("client_id", value.trim()).apply() }
     fun hasAuthorization(): Boolean = tokenStore.read() != null
 
-    fun create(clientId: String): GitHubBackupGateway {
-        val api = GitHubAppApi(httpClient, clientId.trim())
+    fun create(): GitHubBackupGateway {
+        val api = GitHubAppApi(httpClient, clientId)
         return GitHubBackupGateway(api, GitHubTokenManager(api, tokenStore), repository)
     }
 }
