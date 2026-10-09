@@ -47,6 +47,7 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 :app
 :core:database
 :core:archive
+:core:backup
 :core:designsystem
 :core:image
 :core:model
@@ -54,6 +55,7 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 :core:network
 :data:comic
 :data:collection
+:data:backup
 :data:download
 :data:history
 :data:settings

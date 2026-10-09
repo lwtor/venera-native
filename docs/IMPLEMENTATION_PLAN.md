@@ -591,7 +591,7 @@ S3-00 小任务：
 | ID | 任务 | 关键交付物与验收 | 前置 | 状态 |
 | --- | --- | --- | --- | --- |
 | S4-01 | Proto DataStore 设置 | 外观、阅读、网络设置与迁移；配置变更与进程恢复有测试 | S3-08 | TODO |
-| S4-02 | WebDAV 备份恢复 | 格式版本、预览、冲突、安全默认值；往返和旧版本恢复测试 | S4-01 | TODO |
+| S4-02 | GitHub 私有仓库选择性备份恢复 | GitHub App 授权；用户选择结构化数据类别；本地压缩加密快照；预览、冲突与兼容恢复；不包含漫画下载和来源凭据 | S4-01 | IN_PROGRESS |
 | S4-03 | Material 3 Adaptive | Navigation Rail、列表详情、折叠屏；手机与宽屏关键布局验收 | S3-08 | TODO |
 | S4-04 | 无障碍与国际化 | TalkBack、字体缩放、键盘、简繁体/英文；关键页面与操作覆盖 | S4-03、S4-08 | IN_PROGRESS（用户要求提前完成简体中文 UI 支持；完整无障碍与其它语言仍未开始） |
 | S4-05 | 性能基线 | Macrobenchmark、Baseline Profile、回归阈值；记录基线设备与波动范围 | S4-08 | TODO |
@@ -606,6 +606,13 @@ S4-07 发布准备提前子任务：
 | ID | 交付与验收范围 | 状态 |
 | --- | --- | --- |
 | S4-07D1 | 为 Debug 构建固定项目级签名身份；新开发电脑复用同一密钥，并保持当前已安装 App 的覆盖更新兼容性；Release 密钥独立管理 | DONE（`:app:assembleDebug` 通过；生成 APK 证书与当前已安装 App 匹配；Debug keystore 纳入 Git，Release 签名尚未创建；未安装或操作真机） |
+
+S4-02 GitHub 备份子任务：
+
+| ID | 交付与验收范围 | 状态 |
+| --- | --- | --- |
+| S4-02G1 | 新增版本化、可选择类别的结构化快照；本地压缩及密码加密；Room 数据可按类别导出并事务化合并/替换恢复；排除下载媒体 | DONE（`:core:backup:compileDebugKotlin :core:backup:compileDebugUnitTestKotlin :data:backup:compileDebugKotlin` 通过；测试源码已编译但未运行） |
+| S4-02G2 | 增加备份类别选择 UI、GitHub App Device Flow、Private 仓库创建/选择及快照上传/恢复；需要项目 GitHub App Client ID 才能做线上授权闭环 | TODO |
 
 S4-09 页面对照子任务：
 

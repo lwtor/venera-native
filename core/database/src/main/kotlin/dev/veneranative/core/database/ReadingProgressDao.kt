@@ -7,10 +7,18 @@ import androidx.room.Upsert
 @Dao
 interface ReadingProgressDao {
 
+    @Query("SELECT * FROM reading_progress")
+    suspend fun all(): List<ReadingProgressEntity>
+
+    @Query("DELETE FROM reading_progress")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM reading_progress WHERE source_id = :sourceId AND comic_id = :comicId")
     suspend fun find(sourceId: String, comicId: String): ReadingProgressEntity?
 
     @Upsert suspend fun upsert(progress: ReadingProgressEntity)
+
+    @Upsert suspend fun upsertAll(progress: List<ReadingProgressEntity>)
 
     /**
      * Dropping a comic from history has to drop its resume point too, otherwise the reader would

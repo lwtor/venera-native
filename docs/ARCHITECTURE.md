@@ -38,6 +38,7 @@ immutable UiState
 | `:app` | MainActivity、应用 Theme、根装配与首页/书架两个根级 Tab 导航壳；搜索、探索、来源由页面入口进入 | Feature、Core、实现模块 |
 | `:core:model` | 稳定领域 ID 与跨层模型（包括远端/本地 `ChapterRef`） | 尽量只依赖 Kotlin |
 | `:core:archive` | ZIP/CBZ、7z/CB7 只读访问接口与 Commons Compress 适配 | Commons Compress、XZ、Android Framework |
+| `:core:backup` | 与存储无关、带格式版本的选择性数据快照 DTO；压缩并使用用户密码加密/解密备份包 | kotlinx.serialization JSON、Java Cryptography |
 | `:data:source` | 上游来源目录的获取与解析、来源包远程/本地安装、启停与卸载；协调磁盘存储与运行时加载 | `:core:model`、`:core:network`、`:source:api` |
 | `:core:network` | OkHttp 客户端基线、Dispatcher 与通用网络错误 | OkHttp |
 | `:core:image` | 漫画图片管线：`ComicImageRequest` 与稳定缓存键、自建 Fetcher（走 `:core:network` 的共享 OkHttp）、Coil 磁盘缓存、图片头部尺寸解析、封面渲染的 `ComicImage`，以及从 `:feature:reader` 迁来的页面解码与分块 | `:core:model`、`:core:network`、Coil 3.6.3、Compose |
@@ -45,6 +46,7 @@ immutable UiState
 | `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
 | `:core:database` | Room 持久化：阅读历史/进度、收藏、下载、本地库索引、搜索历史和轻量页面偏好实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：保存每漫画/章节进度、最近阅读按漫画返回最新章节、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
+| `:data:backup` | 按用户选择从 Room 创建快照，并在事务中合并或替换恢复收藏、历史/进度和轻量页面偏好；不包含漫画文件 | `:core:backup`、`:core:database`、Room |
 | `:data:search` | 最近搜索词仓库：规范化查询词、去重置顶、有界保留及单项删除/清空；数据保存在 Room | `:core:database`、Coroutines |
 | `:data:settings` | 轻量页面选择偏好的类型无关持久化仓库；为 S4-01 设置模块前的页面状态切片提供 Room 存储 | `:core:database` |
 | `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
@@ -229,7 +231,7 @@ Runtime 最终需要明确以下层级：
 
 目标客户端：
 
-- `AppHttpClient`：源仓库、版本检查、WebDAV。
+- `AppHttpClient`：源仓库、版本检查及 GitHub 备份 API。
 - `SourceHttpClient`：来源动态请求和每源 Cookie。
 - `ImageHttpClient`：与 Coil 共享连接池的图片请求。
 

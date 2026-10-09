@@ -150,7 +150,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 | `:data:source` | 漫画源安装、更新、启停、账户和源设置 |
 | `:data:local` | 本地目录、压缩包索引、封面识别和导入 |
 | `:data:settings` | 阅读器、外观、网络等用户设置 |
-| `:data:sync` | WebDAV 备份、恢复、冲突策略和同步记录 |
+| `:data:backup` | 选择性数据备份、恢复、冲突策略和 GitHub 私有仓库存储 |
 
 ### 4.5 Feature 模块
 
@@ -279,7 +279,7 @@ interface SourceScriptRuntime {
 
 漫画源请求地址和方法是动态的，因此不使用 Retrofit 作为核心网络入口。OkHttp Client 按用途配置：
 
-- `AppHttpClient`：源仓库、版本检查和 WebDAV。
+- `AppHttpClient`：源仓库、版本检查和 GitHub 备份 API。
 - `SourceHttpClient`：漫画源动态请求。
 - `ImageHttpClient`：与 Coil 共享连接池，优化图片并发。
 
@@ -441,12 +441,12 @@ downloads/
 
 ### 9.7 同步与备份
 
-- WebDAV 配置和连通性测试。
-- 设置、收藏、历史、进度和漫画源备份。
-- 敏感账号信息默认不进入普通备份。
-- 增量版本号和数据格式版本。
-- 上传、下载、覆盖前预览和冲突提示。
-- 自动备份使用 WorkManager 和网络约束。
+- 使用用户自己的 GitHub 账号创建/选择 Private 备份仓库，不依赖自建线上服务。
+- 用户可选择备份收藏与收藏夹、浏览/阅读记录与进度、轻量应用偏好等结构化数据。
+- 首版不备份漫画下载文件、图片缓存或 Cookie/Token 等来源登录凭据。
+- 上传前在设备本地生成带格式版本和校验信息的压缩、加密快照；恢复时支持预览和按类别合并/替换。
+- 手动备份/恢复优先，稳定后通过 WorkManager 做限频自动备份；冲突必须显式提示，不冒充实时双向同步。
+- 每个账号按月控制快照数量/历史增长，并提供旧快照管理。
 
 ## 10. 阅读器设计
 
@@ -581,7 +581,7 @@ sealed interface ComicPage {
 
 ### 阶段 4：同步、体验与发布
 
-- WebDAV 备份和恢复。
+- GitHub Private Repository 选择性数据备份和恢复。
 - Material 3 Adaptive 完整适配。
 - 无障碍、国际化和简繁体支持。
 - Baseline Profile、Macrobenchmark 和性能治理。

@@ -29,6 +29,12 @@ interface FavoriteDao {
     @Query("SELECT * FROM favorite_folder")
     suspend fun folders(): List<FavoriteFolderEntity>
 
+    @Upsert
+    suspend fun upsertFolders(folders: List<FavoriteFolderEntity>)
+
+    @Query("DELETE FROM favorite_folder")
+    suspend fun deleteAllFolders()
+
     @Query("SELECT MAX(sort_order) FROM favorite_folder")
     suspend fun maxFolderSortOrder(): Int?
 
@@ -75,8 +81,20 @@ interface FavoriteDao {
     @Upsert
     suspend fun upsertEntry(entry: FavoriteEntryEntity)
 
+    @Upsert
+    suspend fun upsertEntries(entries: List<FavoriteEntryEntity>)
+
     @Query("SELECT * FROM favorite_membership")
     fun observeMemberships(): Flow<List<FavoriteMembershipEntity>>
+
+    @Query("SELECT * FROM favorite_membership")
+    suspend fun memberships(): List<FavoriteMembershipEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertMemberships(memberships: List<FavoriteMembershipEntity>)
+
+    @Query("DELETE FROM favorite_membership")
+    suspend fun deleteAllMemberships()
 
     @Query("SELECT folder_id FROM favorite_membership WHERE ref_source = :refSource AND ref_comic = :refComic")
     suspend fun folderIds(refSource: String, refComic: String): List<String>
@@ -102,6 +120,9 @@ interface FavoriteDao {
     /** Every favourite, for an update sweep. */
     @Query("SELECT * FROM favorite_entry")
     suspend fun entries(): List<FavoriteEntryEntity>
+
+    @Query("DELETE FROM favorite_entry")
+    suspend fun deleteAllEntries()
 
     @Query("DELETE FROM favorite_entry WHERE ref_source = :refSource AND ref_comic = :refComic")
     suspend fun deleteEntry(refSource: String, refComic: String)

@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-09 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-10A3K 用户真机验收下载两层列表、批量移除及离线章节连续阅读 |
-| 当前任务状态 | 用户指定提前完成 S4-07D1：Debug 构建固定使用项目共享 keystore，证书沿用当前已安装 App 的签名以兼容覆盖更新；Debug keystore 已纳入 Git。Release 签名尚未创建。App Debug 构建与 APK 证书核对通过，未安装或操作真机。原唯一下一任务仍为 S4-10A3K 真机验收下载双层列表、批量移除及离线章节连续阅读。 |
+| 当前任务（唯一下一任务） | S4-02G2 增加备份类别选择 UI、GitHub App 授权及 Private 仓库快照上传/恢复 |
+| 当前任务状态 | S4-02G1 已完成：加入带 schema 版本的结构化数据快照模型、GZIP + PBKDF2/AES-GCM 本地加密包，以及 Room 类别导出和事务化合并/替换恢复。当前内容覆盖收藏/收藏夹、阅读历史/进度和轻量页面偏好，不含下载文件与缓存。编译及测试源码编译通过，未运行单测或设备验证。GitHub App Client ID 尚未配置，线上授权闭环尚未实现。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
@@ -46,6 +46,8 @@
 **S4-10A3R DONE：降低已下载章节状态标记的视觉强度。** 按用户反馈，将亮绿底色、文字及边框改为低饱和灰绿色：浅色主题使用浅灰绿底和中等灰绿字色，深色主题使用暗灰绿底和柔和灰绿字色，边框也降低透明度；保留“已下载”勾标及无障碍描述。验证：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机，视觉明暗由用户验收。
 
 **S4-10A3S DONE：书架下载入口改为图标。** 将书架标题栏可见的“下载任务 N”文字按钮换为下载图标按钮，避免文字占据标题操作区；无障碍描述仍包含下载任务和未完成数量，点击后仍进入独立下载任务页。验证：JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未操作真机，图标样式由用户验收。
+
+**S4-02G1 DONE：选择性结构化备份快照基础。** 新建 `:core:backup` 的纯 DTO/版本化压缩加密包格式，用户密码经 PBKDF2-HMAC-SHA256 派生 AES-256-GCM 密钥；新建 `:data:backup`，在 Room 事务内导出或按用户选择合并/替换收藏夹、收藏、阅读历史/进度与轻量偏好。压缩包不包含下载图片或缓存。验证：JDK 17 `:core:backup:compileDebugKotlin :core:backup:compileDebugUnitTestKotlin :data:backup:compileDebugKotlin` — BUILD SUCCESSFUL；加密往返、错误密码和篡改用例已编写并编译，未运行；GitHub 授权及 UI 尚未接入。
 
 **S4-07D1 DONE：固定项目 Debug 签名身份。** `:app` Debug 构建显式使用 `signing/venera-native-debug.keystore`，不再依赖每台电脑各自的系统默认 debug.keystore。该密钥沿用当前已安装 App 的证书以保持覆盖更新兼容性，并已纳入 Git，供其他开发电脑共享。它仅用于 Debug；Release 签名尚未创建，后续须单独管理。JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；生成 APK 的 SHA-256 证书指纹为 `91:CB:00:63:…:AD:9F:24:D8`；`git diff --check` — PASS。未安装或操作真机。
 

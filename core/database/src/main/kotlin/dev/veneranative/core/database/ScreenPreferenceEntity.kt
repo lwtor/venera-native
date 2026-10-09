@@ -16,6 +16,12 @@ data class ScreenPreferenceEntity(
 
 @Dao
 interface ScreenPreferenceDao {
+    @Query("SELECT * FROM `screen_preference`")
+    suspend fun all(): List<ScreenPreferenceEntity>
+
+    @Query("DELETE FROM `screen_preference`")
+    suspend fun deleteAll()
+
     @Query("SELECT `value` FROM `screen_preference` WHERE `key` = :key")
     suspend fun get(key: String): String?
 

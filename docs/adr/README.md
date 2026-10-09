@@ -15,6 +15,7 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | [ADR-0010](0010-archive-library-choice.md) | ZIP/7z 归档库与许可证选择 | Accepted |
 | [ADR-0011](0011-chapter-reference-identity.md) | 远端与本地章节统一身份 | Accepted |
 | [ADR-0012](0012-bounded-source-timers.md) | 受限且可取消的来源计时器 | Accepted |
+| [ADR-0013](0013-github-private-backup.md) | GitHub 私有仓库选择性备份与本地加密快照 | Accepted（实现中） |
 
 ## 编写规则
 

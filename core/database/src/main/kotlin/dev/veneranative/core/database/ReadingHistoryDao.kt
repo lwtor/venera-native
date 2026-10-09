@@ -8,6 +8,12 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ReadingHistoryDao {
 
+    @Query("SELECT * FROM reading_history")
+    suspend fun all(): List<ReadingHistoryEntity>
+
+    @Query("DELETE FROM reading_history")
+    suspend fun deleteAll()
+
     /** One latest chapter position per comic, ordered by the comics most recently read. */
     @Query("""
         SELECT history.* FROM reading_history AS history
@@ -32,6 +38,8 @@ interface ReadingHistoryDao {
     suspend fun find(sourceId: String, comicId: String): ReadingHistoryEntity?
 
     @Upsert suspend fun upsert(entry: ReadingHistoryEntity)
+
+    @Upsert suspend fun upsertAll(entries: List<ReadingHistoryEntity>)
 
     @Query("DELETE FROM reading_history WHERE source_id = :sourceId AND comic_id = :comicId")
     suspend fun delete(sourceId: String, comicId: String)
