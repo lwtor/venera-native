@@ -28,6 +28,9 @@ sealed interface AppRoute {
     /** A standalone download manager outside the main bottom navigation. */
     data object Downloads : AppRoute
 
+    /** Encrypted GitHub backup and restore. */
+    data object Backup : AppRoute
+
     /** Browse a source's declared explore pages. */
     data class Explore(val sourceId: String?) : AppRoute
 

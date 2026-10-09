@@ -56,6 +56,7 @@ immutable UiState
 | `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索、来源管理和书架入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
 | `:feature:library` | 书架页：收藏常驻主视图，下载队列与本地漫画从菜单进入；收藏支持用户收藏夹筛选、多选归属、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
+| `:feature:backup` | GitHub 数据备份页面：选择快照类别、启动 Device Flow 授权、手动备份与合并恢复；Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |

@@ -37,6 +37,7 @@ include(
     ":data:settings",
     ":data:source",
     ":feature:details",
+    ":feature:backup",
     ":feature:explore",
     ":feature:home",
     ":feature:library",

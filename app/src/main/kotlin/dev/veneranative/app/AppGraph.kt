@@ -46,6 +46,8 @@ import dev.veneranative.data.download.DownloadEnvironment
 import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.download.OfflineFirstPageProvider
 import dev.veneranative.data.collection.CollectionRepository
+import dev.veneranative.data.backup.GitHubBackupGatewayFactory
+import dev.veneranative.data.backup.RoomBackupRepository
 import dev.veneranative.data.collection.DefaultCollectionRepository
 import dev.veneranative.data.history.DefaultHistoryRepository
 import dev.veneranative.data.history.HistoryRepository
@@ -234,10 +236,15 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     val local: kotlinx.coroutines.flow.StateFlow<LocalComicRepository?> = _local
     val searchHistory: kotlinx.coroutines.flow.StateFlow<SearchHistoryRepository?> = _searchHistory
     val screenPreferences: kotlinx.coroutines.flow.StateFlow<ScreenPreferenceRepository?> = _screenPreferences
+    private val _backupFactory = kotlinx.coroutines.flow.MutableStateFlow<GitHubBackupGatewayFactory?>(null)
+    val backupFactory: kotlinx.coroutines.flow.StateFlow<GitHubBackupGatewayFactory?> = _backupFactory
     val download: kotlinx.coroutines.flow.StateFlow<DownloadRepository?> = _download
     init {
         scope.launch {
             val db = VeneraDatabaseFactory.get(getApplication())
+            _backupFactory.value = GitHubBackupGatewayFactory(
+                getApplication(), httpClient, RoomBackupRepository(db),
+            )
             val repository = DefaultHistoryRepository(db)
             _searchHistory.value = DefaultSearchHistoryRepository(db.searchHistoryDao())
             _screenPreferences.value = DefaultScreenPreferenceRepository(db.screenPreferenceDao())

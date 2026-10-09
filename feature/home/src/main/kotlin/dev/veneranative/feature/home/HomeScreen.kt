@@ -63,6 +63,7 @@ fun HomeRoute(
     onOpenSources: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenBackup: () -> Unit = {},
 ) {
     val viewModelKey = "home-${history != null}-${collection != null}-${localRepository != null}"
     val homeViewModel: HomeViewModel = viewModel(key = viewModelKey) {
@@ -76,6 +77,7 @@ fun HomeRoute(
         onOpenSources = onOpenSources,
         onOpenSearch = onOpenSearch,
         onOpenLibrary = onOpenLibrary,
+        onOpenBackup = onOpenBackup,
     )
 }
 
@@ -86,6 +88,7 @@ internal fun HomeScreen(
     onOpenSources: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenBackup: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Scaffold(
@@ -103,7 +106,7 @@ internal fun HomeScreen(
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    HomeHeader(onOpenSources = onOpenSources)
+                    HomeHeader(onOpenSources = onOpenSources, onOpenBackup = onOpenBackup)
                     SearchEntry(onOpenSearch = onOpenSearch)
                 }
             }
@@ -169,7 +172,7 @@ internal fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(onOpenSources: () -> Unit) {
+private fun HomeHeader(onOpenSources: () -> Unit, onOpenBackup: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -188,6 +191,9 @@ private fun HomeHeader(onOpenSources: () -> Unit) {
             Text("漫画，随时继续", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.weight(1f))
+        IconButton(onClick = onOpenBackup, modifier = Modifier.clip(CircleShape)) {
+            Text("☁", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
+        }
         IconButton(onClick = onOpenSources, modifier = Modifier.clip(CircleShape)) {
             Icon(Icons.Filled.MoreVert, contentDescription = "管理漫画源", tint = MaterialTheme.colorScheme.primary)
         }

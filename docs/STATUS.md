@@ -8,8 +8,8 @@
 | --- | --- |
 | 最后更新 | 2026-10-09 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-02G2 增加备份类别选择 UI、GitHub App 授权及 Private 仓库快照上传/恢复 |
-| 当前任务状态 | S4-02G1 已完成：加入带 schema 版本的结构化数据快照模型、GZIP + PBKDF2/AES-GCM 本地加密包，以及 Room 类别导出和事务化合并/替换恢复。当前内容覆盖收藏/收藏夹、阅读历史/进度和轻量页面偏好，不含下载文件与缓存。编译及测试源码编译通过，未运行单测或设备验证。GitHub App Client ID 尚未配置，线上授权闭环尚未实现。 |
+| 当前任务（唯一下一任务） | S4-02G2 完成 GitHub App Client ID 配置并走通 GitHub 账号授权、私有仓库创建、备份和恢复 |
+| 当前任务状态 | S4-02G1 快照 DTO、GZIP + PBKDF2/AES-GCM 加密包、Room 分类导出及事务化合并/替换恢复已完成。S4-02G2 的独立 `:feature:backup` Compose/MVI 页面、首页入口、GitHub App Device Flow、Keystore token 加密存储、固定私有仓库查找/创建及加密文件上传/按选择分类合并恢复已实现；JDK 17 `:app:assembleDebug` BUILD SUCCESSFUL，未运行测试或设备验证。页面允许开发阶段输入并保存公开 Client ID，但项目正式可用仍需项目方注册并配置 GitHub App Client ID、启用 Device Flow 和对应仓库权限，然后完成账号授权实测。当前上传数据仅为客户端加密快照，不包含下载媒体或来源凭据。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |

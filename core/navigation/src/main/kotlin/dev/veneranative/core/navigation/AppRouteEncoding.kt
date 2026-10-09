@@ -23,6 +23,7 @@ fun AppRoute.encode(): String = when (this) {
     AppRoute.Sources -> "sources"
     AppRoute.Library -> "library"
     AppRoute.Downloads -> "downloads"
+    AppRoute.Backup -> "backup"
     is AppRoute.Explore -> "explore:${sourceId.escape()}"
     is AppRoute.Search -> "search:${sourceId.escape()}"
     is AppRoute.ComicDetails ->
@@ -44,6 +45,7 @@ fun decodeAppRoute(encoded: String): AppRoute? {
         "sources" -> AppRoute.Sources
         "library" -> AppRoute.Library
         "downloads" -> AppRoute.Downloads
+        "backup" -> AppRoute.Backup
         "explore" -> parts.getOrNull(1)?.let { AppRoute.Explore(it.unescapeOrNull()) } ?: AppRoute.Explore(null)
         "search" -> parts.getOrNull(1)?.let { AppRoute.Search(it.unescapeOrNull()) } ?: AppRoute.Search(null)
 

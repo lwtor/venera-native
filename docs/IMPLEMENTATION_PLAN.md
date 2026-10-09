@@ -612,7 +612,7 @@ S4-02 GitHub 备份子任务：
 | ID | 交付与验收范围 | 状态 |
 | --- | --- | --- |
 | S4-02G1 | 新增版本化、可选择类别的结构化快照；本地压缩及密码加密；Room 数据可按类别导出并事务化合并/替换恢复；排除下载媒体 | DONE（`:core:backup:compileDebugKotlin :core:backup:compileDebugUnitTestKotlin :data:backup:compileDebugKotlin` 通过；测试源码已编译但未运行） |
-| S4-02G2 | 增加备份类别选择 UI、GitHub App Device Flow、Private 仓库创建/选择及快照上传/恢复；需要项目 GitHub App Client ID 才能做线上授权闭环 | TODO |
+| S4-02G2 | 增加备份类别选择 UI、GitHub App Device Flow、Private 仓库创建及快照上传/按类别合并恢复；需要项目 GitHub App Client ID 才能做线上授权闭环 | IN_PROGRESS（`:feature:backup` 页面与 MVI、首页入口、Device Flow、Keystore token 存储、私有仓库创建/查找及加密快照传输已实现；`:app:assembleDebug` 通过。尚缺项目方 GitHub App Client ID 与账号授权实测） |
 
 S4-09 页面对照子任务：
 

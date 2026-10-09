@@ -44,6 +44,7 @@ dependencies {
     implementation(project(":core:navigation"))
     implementation(project(":data:comic"))
     implementation(project(":data:collection"))
+    implementation(project(":data:backup"))
     // The assembly layer installs the download environment the worker reads (ADR-0005 §2.5).
     implementation(project(":data:download"))
     // The app declares WorkManager's foreground service in its merged manifest, so keep the
@@ -56,6 +57,7 @@ dependencies {
     implementation(project(":data:settings"))
     implementation(project(":data:source"))
     implementation(project(":feature:details"))
+    implementation(project(":feature:backup"))
     implementation(project(":feature:explore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:library"))

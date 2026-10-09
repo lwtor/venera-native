@@ -74,6 +74,7 @@ import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.LocalFileScriptFetcher
 import dev.veneranative.data.source.SourcePackageStore
 import dev.veneranative.feature.details.DetailsRoute
+import dev.veneranative.feature.backup.BackupRoute
 import dev.veneranative.feature.explore.ExploreRoute
 import dev.veneranative.feature.home.HomeRoute
 import dev.veneranative.feature.home.toChapterRef
@@ -132,6 +133,7 @@ private fun App(
     val downloadRepository by graph.download.collectAsStateWithLifecycle()
     val searchHistoryRepository by graph.searchHistory.collectAsStateWithLifecycle()
     val screenPreferences by graph.screenPreferences.collectAsStateWithLifecycle()
+    val backupFactory by graph.backupFactory.collectAsStateWithLifecycle()
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -175,6 +177,7 @@ private fun App(
             searchHistoryRepository = searchHistoryRepository,
             screenPreferences = screenPreferences,
             progressTracker = progressTracker,
+            backupFactory = backupFactory,
         )
     }
 }
@@ -199,6 +202,7 @@ private fun AppNavHost(
     searchHistoryRepository: dev.veneranative.data.search.SearchHistoryRepository?,
     screenPreferences: dev.veneranative.data.settings.ScreenPreferenceRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
+    backupFactory: dev.veneranative.data.backup.GitHubBackupGatewayFactory?,
 ) {
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
     val routeStateHolder = rememberSaveableStateHolder()
@@ -273,6 +277,12 @@ private fun AppNavHost(
             onOpenSources = { onRouteChange(AppRoute.Sources) },
             onOpenSearch = { onRouteChange(AppRoute.Search(null)) },
             onOpenLibrary = { onRouteChange(AppRoute.Library) },
+            onOpenBackup = { onRouteChange(AppRoute.Backup) },
+        )
+
+        AppRoute.Backup -> BackupRoute(
+            factory = backupFactory,
+            onBack = onBack,
         )
 
         AppRoute.Library -> {
