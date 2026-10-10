@@ -22,6 +22,8 @@ data class DetailsUiState(
     val sourceName: String? = null,
     /** Last chapter recorded by the reader, if this comic has reading history. */
     val lastReadChapterId: RemoteChapterId? = null,
+    /** A pending, consumable request to reveal the current chapter in the directory. */
+    val chapterLocationRequest: Long? = null,
     /** Chapters whose persisted position reached the final page. */
     val readChapterIds: Set<RemoteChapterId> = emptySet(),
     /** Chapters whose full download has completed for this exact source version. */
@@ -56,6 +58,10 @@ data class DetailsUiState(
     val title: String get() = detail?.comic?.title.orEmpty()
 
     private val chapters: List<Chapter> get() = detail?.chapters.orEmpty()
+
+    // Matches the reader's existing resume behavior; history currently stores no version group.
+    val currentReadingChapter: Chapter?
+        get() = chapters.firstOrNull { it.key.remoteId == lastReadChapterId }
 
     /** Groups the source declared, in the order it declared them. */
     val groups: List<String> get() = chapters.mapNotNull { it.group }.distinct()

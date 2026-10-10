@@ -45,6 +45,7 @@ class DetailsViewModel(
 
     private var screenPreferences: ScreenPreferenceRepository? = screenPreferences
     private var presentationSelectionChanged = false
+    private var nextChapterLocationRequest = 0L
 
     private val comicRef = ComicRef.Remote(comicKey)
 
@@ -58,6 +59,7 @@ class DetailsViewModel(
                 isChapterSelectionMode = false,
                 selectedChapters = emptySet(),
                 downloadMessage = null,
+                chapterLocationRequest = null,
             )
         }
     }
@@ -114,6 +116,24 @@ class DetailsViewModel(
             }
 
             is DetailsAction.ChapterQueryChanged -> _state.update { it.copy(chapterQuery = action.query) }
+
+            DetailsAction.LocateCurrentChapter -> {
+                val current = _state.value
+                val chapter = current.currentReadingChapter
+                if (chapter != null && !current.isChapterSelectionMode && current.status != DetailsStatus.SourceUnavailable) {
+                    val group = if (current.selectedGroup != null && current.selectedGroup != chapter.group) chapter.group else current.selectedGroup
+                    presentationSelectionChanged = true
+                    val requestId = ++nextChapterLocationRequest
+                    _state.update {
+                        it.copy(selectedGroup = group, chapterQuery = "", chapterLocationRequest = requestId)
+                    }
+                    persist(groupPreferenceKey(), group ?: ALL_VERSIONS)
+                }
+            }
+
+            is DetailsAction.ChapterLocationHandled -> _state.update {
+                if (it.chapterLocationRequest == action.requestId) it.copy(chapterLocationRequest = null) else it
+            }
 
             is DetailsAction.DescriptionExpanded -> _state.update { it.copy(descriptionExpanded = action.expanded) }
 

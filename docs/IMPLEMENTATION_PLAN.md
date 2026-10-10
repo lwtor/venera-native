@@ -661,6 +661,7 @@ S4-10 小任务：
 | S4-10A3Q | 详情路由每次重新进入时清理章节编辑模式、已选项和上次下载结果提示，同时保留下载队列及阅读/收藏数据 | DONE（路由重新进入时重置临时 UI 状态；新增 ViewModel 回归证明提示和选择清理、已入队任务仍保留。JDK 17 `:feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。） |
 | S4-10A3R | 降低详情章节列表“已下载”标记的亮度与饱和度，同时保留浅色/深色主题下的可辨识度 | DONE（下载状态色改为低饱和灰绿色，背景、文字和边框均降低视觉对比。JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。） |
 | S4-10A3S | 书架标题栏的下载任务入口改用下载图标，保留未完成任务数的无障碍描述与原导航行为 | DONE（标题栏文字按钮替换为下载图标按钮；JDK 17 `:feature:library:compileDebugKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。） |
+| S4-10A3T | 详情页增加定位当前阅读章节 FAB；清空搜索、必要时切换版本，兼容目录分组及倒序，滚动时避让折叠工具栏 | DONE（依赖已完成的阅读进度与详情目录；有效阅读记录时显示，非多选时可用，保持排序并消费定位请求；目录 key 区分版本，底部预留 FAB 空间。新增 ViewModel 和索引测试源码。JDK 17 `:app:assembleDebug :feature:details:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试未运行，真机体验待用户验收；跨版本复用章节 ID 沿用现有继续阅读规则。） |
 | S4-10A4 | 将详情中部作品信息与作者/题材标签组并入封面主视觉，以半透明信息卡片和标签呈现并随封面折叠；按内容量自适应封面高度 | DONE（`:feature:details:compileDebugKotlin :feature:details:compileDebugUnitTestKotlin :app:assembleDebug` 通过；设备视觉确认由用户执行） |
 | S4-10A5 | 将作品名/来源移到简介上方，封面收藏入口移至右下角并在完全折叠栏显示收藏图标；依据来源嵌套章节组提供版本切换；按阅读历史区分当前章高亮和已读章置灰 | DONE（补齐来源 `isAppVersionAfter` 兼容能力并以 1.3.1 兼容级触发拷贝漫画分组返回；封面内联收藏、交换更新/标签顺序以让变长标签行避开收藏按钮；收藏状态统一为未选中书签轮廓、选中实心书签；版本筛选标题及全量列表的组标题明确标识为版本；JDK 17 下 Source/History/Details 测试源码与 Room AndroidTest 源码编译、`:app:assembleDebug` 通过；设备视觉验收由用户执行） |
 | S4-10C | 接入源支持的详情操作与完整评论流程：漫画点赞/评分、评论分页/发送/回复、评论点赞/投票；按脚本能力显示入口并处理登录失效/不支持错误 | TODO（当前 `SourceCore` / `ComicCatalog` 尚无这些类型化操作契约） |

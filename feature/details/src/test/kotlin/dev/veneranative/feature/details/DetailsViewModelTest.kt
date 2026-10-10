@@ -122,6 +122,46 @@ class DetailsViewModelTest {
         assertEquals("Chapter 2", viewModel.state.value.detail!!.chapters.first { it.key.remoteId == viewModel.state.value.lastReadChapterId }.title)
     }
 
+    @Test fun `locate clears search and reveals the reading version without changing order`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren", grouped = true))
+        val history = FakeHistoryRepository(ReadingProgress(comicKey, RemoteChapterId("en2"), 0, 1L))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, history = history)
+        viewModel.refreshReadingProgress()
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.GroupSelected("JP"))
+        viewModel.onAction(DetailsAction.OrderSelected(ChapterOrder.Reversed))
+        viewModel.onAction(DetailsAction.ChapterQueryChanged("missing"))
+        viewModel.onAction(DetailsAction.LocateCurrentChapter)
+        val first = viewModel.state.value.chapterLocationRequest!!
+        assertEquals("EN", viewModel.state.value.selectedGroup)
+        assertEquals("", viewModel.state.value.chapterQuery)
+        assertEquals(ChapterOrder.Reversed, viewModel.state.value.order)
+        assertEquals(3, viewModel.state.value.currentChapterListIndex())
+        viewModel.onAction(DetailsAction.LocateCurrentChapter)
+        val second = viewModel.state.value.chapterLocationRequest!!
+        assertTrue(second > first)
+        viewModel.onAction(DetailsAction.ChapterLocationHandled(first))
+        assertEquals(second, viewModel.state.value.chapterLocationRequest)
+        viewModel.onAction(DetailsAction.ChapterLocationHandled(second))
+        assertEquals(null, viewModel.state.value.chapterLocationRequest)
+    }
+
+    @Test fun `locate ignores comics without a valid reading chapter and batch selection`() = runTest(dispatcher) {
+        catalog.source = installed("s", name = "Source S")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val history = FakeHistoryRepository(ReadingProgress(comicKey, RemoteChapterId("2"), 0, 1L))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, history = history)
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.LocateCurrentChapter)
+        assertEquals(null, viewModel.state.value.chapterLocationRequest)
+        viewModel.refreshReadingProgress()
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
+        viewModel.onAction(DetailsAction.LocateCurrentChapter)
+        assertEquals(null, viewModel.state.value.chapterLocationRequest)
+    }
+
     @Test fun `only chapters with a completed page position are marked read`() = runTest(dispatcher) {
         catalog.source = installed("s", name = "Source S")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))

@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A3T DONE：详情页快速定位当前阅读章节。** 右下角增加定位 FAB，显示在固定阅读操作上方；仅有有效阅读记录且非多选时显示。点击后清空章节搜索，必要时切换到目标版本，保留排序；按三列网格、版本标题及可选详情内容计算列表位置并平滑滚动，避让顶部工具栏和状态栏。滚动请求可消费，支持重复点击，旧请求结束不会清除新请求；目录底部为 FAB 留出空间，并区分不同版本的列表 key。新增 ViewModel 与目录索引测试源码，覆盖过滤、版本、倒序、可选内容、无目标和请求消费。
+
+验证（2026-10-10）：JDK 17 `:app:assembleDebug :feature:details:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试仅编译，未运行；未操作真机，FAB 位置和滚动手感待用户验收。现有历史仅保存章节 ID，没有版本字段；跨版本重复 ID 沿用“继续阅读”的首个匹配规则，本任务不扩展历史数据结构。下一任务仍为 S4-02G4，并随用户反馈复验定位体验。API 依据：[Compose 列表滚动](https://developer.android.com/develop/ui/compose/lists#controlling-scroll-position)。
+
 | 项目 | 当前值 |
 | --- | --- |
 | 最后更新 | 2026-10-10 |

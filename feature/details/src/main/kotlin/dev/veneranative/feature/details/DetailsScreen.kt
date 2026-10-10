@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -144,11 +145,44 @@ fun DetailsScreen(
     val title = state.detail?.comic?.title.orEmpty()
     val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
     val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
+    val toolbarClearance = WindowInsets.safeDrawing.getTop(density) + with(density) { 68.dp.roundToPx() }
+    LaunchedEffect(state.chapterLocationRequest) {
+        val request = state.chapterLocationRequest ?: return@LaunchedEffect
+        try {
+            state.currentChapterListIndex()?.let { index ->
+                listState.animateScrollToItem(index, scrollOffset = -toolbarClearance)
+            }
+        } finally {
+            onAction(DetailsAction.ChapterLocationHandled(request))
+        }
+    }
 
     Scaffold(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0.dp),
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+        floatingActionButton = {
+            if (showContent && state.currentReadingChapter != null && !state.isChapterSelectionMode) {
+                FloatingActionButton(
+                    onClick = { onAction(DetailsAction.LocateCurrentChapter) },
+                    modifier = Modifier.testTag("details_locate_current_chapter")
+                        .semantics { contentDescription = "定位当前阅读章节" },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ) {
+                    val color = MaterialTheme.colorScheme.onSecondaryContainer
+                    androidx.compose.foundation.Canvas(Modifier.size(24.dp)) {
+                        val stroke = 2.dp.toPx()
+                        drawCircle(color, radius = size.minDimension * 0.29f, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                        drawCircle(color, radius = size.minDimension * 0.08f)
+                        drawLine(color, Offset(center.x, 0f), Offset(center.x, size.height * 0.25f), stroke)
+                        drawLine(color, Offset(center.x, size.height * 0.75f), Offset(center.x, size.height), stroke)
+                        drawLine(color, Offset(0f, center.y), Offset(size.width * 0.25f, center.y), stroke)
+                        drawLine(color, Offset(size.width * 0.75f, center.y), Offset(size.width, center.y), stroke)
+                    }
+                }
+            }
+        },
         bottomBar = {
             if (state.detail != null && state.hasChapters) {
                 Surface(modifier = Modifier.navigationBarsPadding(), tonalElevation = 3.dp) {
@@ -157,7 +191,7 @@ fun DetailsScreen(
                             { onAction(DetailsAction.DownloadSelectedChapters) }
                         } else {
                             {
-                                val resumeChapter = state.detail.chapters.firstOrNull { it.key.remoteId == state.lastReadChapterId }
+                                val resumeChapter = state.currentReadingChapter
                                 (resumeChapter ?: state.detail.chapters.firstOrNull())?.let(onOpenChapter)
                             }
                         },
@@ -171,7 +205,7 @@ fun DetailsScreen(
                         if (state.isChapterSelectionMode) {
                             Text(if (state.isBatchDownloading) "正在加入下载…" else "下载所选 · ${state.selectedChapters.size} 话")
                         } else {
-                            val resumeChapter = state.detail.chapters.firstOrNull { it.key.remoteId == state.lastReadChapterId }
+                            val resumeChapter = state.currentReadingChapter
                             val primaryChapter = resumeChapter ?: state.detail.chapters.firstOrNull()
                             val action = if (resumeChapter != null) "继续阅读" else "开始阅读"
                             Text(primaryChapter?.let { "$action · ${it.title}" }.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -356,7 +390,7 @@ private fun Content(
                 )
             }
             .testTag(DETAILS_CONTENT_TAG),
-        contentPadding = PaddingValues(bottom = 20.dp),
+        contentPadding = PaddingValues(bottom = if (state.currentReadingChapter != null && !state.isChapterSelectionMode) 92.dp else 20.dp),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
@@ -443,10 +477,10 @@ private fun Content(
 
         val withHeaders = state.groupsTheList
         val chapterEntries = buildChapterListEntries(state.filteredChapters, withHeaders)
-        chapterEntries.forEach { entry ->
+        chapterEntries.forEachIndexed { entryIndex, entry ->
             when (entry) {
-                is ChapterListEntry.Group -> item(key = "group:${entry.name}") { GroupHeader(entry.name) }
-                is ChapterListEntry.Row -> item(key = "chapter-row:${entry.chapters.first().key.remoteId.value}") {
+                is ChapterListEntry.Group -> item(key = "group:$entryIndex:${entry.name}") { GroupHeader(entry.name) }
+                is ChapterListEntry.Row -> item(key = "chapter-row:$entryIndex:${entry.chapters.first().group}:${entry.chapters.first().key.remoteId.value}") {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1023,12 +1057,12 @@ private fun GroupHeader(name: String) {
     }
 }
 
-private sealed interface ChapterListEntry {
+internal sealed interface ChapterListEntry {
     data class Group(val name: String) : ChapterListEntry
     data class Row(val chapters: List<Chapter>) : ChapterListEntry
 }
 
-private fun buildChapterListEntries(chapters: List<Chapter>, showGroups: Boolean): List<ChapterListEntry> {
+internal fun buildChapterListEntries(chapters: List<Chapter>, showGroups: Boolean): List<ChapterListEntry> {
     val entries = mutableListOf<ChapterListEntry>()
     val row = mutableListOf<Chapter>()
     var previousGroup: String? = null
@@ -1185,7 +1219,7 @@ private fun String.toChineseTagGroupLabel(): String = when (this) {
     else -> this
 }
 
-private fun String.isHttpUrl(): Boolean = startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true)
+internal fun String.isHttpUrl(): Boolean = startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true)
 
 internal const val DETAILS_LOADING_TAG = "details-loading"
 internal const val DETAILS_CONTENT_TAG = "details-content"

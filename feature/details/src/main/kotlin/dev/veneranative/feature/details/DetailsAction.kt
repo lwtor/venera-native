@@ -16,6 +16,9 @@ sealed interface DetailsAction {
 
     data class ChapterQueryChanged(val query: String) : DetailsAction
 
+    data object LocateCurrentChapter : DetailsAction
+    data class ChapterLocationHandled(val requestId: Long) : DetailsAction
+
     data class DescriptionExpanded(val expanded: Boolean) : DetailsAction
 
     data class ChapterSelectionModeChanged(val enabled: Boolean) : DetailsAction
