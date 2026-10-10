@@ -6,14 +6,18 @@
 
 | 项目 | 当前值 |
 | --- | --- |
-| 最后更新 | 2026-10-09 |
+| 最后更新 | 2026-10-10 |
 | 当前阶段 | Stage 3：来源扩展能力（基线审查受网络阻塞；已按用户要求提前做首页首屏） |
-| 当前任务（唯一下一任务） | S4-02G2 完成 GitHub App Client ID 配置并走通 GitHub 账号授权、私有仓库创建、备份和恢复 |
-| 当前任务状态 | S4-02G1 快照 DTO、GZIP + PBKDF2/AES-GCM 加密包、Room 分类导出及事务化合并/替换恢复已完成。S4-02G2 的独立 `:feature:backup` Compose/MVI 页面、首页入口、GitHub App Device Flow、Keystore token 加密存储、固定私有仓库查找/创建及加密文件上传/按选择分类合并恢复已实现；项目 Client ID 已接入应用。线上授权后仓库创建仍返回 “Resource not accessible by integration”，虽用户已调整 App 权限并重新授权，但未创建仓库。当前增加 GitHub 失败接口与 `X-Accepted-GitHub-Permissions` 显示，下一步用该诊断精确定位，不再重复盲改权限。JDK 17 `:app:assembleDebug` BUILD SUCCESSFUL，未运行测试或设备验证。上传数据仅为客户端加密快照，不包含下载媒体或来源凭据。 |
+| 当前任务（唯一下一任务） | S4-02G4 用户真机验收三 Tab、个人资料、最近同步时间及手动备份/恢复，按反馈修复 |
+| 当前任务状态 | TODO。用户反馈 GitHub 基本逻辑已通；S4-02G3 个人页与备份体验优化已交付并通过编译。尚未由 Agent 执行本轮真机视觉/授权/备份恢复验收，S4-02G2 完整线上闭环不据此标为通过。当前仍为手动备份/恢复，自动同步留待后续需求。 |
 | 默认分支 | `main` |
 | 远程仓库 | `https://github.com/lwtor/venera-native` |
 | 当前代码基线 | `main`（以 Git HEAD 为准） |
 | 工作基线 | AGP 9.3.1、Gradle 9.5.0、KGP 2.4.20（AGP 内置）、JDK 17、SDK 37、minSdk 26、KSP 2.3.12、Coil 3.6.3、QuickJS 1.0.15、Room 2.8.5 |
+
+**S4-02G3 DONE：个人 Tab、GitHub 资料与手动备份体验。** 用户指定将主导航改为首页/书架/我的；新增独立 `:feature:profile`，展示 GitHub 头像、昵称（未设置时回退用户名）、用户名与此设备最近成功备份/恢复时间，并提供关于页显示实际安装版本名称/版本码。授权码弹窗支持复制、打开 GitHub、取消与过期/拒绝反馈，断开需确认；公开资料与回执使用 App 私有 AtomicFile，token 沿用已有 Keystore 存储，断开/换号隔离旧数据。个人与备份 Feature 通过 `:data:backup` 共享账号 StateFlow，无 Feature 间依赖。备份页重做内容分组、密码显示/隐藏、恢复确认和操作反馈，禁止重复提交，离开或成功后清空密码；成功操作后才保存时间，不包含下载媒体或来源凭据。MainActivity 精简为生命周期入口，根导航移至 AppRoot，子页返回我的。新增账号回执、取消授权、重复提交、恢复确认回归及三 Tab/关于导航测试源码。
+
+验证（2026-10-10）：JDK 17 `:app:assembleDebug :data:backup:compileDebugUnitTestKotlin :feature:profile:compileDebugUnitTestKotlin :feature:backup:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试仅编译，未运行；未安装或操作真机。本轮视觉、断网资料展示、真实授权与手动备份/恢复由 S4-02G4 验收；历史版本的成功同步无本机回执，首次展示“尚未在此设备同步”，下次成功后开始记录。用户明确暂不启用自动同步。头像字段按 GitHub 官方 `GET /user` 的 `avatar_url`/`name`/`login` 获取，不增加额外账号权限；版本使用 Android PackageInfo/PackageInfoCompat。实现依据：[GitHub 用户 API](https://docs.github.com/en/rest/users/users#get-the-authenticated-user)、[Android PackageInfo](https://developer.android.com/reference/android/content/pm/PackageInfo)。
 
 **S3-00S DONE：阅读器沉浸式控制层与章节/页码快速导航。** 阅读器默认隐藏系统栏；点页面中央后显示状态栏和工具层，导航栏仍隐藏。详情折叠栏和阅读器顶部标题栏使用 safeDrawing 顶部 inset 避让状态栏及挖孔区；阅读器标题栏从屏幕上方滑入（向下出现），底部工具区从屏幕下方向上滑入，两处均带淡入并独立收起。页码滑块为自绘窄轨道与圆形滑块，支持点击和拖动定位；上一话/下一话图标置于滑块两侧，翻页与解码方式分组等宽。最近修改验证：JDK 17 `:feature:details:compileDebugKotlin :feature:reader:compileDebugKotlin :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或操作真机，挖孔屏避让、状态栏显示及动画方向由用户复验。
 

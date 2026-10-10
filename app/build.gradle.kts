@@ -58,6 +58,8 @@ dependencies {
     implementation(project(":data:source"))
     implementation(project(":feature:details"))
     implementation(project(":feature:backup"))
+    implementation(project(":feature:profile"))
+    implementation("androidx.compose.material:material-icons-core")
     implementation(project(":feature:explore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:library"))

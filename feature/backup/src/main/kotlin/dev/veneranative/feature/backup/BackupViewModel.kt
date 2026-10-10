@@ -2,102 +2,76 @@ package dev.veneranative.feature.backup
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.veneranative.core.backup.BackupCategory
-import dev.veneranative.data.backup.GitHubBackupGateway
-import dev.veneranative.data.backup.GitHubBackupGatewayFactory
-import dev.veneranative.data.backup.GitHubDevicePollResult
+import dev.veneranative.data.backup.GitHubBackupService
 import dev.veneranative.data.backup.GitHubAuthorizationRequiredException
-import kotlinx.coroutines.delay
+import dev.veneranative.data.backup.GitHubApiException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class BackupViewModel(private val factory: GitHubBackupGatewayFactory?) : ViewModel() {
-    private val mutableState = MutableStateFlow(
-        BackupUiState(connected = factory?.hasAuthorization() == true),
-    )
-    val state: StateFlow<BackupUiState> = mutableState.asStateFlow()
-    private var gateway: GitHubBackupGateway? = null
+class BackupViewModel(
+    private val service: GitHubBackupService?,
+    private val workerDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : ViewModel() {
+    private val mutableState = MutableStateFlow(BackupUiState(connected = service?.account?.value?.connected == true))
+    val state = mutableState.asStateFlow()
+
+    init {
+        service?.let { gateway ->
+            viewModelScope.launch {
+                gateway.account.collect { account -> mutableState.update { it.copy(connected = account.connected) } }
+            }
+        }
+    }
+
+    fun clearPassword() { mutableState.update { it.copy(password = "", confirmRestore = false) } }
 
     fun onAction(action: BackupAction) {
+        if (mutableState.value.busy) return
         when (action) {
-            is BackupAction.PasswordChanged -> mutableState.update { it.copy(password = action.value, error = null) }
+            is BackupAction.PasswordChanged -> mutableState.update { it.copy(password = action.value, error = null, message = null) }
             is BackupAction.CategoryToggled -> mutableState.update { state ->
                 state.copy(categories = state.categories.toMutableSet().apply {
                     if (!add(action.category)) remove(action.category)
-                }, error = null)
+                }, error = null, message = null)
             }
-            BackupAction.Connect -> connect()
-            BackupAction.CreateBackup -> runAction("备份已上传到 GitHub 私有仓库") {
-                require(mutableState.value.categories.isNotEmpty()) { "至少选择一种数据" }
-                val password = mutableState.value.password.toCharArray()
-                try { gateway().createBackup(mutableState.value.categories, password) }
-                finally { password.fill('\u0000') }
-            }
-            BackupAction.Restore -> runAction("恢复完成（采用合并方式，没有清除本机已有数据）") {
-                val password = mutableState.value.password.toCharArray()
-                try { gateway().restoreBackup(password, mutableState.value.categories) }
-                finally { password.fill('\u0000') }
-            }
-            BackupAction.Disconnect -> {
-                if (gateway == null && factory != null) {
-                    gateway = factory.create()
+            BackupAction.CreateBackup -> runAction(restoring = false)
+            BackupAction.RequestRestore -> if (mutableState.value.canSubmit) mutableState.update { it.copy(confirmRestore = true) }
+            BackupAction.CancelRestore -> mutableState.update { it.copy(confirmRestore = false) }
+            BackupAction.Restore -> if (mutableState.value.confirmRestore) runAction(restoring = true)
+        }
+    }
+
+    private fun runAction(restoring: Boolean) {
+        val service = service ?: return
+        val request = mutableState.value
+        if (!request.canSubmit) return
+        val password = request.password.toCharArray()
+        mutableState.update { it.copy(busy = true, restoring = restoring, confirmRestore = false, error = null, message = null) }
+        viewModelScope.launch {
+            try {
+                withContext(workerDispatcher) {
+                    if (restoring) service.restoreBackup(password, request.categories)
+                    else service.createBackup(request.categories, password)
                 }
-                gateway?.disconnect()
-                gateway = null
-                mutableState.update { it.copy(connected = false, authorization = null, message = "已断开 GitHub 连接") }
-            }
-        }
-    }
-
-    private fun gateway(): GitHubBackupGateway {
-        gateway?.let { return it }
-        checkNotNull(factory) { "本地备份数据库尚未准备完成，请稍后重试" }
-        return factory.create().also { service ->
-            gateway = service
-            if (service.isAuthorized) mutableState.update { it.copy(connected = true) }
-        }
-    }
-
-    private fun connect() = viewModelScope.launch {
-        mutableState.update { it.copy(busy = true, error = null, message = null) }
-        try {
-            val service = gateway()
-            val authorization = service.beginAuthorization()
-            mutableState.update { it.copy(authorization = authorization, busy = false, message = "打开 GitHub 授权页面并输入下方授权码") }
-            var interval = authorization.intervalSeconds
-            while (System.currentTimeMillis() < authorization.expiresAtEpochMillis) {
-                delay(interval * 1_000)
-                when (val result = service.pollAuthorization(authorization.deviceCode)) {
-                    GitHubDevicePollResult.Pending -> Unit
-                    is GitHubDevicePollResult.WaitLonger -> interval += result.additionalSeconds
-                    GitHubDevicePollResult.Expired -> error("授权码已过期，请重新连接")
-                    GitHubDevicePollResult.Denied -> error("你拒绝了 GitHub 授权")
-                    is GitHubDevicePollResult.Authorized -> {
-                        mutableState.update { it.copy(connected = true, authorization = null, message = "GitHub 已连接；数据只会以加密文件写入私有仓库") }
-                        return@launch
-                    }
+                mutableState.update { it.copy(busy = false, password = "", message =
+                    if (restoring) "恢复完成，所选数据已合并到本机" else "备份成功，已安全保存到 GitHub") }
+            } catch (failure: Exception) {
+                if (failure is CancellationException) throw failure
+                val message = when {
+                    failure is GitHubAuthorizationRequiredException -> "GitHub 授权已过期，请返回我的重新连接"
+                    failure is GitHubApiException && failure.statusCode == 404 -> "还没有可恢复的备份，请先完成一次备份"
+                    failure is GitHubApiException && failure.statusCode in 401..403 -> "GitHub 授权不可用，请返回我的重新连接并检查仓库访问权限"
+                    restoring && failure is IllegalArgumentException -> "无法恢复，请检查密码、备份文件及所选内容"
+                    else -> "操作未完成，请检查网络后重试"
                 }
-            }
-            error("授权等待超时，请重新连接")
-        } catch (failure: Exception) {
-            if (failure is CancellationException) throw failure
-            mutableState.update { it.copy(busy = false, error = failure.message ?: "GitHub 授权失败") }
-        }
-    }
-
-    private fun runAction(success: String, action: suspend () -> Any) = viewModelScope.launch {
-        mutableState.update { it.copy(busy = true, error = null, message = null) }
-        try {
-            action()
-            mutableState.update { it.copy(busy = false, message = success, password = "") }
-        } catch (failure: Exception) {
-            if (failure is CancellationException) throw failure
-            val message = if (failure is GitHubAuthorizationRequiredException) "请先连接 GitHub" else failure.message ?: "操作失败"
-            mutableState.update { it.copy(busy = false, error = message) }
+                mutableState.update { it.copy(busy = false, error = message) }
+            } finally { password.fill(0.toChar()) }
         }
     }
 }

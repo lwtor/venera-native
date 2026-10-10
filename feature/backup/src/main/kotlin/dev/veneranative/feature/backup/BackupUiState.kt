@@ -1,14 +1,16 @@
 package dev.veneranative.feature.backup
 
 import dev.veneranative.core.backup.BackupCategory
-import dev.veneranative.data.backup.GitHubDeviceAuthorization
 
 data class BackupUiState(
     val password: String = "",
     val categories: Set<BackupCategory> = setOf(BackupCategory.Favorites, BackupCategory.ReadingHistory),
-    val authorization: GitHubDeviceAuthorization? = null,
     val connected: Boolean = false,
     val busy: Boolean = false,
+    val restoring: Boolean = false,
+    val confirmRestore: Boolean = false,
     val message: String? = null,
     val error: String? = null,
-)
+) {
+    val canSubmit: Boolean get() = connected && !busy && password.length >= 8 && categories.isNotEmpty()
+}

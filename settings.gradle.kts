@@ -38,6 +38,7 @@ include(
     ":data:source",
     ":feature:details",
     ":feature:backup",
+    ":feature:profile",
     ":feature:explore",
     ":feature:home",
     ":feature:library",

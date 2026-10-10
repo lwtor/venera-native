@@ -12,14 +12,43 @@ class GitHubBackupGateway(
     private val api: GitHubAppApi,
     private val tokenManager: GitHubTokenManager,
     private val repository: BackupRepository,
-) {
-    suspend fun beginAuthorization() = api.beginDeviceAuthorization()
+    private val accountSession: GitHubAccountSession,
+) : GitHubBackupService {
+    override val account get() = accountSession.state
+    private val accountGeneration = java.util.concurrent.atomic.AtomicLong()
 
-    suspend fun pollAuthorization(deviceCode: String) = api.pollDeviceAuthorization(deviceCode).also { result ->
-        if (result is GitHubDevicePollResult.Authorized) tokenManager.save(result.token)
+    override suspend fun refreshProfile() {
+        val generation = accountGeneration.get()
+        if (!isAuthorized) {
+            accountSession.disconnect()
+            throw GitHubAuthorizationRequiredException()
+        }
+        val profile = try {
+            api.authenticatedUserProfile(tokenManager.accessToken())
+        } catch (failure: Exception) {
+            if (failure is GitHubAuthorizationRequiredException ||
+                (failure is GitHubApiException && failure.statusCode == 401)) {
+                disconnect()
+                throw GitHubAuthorizationRequiredException()
+            }
+            throw failure
+        }
+        if (generation == accountGeneration.get()) accountSession.updateProfile(profile)
     }
 
-    suspend fun createBackup(categories: Set<BackupCategory>, password: CharArray): BackupSnapshot {
+    override suspend fun beginAuthorization() = api.beginDeviceAuthorization()
+
+    override suspend fun pollAuthorization(deviceCode: String) = api.pollDeviceAuthorization(deviceCode).also { result ->
+        if (result is GitHubDevicePollResult.Authorized) {
+            tokenManager.save(result.token)
+            accountGeneration.incrementAndGet()
+            accountSession.authorized()
+        }
+    }
+
+    override suspend fun createBackup(categories: Set<BackupCategory>, password: CharArray): BackupSnapshot {
+        refreshProfile()
+        val accountId = checkNotNull(account.value.profile).id
         val accessToken = tokenManager.accessToken()
         val githubRepository = backupRepository(accessToken)
         val snapshot = repository.createSnapshot(BackupSelection(categories))
@@ -29,14 +58,17 @@ class GitHubBackupGateway(
         } finally {
             archive.fill(0)
         }
+        accountSession.completed(GitHubSyncOperation.Backup, accountId)
         return snapshot
     }
 
-    suspend fun restoreBackup(
+    override suspend fun restoreBackup(
         password: CharArray,
         categories: Set<BackupCategory>,
-        mode: RestoreMode = RestoreMode.Merge,
+        mode: RestoreMode,
     ): BackupSnapshot {
+        refreshProfile()
+        val accountId = checkNotNull(account.value.profile).id
         val accessToken = tokenManager.accessToken()
         val githubRepository = backupRepository(accessToken)
         val archive = api.downloadSnapshot(accessToken, githubRepository)
@@ -45,13 +77,20 @@ class GitHubBackupGateway(
         } finally {
             archive.fill(0)
         }
-        repository.restore(snapshot, categories.intersect(snapshot.categories), mode)
+        val selected = categories.intersect(snapshot.categories)
+        require(selected.isNotEmpty()) { "No selected category exists in the backup" }
+        repository.restore(snapshot, selected, mode)
+        accountSession.completed(GitHubSyncOperation.Restore, accountId)
         return snapshot
     }
 
     val isAuthorized: Boolean get() = tokenManager.isAuthorized()
 
-    fun disconnect() = tokenManager.disconnect()
+    override fun disconnect() {
+        accountGeneration.incrementAndGet()
+        tokenManager.disconnect()
+        accountSession.disconnect()
+    }
 
     private suspend fun backupRepository(accessToken: String): GitHubBackupRepositoryRef {
         val owner = api.authenticatedUserLogin(accessToken)
@@ -72,11 +111,14 @@ class GitHubBackupGatewayFactory(
     private val clientId: String,
 ) {
     private val tokenStore = AndroidGitHubTokenStore(context.applicationContext)
+    private val accountStore = AndroidGitHubAccountStore(context.applicationContext.filesDir)
+    private val service = run {
+        val api = GitHubAppApi(httpClient, clientId)
+        GitHubBackupGateway(api, GitHubTokenManager(api, tokenStore), repository,
+            GitHubAccountSession(accountStore, hasAuthorization()))
+    }
 
     fun hasAuthorization(): Boolean = tokenStore.read() != null
 
-    fun create(): GitHubBackupGateway {
-        val api = GitHubAppApi(httpClient, clientId)
-        return GitHubBackupGateway(api, GitHubTokenManager(api, tokenStore), repository)
-    }
+    fun create(): GitHubBackupGateway = service
 }

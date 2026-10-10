@@ -31,6 +31,12 @@ sealed interface AppRoute {
     /** Encrypted GitHub backup and restore. */
     data object Backup : AppRoute
 
+    /** Personal account, sync status and settings entries. */
+    data object Profile : AppRoute
+
+    /** Installed app version information. */
+    data object About : AppRoute
+
     /** Browse a source's declared explore pages. */
     data class Explore(val sourceId: String?) : AppRoute
 

@@ -13,6 +13,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class BackDestinationTest {
+    @Test fun personalPagesReturnToProfileAndProfileReturnsHome() {
+        assertEquals(AppRoute.Profile, backDestination(AppRoute.About, AppRoute.Home))
+        assertEquals(AppRoute.Profile, backDestination(AppRoute.Backup, AppRoute.Home))
+        assertEquals(AppRoute.Home, backDestination(AppRoute.Profile, AppRoute.Home))
+    }
+
     private val comic = ComicKey(SourceId("source"), RemoteComicId("comic"))
     private val origin = AppRoute.Search("source")
 

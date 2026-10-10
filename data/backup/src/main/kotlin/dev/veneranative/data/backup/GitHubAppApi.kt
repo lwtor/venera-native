@@ -125,9 +125,17 @@ class GitHubAppApi(
         )
     }
 
-    suspend fun authenticatedUserLogin(accessToken: String): String = requestJson(
-        apiRequest("https://api.github.com/user", accessToken).get().build(),
-    ).getString("login")
+    suspend fun authenticatedUserProfile(accessToken: String): GitHubProfile {
+        val json = requestJson(apiRequest("https://api.github.com/user", accessToken).get().build())
+        return GitHubProfile(
+            id = json.getLong("id"),
+            login = json.getString("login"),
+            name = json.optString("name").takeIf { it.isNotBlank() && it != "null" },
+            avatarUrl = json.optString("avatar_url").takeIf { it.startsWith("https://") },
+        )
+    }
+
+    suspend fun authenticatedUserLogin(accessToken: String): String = authenticatedUserProfile(accessToken).login
 
     suspend fun findPrivateRepository(accessToken: String, owner: String, name: String): GitHubBackupRepositoryRef? {
         val response = request(

@@ -35,7 +35,7 @@ immutable UiState
 
 | 模块 | 当前职责 | 可依赖 |
 | --- | --- | --- |
-| `:app` | MainActivity、应用 Theme、根装配与首页/书架两个根级 Tab 导航壳；搜索、探索、来源由页面入口进入 | Feature、Core、实现模块 |
+| `:app` | MainActivity 生命周期入口、应用 Theme、AppRoot 根装配与首页/书架/我的三个根级 Tab 导航壳；搜索、探索、来源由页面入口进入 | Feature、Core、实现模块 |
 | `:core:model` | 稳定领域 ID 与跨层模型（包括远端/本地 `ChapterRef`） | 尽量只依赖 Kotlin |
 | `:core:archive` | ZIP/CBZ、7z/CB7 只读访问接口与 Commons Compress 适配 | Commons Compress、XZ、Android Framework |
 | `:core:backup` | 与存储无关、带格式版本的选择性数据快照 DTO；压缩并使用用户密码加密/解密备份包 | kotlinx.serialization JSON、Java Cryptography |
@@ -46,7 +46,7 @@ immutable UiState
 | `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
 | `:core:database` | Room 持久化：阅读历史/进度、收藏、下载、本地库索引、搜索历史和轻量页面偏好实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：保存每漫画/章节进度、最近阅读按漫画返回最新章节、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
-| `:data:backup` | 按用户选择从 Room 创建快照，并在事务中合并或替换恢复收藏、历史/进度和轻量页面偏好；不包含漫画文件 | `:core:backup`、`:core:database`、Room |
+| `:data:backup` | 按用户选择从 Room 创建快照与事务化恢复；GitHub Device Flow、私有仓库传输、共享账号资料与成功同步回执；不包含漫画文件 | `:core:backup`、`:core:database`、Room、OkHttp、Android Keystore/AtomicFile |
 | `:data:search` | 最近搜索词仓库：规范化查询词、去重置顶、有界保留及单项删除/清空；数据保存在 Room | `:core:database`、Coroutines |
 | `:data:settings` | 轻量页面选择偏好的类型无关持久化仓库；为 S4-01 设置模块前的页面状态切片提供 Room 存储 | `:core:database` |
 | `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
@@ -56,7 +56,8 @@ immutable UiState
 | `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索、来源管理和书架入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
 | `:feature:library` | 书架页：收藏常驻主视图，下载队列与本地漫画从菜单进入；收藏支持用户收藏夹筛选、多选归属、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
-| `:feature:backup` | GitHub 数据备份页面：选择快照类别、启动 Device Flow 授权、手动备份与合并恢复；Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |
+| `:feature:backup` | GitHub 数据备份页面：选择快照类别、密码输入、手动备份与确认后合并恢复；账号授权移到我的页，Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |
+| `:feature:profile` | 我的根页、GitHub 账号授权与资料、最近成功同步时间、关于页；通过导航回调进入备份，不依赖其他 Feature | Design System、`:core:image`、`:data:backup`、Lifecycle |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |
@@ -250,6 +251,7 @@ Retrofit 可以用于固定的应用服务，但不得成为动态漫画源请�
 - Proto DataStore：全局设置和阅读器偏好。
 - Android Keystore：需要保护的密钥材料。
 - App 私有文件：下载页、缓存和来源包。
+- GitHub 公开账号资料与此设备最近成功备份/恢复回执使用 App 私有 AtomicFile 持久化；由 `:data:backup` 的共享账号 StateFlow 向个人页和备份页发布。该文件不包含 token、不纳入备份，断开连接清除；token 继续使用已有 Keystore 加密存储。
 - SAF：用户选择的本地漫画目录或压缩包。
 
 SharedPreferences 不用于新功能。数据库实体不得直接传到 UI；通过领域模型或 Projection 转换。

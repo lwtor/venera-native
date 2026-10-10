@@ -612,7 +612,9 @@ S4-02 GitHub 备份子任务：
 | ID | 交付与验收范围 | 状态 |
 | --- | --- | --- |
 | S4-02G1 | 新增版本化、可选择类别的结构化快照；本地压缩及密码加密；Room 数据可按类别导出并事务化合并/替换恢复；排除下载媒体 | DONE（`:core:backup:compileDebugKotlin :core:backup:compileDebugUnitTestKotlin :data:backup:compileDebugKotlin` 通过；测试源码已编译但未运行） |
-| S4-02G2 | 增加备份类别选择 UI、GitHub App Device Flow、Private 仓库创建及快照上传/按类别合并恢复；需要项目 GitHub App Client ID 才能做线上授权闭环 | IN_PROGRESS（`:feature:backup` 页面与 MVI、首页入口、Device Flow、Keystore token 存储、私有仓库创建/查找及加密快照传输已实现；项目 Client ID 已接入。尚需确认 Device Flow/权限设置并完成账号授权实测） |
+| S4-02G2 | 增加备份类别选择 UI、GitHub App Device Flow、Private 仓库创建及快照上传/按类别合并恢复 | IN_PROGRESS（用户于 2026-10-10 反馈 GitHub 基本逻辑已通；完整线上授权、备份与恢复验收证据仍待 S4-02G4，不据此宣称全闭环通过） |
+| S4-02G3 | 用户指定三 Tab（首页/书架/我的）；独立个人 Feature 展示 GitHub 头像/昵称和此设备最近成功手动同步时间；关于显示安装版本；重做备份分组、密码与确认交互，MainActivity 只保留生命周期；新增业务回归，App 与相关测试源码可编译 | DONE（2026-10-10；App Debug、相关 JVM/AndroidTest 源码编译通过；测试未执行，未操作真机，视觉与在线交互由 G4 验收） |
+| S4-02G4 | 用户真机验收三 Tab 切换、关于返回、授权/取消/断开、头像与昵称、重启后同步回执、手动选择性备份和合并恢复；按反馈拆小任务修复 | TODO（依赖 G3；自动同步未纳入本轮） |
 
 S4-09 页面对照子任务：
 

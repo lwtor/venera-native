@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Person
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.designsystem.VeneraNativeTheme
@@ -192,7 +193,7 @@ private fun HomeHeader(onOpenSources: () -> Unit, onOpenBackup: () -> Unit) {
         }
         Spacer(Modifier.weight(1f))
         IconButton(onClick = onOpenBackup, modifier = Modifier.clip(CircleShape)) {
-            Text("☁", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.titleLarge)
+            Icon(Icons.Default.Person, contentDescription = "我的与备份", tint = MaterialTheme.colorScheme.primary)
         }
         IconButton(onClick = onOpenSources, modifier = Modifier.clip(CircleShape)) {
             Icon(Icons.Filled.MoreVert, contentDescription = "管理漫画源", tint = MaterialTheme.colorScheme.primary)

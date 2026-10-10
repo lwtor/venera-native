@@ -43,6 +43,8 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 
 ## 当前模块
 
+主导航为「首页 / 书架 / 我的」；我的页提供 GitHub 授权、头像/昵称、此设备最近成功同步时间、手动备份与恢复入口，以及显示实际安装版本的关于页。MainActivity 只处理生命周期，根导航与装配 UI 位于 AppRoot。当前执行进度始终以 `docs/STATUS.md` 为准。
+
 ```text
 :app
 :core:database
@@ -62,6 +64,7 @@ Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解�
 :data:source
 :feature:details
 :feature:backup
+:feature:profile
 :feature:explore
 :feature:home
 :feature:library
