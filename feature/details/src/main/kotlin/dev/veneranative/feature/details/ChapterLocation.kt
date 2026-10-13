@@ -1,5 +1,11 @@
 package dev.veneranative.feature.details
 
+/** Negative scroll offsets place the row below the viewport's start. */
+internal fun chapterCenterScrollOffset(viewportHeight: Int, toolbarHeight: Int, rowHeight: Int): Int {
+    val top = toolbarHeight.coerceIn(0, viewportHeight.coerceAtLeast(0))
+    return -(top + ((viewportHeight - top - rowHeight).coerceAtLeast(0) / 2))
+}
+
 /** LazyColumn index, including the hero, metadata, optional content and version headings. */
 internal fun DetailsUiState.currentChapterListIndex(): Int? {
     val chapter = currentReadingChapter ?: return null

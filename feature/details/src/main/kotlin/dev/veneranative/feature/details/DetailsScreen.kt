@@ -4,8 +4,10 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -58,6 +60,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.derivedStateOf
@@ -145,12 +148,24 @@ fun DetailsScreen(
     val title = state.detail?.comic?.title.orEmpty()
     val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
     val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
-    val toolbarClearance = WindowInsets.safeDrawing.getTop(density) + with(density) { 68.dp.roundToPx() }
+    val toolbarHeight = WindowInsets.safeDrawing.getTop(density) + with(density) { 56.dp.roundToPx() }
     LaunchedEffect(state.chapterLocationRequest) {
         val request = state.chapterLocationRequest ?: return@LaunchedEffect
         try {
             state.currentChapterListIndex()?.let { index ->
-                listState.animateScrollToItem(index, scrollOffset = -toolbarClearance)
+                val layout = listState.layoutInfo
+                val measuredHeight = layout.visibleItemsInfo.firstOrNull { it.index == index }?.size ?: 0
+                listState.animateScrollToItem(
+                    index,
+                    scrollOffset = chapterCenterScrollOffset(layout.viewportSize.height, toolbarHeight, measuredHeight),
+                )
+                // A distant row is measured only once it enters the viewport. Center its actual height.
+                withFrameNanos { }
+                val updatedLayout = listState.layoutInfo
+                updatedLayout.visibleItemsInfo.firstOrNull { it.index == index }?.let { row ->
+                    val desiredOffset = -chapterCenterScrollOffset(updatedLayout.viewportSize.height, toolbarHeight, row.size)
+                    listState.animateScrollBy((row.offset - desiredOffset).toFloat())
+                }
             }
         } finally {
             onAction(DetailsAction.ChapterLocationHandled(request))
@@ -215,7 +230,10 @@ fun DetailsScreen(
             }
         },
     ) { contentPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
+            val directoryBottomPadding = if (state.currentReadingChapter != null && !state.isChapterSelectionMode) {
+                maxOf(92.dp, maxHeight / 2)
+            } else 20.dp
             when {
                 showContent -> PullToRefreshBox(
                     isRefreshing = isRefreshing,
@@ -230,6 +248,7 @@ fun DetailsScreen(
                         collapseFraction = collapseFraction,
                         onAction = onAction,
                         onOpenChapter = onOpenChapter,
+                        bottomPadding = directoryBottomPadding,
                     )
                 }
 
@@ -351,6 +370,7 @@ private fun Content(
     collapseFraction: Float,
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (Chapter) -> Unit,
+    bottomPadding: androidx.compose.ui.unit.Dp,
 ) {
     val chapterBounds = remember { mutableStateMapOf<ChapterKey, Rect>() }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -390,7 +410,7 @@ private fun Content(
                 )
             }
             .testTag(DETAILS_CONTENT_TAG),
-        contentPadding = PaddingValues(bottom = if (state.currentReadingChapter != null && !state.isChapterSelectionMode) 92.dp else 20.dp),
+        contentPadding = PaddingValues(bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {

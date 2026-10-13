@@ -11,6 +11,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ChapterLocationTest {
+    @Test fun `chapter row centers between toolbar and bottom action`() {
+        assertEquals(-410, chapterCenterScrollOffset(viewportHeight = 900, toolbarHeight = 80, rowHeight = 160))
+        assertEquals(-200, chapterCenterScrollOffset(viewportHeight = 500, toolbarHeight = 80, rowHeight = 180))
+    }
+
+    @Test fun `oversized row stays below toolbar in a short viewport`() {
+        assertEquals(-80, chapterCenterScrollOffset(viewportHeight = 200, toolbarHeight = 80, rowHeight = 240))
+    }
+
     private val comicKey = ComicKey(SourceId("fixture"), RemoteComicId("comic"))
     private val chapters = groupedChaptersOf(comicKey, linkedMapOf(
         "EN" to linkedMapOf("1" to "One", "2" to "Two", "3" to "Three", "4" to "Four"),
