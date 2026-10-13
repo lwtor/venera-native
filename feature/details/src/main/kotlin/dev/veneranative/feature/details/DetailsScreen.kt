@@ -63,6 +63,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -96,6 +97,7 @@ import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicComment
 import dev.veneranative.core.model.SourceId
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import kotlinx.coroutines.launch
 
 
 /**
@@ -149,6 +151,16 @@ fun DetailsScreen(
     val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
     val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
     val toolbarHeight = WindowInsets.safeDrawing.getTop(density) + with(density) { 56.dp.roundToPx() }
+    val currentChapterIndex = state.currentChapterListIndex()
+    val currentChapterVisible by remember(listState, currentChapterIndex, toolbarHeight) {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            layout.visibleItemsInfo.firstOrNull { it.index == currentChapterIndex }?.let { row ->
+                chapterRowIsVisible(row.offset, row.size, layout.viewportSize.height, toolbarHeight)
+            } ?: false
+        }
+    }
+    val scrollScope = rememberCoroutineScope()
     LaunchedEffect(state.chapterLocationRequest) {
         val request = state.chapterLocationRequest ?: return@LaunchedEffect
         try {
@@ -179,21 +191,34 @@ fun DetailsScreen(
         floatingActionButton = {
             if (showContent && state.currentReadingChapter != null && !state.isChapterSelectionMode) {
                 FloatingActionButton(
-                    onClick = { onAction(DetailsAction.LocateCurrentChapter) },
+                    onClick = {
+                        if (currentChapterVisible) {
+                            state.chapterDirectoryListIndex()?.let { index ->
+                                scrollScope.launch { listState.animateScrollToItem(index, scrollOffset = -toolbarHeight) }
+                            }
+                        } else onAction(DetailsAction.LocateCurrentChapter)
+                    },
                     modifier = Modifier.testTag("details_locate_current_chapter")
-                        .semantics { contentDescription = "定位当前阅读章节" },
+                        .semantics { contentDescription = if (currentChapterVisible) "返回章节列表顶部" else "定位当前阅读章节" },
                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
                     contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                 ) {
                     val color = MaterialTheme.colorScheme.onSecondaryContainer
                     androidx.compose.foundation.Canvas(Modifier.size(24.dp)) {
                         val stroke = 2.dp.toPx()
-                        drawCircle(color, radius = size.minDimension * 0.29f, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
-                        drawCircle(color, radius = size.minDimension * 0.08f)
-                        drawLine(color, Offset(center.x, 0f), Offset(center.x, size.height * 0.25f), stroke)
-                        drawLine(color, Offset(center.x, size.height * 0.75f), Offset(center.x, size.height), stroke)
-                        drawLine(color, Offset(0f, center.y), Offset(size.width * 0.25f, center.y), stroke)
-                        drawLine(color, Offset(size.width * 0.75f, center.y), Offset(size.width, center.y), stroke)
+                        if (currentChapterVisible) {
+                            drawLine(color, Offset(center.x, size.height * 0.85f), Offset(center.x, size.height * 0.2f), stroke)
+                            drawLine(color, Offset(center.x, size.height * 0.2f), Offset(size.width * 0.2f, size.height * 0.5f), stroke)
+                            drawLine(color, Offset(center.x, size.height * 0.2f), Offset(size.width * 0.8f, size.height * 0.5f), stroke)
+                            drawLine(color, Offset(size.width * 0.2f, size.height * 0.05f), Offset(size.width * 0.8f, size.height * 0.05f), stroke)
+                        } else {
+                            drawCircle(color, radius = size.minDimension * 0.29f, style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                            drawCircle(color, radius = size.minDimension * 0.08f)
+                            drawLine(color, Offset(center.x, 0f), Offset(center.x, size.height * 0.25f), stroke)
+                            drawLine(color, Offset(center.x, size.height * 0.75f), Offset(center.x, size.height), stroke)
+                            drawLine(color, Offset(0f, center.y), Offset(size.width * 0.25f, center.y), stroke)
+                            drawLine(color, Offset(size.width * 0.75f, center.y), Offset(size.width, center.y), stroke)
+                        }
                     }
                 }
             }
