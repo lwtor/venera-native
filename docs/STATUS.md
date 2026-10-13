@@ -4,6 +4,8 @@
 
 ## 状态快照
 
+**S4-10A6U DONE：按用户反馈移除作者/画师入口文字下划线。** 保留标签点击、来源能力判断与无障碍说明。JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅展示样式调整，未运行测试或真机验证；当前唯一下一任务仍为 S4-02G4。
+
 **S4-10A6 DONE：详情作者标签按原漫画源协议打开相关作品。** 对照上游固定基线的 `comic.onClickTag(namespace,tag)`，保留原始作者/画师分组名称；有回调时作者标签显示下划线并可点击，无回调保持静态。兼容旧 action 和新 page/attributes 的搜索、分类目标，以及源指定的 keyword/category、param、位置 options；分类支持静态/异步选项、条件显示、空默认值和分页。作者结果限定原漫画源，支持分页、错误重试、打开作品详情和返回原详情；无目标给出提示，不自行猜测普通搜索。新增模型、协议、引擎、分页、ViewModel 与导航回归源码。未增加全局分类首页或分类筛选编辑，模块依赖方向不变；协议及上游许可证判断记录于 ADR-0007 §4.8。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :source:api:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试仅编译，未运行；未安装或操作真机。真实源作者搜索/分类返回与设备交互仍待用户验收，不据此宣称真实源闭环通过。当前唯一下一任务保持 S4-02G4，并随反馈复验作者作品入口。

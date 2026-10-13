@@ -880,8 +880,7 @@ private fun HeroTagGroups(
                                 androidx.compose.foundation.text.BasicText(
                                     text = value,
                                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White,
-                                        textDecoration = if (onAuthorClick != null && isAuthorNamespace(name)) androidx.compose.ui.text.style.TextDecoration.Underline else null),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
