@@ -99,6 +99,8 @@ S4-10A6T 将详情标签点击状态和动作泛化，所有来源标签组均�
 
 S4-10A6I2 在相关作品 ViewModel 内补全缺失的列表标签：UI 仅报告结果行进入/离开，ViewModel 通过 ComicCatalog.detail 读取缓存或详情，以最多两条并发和离开取消控制补读成本；独立 StateFlow 保存题材/标签结果，不阻塞 PagingData，既有列表标签优先。未新增跨模块依赖或 UI 网络调用，普通搜索不启用此补读。
 
+S4-10A6I3 将补读入口改为类型化 ComicCatalog/SourceCore.comicTags，并在 data/comic 按作品与源版本缓存五分钟。CopyManga 的固定兼容操作定义于 source/api/protocol，engine 仅附着到源实例，source/core 按 sourceId 选择；该操作只接受作品 ID，只读固定 comic2 基础资料端点，沿用源 apiUrl/headers/getReqID 和既有带调用 ID、超时、取消的 Network Host 桥，不接受调用者指定 URL、路径或认证头。其他源保留详情标签回退；标签分组筛选位于纯模型层。见 ADR-0007 §4.11。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

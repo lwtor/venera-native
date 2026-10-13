@@ -2,6 +2,7 @@ package dev.veneranative.source.api
 
 import dev.veneranative.core.model.SourceFilter
 import dev.veneranative.core.model.TagNavigation
+import dev.veneranative.core.model.contentTags
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -46,6 +47,12 @@ interface SourceCore {
     suspend fun search(request: SearchRequest): SourceOutcome<PagedResult<Comic>>
 
     suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail>
+
+    /** Content labels only; adapters can avoid loading chapters and account state. */
+    suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> = when (val result = detail(comicKey)) {
+        is SourceOutcome.Failure -> result
+        is SourceOutcome.Success -> SourceOutcome.Success(result.value.contentTags())
+    }
 
     /** Chapters of a comic. An implementation may answer this from a cached detail response. */
     suspend fun chapters(comicKey: ComicKey): SourceOutcome<List<Chapter>>

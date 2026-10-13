@@ -3,6 +3,7 @@ package dev.veneranative.data.comic
 import dev.veneranative.core.model.SourceFilter
 import dev.veneranative.source.api.CategoryRequest
 import dev.veneranative.core.model.TagNavigation
+import dev.veneranative.core.model.contentTags
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -29,6 +30,11 @@ import dev.veneranative.source.api.SourceRuntimeError
  * rather than lower-layer diagnostics, so features map them to copy directly.
  */
 interface ComicCatalog {
+
+    suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> = when (val result = detail(comicKey)) {
+        is SourceOutcome.Failure -> result
+        is SourceOutcome.Success -> SourceOutcome.Success(result.value.contentTags())
+    }
 
     suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> = SourceOutcome.Success(null)
 

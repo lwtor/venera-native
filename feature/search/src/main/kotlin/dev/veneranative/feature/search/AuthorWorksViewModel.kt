@@ -9,7 +9,6 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicKey
-import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.FilterValue
 import dev.veneranative.core.model.TagNavigation
@@ -52,10 +51,10 @@ class AuthorWorksViewModel(
         tagJobs[comic.key] = viewModelScope.launch {
             try {
                 tagPermits.withPermit {
-                    val result = catalog.detail(comic.key)
+                    val result = catalog.comicTags(comic.key)
                     coroutineContext.ensureActive()
                     if (result is SourceOutcome.Success) {
-                        _resultTags.update { it + (comic.key to result.value.relatedResultTags()) }
+                        _resultTags.update { it + (comic.key to result.value) }
                     }
                 }
             } catch (cancelled: CancellationException) {
@@ -112,11 +111,6 @@ class AuthorWorksViewModel(
             }
         }
     }
-}
-
-private fun ComicDetail.relatedResultTags(): List<String> {
-    val groups = tagGroups.filterKeys { it.lowercase() in setOf("tag", "tags", "genre", "genres", "theme", "themes", "category", "categories", "标签", "標籤", "题材", "題材", "主题", "主題", "类型", "類型", "分类", "分類") }
-    return (groups.values.flatten() + comic.tags).map(String::trim).filter(String::isNotBlank).distinct()
 }
 
 internal fun authorWorksRequest(origin: ComicKey, target: TagNavigation, filters: List<SourceFilter>): Pair<SearchRequest?, CategoryRequest?> = when (target) {

@@ -56,6 +56,31 @@ class DefaultComicCatalog(
     )
 
     private val details = ConcurrentHashMap<ComicKey, DetailEntry>()
+
+    private data class TagsEntry(
+        val mutex: Mutex = Mutex(),
+        var sourceVersion: String? = null,
+        var expiresAtMillis: Long = 0,
+        var value: List<String>? = null,
+    )
+    private val tags = ConcurrentHashMap<ComicKey, TagsEntry>()
+
+    override suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> {
+        val version = sources.installed().firstOrNull { it.sourceId == comicKey.sourceId }?.version
+        val entry = tags.getOrPut(comicKey) { TagsEntry() }
+        return entry.mutex.withLock {
+            entry.value?.takeIf { entry.sourceVersion == version && nowMillis() < entry.expiresAtMillis }
+                ?.let { return@withLock SourceOutcome.Success(it) }
+            core.comicTags(comicKey).also { result ->
+                if (result is SourceOutcome.Success) {
+                    entry.sourceVersion = version
+                    entry.expiresAtMillis = nowMillis() + detailCacheTtlMillis
+                    entry.value = result.value
+                }
+            }
+        }
+    }
+
     private data class CapabilityEntry(
         val sourceVersion: String,
         val expiresAtMillis: Long,

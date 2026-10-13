@@ -35,6 +35,20 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
+    @Test fun `content tag cache avoids repeated source reads and expires`() = runTest {
+        var now = 0L
+        val source = source("tag-source")
+        val key = ComicKey(source.sourceId, RemoteComicId("comic"))
+        val core = FakeSourceCore()
+        core.detailResponse = SourceOutcome.Success(ComicDetail(Comic(key, "Work"), tagGroups = mapOf("作者" to listOf("Author"), "标签" to listOf("Adventure"))))
+        val catalog = DefaultComicCatalog(FakeSourceRepository(listOf(source)), core, detailCacheTtlMillis = 1000, nowMillis = { now })
+        assertEquals(listOf("Adventure"), (catalog.comicTags(key) as SourceOutcome.Success).value)
+        catalog.comicTags(key)
+        assertEquals(1, core.detailCalls)
+        now = 1001
+        catalog.comicTags(key)
+        assertEquals(2, core.detailCalls)
+    }
     @Test fun `category paging forwards target and next page without searching`() = runTest {
         val core = FakeSourceCore()
         core.next = PageCursor.Page(2)

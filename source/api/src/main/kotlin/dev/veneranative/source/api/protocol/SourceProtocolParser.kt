@@ -34,6 +34,11 @@ import kotlinx.serialization.json.contentOrNull
  */
 object SourceProtocolParser {
 
+    fun parseContentTags(payload: String): List<String>? =
+        (runCatching { json.parseToJsonElement(payload) }.getOrNull() as? JsonArray)?.mapNotNull {
+            it.stringOrNull()?.trim()?.takeIf(String::isNotBlank)
+        }?.distinct()
+
     fun parseTagNavigation(payload: String): TagNavigation? {
         val root = payload.objectOrNull() ?: return null
         val modern = root["page"].stringOrNull()

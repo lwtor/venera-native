@@ -232,6 +232,14 @@ Stage 3/4 的内容提前拖进 Stage 1。
 
 拷贝漫画源的“标签”回调返回 category 目标，沿用 §4.8 的分类加载和筛选默认值。Komiic 1.0.3 没有回调，但其 category.parts 声明 fixed/category 的 categories 与 categoryParams 一一对应。本项目仅在原始 namespace 为“标签”时探测这一声明和 categoryComics.load，精确匹配唯一目标后返回 Category(tag,param)，不将标签名作为作品名搜索，不硬编码站点分类 ID。未知标签、多个不同分类 ID 或缺少加载器均返回无目标。实际分类加载仍通过已安装源及现有 categoryComics 协议，作者查询逻辑保持不变。参考源码及许可证边界沿用 §4.8/§4.9，测试采用合成 fixture。
 
+### 4.11 CopyManga 结果标签轻量读取（2026-10-13，S4-10A6I3）
+
+用户反馈 I2 补读标签需要数秒。只读核对官方 [copy_manga.js 1.4.2](https://github.com/venera-app/venera-configs/blob/main/copy_manga.js)：loadInfo 在返回 theme 标签前还等待收藏状态以及所有 groups 的章节分页。标签已在 `/api/v3/comic2/{id}` 基础资料响应的 results.comic.theme 中，因此结果列表不应通过完整详情来获取标签。
+
+增加类型化 comicTags 操作；CopyManga 专用协议函数仅接受一个作品 ID，编码为单一路径段，严格限定源 key 和固定基础资料端点，拒绝对象形式的请求参数。源提供 apiUrl、headers、getReqID，以保留已配置地址、签名与会话；不复制密钥或重新实现认证。engine 只安装受限协议函数，业务选择与解析仍在 source/core，调用继续经过 SourceCall 和现有 Network Host 的超时/取消路径。没有新增通用 fetch 能力，不允许调用者指定任意 URL、路径或 headers。实现是针对公开响应结构独立编写的最小兼容代码，未复制上游脚本、资源或真实数据；许可证判断沿用 §4.8。
+
+data/comic 缓存成功标签（包括空数组）五分钟，并在源版本变化时失效；失败不缓存。其他源通过默认详情操作提取内容标签。相关作品行保留最多两条并发、离开取消、已有列表标签优先及独立更新。新增合成回归覆盖固定端点、ID 编码、原源 headers 传递、完整详情不得调用、非 ID 参数拒绝、缓存过期及内容分组筛选。普通开发节点只编译回归源码，真实时延待用户复验；首次读取仍受基础资料和源 getReqID 网络耗时影响，不声称瞬时加载。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |

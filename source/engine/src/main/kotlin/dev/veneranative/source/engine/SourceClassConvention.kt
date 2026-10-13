@@ -1,5 +1,7 @@
 package dev.veneranative.source.engine
 
+import dev.veneranative.source.api.protocol.CopyMangaMetadataAdapter
+
 /**
  * How a source script exposes its object to the host.
  *
@@ -86,7 +88,9 @@ internal object SourceClassConvention {
     val PROBE_ATTACHMENT_SCRIPT: String =
         """
         Object.defineProperty($INSTANCE, "__venera", {
-          value: globalThis.__venera,
+          value: Object.freeze(Object.assign({}, globalThis.__venera, {
+            copyMangaTags: ${CopyMangaMetadataAdapter.functionExpression}
+          })),
           enumerable: false,
           writable: false,
           configurable: false

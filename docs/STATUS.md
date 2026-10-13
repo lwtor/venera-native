@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A6I3 DONE：加速拷贝漫画作者/标签结果的标签补读。** 用户反馈 I2 标签补读耗时数秒，核对源 loadInfo 发现其等待收藏查询及所有版本章节分页后才返回。相关作品现在通过类型化 ComicCatalog/SourceCore.comicTags 读取标签；拷贝漫画仅请求固定 comic2 基础资料端点的 results.comic.theme，复用源 apiUrl/headers/getReqID，不加载收藏或章节，不新增通用网络请求能力。成功标签（包括空数组）按作品/源版本缓存五分钟，失败不缓存；保留行离开取消、两条并发及已有标签优先。其他源默认通过详情提取内容标签，分组筛选移至纯模型层。受限适配与来源/许可证判断见 ADR-0007 §4.11。
+
+验证（2026-10-13）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :source:api:compileDebugUnitTestKotlin :source:engine:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成回归源码覆盖固定元数据端点、作品 ID 编码、源请求头复用、禁止完整详情加载、对象形式网络参数拒绝、标签过滤去重及缓存过期；仅编译，未运行测试、未安装或操作真机。首次请求仍受基础资料接口和源 getReqID 网络耗时影响，真实时延待用户复验，未声称性能实测通过。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6I2 DONE：补全作者/标签结果条目的缺失标签。** 用户反馈拷贝漫画作者和标签结果页仍无标签。I 只展示列表返回的 Comic.tags、没有在列表缺少 theme 时补读详情，未完整满足用户需求。本次相关作品 ViewModel 接收结果行进入/离开事件；已有标签不请求，缺失时通过 ComicCatalog.detail 的既有缓存补读标签组，筛选 Tags/Genres/Theme/Category 及对应中文分组，排除作者、状态和更新时间。列表先显示，标签独立渐进更新；最多并发两条，离开行取消请求，成功结果（包括空标签）按作品去重缓存，失败不阻塞列表，重新进入可重试。普通搜索未开启补读，原有列表标签样式保留。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成回归源码覆盖空列表标签补齐、排除作者/状态、缓存/重复点击、已有标签不请求、两条并发限制及离开取消；仅编译，未运行测试，未安装或操作真机。列表有标签的源无额外请求；缺失标签的源会增加详情读取成本，使用缓存、并发限制和取消控制。真实拷贝漫画的返回字段与补读时延待用户复验；当前唯一下一任务保持 S4-02G4。

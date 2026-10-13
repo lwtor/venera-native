@@ -252,6 +252,15 @@ class EngineSourceCore(
         }
     }
 
+    override suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> {
+        if (comicKey.sourceId.value != "copy_manga") return super<SourceCore>.comicTags(comicKey)
+        return when (val result = invoke(comicKey.sourceId, SourceProtocol.copyMangaTags(comicKey))) {
+            is SourceOutcome.Failure -> result
+            is SourceOutcome.Success -> SourceProtocolParser.parseContentTags(result.value)?.let { SourceOutcome.Success(it) }
+                ?: SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid comic tag metadata."))
+        }
+    }
+
     override suspend fun chapters(comicKey: ComicKey): SourceOutcome<List<Chapter>> {
         val description = when (val described = describe(comicKey.sourceId)) {
             is SourceOutcome.Success -> described.value

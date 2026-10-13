@@ -40,6 +40,8 @@ data class SourceProtocolCall(
  */
 object SourceProtocol {
 
+    fun copyMangaTags(comicKey: ComicKey): SourceProtocolCall = call(CopyMangaMetadataAdapter.MEMBER, JsonPrimitive(comicKey.remoteId.value))
+
     fun onClickTag(namespace: String, tag: String): SourceProtocolCall =
         call("comic.onClickTag", JsonPrimitive(namespace), JsonPrimitive(tag))
 
