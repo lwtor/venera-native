@@ -2,6 +2,8 @@ package dev.veneranative.feature.reader
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -516,10 +518,15 @@ private fun ReaderTopBar(
                 Text("${state.currentPageNumber} / ${state.currentChapterPageCount}", style = MaterialTheme.typography.labelMedium)
             }
             if (onOpenComicDetails != null) {
-                TextButton(
+                IconButton(
                     onClick = onOpenComicDetails,
                     modifier = Modifier.testTag("reader-open-details").semantics { contentDescription = "漫画详情" },
-                ) { Text("详情") }
+                ) {
+                    Box(
+                        modifier = Modifier.size(32.dp).border(1.dp, LocalContentColor.current, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { Text("详", style = MaterialTheme.typography.labelLarge) }
+                }
             }
         }
     }

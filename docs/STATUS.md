@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S3-00S1U DONE：阅读器详情入口改为圆形描边“详”。** 按用户指定，标题栏右侧入口使用直径 32dp、线宽 1dp 的圆形描边，中心显示单字“详”；外层沿用 IconButton 的触摸区域与涟漪，无障碍名称仍为“漫画详情”。不改变闲置计时、进度保存及详情返回逻辑。
+
+验证（2026-10-13）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅展示样式调整，未运行测试、未安装或操作真机；明暗主题视觉待用户复验。当前唯一下一任务保持 S4-02G4。
+
 **S3-00S1 DONE：阅读器工具层闲置收起与详情入口。** 用户指定优化阅读器：工具层打开后闲置五秒自动收起，上下工具栏和状态栏同步恢复隐藏；点击、滑动及工具操作重新计时，手指持续按住（包括页码拖动/缩放）期间暂停计时，松开后重新等待五秒。计时器使用随 Compose 生命周期取消的 CoroutineScope 和可注入等待时长，不消费触摸事件，也不因预取/图片加载等后台状态变化重置计时。标题栏右侧增加“详情”；原入口为同漫画详情时复用原详情并保留其列表返回来源，否则替换 Reader 为该漫画详情并将详情返回来源设为原阅读入口（首页/书架/下载等）。切换前刷新阅读进度，离开时沿用 Reader ViewModel 清理流程，不留下返回阅读器的路由。项目为单 Activity，因此 finish 语义由根路由替换实现，不结束 MainActivity；本地导入漫画尚无详情路由，不显示远端详情入口。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug :feature:reader:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成/虚拟时间回归源码覆盖五秒边界、持续拖动与松开重计时、关闭后重开取消旧计时，以及同漫画详情复用、首页/书架/下载替换和本地无目标；Compose 回归源码覆盖标题详情按钮接线。测试仅编译，未运行，未安装或操作真机；实际收起动画、拖动手感和阅读进度返回效果待用户复验。当前唯一下一任务保持 S4-02G4。
