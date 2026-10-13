@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
@@ -31,6 +32,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -337,10 +339,10 @@ private fun Results(results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> 
                                 modifier = Modifier.size(width = 68.dp, height = 96.dp),
                                 placeholder = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("漫") } },
                             )
-                            Column(Modifier.padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Column(Modifier.weight(1f).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(comic.title, style = MaterialTheme.typography.titleMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 comic.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                                if (comic.tags.isNotEmpty()) Text(comic.tags.take(3).joinToString(" · "), style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                ComicResultTags(comic.tags)
                             }
                         }
                     }
@@ -354,6 +356,28 @@ private fun Results(results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> 
                         Button(onClick = { results.retry() }) { Text(stringResource(R.string.retry)) }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComicResultTags(tags: List<String>) {
+    val visibleTags = tags.filter(String::isNotBlank).distinct()
+    if (visibleTags.isEmpty()) return
+    FlowRow(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        visibleTags.forEach { tag ->
+            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    tag, Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

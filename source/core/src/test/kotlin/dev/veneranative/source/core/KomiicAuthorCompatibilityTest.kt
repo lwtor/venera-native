@@ -40,6 +40,7 @@ class KomiicAuthorCompatibilityTest {
             val works = (core.search(SearchRequest(id, target.keyword, authorId = target.authorId)) as SourceOutcome.Success).value
             assertEquals(listOf("work-1"), works.items.map { it.key.remoteId.value })
             assertEquals("https://fixture.invalid/cover", works.items.single().coverUrl)
+            assertEquals(listOf("Genre", "Adventure"), works.items.single().tags)
             assertNull(works.next)
             assertNull((core.tagNavigation(key, "标签", "A\"B") as SourceOutcome.Success).value)
             assertNull((core.tagNavigation(key, "作者", "Missing") as SourceOutcome.Success).value)
@@ -85,7 +86,8 @@ class KomiicAuthorCompatibilityTest {
                   return {data: {searchComicsAndAuthors: {authors: request.variables.keyword === 'A"B' ? [{id: 'author-7', name: 'A"B'}, {id: 'wrong', name: 'Partial A"B'}] : []}}};
                 }
                 if (request.operationName === 'comicsByAuthor' && request.variables.authorId === 'author-7') {
-                  return {data: {getComicsByAuthor: [{id: 'work-1', title: 'Work', imageUrl: 'https://fixture.invalid/cover', authors: [{name: 'A"B'}]}]}};
+                  if (!request.query.includes('categories')) throw new Error('missing category fields');
+                  return {data: {getComicsByAuthor: [{id: 'work-1', title: 'Work', imageUrl: 'https://fixture.invalid/cover', authors: [{name: 'A"B'}], categories: [{name: 'Genre'}, {name: 'Adventure'}, {name: ''}, {name: 'Genre'}]}]}};
                 }
                 throw new Error('unexpected operation');
               };

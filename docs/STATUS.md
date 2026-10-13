@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A6I DONE：作者/标签结果条目展示漫画标签。** 相关作品复用的 Search 结果列表将原来的前三个标签单行文字改为紧凑标签块，按可用宽度换行，显示所有非空且去重后的来源标签；标题/作者所在列分配剩余宽度以防止溢出。普通搜索完整列表同步使用这一组件。补齐 Komiic 作者作品 GraphQL 查询的 categories.name 并映射至 Comic.tags，空名称跳过、重复项去重；没有标签的源不显示占位，也不逐项请求详情。新增合成 fixture 断言查询包含分类字段、结果标签及空/重复过滤。
+
+验证（2026-10-13）：JDK 17 `:app:assembleDebug :source:core:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅编译测试源码，未运行测试、未安装或操作真机；结果项换行、明暗主题与真实源标签仍待用户验收。官方 Komiic 前端作者接口的 categories 字段已只读核对，未调用真实用户查询或保存用户数据。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6T DONE：详情标签检索，复用源回调与分类目标。** 用户确认 Komiic 作者入口已可用后要求增加标签检索。详情中来源提供的标签组现在均可发送原始 namespace/tag 至源 onClickTag，保留源返回的搜索关键词、分类 param/options，并进入同源相关作品列表；无目标给出提示，不猜测普通搜索。作者与标签共用可消费导航、重复点击保护和返回行为，入口保持无下划线，加载/错误文案改为“相关作品”。Komiic 无回调时，仅“标签”分组通过源 category.parts 的 fixed/category 声明按名称精确查找 categoryParams，再调用既有 categoryComics.load，沿用排序/状态默认值和分页；不硬编码分类 ID，无映射、歧义或无分类加载器则不跳转。作者适配及显式源回调优先规则保留。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug :source:core:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增非作者标签原始分组/分类参数/重复点击/消费测试，以及 Komiic 声明分类 ID、空状态默认值和下一页回归源码；测试仅编译，未运行，未安装或操作真机。拷贝漫画标签分类和 Komiic 标签结果仍待用户复验；源脚本与上游处理只读参考，未复制源码或保存用户数据。协议决定见 ADR-0007 §4.10；下一任务保持 S4-02G4。
