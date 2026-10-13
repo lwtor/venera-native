@@ -1,5 +1,7 @@
 package dev.veneranative.data.comic
 
+import dev.veneranative.source.api.CategoryRequest
+import dev.veneranative.core.model.TagNavigation
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -39,6 +41,12 @@ class DefaultComicCatalog(
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val onDiscoveryTiming: (sourceCount: Int, installMillis: Long, capabilityMillis: Long) -> Unit = { _, _, _ -> },
 ) : ComicCatalog {
+
+    override suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String) = core.tagNavigation(comicKey, namespace, tag)
+
+    override suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation) = core.relatedWorksFilters(sourceId, target)
+
+    override fun category(request: CategoryRequest): PagingSource<PageKey, Comic> = CategoryPagingSource(core, request)
 
     private data class DetailEntry(
         val mutex: Mutex = Mutex(),

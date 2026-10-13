@@ -1,5 +1,6 @@
 package dev.veneranative.source.api.protocol
 
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
@@ -32,6 +33,21 @@ import kotlinx.serialization.json.contentOrNull
  * possibly grouped `chapters` map for details, and `{images}` for a chapter.
  */
 object SourceProtocolParser {
+
+    fun parseTagNavigation(payload: String): TagNavigation? {
+        val root = payload.objectOrNull() ?: return null
+        val modern = root["page"].stringOrNull()
+        val action = modern ?: root["action"].stringOrNull() ?: return null
+        val attributes = if (modern != null) root["attributes"].objectOrNull() ?: return null else root
+        val options = attributes["options"].arrayOrNull().orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        return when (action) {
+            "search" -> (attributes[if (modern != null) "text" else "keyword"].stringOrNull() ?: attributes["keyword"].stringOrNull())?.takeIf { it.isNotBlank() }
+                ?.let { TagNavigation.Search(it, options) }
+            "category" -> attributes[if (modern != null) "category" else "keyword"].stringOrNull()?.takeIf { it.isNotBlank() }
+                ?.let { TagNavigation.Category(it, attributes["param"].stringOrNull(), options) }
+            else -> null
+        }
+    }
 
     private val json = Json
 

@@ -1,5 +1,7 @@
 package dev.veneranative.source.core
 
+import dev.veneranative.source.api.CategoryRequest
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
@@ -37,6 +39,54 @@ import org.junit.Test
  * work on an actual `class X extends ComicSource`.
  */
 class EngineSourceCoreTest {
+
+    @Test fun `author callback receives original namespace and value without fallback`() = runBlocking {
+        withCore(source("""
+            comic = { onClickTag: (namespace, tag) => namespace === "作者" ? { action: "search", keyword: namespace + ":" + tag } : null };
+            search = { load: async () => ({comics: [], maxPage: 1}) };
+        """.trimIndent())) { core ->
+            assertTrue(core.capabilitiesSuccess().canNavigateTags)
+            val key = ComicKey(sourceId, RemoteComicId("c"))
+            assertEquals(TagNavigation.Search("作者:A\"B"), (core.tagNavigation(key, "作者", "A\"B") as SourceOutcome.Success).value)
+            assertNull((core.tagNavigation(key, "Authors", "A") as SourceOutcome.Success).value)
+        }
+        withCore(SEARCH_ONLY_SOURCE) { core ->
+            assertNull((core.tagNavigation(ComicKey(sourceId, RemoteComicId("c")), "作者", "A") as SourceOutcome.Success).value)
+        }
+    }
+
+    @Test fun `category uses filtered static options param and page number`() = runBlocking {
+        withCore(source("""
+            categoryComics = {
+              optionList: [
+                { label: "hidden", options: ["x-X"], notShowWhen: ["A"] },
+                { label: "order", options: ["new-New-First", "old-Old"], showWhen: ["A"] }
+              ],
+              load: async (category, param, options, page) => ({comics: [{id: String(page), title: JSON.stringify([category,param,options,page])}], maxPage: 2})
+            };
+        """.trimIndent())) { core ->
+            val target = TagNavigation.Category("A", "author-id")
+            val filters = (core.relatedWorksFilters(sourceId, target) as SourceOutcome.Success).value
+            assertEquals(listOf("order"), filters.map { it.label })
+            assertEquals("New-First", (filters.single() as SourceFilter.Select).options.first().label)
+            val page = (core.category(CategoryRequest(sourceId, "A", "author-id", listOf("new"))) as SourceOutcome.Success).value
+            assertEquals("""["A","author-id",["new"],1]""", page.items.single().title)
+            assertEquals(PageCursor.Page(2), page.next)
+        }
+    }
+
+    @Test fun `category option loader resolves dynamic author options`() = runBlocking {
+        withCore(source("""
+            categoryComics = {
+              optionLoader: async (category, param) => [{label: category + param, options: ["-Default", "recent-Recent"], notShowWhen: [category]}],
+              load: async () => ({comics: [], maxPage: 1})
+            };
+        """.trimIndent())) { core ->
+            val filters = (core.relatedWorksFilters(sourceId, TagNavigation.Category("A", "id")) as SourceOutcome.Success).value
+            assertEquals("Aid", filters.single().label)
+            assertEquals(dev.veneranative.core.model.FilterValue.Single(""), filters.single().selectionValue(FilterSelection.Empty))
+        }
+    }
 
     @Test
     fun `repository demo source exposes the complete stage one protocol`() = runBlocking {

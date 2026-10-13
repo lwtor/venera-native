@@ -1,5 +1,7 @@
 package dev.veneranative.source.api
 
+import dev.veneranative.core.model.SourceFilter
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -15,7 +17,7 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
 
 /**
- * The five capabilities Feature and Data layers are allowed to use.
+ * Typed source operations Feature and Data layers are allowed to use.
  *
  * Everything a caller needs is typed: no method names, no JSON, no script. The implementation maps
  * these calls onto source invocations, so this contract survives an engine replacement (ADR-0008).
@@ -26,6 +28,15 @@ import dev.veneranative.core.model.SourcePage
  * failure (ADR-0007).
  */
 interface SourceCore {
+
+    /** Null means the source provided no supported destination; callers must not guess a search. */
+    suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> = SourceOutcome.Success(null)
+
+    /** Source-declared defaults, including category optionLoader and conditional option groups. */
+    suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation): SourceOutcome<List<SourceFilter>> = SourceOutcome.Success(emptyList())
+
+    suspend fun category(request: CategoryRequest): SourceOutcome<PagedResult<Comic>> =
+        SourceOutcome.Failure(SourceRuntimeError.InvalidCall("Category browsing is unavailable."))
 
     suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities>
 
@@ -77,8 +88,18 @@ data class SearchRequest(
     val keyword: String,
     val cursor: PageCursor? = null,
     val filters: FilterSelection = FilterSelection.Empty,
+    /** Exact positional options supplied by a source's tag navigation callback. */
+    val optionsOverride: List<String>? = null,
 ) {
     init {
         require(keyword.isNotBlank()) { "search keyword must not be blank" }
     }
 }
+
+data class CategoryRequest(
+    val sourceId: SourceId,
+    val category: String,
+    val param: String? = null,
+    val options: List<String> = emptyList(),
+    val cursor: PageCursor? = null,
+)

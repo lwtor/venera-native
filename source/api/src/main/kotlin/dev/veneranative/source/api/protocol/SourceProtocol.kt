@@ -1,5 +1,6 @@
 package dev.veneranative.source.api.protocol
 
+import dev.veneranative.source.api.CategoryRequest
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreKind
@@ -38,6 +39,14 @@ data class SourceProtocolCall(
  * - explore page numbers are **1-based** for `multiPageComicList` and **0-based** for `mixed`.
  */
 object SourceProtocol {
+
+    fun onClickTag(namespace: String, tag: String): SourceProtocolCall =
+        call("comic.onClickTag", JsonPrimitive(namespace), JsonPrimitive(tag))
+
+    fun category(request: CategoryRequest): SourceProtocolCall = call(
+        "categoryComics.load", JsonPrimitive(request.category), request.param?.let(::JsonPrimitive) ?: JsonNull,
+        JsonArray(request.options.map(::JsonPrimitive)), JsonPrimitive(pageNumber(request.cursor, FIRST_PAGE)),
+    )
 
     /** Internal source-shape inspection; this call must not trigger optional source initialization. */
     const val MEMBER_PROBE = "__venera.probe"
@@ -88,7 +97,7 @@ object SourceProtocol {
     ): SourceProtocolCall = call(
         MEMBER_SEARCH_LOAD,
         JsonPrimitive(request.keyword),
-        optionsArray(filters, request),
+        request.optionsOverride?.let { JsonArray(it.map(::JsonPrimitive)) } ?: optionsArray(filters, request),
         JsonPrimitive(pageNumber),
     )
 
@@ -105,7 +114,7 @@ object SourceProtocol {
     ): SourceProtocolCall = call(
         MEMBER_SEARCH_LOAD_NEXT,
         JsonPrimitive(request.keyword),
-        optionsArray(filters, request),
+        request.optionsOverride?.let { JsonArray(it.map(::JsonPrimitive)) } ?: optionsArray(filters, request),
         token?.let(::JsonPrimitive) ?: JsonNull,
     )
 

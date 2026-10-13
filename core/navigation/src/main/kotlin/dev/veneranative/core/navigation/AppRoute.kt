@@ -1,5 +1,6 @@
 package dev.veneranative.core.navigation
 
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicKey
 
@@ -42,6 +43,8 @@ sealed interface AppRoute {
 
     /** Search inside one source. */
     data class Search(val sourceId: String?) : AppRoute
+
+    data class AuthorWorks(val origin: ComicKey, val author: String, val target: TagNavigation, val returnOrigin: AppRoute = Home) : AppRoute
 
     /**
      * One comic's details.

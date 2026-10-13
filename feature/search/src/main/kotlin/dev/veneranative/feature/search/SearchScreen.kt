@@ -347,6 +347,14 @@ private fun Results(results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> 
                 }
             }
             if (results.loadState.append is LoadState.Loading) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
+            (results.loadState.append as? LoadState.Error)?.let { error ->
+                item {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(error.localizedMessage(), style = MaterialTheme.typography.bodySmall)
+                        Button(onClick = { results.retry() }) { Text(stringResource(R.string.retry)) }
+                    }
+                }
+            }
         }
     }
 }

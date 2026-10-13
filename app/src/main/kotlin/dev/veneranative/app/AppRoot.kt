@@ -95,6 +95,10 @@ internal fun AppRoot(
     CompositionLocalProvider(LocalComicImageLoader provides imageLoader) {
         AppNavHost(
             route = route,
+            onAuthorWorksBack = { current ->
+                detailsOrigin = current.returnOrigin
+                route = AppRoute.ComicDetails(current.origin)
+            },
             onRouteChange = { next ->
                 detailsOrigin = detailsOriginAfterNavigation(route, next, detailsOrigin)
                 if (next is AppRoute.Reader && route !is AppRoute.Reader) readerOrigin = route
@@ -124,6 +128,7 @@ internal fun AppRoot(
 @Composable
 private fun AppNavHost(
     route: AppRoute,
+    onAuthorWorksBack: (AppRoute.AuthorWorks) -> Unit,
     onRouteChange: (AppRoute) -> Unit,
     detailsOrigin: AppRoute,
     readerOrigin: AppRoute,
@@ -147,7 +152,9 @@ private fun AppNavHost(
     val routeStateHolder = rememberSaveableStateHolder()
     val onBack: () -> Unit = {
         val destination = backRoute ?: AppRoute.Home
-        if (route is AppRoute.Reader) {
+        if (route is AppRoute.AuthorWorks) {
+            onAuthorWorksBack(route)
+        } else if (route is AppRoute.Reader) {
             appScope.launch {
                 progressTracker.get()?.let { tracker -> runCatching { tracker.flush() } }
                 onRouteChange(destination)
@@ -312,6 +319,11 @@ private fun AppNavHost(
                         onBack = onBack,
                     )
 
+                    is AppRoute.AuthorWorks -> dev.veneranative.feature.search.AuthorWorksRoute(
+                        catalog, current.origin, current.author, current.target,
+                        onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) }, onBack = onBack,
+                    )
+
                     is AppRoute.ComicDetails -> DetailsRoute(
                         catalog = catalog,
                         comicKey = current.comicKey,
@@ -322,6 +334,7 @@ private fun AppNavHost(
                         onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it.key, it.group))) },
                         onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                         onOpenDownloads = { onRouteChange(AppRoute.Downloads) },
+                        onOpenAuthorWorks = { author, target -> onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, detailsOrigin)) },
                         onBack = onBack,
                     )
 

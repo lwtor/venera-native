@@ -13,6 +13,7 @@ fun backDestination(
     AppRoute.Backup, AppRoute.About -> AppRoute.Profile
     AppRoute.Downloads -> AppRoute.Library
     is AppRoute.Explore, is AppRoute.Search -> AppRoute.Home
+    is AppRoute.AuthorWorks -> AppRoute.ComicDetails(route.origin)
     is AppRoute.ComicDetails -> detailsOrigin
     is AppRoute.Reader -> readerOrigin ?: when (val chapter = route.chapter) {
         is ChapterRef.Local -> AppRoute.Library

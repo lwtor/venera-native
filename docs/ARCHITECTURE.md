@@ -91,6 +91,8 @@ S1-05 已建立 `:core:image`，S0-06 的解码代码随之从 `:feature:reader`
 
 ## 4. 目标依赖方向
 
+S4-10A6 在既有模块内增加作者作品闭环：纯 `TagNavigation` 模型承载源回调的 Search / Category 目标；SourceCore 负责原始 namespace/tag 调用与 categoryComics 协议，ComicCatalog 转发并提供分类 PagingSource。Details 只发 Action 并产生可消费导航状态，Search 承载作者作品结果，App 装配 `AuthorWorks` 路由与原详情返回来源。没有 Feature 之间的依赖，也没有 UI 拼接脚本；分类首页、标签通用跳转与分类筛选编辑不属于本次交付。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

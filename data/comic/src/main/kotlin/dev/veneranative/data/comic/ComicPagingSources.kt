@@ -1,5 +1,6 @@
 package dev.veneranative.data.comic
 
+import dev.veneranative.source.api.CategoryRequest
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import dev.veneranative.core.model.Comic
@@ -32,6 +33,18 @@ internal class SearchPagingSource(
                     nextKey = outcome.value.next?.let(PageKey::At),
                 )
 
+            is SourceOutcome.Failure -> LoadResult.Error(SourceLoadException(outcome.error))
+        }
+}
+
+internal class CategoryPagingSource(
+    private val core: SourceCore,
+    private val request: CategoryRequest,
+) : PagingSource<PageKey, Comic>() {
+    override fun getRefreshKey(state: PagingState<PageKey, Comic>): PageKey = PageKey.Start
+    override suspend fun load(params: LoadParams<PageKey>): LoadResult<PageKey, Comic> =
+        when (val outcome = core.category(request.copy(cursor = params.key.cursor()))) {
+            is SourceOutcome.Success -> LoadResult.Page(outcome.value.items, null, outcome.value.next?.let(PageKey::At))
             is SourceOutcome.Failure -> LoadResult.Error(SourceLoadException(outcome.error))
         }
 }

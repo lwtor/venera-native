@@ -1,5 +1,6 @@
 package dev.veneranative.core.navigation
 
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.LocalComicId
@@ -28,6 +29,10 @@ fun AppRoute.encode(): String = when (this) {
     AppRoute.About -> "about"
     is AppRoute.Explore -> "explore:${sourceId.escape()}"
     is AppRoute.Search -> "search:${sourceId.escape()}"
+    is AppRoute.AuthorWorks -> "author:${origin.sourceId.value.escape()}:${origin.remoteId.value.escape()}:${author.escape()}:" +
+        (if (target is TagNavigation.Search) "search" else "category") +
+        ":${target.keyword.escape()}:${(target as? TagNavigation.Category)?.param.escape()}:${returnOrigin.encode().escape()}" +
+        target.options.joinToString(separator = "", transform = { ":${it.escape()}" })
     is AppRoute.ComicDetails ->
         "comic:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}"
 
@@ -52,6 +57,20 @@ fun decodeAppRoute(encoded: String): AppRoute? {
         "about" -> AppRoute.About
         "explore" -> parts.getOrNull(1)?.let { AppRoute.Explore(it.unescapeOrNull()) } ?: AppRoute.Explore(null)
         "search" -> parts.getOrNull(1)?.let { AppRoute.Search(it.unescapeOrNull()) } ?: AppRoute.Search(null)
+        "author" -> {
+            val source = parts.getOrNull(1)?.unescapeOrNull() ?: return null
+            val comic = parts.getOrNull(2)?.unescapeOrNull() ?: return null
+            val author = parts.getOrNull(3)?.unescapeOrNull() ?: return null
+            val keyword = parts.getOrNull(5)?.unescapeOrNull()?.takeIf { it.isNotBlank() } ?: return null
+            val returnOrigin = parts.getOrNull(7)?.unescapeOrNull()?.let(::decodeAppRoute) ?: return null
+            val options = parts.drop(8).map { it.unescapeOrNull().orEmpty() }
+            val target = when (parts.getOrNull(4)) {
+                "search" -> TagNavigation.Search(keyword, options)
+                "category" -> TagNavigation.Category(keyword, parts.getOrNull(6)?.unescapeOrNull(), options)
+                else -> return null
+            }
+            AppRoute.AuthorWorks(ComicKey(SourceId(source), RemoteComicId(comic)), author, target, returnOrigin)
+        }
 
         "comic" -> {
             val sourceId = parts.getOrNull(1)?.unescapeOrNull()

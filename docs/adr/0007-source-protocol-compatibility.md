@@ -207,6 +207,17 @@ Stage 3/4 的内容提前拖进 Stage 1。
 
 领域层同时保留兼容既有扁平 `Comic.tags` 的 `ComicDetail.tagGroups`，并从明确允许展示的标量字段提取 metadata；不将 `subId` 等不透明字段直接暴露在页面上。详情页面展示标签组、元数据、来源提供的预览图、简介和章节数/分组。解析和嵌套 Map 行为有合成 fixture 回归测试；真实来源详情页面 Android 测试已加入并编译通过，但当前还没有完成设备端运行，不能视为 CopyManga 详情调用及 UI 已通过实机验收。
 
+### 4.8 作者标签跳转（2026-10-13，S4-10A6）
+
+- 详情保留原始标签 namespace 和文本，仅作者/画师分组提供本次入口；是否可点由来源 `comic.onClickTag` 的可调用声明决定。
+- 原源回调负责构造目标，兼容旧 `{action, keyword, param}` 和新 `{page, attributes}`，搜索读取 `text`（兼容 `keyword`），分类读取 `category`；保留 `options`。没有回调、返回 null 或不支持的目标不猜测普通关键词搜索。
+- `TagNavigation` 在纯模型层表达 Search / Category；`:source:api` 增加类型化 tagNavigation、relatedWorksFilters、category 操作。SearchRequest 的 optionsOverride 只用于源明确提供的位置选项；普通搜索继续由 SourceFilter 编码。
+- 分类读取 `categoryComics.optionList` 或异步 `optionLoader(category,param)`，支持 showWhen/notShowWhen、首个选项默认值及 callback options；分页调用 `categoryComics.load(category,param,options,page)`，页码从 1 开始。分类页只按源默认/跳转指定选项展示作品；本次未增加全局分类首页或筛选编辑。
+- `:feature:details` 通过 ViewModel 获取可消费导航状态；`:feature:search` 承载原源的作者作品分页列表；`:app` 仅装配路由与返回。AuthorWorks 路由保存原详情及其返回来源，避免作品详情→作者结果→另一作品详情形成返回循环。
+- 所有脚本操作沿用带 ID、timeout 和 cancel 的 SourceCall，不向 UI 暴露 JS；不记录作者参数或源码异常为产品文案。
+
+参考基线：[Venera a0eba914](https://github.com/venera-app/venera/tree/a0eba914f4c2a84ac1bc925adec2baabe920b9be)，重点核对 [actions.dart](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/lib/pages/comic_details_page/actions.dart)、[parser.dart](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/lib/foundation/comic_source/parser.dart)、[models.dart](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/lib/foundation/comic_source/models.dart)、category_comics_page.dart 和漫画源协议文档。上游 [LICENSE](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/LICENSE) 为 GPL-3.0。本任务仅对照公开协议和行为独立实现 Kotlin，未复制上游 Flutter/JS 源码或资源；测试为仓库内合成 fixture，不含真实来源脚本、账号或漫画内容。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |

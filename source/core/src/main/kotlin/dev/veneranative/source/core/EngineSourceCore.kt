@@ -1,5 +1,7 @@
 package dev.veneranative.source.core
 
+import dev.veneranative.source.api.CategoryRequest
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -55,6 +57,76 @@ class EngineSourceCore(
 ) : SourceCore {
 
     private val sequence = AtomicLong(0)
+
+    override suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> {
+        val description = when (val result = describe(comicKey.sourceId)) {
+            is SourceOutcome.Failure -> return result
+            is SourceOutcome.Success -> result.value
+        }
+        if (!description.capabilities.canNavigateTags) return SourceOutcome.Success(null)
+        return when (val result = invoke(comicKey.sourceId, SourceProtocol.onClickTag(namespace, tag))) {
+            is SourceOutcome.Failure -> result
+            is SourceOutcome.Success -> SourceOutcome.Success(SourceProtocolParser.parseTagNavigation(result.value))
+        }
+    }
+
+    override suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation): SourceOutcome<List<SourceFilter>> {
+        if (target is TagNavigation.Search) {
+            return when (val result = capabilities(sourceId)) {
+                is SourceOutcome.Failure -> result
+                is SourceOutcome.Success -> SourceOutcome.Success(result.value.searchFilters)
+            }
+        }
+        target as TagNavigation.Category
+        val category = when (val result = probe(sourceId, listOf("categoryComics"))) {
+            is SourceOutcome.Failure -> return result
+            is SourceOutcome.Success -> result.value
+        }
+        if (!category.entry("load").isCallable()) return SourceOutcome.Failure(SourceRuntimeError.InvalidCall("Category loader is unavailable."))
+        val optionList = if (category.entry("optionLoader").isCallable()) {
+            val call = SourceProtocolCall("categoryComics.optionLoader", JsonArray(listOf(JsonPrimitive(target.keyword), target.param?.let(::JsonPrimitive) ?: JsonNull)).toString())
+            when (val result = invoke(sourceId, call)) {
+                is SourceOutcome.Failure -> return result
+                is SourceOutcome.Success -> runCatching { SourceShape.parse(kotlinx.serialization.json.Json.parseToJsonElement(result.value)) }.getOrNull()
+                    ?: return SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid category options."))
+            }
+        } else {
+            // Probe separately so nested option arrays are not cut off by the shape depth limit.
+            when (val result = probe(sourceId, listOf("categoryComics", "optionList"))) {
+                is SourceOutcome.Failure -> return result
+                is SourceOutcome.Success -> result.value
+            }
+        }
+        if (category.entry("optionLoader").isCallable() && optionList !is SourceShape.ListOf) {
+            return SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid category options."))
+        }
+        val filters = optionList.items().mapIndexedNotNull { index, option ->
+            val hidden = option.entry("notShowWhen").items().any { it.text() == target.keyword }
+            val shown = (option.entry("showWhen") as? SourceShape.ListOf)?.items()?.any { it.text() == target.keyword } ?: true
+            if (!category.entry("optionLoader").isCallable() && (hidden || !shown)) return@mapIndexedNotNull null
+            val choices = option.entry("options").items().mapNotNull { declared ->
+                val text = declared.text() ?: return@mapNotNull null
+                val separator = text.indexOf('-')
+                if (separator < 0) null else text.substring(0, separator) to text.substring(separator + 1)
+            }.toMap()
+            // An empty category value is valid upstream; keep it as the positional default.
+            val options = choices.filterKeys { it.isNotEmpty() }.map { (value, label) -> FilterOption(value, label) }
+            if (choices.isEmpty()) null else SourceFilter.Select("category-option-$index", option.entry("label").text().orEmpty(), options, choices.keys.first())
+        }
+        return SourceOutcome.Success(filters)
+    }
+
+    override suspend fun category(request: CategoryRequest): SourceOutcome<PagedResult<Comic>> {
+        val shape = when (val result = probe(request.sourceId, listOf("categoryComics", "load"))) {
+            is SourceOutcome.Failure -> return result
+            is SourceOutcome.Success -> result.value
+        }
+        if (!shape.isCallable()) return SourceOutcome.Failure(SourceRuntimeError.InvalidCall("Category loader is unavailable."))
+        return when (val result = invoke(request.sourceId, SourceProtocol.category(request))) {
+            is SourceOutcome.Failure -> result
+            is SourceOutcome.Success -> SourceOutcome.Success(SourceProtocolParser.parseComicList(request.sourceId, result.value, (request.cursor as? PageCursor.Page)?.number ?: FIRST_PAGE))
+        }
+    }
 
 
     override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
@@ -252,6 +324,7 @@ class EngineSourceCore(
                     supported = supported,
                     explorePages = pages,
                     searchFilters = searchFilters(probed["search.optionList"]),
+                    canNavigateTags = comic.entry("onClickTag").isCallable(),
                 ),
                 explorePages = declaredPages,
                 searchUsesLoad = searchUsesLoad,

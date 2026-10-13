@@ -1,5 +1,8 @@
 package dev.veneranative.data.comic
 
+import dev.veneranative.core.model.SourceFilter
+import dev.veneranative.source.api.CategoryRequest
+import dev.veneranative.core.model.TagNavigation
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -26,6 +29,13 @@ import dev.veneranative.source.api.SourceRuntimeError
  * rather than lower-layer diagnostics, so features map them to copy directly.
  */
 interface ComicCatalog {
+
+    suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> = SourceOutcome.Success(null)
+
+    suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation): SourceOutcome<List<SourceFilter>> = SourceOutcome.Success(emptyList())
+
+    fun category(request: CategoryRequest): PagingSource<PageKey, Comic> =
+        error("Category paging is unavailable in this catalog.")
 
     /** Installed and enabled sources that declare `search`. */
     suspend fun searchableSources(): List<InstalledSource>

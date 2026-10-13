@@ -1,5 +1,6 @@
 package dev.veneranative.feature.search
 
+import dev.veneranative.core.model.TagNavigation
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import dev.veneranative.core.model.SourcePage
@@ -40,6 +41,20 @@ import kotlinx.coroutines.flow.flowOf
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SearchViewModelTest {
+
+    @Test fun `author works requires its original source and can retry after availability returns`() = runTest(dispatcher) {
+        val origin = ComicKey(SourceId("a"), dev.veneranative.core.model.RemoteComicId("comic"))
+        val model = AuthorWorksViewModel(catalog, origin, "A", TagNavigation.Search("作者:A"))
+        advanceUntilIdle()
+        assertEquals(SearchStatus.Failed, model.state.value.status)
+        catalog.searchable = listOf(source("a"), source("b"))
+        model.retry()
+        advanceUntilIdle()
+        assertEquals(SearchStatus.Ready, model.state.value.status)
+        assertEquals(SourceId("a"), model.state.value.selectedSourceId)
+        assertEquals(listOf("a"), model.state.value.sources.map { it.sourceId.value })
+        assertEquals("A", model.state.value.keyword)
+    }
 
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeComicCatalog()
@@ -319,7 +334,7 @@ class SearchViewModelTest {
         override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
             error("not used by this screen")
 
-        override suspend fun enabledSource(sourceId: SourceId): InstalledSource? = null
+        override suspend fun enabledSource(sourceId: SourceId): InstalledSource? = searchable.firstOrNull { it.sourceId == sourceId }
 
         override fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem> =
             error("not used by the search screen")

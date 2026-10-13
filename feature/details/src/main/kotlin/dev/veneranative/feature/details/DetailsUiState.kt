@@ -1,5 +1,6 @@
 package dev.veneranative.feature.details
 
+import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicDetail
@@ -8,6 +9,11 @@ import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.FavoriteFolder
 
 enum class FavoriteDialog { Add, Remove }
+
+data class AuthorNavigation(val author: String, val target: TagNavigation)
+
+internal fun isAuthorNamespace(namespace: String): Boolean = namespace.lowercase() in
+    setOf("author", "authors", "artist", "artists", "作者", "作家", "绘师", "繪師")
 
 /**
  * Everything the details screen renders.
@@ -20,6 +26,10 @@ data class DetailsUiState(
     val detail: ComicDetail? = null,
     /** Name of the source the comic came from, once it is known to be installed and enabled. */
     val sourceName: String? = null,
+    val canOpenAuthors: Boolean = false,
+    val openingAuthor: Boolean = false,
+    val authorNavigation: AuthorNavigation? = null,
+    val authorMessage: String? = null,
     /** Last chapter recorded by the reader, if this comic has reading history. */
     val lastReadChapterId: RemoteChapterId? = null,
     /** A pending, consumable request to reveal the current chapter in the directory. */

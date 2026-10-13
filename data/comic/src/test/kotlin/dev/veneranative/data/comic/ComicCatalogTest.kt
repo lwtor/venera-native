@@ -1,5 +1,6 @@
 package dev.veneranative.data.comic
 
+import dev.veneranative.source.api.CategoryRequest
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
@@ -34,6 +35,19 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
+    @Test fun `category paging forwards target and next page without searching`() = runTest {
+        val core = FakeSourceCore()
+        core.next = PageCursor.Page(2)
+        val request = CategoryRequest(SourceId("s"), "Author", "id", listOf("new"))
+        val paging = CategoryPagingSource(core, request)
+        val first = paging.load(PagingSource.LoadParams.Refresh<PageKey>(PageKey.Start, 30, false)) as PagingSource.LoadResult.Page
+        assertEquals(PageKey.At(PageCursor.Page(2)), first.nextKey)
+        core.next = null
+        paging.load(PagingSource.LoadParams.Append(first.nextKey!!, 30, false))
+        assertEquals(listOf(null, PageCursor.Page(2)), core.categoryRequests.map { it.cursor })
+        assertTrue(core.requests.isEmpty())
+        assertTrue(core.categoryRequests.all { it.category == "Author" && it.param == "id" && it.options == listOf("new") })
+    }
 
     private val sourceId = SourceId("source-a")
 
@@ -307,6 +321,11 @@ class ComicCatalogTest {
         private val declaredCapabilities: Map<SourceId, SourceOutcome<SourceCapabilities>> = emptyMap(),
     ) : SourceCore {
         val requests = mutableListOf<SearchRequest>()
+        val categoryRequests = mutableListOf<CategoryRequest>()
+        override suspend fun category(request: CategoryRequest): SourceOutcome<PagedResult<Comic>> {
+            categoryRequests += request
+            return SourceOutcome.Success(PagedResult(items, next))
+        }
         val exploreRequests = mutableListOf<ExploreRequest>()
 
         var items: List<Comic> = emptyList()

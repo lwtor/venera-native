@@ -60,6 +60,8 @@ class DetailsViewModel(
                 selectedChapters = emptySet(),
                 downloadMessage = null,
                 chapterLocationRequest = null,
+                authorNavigation = null,
+                authorMessage = null,
             )
         }
     }
@@ -102,6 +104,10 @@ class DetailsViewModel(
     fun onAction(action: DetailsAction) {
         when (action) {
             DetailsAction.Retry, DetailsAction.Refresh -> load(forceRefresh = true)
+
+            is DetailsAction.AuthorClicked -> openAuthor(action)
+            DetailsAction.AuthorNavigationConsumed -> _state.update { it.copy(authorNavigation = null) }
+            DetailsAction.AuthorMessageConsumed -> _state.update { it.copy(authorMessage = null) }
 
             is DetailsAction.GroupSelected -> {
                 presentationSelectionChanged = true
@@ -396,6 +402,30 @@ class DetailsViewModel(
         }
     }
 
+    private fun openAuthor(action: DetailsAction.AuthorClicked) {
+        val current = _state.value
+        if (!current.canOpenAuthors || current.openingAuthor || !isAuthorNamespace(action.namespace) ||
+            action.author !in current.detail?.tagGroups?.get(action.namespace).orEmpty()) return
+        _state.update { it.copy(openingAuthor = true, authorMessage = null) }
+        viewModelScope.launch {
+            try {
+                when (val result = catalog.tagNavigation(comicKey, action.namespace, action.author)) {
+                    is SourceOutcome.Success -> _state.update {
+                        it.copy(authorNavigation = result.value?.let { target -> AuthorNavigation(action.author, target) },
+                            authorMessage = if (result.value == null) "此漫画源暂不支持该作者的作品检索。" else null)
+                    }
+                    is SourceOutcome.Failure -> _state.update { it.copy(authorMessage = "无法打开作者作品，请稍后重试。") }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(authorMessage = "无法打开作者作品，请稍后重试。") }
+            } finally {
+                _state.update { it.copy(openingAuthor = false) }
+            }
+        }
+    }
+
     private fun load(forceRefresh: Boolean = false) {
         _state.update { it.copy(status = DetailsStatus.Loading, message = null) }
         viewModelScope.launch {
@@ -413,12 +443,14 @@ class DetailsViewModel(
             }
 
             val outcome = if (forceRefresh) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
+            val canOpenAuthors = (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
             when (outcome) {
                 is SourceOutcome.Success -> _state.update { current ->
                     current.copy(
                         status = DetailsStatus.Ready,
                         detail = outcome.value,
                         sourceName = source.name,
+                        canOpenAuthors = canOpenAuthors,
                         // A refresh can drop the group the user had selected.
                         selectedGroup = current.selectedGroup?.takeIf { group ->
                             outcome.value.chapters.any { it.group == group }

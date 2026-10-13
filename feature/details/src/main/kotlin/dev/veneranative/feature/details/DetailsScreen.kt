@@ -119,6 +119,12 @@ fun DetailsScreen(
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.authorMessage) {
+        state.authorMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            onAction(DetailsAction.AuthorMessageConsumed)
+        }
+    }
     LaunchedEffect(state.downloadMessage) {
         val message = state.downloadMessage ?: return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
@@ -616,6 +622,9 @@ private fun Header(
             if (hasTagGroups) {
                 HeroTagGroups(
                     groups = tagGroups,
+                    onAuthorClick = if (state.canOpenAuthors && !state.openingAuthor) {
+                        { namespace, author -> onAction(DetailsAction.AuthorClicked(namespace, author)) }
+                    } else null,
                     trailingFavorite = if (state.hasShelf) {
                         { FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }
                     } else null,
@@ -833,6 +842,7 @@ private fun InfoLabel(text: String) {
 @Composable
 private fun HeroTagGroups(
     groups: Map<String, List<String>>,
+    onAuthorClick: ((String, String) -> Unit)? = null,
     trailingFavorite: (@Composable () -> Unit)? = null,
 ) {
     val visibleGroups = groups.filterValues { it.isNotEmpty() }
@@ -862,11 +872,16 @@ private fun HeroTagGroups(
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = Color.White.copy(alpha = 0.2f),
+                                modifier = if (onAuthorClick != null && isAuthorNamespace(name)) {
+                                    Modifier.clickable { onAuthorClick(name, value) }
+                                        .semantics { contentDescription = "查看作者 $value 的作品" }
+                                } else Modifier,
                             ) {
                                 androidx.compose.foundation.text.BasicText(
                                     text = value,
                                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White),
+                                    style = MaterialTheme.typography.labelSmall.copy(color = Color.White,
+                                        textDecoration = if (onAuthorClick != null && isAuthorNamespace(name)) androidx.compose.ui.text.style.TextDecoration.Underline else null),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -1254,8 +1269,8 @@ private fun String.toChineseTagGroupLabel(): String = when (this) {
     "Tags" -> "标签"
     "Updated", "Update" -> "更新"
     "Status" -> "状态"
-    "Authors" -> "作者"
-    "Artists" -> "画师"
+    "Author", "Authors" -> "作者"
+    "Artist", "Artists" -> "画师"
     "Genres" -> "题材"
     "Characters" -> "角色"
     "Parodies" -> "原作"

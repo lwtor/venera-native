@@ -25,6 +25,8 @@ data class SourceCapabilities(
     val supported: Set<SourceCapability>,
     val explorePages: List<ExplorePage> = emptyList(),
     val searchFilters: List<SourceFilter> = emptyList(),
+    /** Whether comic.onClickTag is callable; individual tags may still return no destination. */
+    val canNavigateTags: Boolean = false,
 ) {
     fun supports(capability: SourceCapability): Boolean = capability in supported
 

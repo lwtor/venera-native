@@ -1,5 +1,6 @@
 package dev.veneranative.feature.details
 
+import dev.veneranative.core.model.TagNavigation
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
@@ -160,6 +161,44 @@ class DetailsViewModelTest {
         viewModel.onAction(DetailsAction.ChapterSelectionModeChanged(true))
         viewModel.onAction(DetailsAction.LocateCurrentChapter)
         assertEquals(null, viewModel.state.value.chapterLocationRequest)
+    }
+
+    @Test fun `author click uses original group and source target and consumes navigation`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.canNavigateTags = true
+        catalog.detailResponse = SourceOutcome.Success(detail("Fixture").copy(tagGroups = mapOf("作者" to listOf("A"))))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.canOpenAuthors)
+        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        advanceUntilIdle()
+        assertEquals(listOf("作者" to "A"), catalog.tagCalls)
+        assertEquals(AuthorNavigation("A", TagNavigation.Search("作者:A")), viewModel.state.value.authorNavigation)
+        viewModel.onAction(DetailsAction.AuthorNavigationConsumed)
+        assertEquals(null, viewModel.state.value.authorNavigation)
+        catalog.tagResponse = SourceOutcome.Success(null)
+        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        advanceUntilIdle()
+        assertEquals(null, viewModel.state.value.authorNavigation)
+        assertEquals("此漫画源暂不支持该作者的作品检索。", viewModel.state.value.authorMessage)
+    }
+
+    @Test fun `author click rejects unsupported sources and unrelated tags`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail("Fixture").copy(tagGroups = mapOf("作者" to listOf("A"), "标签" to listOf("B"))))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        advanceUntilIdle()
+        assertTrue(catalog.tagCalls.isEmpty())
+        catalog.canNavigateTags = true
+        viewModel.onAction(DetailsAction.Refresh)
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.AuthorClicked("标签", "B"))
+        viewModel.onAction(DetailsAction.AuthorClicked("作者", "missing"))
+        advanceUntilIdle()
+        assertTrue(catalog.tagCalls.isEmpty())
     }
 
     @Test fun `only chapters with a completed page position are marked read`() = runTest(dispatcher) {
@@ -602,6 +641,13 @@ class DetailsViewModelTest {
     )
 
     private class FakeCatalog : ComicCatalog {
+        var canNavigateTags = false
+        val tagCalls = mutableListOf<Pair<String, String>>()
+        var tagResponse: SourceOutcome<TagNavigation?> = SourceOutcome.Success(TagNavigation.Search("作者:A"))
+        override suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> {
+            tagCalls += namespace to tag
+            return tagResponse
+        }
         var source: InstalledSource? = null
         var detailResponse: SourceOutcome<ComicDetail> =
             SourceOutcome.Failure(SourceRuntimeError.Internal("no response configured"))
@@ -613,7 +659,7 @@ class DetailsViewModelTest {
         override suspend fun explorableSources(): List<InstalledSource> = emptyList()
 
         override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> =
-            SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(sourceId))
+            SourceOutcome.Success(SourceCapabilities(emptySet(), canNavigateTags = canNavigateTags))
 
         override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
             detailCalls++
