@@ -9,6 +9,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.FilterValue
 import dev.veneranative.core.model.TagNavigation
@@ -23,6 +24,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /** A result list scoped to the source and exact target returned by its author callback. */
 class AuthorWorksViewModel(
@@ -35,6 +41,36 @@ class AuthorWorksViewModel(
     val state = _state.asStateFlow()
     private val ready = MutableStateFlow<Pair<SearchRequest?, CategoryRequest?>?>(null)
     private var loadJob: kotlinx.coroutines.Job? = null
+    private val _resultTags = MutableStateFlow<Map<ComicKey, List<String>>>(emptyMap())
+    val resultTags = _resultTags.asStateFlow()
+    private val tagJobs = mutableMapOf<ComicKey, Job>()
+    private val tagPermits = Semaphore(2)
+
+    fun onResultVisible(comic: Comic) {
+        if (_state.value.status != SearchStatus.Ready || comic.key.sourceId != origin.sourceId ||
+            comic.tags.any(String::isNotBlank) || _resultTags.value.containsKey(comic.key) || tagJobs[comic.key]?.isActive == true) return
+        tagJobs[comic.key] = viewModelScope.launch {
+            try {
+                tagPermits.withPermit {
+                    val result = catalog.detail(comic.key)
+                    coroutineContext.ensureActive()
+                    if (result is SourceOutcome.Success) {
+                        _resultTags.update { it + (comic.key to result.value.relatedResultTags()) }
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                // Optional tags must not hide an otherwise usable result or fail its paging load.
+            } finally {
+                if (tagJobs[comic.key] === coroutineContext[Job]) tagJobs.remove(comic.key)
+            }
+        }
+    }
+
+    fun onResultHidden(key: ComicKey) {
+        tagJobs.remove(key)?.cancel()
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val results = ready.flatMapLatest { request ->
@@ -76,6 +112,11 @@ class AuthorWorksViewModel(
             }
         }
     }
+}
+
+private fun ComicDetail.relatedResultTags(): List<String> {
+    val groups = tagGroups.filterKeys { it.lowercase() in setOf("tag", "tags", "genre", "genres", "theme", "themes", "category", "categories", "标签", "標籤", "题材", "題材", "主题", "主題", "类型", "類型", "分类", "分類") }
+    return (groups.values.flatten() + comic.tags).map(String::trim).filter(String::isNotBlank).distinct()
 }
 
 internal fun authorWorksRequest(origin: ComicKey, target: TagNavigation, filters: List<SourceFilter>): Pair<SearchRequest?, CategoryRequest?> = when (target) {

@@ -59,6 +59,43 @@ class SearchViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeComicCatalog()
 
+    @Test fun `related result fills missing tags from detail once without author metadata`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"))
+        val key = ComicKey(SourceId("a"), dev.veneranative.core.model.RemoteComicId("work"))
+        catalog.detailLoader = { SourceOutcome.Success(ComicDetail(Comic(key, "Work"), tagGroups = mapOf("作者" to listOf("Author"), "标签" to listOf("Adventure", "Fantasy", "Adventure"), "状态" to listOf("Ongoing")))) }
+        val model = AuthorWorksViewModel(catalog, key, "Author", TagNavigation.Search("Author"))
+        advanceUntilIdle()
+        val comic = Comic(key, "Work")
+        model.onResultVisible(comic)
+        model.onResultVisible(comic)
+        advanceUntilIdle()
+        assertEquals(listOf("Adventure", "Fantasy"), model.resultTags.value[key])
+        model.onResultHidden(key)
+        model.onResultVisible(comic)
+        advanceUntilIdle()
+        assertEquals(listOf(key), catalog.detailRequests)
+        model.onResultVisible(comic.copy(key = key.copy(remoteId = dev.veneranative.core.model.RemoteComicId("already-tagged")), tags = listOf("Existing")))
+        advanceUntilIdle()
+        assertEquals(1, catalog.detailRequests.size)
+    }
+
+    @Test fun `related result tag loads are bounded and cancel when items leave`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"))
+        val key = ComicKey(SourceId("a"), dev.veneranative.core.model.RemoteComicId("origin"))
+        var cancelled = 0
+        catalog.detailLoader = { try { kotlinx.coroutines.awaitCancellation() } finally { cancelled++ } }
+        val model = AuthorWorksViewModel(catalog, key, "Author", TagNavigation.Search("Author"))
+        advanceUntilIdle()
+        val items = (1..4).map { Comic(ComicKey(key.sourceId, dev.veneranative.core.model.RemoteComicId("$it")), "Work") }
+        items.forEach(model::onResultVisible)
+        advanceUntilIdle()
+        assertEquals(2, catalog.detailRequests.size)
+        items.forEach { model.onResultHidden(it.key) }
+        advanceUntilIdle()
+        assertEquals(2, cancelled)
+        assertTrue(model.resultTags.value.isEmpty())
+    }
+
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
@@ -316,6 +353,8 @@ class SearchViewModelTest {
         var failList: Boolean = false
         val searchFailures = mutableSetOf<SourceId>()
         val searchRequests = mutableListOf<SearchRequest>()
+        val detailRequests = mutableListOf<ComicKey>()
+        var detailLoader: suspend (ComicKey) -> SourceOutcome<ComicDetail> = { error("not used by this screen") }
 
         override suspend fun searchableSources(): List<InstalledSource> {
             if (failList) throw IllegalStateException("the source list is unreadable")
@@ -328,8 +367,10 @@ class SearchViewModelTest {
             capabilityResponses[sourceId]
                 ?: SourceOutcome.Failure(SourceRuntimeError.SourceNotLoaded(sourceId))
 
-        override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> =
-            error("not used by the search screen")
+        override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
+            detailRequests += comicKey
+            return detailLoader(comicKey)
+        }
 
         override suspend fun pages(chapterKey: ChapterKey): SourceOutcome<List<SourcePage>> =
             error("not used by this screen")

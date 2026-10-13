@@ -40,9 +40,13 @@ fun AuthorWorksRoute(
         AuthorWorksViewModel(catalog, origin, author, target)
     }
     val state by model.state.collectAsStateWithLifecycle()
+    val resultTags by model.resultTags.collectAsStateWithLifecycle()
     val results = model.results.collectAsLazyPagingItems()
     if (state.status == SearchStatus.Ready) {
-        SearchResultScreen(state, results, emptyList(), {}, onOpenComic, onBack)
+        SearchResultScreen(
+            state, results, emptyList(), {}, onOpenComic, onBack,
+            resultTags = resultTags, onResultVisible = model::onResultVisible, onResultHidden = model::onResultHidden,
+        )
     } else {
         Scaffold(topBar = {
             TopAppBar(title = { Text("相关作品 · $author") }, navigationIcon = {

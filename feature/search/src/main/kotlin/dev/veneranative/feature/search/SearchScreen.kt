@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -121,6 +122,9 @@ fun SearchResultScreen(
     onOpenComic: (ComicKey) -> Unit,
     onBackToSearch: () -> Unit,
     modifier: Modifier = Modifier,
+    resultTags: Map<ComicKey, List<String>> = emptyMap(),
+    onResultVisible: (Comic) -> Unit = {},
+    onResultHidden: (ComicKey) -> Unit = {},
 ) {
     BackHandler(onBack = onBackToSearch)
     val showingSourceResults = state.aggregateSourceResultsId != null
@@ -145,9 +149,9 @@ fun SearchResultScreen(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (showingSourceResults) Results(results, onOpenComic)
+            if (showingSourceResults) Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden)
             else if (state.aggregateSearch) AggregateResults(aggregateResults, onAction, onOpenComic)
-            else Results(results, onOpenComic)
+            else Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden)
         }
     }
 }
@@ -318,7 +322,10 @@ private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (Searc
 }
 
 @Composable
-private fun Results(results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> Unit) {
+private fun Results(
+    results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> Unit,
+    resultTags: Map<ComicKey, List<String>>, onResultVisible: (Comic) -> Unit, onResultHidden: (ComicKey) -> Unit,
+) {
     when (val refresh = results.loadState.refresh) {
         is LoadState.Loading -> Centered { CircularProgressIndicator(Modifier.testTag(SEARCH_LOADING_TAG)) }
         is LoadState.Error -> Centered {
@@ -331,6 +338,10 @@ private fun Results(results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> 
         else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(results.itemCount, key = { index -> results.peek(index)?.key?.remoteId?.value ?: index }) { index ->
                 results[index]?.let { comic ->
+                    DisposableEffect(comic.key) {
+                        onResultVisible(comic)
+                        onDispose { onResultHidden(comic.key) }
+                    }
                     Card(onClick = { onOpenComic(comic.key) }, modifier = Modifier.fillMaxWidth()) {
                         Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             ComicImage(
@@ -342,7 +353,7 @@ private fun Results(results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> 
                             Column(Modifier.weight(1f).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(comic.title, style = MaterialTheme.typography.titleMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 comic.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                                ComicResultTags(comic.tags)
+                                ComicResultTags(comic.tags.takeIf { it.any(String::isNotBlank) } ?: resultTags[comic.key].orEmpty())
                             }
                         }
                     }

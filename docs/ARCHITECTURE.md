@@ -97,6 +97,8 @@ S4-10A6K 为缺少 onClickTag 的 Komiic 增加 source/core 专用作者适配�
 
 S4-10A6T 将详情标签点击状态和动作泛化，所有来源标签组均按原始 namespace/tag 交由 SourceCore 判定目标；复用 AuthorWorks 路由及结果页。Komiic 的“标签”适配从源 category.parts 的静态分类声明解析名称/ID，分类加载仍使用既有类型化契约。该任务交付标签跳转，分类首页与筛选编辑继续延期，边界见 ADR-0007 §4.10。
 
+S4-10A6I2 在相关作品 ViewModel 内补全缺失的列表标签：UI 仅报告结果行进入/离开，ViewModel 通过 ComicCatalog.detail 读取缓存或详情，以最多两条并发和离开取消控制补读成本；独立 StateFlow 保存题材/标签结果，不阻塞 PagingData，既有列表标签优先。未新增跨模块依赖或 UI 网络调用，普通搜索不启用此补读。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │
