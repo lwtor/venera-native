@@ -37,16 +37,16 @@ fun DetailsRoute(
     history: HistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
     onOpenDownloads: () -> Unit = {},
-    onOpenAuthorWorks: (String, TagNavigation) -> Unit = { _, _ -> },
+    onOpenRelatedWorks: (String, TagNavigation) -> Unit = { _, _ -> },
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
-    androidx.compose.runtime.LaunchedEffect(state.authorNavigation) {
-        state.authorNavigation?.let { navigation ->
-            viewModel.onAction(DetailsAction.AuthorNavigationConsumed)
-            onOpenAuthorWorks(navigation.author, navigation.target)
+    androidx.compose.runtime.LaunchedEffect(state.tagNavigation) {
+        state.tagNavigation?.let { navigation ->
+            viewModel.onAction(DetailsAction.TagNavigationConsumed)
+            onOpenRelatedWorks(navigation.tag, navigation.target)
         }
     }
     androidx.compose.runtime.LaunchedEffect(comicKey) {

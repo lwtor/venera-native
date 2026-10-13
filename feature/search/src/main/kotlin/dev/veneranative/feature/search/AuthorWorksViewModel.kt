@@ -61,7 +61,7 @@ class AuthorWorksViewModel(
                 }
                 val filters = when (val outcome = catalog.relatedWorksFilters(origin.sourceId, target)) {
                     is SourceOutcome.Failure -> {
-                        _state.value = _state.value.copy(status = SearchStatus.Failed, message = "无法加载作者作品，请重试。")
+                        _state.value = _state.value.copy(status = SearchStatus.Failed, message = "无法加载相关作品，请重试。")
                         return@launch
                     }
                     is SourceOutcome.Success -> outcome.value
@@ -72,7 +72,7 @@ class AuthorWorksViewModel(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _state.value = _state.value.copy(status = SearchStatus.Failed, message = "无法加载作者作品，请重试。")
+                _state.value = _state.value.copy(status = SearchStatus.Failed, message = "无法加载相关作品，请重试。")
             }
         }
     }

@@ -8,9 +8,9 @@ sealed interface DetailsAction {
 
     /** Ask the source for the details again; the chapter list is part of that answer. */
     data object Refresh : DetailsAction
-    data class AuthorClicked(val namespace: String, val author: String) : DetailsAction
-    data object AuthorNavigationConsumed : DetailsAction
-    data object AuthorMessageConsumed : DetailsAction
+    data class TagClicked(val namespace: String, val tag: String) : DetailsAction
+    data object TagNavigationConsumed : DetailsAction
+    data object TagMessageConsumed : DetailsAction
 
     /** Narrow the list to one group, or to every group when [group] is null. */
     data class GroupSelected(val group: String?) : DetailsAction

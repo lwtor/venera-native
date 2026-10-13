@@ -226,6 +226,12 @@ Stage 3/4 的内容提前拖进 Stage 1。
 
 这是 §4.8 的显式例外：仅 source key 为 Komiic、缺少 onClickTag 且 queryJson/search 可调用时启用；只处理原始 namespace 为“作者”的标签。按 name/chName/enName 精确匹配并去重 ID，歧义不自动选第一个；显式源回调始终优先，其他源仍保持无回调不跳转。Search 目标及 SearchRequest 通过可空 authorId 表达精确作者检索，源适配执行专门作品接口，不转为标题关键词搜索。路由以 author-search 类型保留 ID，既有 search/category 编码保持兼容。无 API 错误、但确实没有作品时展示空结果；错误不得伪装为空列表。
 
+### 4.10 详情标签检索（2026-10-13，S4-10A6T）
+
+按用户要求将 §4.8 的作者入口扩展至来源所有详情标签组。上游 actions.dart 的 onTapTag 将原始 namespace/tag 交给 handleClickTagEvent，因此本项目移除 UI 作者分组白名单；是否提供导航能力仍由源回调或已明确支持的源适配决定，回调返回 null/不支持目标时不进行普通搜索兜底。Details Action/UiState/导航回调改为标签语义，复用既有 AuthorWorks 路由与 Search 结果页，产品文案统一为“相关作品”，保持原路由编码和返回来源兼容。
+
+拷贝漫画源的“标签”回调返回 category 目标，沿用 §4.8 的分类加载和筛选默认值。Komiic 1.0.3 没有回调，但其 category.parts 声明 fixed/category 的 categories 与 categoryParams 一一对应。本项目仅在原始 namespace 为“标签”时探测这一声明和 categoryComics.load，精确匹配唯一目标后返回 Category(tag,param)，不将标签名作为作品名搜索，不硬编码站点分类 ID。未知标签、多个不同分类 ID 或缺少加载器均返回无目标。实际分类加载仍通过已安装源及现有 categoryComics 协议，作者查询逻辑保持不变。参考源码及许可证边界沿用 §4.8/§4.9，测试采用合成 fixture。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |

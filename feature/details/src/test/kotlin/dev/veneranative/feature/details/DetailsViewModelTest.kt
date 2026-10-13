@@ -169,36 +169,52 @@ class DetailsViewModelTest {
         catalog.detailResponse = SourceOutcome.Success(detail("Fixture").copy(tagGroups = mapOf("作者" to listOf("A"))))
         val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
-        assertTrue(viewModel.state.value.canOpenAuthors)
-        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
-        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        assertTrue(viewModel.state.value.canOpenTags)
+        viewModel.onAction(DetailsAction.TagClicked("作者", "A"))
+        viewModel.onAction(DetailsAction.TagClicked("作者", "A"))
         advanceUntilIdle()
         assertEquals(listOf("作者" to "A"), catalog.tagCalls)
-        assertEquals(AuthorNavigation("A", TagNavigation.Search("作者:A")), viewModel.state.value.authorNavigation)
-        viewModel.onAction(DetailsAction.AuthorNavigationConsumed)
-        assertEquals(null, viewModel.state.value.authorNavigation)
+        assertEquals(TagNavigationRequest("A", TagNavigation.Search("作者:A")), viewModel.state.value.tagNavigation)
+        viewModel.onAction(DetailsAction.TagNavigationConsumed)
+        assertEquals(null, viewModel.state.value.tagNavigation)
         catalog.tagResponse = SourceOutcome.Success(null)
-        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        viewModel.onAction(DetailsAction.TagClicked("作者", "A"))
         advanceUntilIdle()
-        assertEquals(null, viewModel.state.value.authorNavigation)
-        assertEquals("此漫画源暂不支持该作者的作品检索。", viewModel.state.value.authorMessage)
+        assertEquals(null, viewModel.state.value.tagNavigation)
+        assertEquals("此漫画源暂不支持该标签的作品检索。", viewModel.state.value.tagMessage)
     }
 
-    @Test fun `author click rejects unsupported sources and unrelated tags`() = runTest(dispatcher) {
+    @Test fun `tag click rejects unsupported sources and missing values`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Success(detail("Fixture").copy(tagGroups = mapOf("作者" to listOf("A"), "标签" to listOf("B"))))
         val viewModel = DetailsViewModel(catalog, comicKey, collection)
         advanceUntilIdle()
-        viewModel.onAction(DetailsAction.AuthorClicked("作者", "A"))
+        viewModel.onAction(DetailsAction.TagClicked("作者", "A"))
         advanceUntilIdle()
         assertTrue(catalog.tagCalls.isEmpty())
         catalog.canNavigateTags = true
         viewModel.onAction(DetailsAction.Refresh)
         advanceUntilIdle()
-        viewModel.onAction(DetailsAction.AuthorClicked("标签", "B"))
-        viewModel.onAction(DetailsAction.AuthorClicked("作者", "missing"))
+        viewModel.onAction(DetailsAction.TagClicked("missing", "B"))
+        viewModel.onAction(DetailsAction.TagClicked("作者", "missing"))
         advanceUntilIdle()
         assertTrue(catalog.tagCalls.isEmpty())
+    }
+
+    @Test fun `non author tag preserves original namespace and source category target`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.canNavigateTags = true
+        catalog.detailResponse = SourceOutcome.Success(detail("Fixture").copy(tagGroups = mapOf("Genres" to listOf("Fantasy"))))
+        catalog.tagResponse = SourceOutcome.Success(TagNavigation.Category("Fantasy", "genre-7", listOf("new")))
+        val model = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+        model.onAction(DetailsAction.TagClicked("Genres", "Fantasy"))
+        model.onAction(DetailsAction.TagClicked("Genres", "Fantasy"))
+        advanceUntilIdle()
+        assertEquals(listOf("Genres" to "Fantasy"), catalog.tagCalls)
+        assertEquals(TagNavigationRequest("Fantasy", TagNavigation.Category("Fantasy", "genre-7", listOf("new"))), model.state.value.tagNavigation)
+        model.onAction(DetailsAction.TagNavigationConsumed)
+        assertEquals(null, model.state.value.tagNavigation)
     }
 
     @Test fun `only chapters with a completed page position are marked read`() = runTest(dispatcher) {

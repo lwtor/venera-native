@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A6T DONE：详情标签检索，复用源回调与分类目标。** 用户确认 Komiic 作者入口已可用后要求增加标签检索。详情中来源提供的标签组现在均可发送原始 namespace/tag 至源 onClickTag，保留源返回的搜索关键词、分类 param/options，并进入同源相关作品列表；无目标给出提示，不猜测普通搜索。作者与标签共用可消费导航、重复点击保护和返回行为，入口保持无下划线，加载/错误文案改为“相关作品”。Komiic 无回调时，仅“标签”分组通过源 category.parts 的 fixed/category 声明按名称精确查找 categoryParams，再调用既有 categoryComics.load，沿用排序/状态默认值和分页；不硬编码分类 ID，无映射、歧义或无分类加载器则不跳转。作者适配及显式源回调优先规则保留。
+
+验证（2026-10-13）：JDK 17 `:app:assembleDebug :source:core:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增非作者标签原始分组/分类参数/重复点击/消费测试，以及 Komiic 声明分类 ID、空状态默认值和下一页回归源码；测试仅编译，未运行，未安装或操作真机。拷贝漫画标签分类和 Komiic 标签结果仍待用户复验；源脚本与上游处理只读参考，未复制源码或保存用户数据。协议决定见 ADR-0007 §4.10；下一任务保持 S4-02G4。
+
 **S4-10A6K DONE：补齐 Komiic 无标签回调时的作者作品查询。** 官方 Komiic 1.0.3 脚本没有 `comic.onClickTag`，普通 `search.load` 只返回漫画列表并丢弃作者结果，不能实现按作者检索。本次在 SourceCore 增加仅适用于 `Komiic` 且无显式回调、具备 search/queryJson 的兼容适配：通过原源 queryJson 查询作者，按 name/chName/enName 精确匹配唯一 ID，再查询 getComicsByAuthor。显式回调优先，其他源不启用 fallback；同名多 ID 或无匹配保持无目标，GraphQL 错误映射为领域失败。作者 ID 经类型化模型、搜索请求和可保存路由传递，作品沿用现有结果页；接口返回完整列表，不伪造下一页。原源继续负责 URL、请求头、登录与 Cookie，UI 不拼接脚本，作者入口保持无下划线。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :source:api:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成 fixture 覆盖无回调、精确作者 ID、别名、歧义拒绝、结果身份/封面、无分页、显式回调优先和其他源隔离；参数与路由回归源码已编译，未运行测试、未安装或操作真机。官方脚本和网页只读核对，未调用真实作者查询、未提交真实源或用户数据；设备实际效果待用户复验。参考及决定见 ADR-0007 §4.9；下一任务保持 S4-02G4。

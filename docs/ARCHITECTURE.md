@@ -95,6 +95,8 @@ S4-10A6 在既有模块内增加作者作品闭环：纯 `TagNavigation` 模型�
 
 S4-10A6K 为缺少 onClickTag 的 Komiic 增加 source/core 专用作者适配，复用源 queryJson 获取精确作者 ID 与作品；Search 目标和请求保存 authorId，既有 PagingSource 继续承担结果和重试。该例外不扩散为所有源的关键词 fallback，源显式回调优先；模型、导航和 UI 不依赖 Komiic 的 GraphQL 实现，决定记录于 ADR-0007 §4.9。
 
+S4-10A6T 将详情标签点击状态和动作泛化，所有来源标签组均按原始 namespace/tag 交由 SourceCore 判定目标；复用 AuthorWorks 路由及结果页。Komiic 的“标签”适配从源 category.parts 的静态分类声明解析名称/ID，分类加载仍使用既有类型化契约。该任务交付标签跳转，分类首页与筛选编辑继续延期，边界见 ADR-0007 §4.10。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

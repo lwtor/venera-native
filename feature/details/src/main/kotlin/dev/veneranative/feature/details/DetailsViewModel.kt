@@ -60,8 +60,8 @@ class DetailsViewModel(
                 selectedChapters = emptySet(),
                 downloadMessage = null,
                 chapterLocationRequest = null,
-                authorNavigation = null,
-                authorMessage = null,
+                tagNavigation = null,
+                tagMessage = null,
             )
         }
     }
@@ -105,9 +105,9 @@ class DetailsViewModel(
         when (action) {
             DetailsAction.Retry, DetailsAction.Refresh -> load(forceRefresh = true)
 
-            is DetailsAction.AuthorClicked -> openAuthor(action)
-            DetailsAction.AuthorNavigationConsumed -> _state.update { it.copy(authorNavigation = null) }
-            DetailsAction.AuthorMessageConsumed -> _state.update { it.copy(authorMessage = null) }
+            is DetailsAction.TagClicked -> openTag(action)
+            DetailsAction.TagNavigationConsumed -> _state.update { it.copy(tagNavigation = null) }
+            DetailsAction.TagMessageConsumed -> _state.update { it.copy(tagMessage = null) }
 
             is DetailsAction.GroupSelected -> {
                 presentationSelectionChanged = true
@@ -402,26 +402,26 @@ class DetailsViewModel(
         }
     }
 
-    private fun openAuthor(action: DetailsAction.AuthorClicked) {
+    private fun openTag(action: DetailsAction.TagClicked) {
         val current = _state.value
-        if (!current.canOpenAuthors || current.openingAuthor || !isAuthorNamespace(action.namespace) ||
-            action.author !in current.detail?.tagGroups?.get(action.namespace).orEmpty()) return
-        _state.update { it.copy(openingAuthor = true, authorMessage = null) }
+        if (!current.canOpenTags || current.openingTag || action.tag.isBlank() ||
+            action.tag !in current.detail?.tagGroups?.get(action.namespace).orEmpty()) return
+        _state.update { it.copy(openingTag = true, tagMessage = null) }
         viewModelScope.launch {
             try {
-                when (val result = catalog.tagNavigation(comicKey, action.namespace, action.author)) {
+                when (val result = catalog.tagNavigation(comicKey, action.namespace, action.tag)) {
                     is SourceOutcome.Success -> _state.update {
-                        it.copy(authorNavigation = result.value?.let { target -> AuthorNavigation(action.author, target) },
-                            authorMessage = if (result.value == null) "此漫画源暂不支持该作者的作品检索。" else null)
+                        it.copy(tagNavigation = result.value?.let { target -> TagNavigationRequest(action.tag, target) },
+                            tagMessage = if (result.value == null) "此漫画源暂不支持该标签的作品检索。" else null)
                     }
-                    is SourceOutcome.Failure -> _state.update { it.copy(authorMessage = "无法打开作者作品，请稍后重试。") }
+                    is SourceOutcome.Failure -> _state.update { it.copy(tagMessage = "无法打开相关作品，请稍后重试。") }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _state.update { it.copy(authorMessage = "无法打开作者作品，请稍后重试。") }
+                _state.update { it.copy(tagMessage = "无法打开相关作品，请稍后重试。") }
             } finally {
-                _state.update { it.copy(openingAuthor = false) }
+                _state.update { it.copy(openingTag = false) }
             }
         }
     }
@@ -443,14 +443,14 @@ class DetailsViewModel(
             }
 
             val outcome = if (forceRefresh) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
-            val canOpenAuthors = (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
+            val canOpenTags = (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
             when (outcome) {
                 is SourceOutcome.Success -> _state.update { current ->
                     current.copy(
                         status = DetailsStatus.Ready,
                         detail = outcome.value,
                         sourceName = source.name,
-                        canOpenAuthors = canOpenAuthors,
+                        canOpenTags = canOpenTags,
                         // A refresh can drop the group the user had selected.
                         selectedGroup = current.selectedGroup?.takeIf { group ->
                             outcome.value.chapters.any { it.group == group }

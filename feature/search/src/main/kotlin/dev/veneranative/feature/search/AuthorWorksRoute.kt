@@ -45,7 +45,7 @@ fun AuthorWorksRoute(
         SearchResultScreen(state, results, emptyList(), {}, onOpenComic, onBack)
     } else {
         Scaffold(topBar = {
-            TopAppBar(title = { Text("作者 · $author") }, navigationIcon = {
+            TopAppBar(title = { Text("相关作品 · $author") }, navigationIcon = {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回") }
             })
         }) { padding ->
@@ -55,7 +55,7 @@ fun AuthorWorksRoute(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (state.status == SearchStatus.Loading) CircularProgressIndicator() else {
-                    Text(state.message ?: "无法加载作者作品。")
+                    Text(state.message ?: "无法加载相关作品。")
                     Button(onClick = model::retry) { Text("重试") }
                 }
             }

@@ -119,10 +119,10 @@ fun DetailsScreen(
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
-    LaunchedEffect(state.authorMessage) {
-        state.authorMessage?.let { message ->
+    LaunchedEffect(state.tagMessage) {
+        state.tagMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
-            onAction(DetailsAction.AuthorMessageConsumed)
+            onAction(DetailsAction.TagMessageConsumed)
         }
     }
     LaunchedEffect(state.downloadMessage) {
@@ -622,8 +622,8 @@ private fun Header(
             if (hasTagGroups) {
                 HeroTagGroups(
                     groups = tagGroups,
-                    onAuthorClick = if (state.canOpenAuthors && !state.openingAuthor) {
-                        { namespace, author -> onAction(DetailsAction.AuthorClicked(namespace, author)) }
+                    onTagClick = if (state.canOpenTags && !state.openingTag) {
+                        { namespace, author -> onAction(DetailsAction.TagClicked(namespace, author)) }
                     } else null,
                     trailingFavorite = if (state.hasShelf) {
                         { FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }
@@ -842,7 +842,7 @@ private fun InfoLabel(text: String) {
 @Composable
 private fun HeroTagGroups(
     groups: Map<String, List<String>>,
-    onAuthorClick: ((String, String) -> Unit)? = null,
+    onTagClick: ((String, String) -> Unit)? = null,
     trailingFavorite: (@Composable () -> Unit)? = null,
 ) {
     val visibleGroups = groups.filterValues { it.isNotEmpty() }
@@ -872,9 +872,9 @@ private fun HeroTagGroups(
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = Color.White.copy(alpha = 0.2f),
-                                modifier = if (onAuthorClick != null && isAuthorNamespace(name)) {
-                                    Modifier.clickable { onAuthorClick(name, value) }
-                                        .semantics { contentDescription = "查看作者 $value 的作品" }
+                                modifier = if (onTagClick != null) {
+                                    Modifier.clickable { onTagClick(name, value) }
+                                        .semantics { contentDescription = "查看 $name 标签 $value 的相关作品" }
                                 } else Modifier,
                             ) {
                                 androidx.compose.foundation.text.BasicText(

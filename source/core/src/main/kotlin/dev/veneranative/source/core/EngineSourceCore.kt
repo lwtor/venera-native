@@ -64,7 +64,8 @@ class EngineSourceCore(
             is SourceOutcome.Success -> result.value
         }
         if (!description.capabilities.canNavigateTags) return SourceOutcome.Success(null)
-        if (description.usesKomiicAuthorLookup) {
+        if (description.usesKomiicTagFallback) {
+            if (namespace == "标签") return komiicCategoryTag(comicKey.sourceId, tag)
             if (namespace != "作者" || tag.isBlank()) return SourceOutcome.Success(null)
             return when (val result = invoke(comicKey.sourceId, KomiicAuthorCompatibility.resolveCall(tag))) {
                 is SourceOutcome.Failure -> result
@@ -336,7 +337,7 @@ class EngineSourceCore(
             if (comic.entry("loadEp").isCallable()) add(SourceCapability.PAGES)
         }
 
-        val usesKomiicAuthorLookup = if (sourceId.value == KomiicAuthorCompatibility.SOURCE_KEY &&
+        val usesKomiicTagFallback = if (sourceId.value == KomiicAuthorCompatibility.SOURCE_KEY &&
             !comic.entry("onClickTag").isCallable() && SourceCapability.SEARCH in supported) {
             when (val result = probe(sourceId, listOf("queryJson"))) {
                 is SourceOutcome.Failure -> return result
@@ -350,12 +351,12 @@ class EngineSourceCore(
                     supported = supported,
                     explorePages = pages,
                     searchFilters = searchFilters(probed["search.optionList"]),
-                    canNavigateTags = comic.entry("onClickTag").isCallable() || usesKomiicAuthorLookup,
+                    canNavigateTags = comic.entry("onClickTag").isCallable() || usesKomiicTagFallback,
                 ),
                 explorePages = declaredPages,
                 searchUsesLoad = searchUsesLoad,
                 usesImageLoadConfig = comic.entry("onImageLoad").isCallable(),
-                usesKomiicAuthorLookup = usesKomiicAuthorLookup,
+                usesKomiicTagFallback = usesKomiicTagFallback,
             )
         return SourceOutcome.Success(description)
     }
@@ -466,13 +467,34 @@ class EngineSourceCore(
         val explorePages: Map<String, ExplorePageRuntime>,
         val searchUsesLoad: Boolean,
         val usesImageLoadConfig: Boolean,
-        val usesKomiicAuthorLookup: Boolean,
+        val usesKomiicTagFallback: Boolean,
     )
 
     private fun <T> parseAuthorResponse(parse: () -> T): SourceOutcome<T> = try {
         SourceOutcome.Success(parse())
     } catch (_: Exception) {
         SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid author response."))
+    }
+
+    private suspend fun komiicCategoryTag(sourceId: SourceId, tag: String): SourceOutcome<TagNavigation?> {
+        val loader = when (val result = probe(sourceId, listOf("categoryComics", "load"))) {
+            is SourceOutcome.Failure -> return result
+            is SourceOutcome.Success -> result.value
+        }
+        if (!loader.isCallable()) return SourceOutcome.Success(null)
+        val parts = when (val result = probe(sourceId, listOf("category", "parts"))) {
+            is SourceOutcome.Failure -> return result
+            is SourceOutcome.Success -> result.value
+        }
+        val targets = parts.items().flatMap { part ->
+            if (part.entry("type").text() != "fixed" || part.entry("itemType").text() != "category") return@flatMap emptyList()
+            val params = part.entry("categoryParams").items()
+            part.entry("categories").items().mapIndexedNotNull { index, category ->
+                val param = params.getOrNull(index).text()?.takeIf(String::isNotBlank)
+                if (category.text() == tag && param != null) TagNavigation.Category(tag, param) else null
+            }
+        }.distinct()
+        return SourceOutcome.Success(targets.singleOrNull())
     }
 
     private data class ExplorePageRuntime(val index: Int, val usesLoadNext: Boolean)

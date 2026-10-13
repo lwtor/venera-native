@@ -334,7 +334,7 @@ private fun AppNavHost(
                         onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it.key, it.group))) },
                         onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                         onOpenDownloads = { onRouteChange(AppRoute.Downloads) },
-                        onOpenAuthorWorks = { author, target -> onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, detailsOrigin)) },
+                        onOpenRelatedWorks = { author, target -> onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, detailsOrigin)) },
                         onBack = onBack,
                     )
 

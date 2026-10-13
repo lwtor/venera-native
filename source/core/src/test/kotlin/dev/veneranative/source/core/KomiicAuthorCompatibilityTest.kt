@@ -56,12 +56,30 @@ class KomiicAuthorCompatibilityTest {
         }
     }
 
+    @Test fun `Komiic tags use declared category id and positional defaults`() = runBlocking {
+        withSource { core, id ->
+            val target = (core.tagNavigation(ComicKey(id, RemoteComicId("c")), "标签", "Genre") as SourceOutcome.Success).value as TagNavigation.Category
+            assertEquals(TagNavigation.Category("Genre", "category-7"), target)
+            val filters = (core.relatedWorksFilters(id, target) as SourceOutcome.Success).value
+            val options = filters.map { (it.selectionValue(dev.veneranative.core.model.FilterSelection.Empty) as dev.veneranative.core.model.FilterValue.Single).value }
+            assertEquals(listOf("updated", ""), options)
+            val page = (core.category(dev.veneranative.source.api.CategoryRequest(id, target.keyword, target.param, options)) as SourceOutcome.Success).value
+            assertEquals("category-7:updated::1", page.items.single().title)
+            assertEquals(dev.veneranative.core.model.PageCursor.Page(2), page.next)
+        }
+    }
+
     private suspend fun withSource(key: String = "Komiic", callback: String = "", block: suspend (EngineSourceCore, SourceId) -> Unit) {
         val script = """
             class Fixture extends ComicSource {
               name = 'Fixture'; key = '$key'; version = '1';
               comic = {$callback loadInfo: async () => ({title: 'Fixture'})};
               search = {load: async () => { throw new Error('ordinary search must not run'); }};
+              category = {parts: [{type: 'fixed', itemType: 'category', categories: ['All', 'Genre'], categoryParams: ['0', 'category-7']}]};
+              categoryComics = {
+                optionList: [{options: ['updated-Updated']}, {options: ['-All', 'end-End'], showWhen: null}],
+                load: async (category, param, options, page) => ({comics: [{id: 'category-work', title: param + ':' + options.join(':') + ':' + page}], maxPage: 2})
+              };
               queryJson = async (request) => {
                 if (request.operationName === 'searchComicAndAuthorQuery') {
                   return {data: {searchComicsAndAuthors: {authors: request.variables.keyword === 'A"B' ? [{id: 'author-7', name: 'A"B'}, {id: 'wrong', name: 'Partial A"B'}] : []}}};
