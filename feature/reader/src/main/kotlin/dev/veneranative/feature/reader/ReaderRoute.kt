@@ -32,6 +32,7 @@ fun ReaderRoute(
     progress: ReaderProgress? = null,
     progressFactory: ((ChapterRef) -> ReaderProgress?)? = null,
     onExit: () -> Unit = {},
+    onOpenComicDetails: (() -> Unit)? = null,
 ) {
     val owner = androidx.compose.runtime.remember(chapter) {
         object : androidx.lifecycle.ViewModelStoreOwner {
@@ -54,5 +55,6 @@ fun ReaderRoute(
         onBack = onBack,
         modifier = modifier,
         decoderFactory = decoderFactory,
+        onOpenComicDetails = onOpenComicDetails,
     )
 }

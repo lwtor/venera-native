@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S3-00S1 DONE：阅读器工具层闲置收起与详情入口。** 用户指定优化阅读器：工具层打开后闲置五秒自动收起，上下工具栏和状态栏同步恢复隐藏；点击、滑动及工具操作重新计时，手指持续按住（包括页码拖动/缩放）期间暂停计时，松开后重新等待五秒。计时器使用随 Compose 生命周期取消的 CoroutineScope 和可注入等待时长，不消费触摸事件，也不因预取/图片加载等后台状态变化重置计时。标题栏右侧增加“详情”；原入口为同漫画详情时复用原详情并保留其列表返回来源，否则替换 Reader 为该漫画详情并将详情返回来源设为原阅读入口（首页/书架/下载等）。切换前刷新阅读进度，离开时沿用 Reader ViewModel 清理流程，不留下返回阅读器的路由。项目为单 Activity，因此 finish 语义由根路由替换实现，不结束 MainActivity；本地导入漫画尚无详情路由，不显示远端详情入口。
+
+验证（2026-10-13）：JDK 17 `:app:assembleDebug :feature:reader:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :core:navigation:compileDebugUnitTestKotlin :app:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成/虚拟时间回归源码覆盖五秒边界、持续拖动与松开重计时、关闭后重开取消旧计时，以及同漫画详情复用、首页/书架/下载替换和本地无目标；Compose 回归源码覆盖标题详情按钮接线。测试仅编译，未运行，未安装或操作真机；实际收起动画、拖动手感和阅读进度返回效果待用户复验。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6I3 DONE：加速拷贝漫画作者/标签结果的标签补读。** 用户反馈 I2 标签补读耗时数秒，核对源 loadInfo 发现其等待收藏查询及所有版本章节分页后才返回。相关作品现在通过类型化 ComicCatalog/SourceCore.comicTags 读取标签；拷贝漫画仅请求固定 comic2 基础资料端点的 results.comic.theme，复用源 apiUrl/headers/getReqID，不加载收藏或章节，不新增通用网络请求能力。成功标签（包括空数组）按作品/源版本缓存五分钟，失败不缓存；保留行离开取消、两条并发及已有标签优先。其他源默认通过详情提取内容标签，分组筛选移至纯模型层。受限适配与来源/许可证判断见 ADR-0007 §4.11。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :source:api:compileDebugUnitTestKotlin :source:engine:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成回归源码覆盖固定元数据端点、作品 ID 编码、源请求头复用、禁止完整详情加载、对象形式网络参数拒绝、标签过滤去重及缓存过期；仅编译，未运行测试、未安装或操作真机。首次请求仍受基础资料接口和源 getReqID 网络耗时影响，真实时延待用户复验，未声称性能实测通过。当前唯一下一任务保持 S4-02G4。

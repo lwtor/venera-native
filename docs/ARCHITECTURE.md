@@ -273,6 +273,7 @@ SharedPreferences 不用于新功能。数据库实体不得直接传到 UI；�
 - 大对象、Bitmap、脚本文本不得作为导航参数。
 - 详情通过 `ComicKey` 定位；章节通过稳定 `ChapterKey` 定位。
 - Feature 暴露导航意图或 Entry，不直接依赖目标 Feature。
+- 阅读器通过可选 onOpenComicDetails 回调发送详情意图；core/navigation 的 readerDetailsDestination 决定复用同漫画详情并保留列表来源，或用新详情替换 Reader、返回原阅读入口。App 仅装配回调、刷新既有进度并更新路由；不增加 Feature 依赖或结束 MainActivity。本地导入漫画无详情路由时不提供该入口（S3-00S1）。
 - Reader 全屏状态由根布局响应，不让 Reader 操纵 MainActivity 内部实现。
 
 ## 12. 测试归属

@@ -42,6 +42,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -275,9 +277,19 @@ fun ReaderScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
+    onOpenComicDetails: (() -> Unit)? = null,
 ) {
     var strategy by rememberSaveable { mutableStateOf(DecodeStrategy.Region) }
-    var controlsVisible by rememberSaveable { mutableStateOf(false) }
+    val controlsScope = rememberCoroutineScope()
+    val controlsTimer = remember(controlsScope) { ReaderControlsTimer(controlsScope) }
+    val controlsVisible by controlsTimer.visible.collectAsState()
+    fun toolbarAction(action: ReaderAction) {
+        controlsTimer.onInteraction()
+        onAction(action)
+    }
+    LaunchedEffect(state.status) {
+        if (state.status != ReaderStatus.Ready) controlsTimer.hide()
+    }
     val doubleTapZoomHandler = remember { ReaderDoubleTapZoomHandler() }
     var sliderPage by remember(state.currentPageNumber) { mutableStateOf(state.currentPageNumber.toFloat()) }
     val view = LocalView.current
@@ -315,7 +327,14 @@ fun ReaderScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(modifier = modifier.fillMaxSize().pointerInput(controlsTimer) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                controlsTimer.onPointerActivity(event.changes.any { it.pressed })
+            }
+        }
+    }, contentAlignment = Alignment.Center) {
         Box(
             modifier = Modifier.fillMaxSize().testTag("reader-canvas").pointerInput(state.status) {
                 detectReaderTapGestures(
@@ -324,7 +343,7 @@ fun ReaderScreen(
                         val width = size.width.toFloat()
                         val height = size.height.toFloat()
                         if (tap.x in width * 0.28f..width * 0.72f && tap.y in height * 0.25f..height * 0.75f) {
-                            controlsVisible = !controlsVisible
+                            if (state.status == ReaderStatus.Ready) controlsTimer.toggle()
                         }
                     },
                 )
@@ -370,15 +389,15 @@ fun ReaderScreen(
             ReaderToolOverlay(
                 state = state,
                 sliderPage = sliderPage,
-                onSliderPageChange = { sliderPage = it },
-                onSeek = { onAction(ReaderAction.SeekPage(it - 1)) },
-                onPreviousChapter = { onAction(ReaderAction.LoadPreviousChapter) },
-                onNextChapter = { onAction(ReaderAction.NavigateNextChapter) },
-                onRetryNextChapter = { onAction(ReaderAction.RetryNextChapter) },
-                onRetryPreviousChapter = { onAction(ReaderAction.RetryPreviousChapter) },
+                onSliderPageChange = { controlsTimer.onInteraction(); sliderPage = it },
+                onSeek = { toolbarAction(ReaderAction.SeekPage(it - 1)) },
+                onPreviousChapter = { toolbarAction(ReaderAction.LoadPreviousChapter) },
+                onNextChapter = { toolbarAction(ReaderAction.NavigateNextChapter) },
+                onRetryNextChapter = { toolbarAction(ReaderAction.RetryNextChapter) },
+                onRetryPreviousChapter = { toolbarAction(ReaderAction.RetryPreviousChapter) },
                 strategy = if (decoderFactory == null) null else strategy,
-                onDirectionChange = { onAction(ReaderAction.ChangeDirection(it)) },
-                onStrategyChange = { strategy = it },
+                onDirectionChange = { toolbarAction(ReaderAction.ChangeDirection(it)) },
+                onStrategyChange = { controlsTimer.onInteraction(); strategy = it },
             )
         }
         AnimatedVisibility(
@@ -393,7 +412,7 @@ fun ReaderScreen(
             ),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
-            ReaderTopBar(state = state, onBack = onBack)
+            ReaderTopBar(state = state, onBack = onBack, onOpenComicDetails = onOpenComicDetails)
         }
     }
 }
@@ -477,6 +496,7 @@ private fun ReaderToolOverlay(
 private fun ReaderTopBar(
     state: ReaderUiState,
     onBack: () -> Unit,
+    onOpenComicDetails: (() -> Unit)?,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -494,6 +514,12 @@ private fun ReaderTopBar(
             Column(modifier = Modifier.weight(1f)) {
                 Text(state.chapterTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text("${state.currentPageNumber} / ${state.currentChapterPageCount}", style = MaterialTheme.typography.labelMedium)
+            }
+            if (onOpenComicDetails != null) {
+                TextButton(
+                    onClick = onOpenComicDetails,
+                    modifier = Modifier.testTag("reader-open-details").semantics { contentDescription = "漫画详情" },
+                ) { Text("详情") }
             }
         }
     }

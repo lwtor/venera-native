@@ -36,6 +36,7 @@ import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.backDestination
 import dev.veneranative.core.navigation.decodeAppRoute
 import dev.veneranative.core.navigation.detailsOriginAfterNavigation
+import dev.veneranative.core.navigation.readerDetailsDestination
 import dev.veneranative.core.navigation.encode
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.comic.DefaultComicCatalog
@@ -106,6 +107,12 @@ internal fun AppRoot(
             },
             detailsOrigin = detailsOrigin,
             readerOrigin = readerOrigin,
+            onOpenReaderDetails = { current ->
+                readerDetailsDestination(current, readerOrigin, detailsOrigin)?.let { target ->
+                    detailsOrigin = target.detailsOrigin
+                    route = target.route
+                }
+            },
             catalog = catalog,
             sourceRepository = sourceRepository,
             sourceCatalogRepository = sourceCatalogRepository,
@@ -132,6 +139,7 @@ private fun AppNavHost(
     onRouteChange: (AppRoute) -> Unit,
     detailsOrigin: AppRoute,
     readerOrigin: AppRoute,
+    onOpenReaderDetails: (AppRoute.Reader) -> Unit,
     catalog: DefaultComicCatalog,
     sourceRepository: DefaultSourceRepository,
     sourceCatalogRepository: dev.veneranative.data.source.SourceCatalogRepository,
@@ -352,6 +360,12 @@ private fun AppNavHost(
                                 chapter = current.chapter, provider = provider,
                                 onBack = onBack,
                                 decoderFactory = decoderFactory, progress = session,
+                                onOpenComicDetails = if (current.chapter is ChapterRef.Remote) ({
+                                    appScope.launch {
+                                        runCatching { tracker.flush() }
+                                        onOpenReaderDetails(current)
+                                    }
+                                }) else null,
                                 progressFactory = { target ->
                                     if (target == current.chapter) session
                                     else dev.veneranative.data.history.ReaderProgressSession(

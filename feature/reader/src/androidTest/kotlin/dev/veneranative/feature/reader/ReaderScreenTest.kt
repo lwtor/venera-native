@@ -67,6 +67,20 @@ class ReaderScreenTest {
         )
     }
 
+    @Test fun titleBarDetailsButtonInvokesNavigationCallback() {
+        val opens = AtomicInteger()
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(chapterTitle = "当前话", pages = pages,
+                    currentChapterPageCount = pages.size, status = ReaderStatus.Ready),
+                onAction = {}, onBack = {}, onOpenComicDetails = { opens.incrementAndGet() },
+            )
+        }
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput { click(center) }
+        composeRule.onNodeWithTag("reader-open-details").assertIsDisplayed().performClick()
+        assertEquals(1, opens.get())
+    }
+
     @Test
     fun centerTapShowsFullscreenReaderControls() {
         val next = Chapter(

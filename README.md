@@ -23,6 +23,8 @@ WebView 系引擎来提供异步 Host API。
 （`tools/test-images`）、`Sampled` 与 `Region` 两种解码策略、有界位图缓存，以及把单次解码
 上界写成断言的 JVM 预算测试。默认策略与依据见 `docs/adr/0004-large-image-strategy.md`。
 
+阅读器点击中央打开工具层，闲置五秒后自动收起，持续拖动期间保持显示。远端漫画（含已下载章节）可从标题栏右侧“详情”退出阅读器：从详情进入时回到原详情，其他入口进入时打开对应详情，返回时回到原入口。
+
 Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解码耗时、PSS、掉帧、手势冲突）
 按项目决定推迟，需要时用 `LargeImageProbeTest` 采集。
 
