@@ -79,7 +79,7 @@ class AuthorWorksViewModel(
 }
 
 internal fun authorWorksRequest(origin: ComicKey, target: TagNavigation, filters: List<SourceFilter>): Pair<SearchRequest?, CategoryRequest?> = when (target) {
-    is TagNavigation.Search -> SearchRequest(origin.sourceId, target.keyword, optionsOverride = target.options.takeIf { it.isNotEmpty() }) to null
+    is TagNavigation.Search -> SearchRequest(origin.sourceId, target.keyword, optionsOverride = target.options.takeIf { it.isNotEmpty() }, authorId = target.authorId) to null
     is TagNavigation.Category -> {
         val options = if (filters.isEmpty()) target.options else filters.mapIndexed { index, filter ->
             target.options.getOrNull(index) ?: (filter.selectionValue(FilterSelection.Empty) as? FilterValue.Single)?.value.orEmpty()

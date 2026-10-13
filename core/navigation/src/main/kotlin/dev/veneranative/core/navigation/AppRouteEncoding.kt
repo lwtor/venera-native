@@ -30,8 +30,8 @@ fun AppRoute.encode(): String = when (this) {
     is AppRoute.Explore -> "explore:${sourceId.escape()}"
     is AppRoute.Search -> "search:${sourceId.escape()}"
     is AppRoute.AuthorWorks -> "author:${origin.sourceId.value.escape()}:${origin.remoteId.value.escape()}:${author.escape()}:" +
-        (if (target is TagNavigation.Search) "search" else "category") +
-        ":${target.keyword.escape()}:${(target as? TagNavigation.Category)?.param.escape()}:${returnOrigin.encode().escape()}" +
+        (if (target is TagNavigation.Search) { if (target.authorId == null) "search" else "author-search" } else "category") +
+        ":${target.keyword.escape()}:${when (target) { is TagNavigation.Search -> target.authorId; is TagNavigation.Category -> target.param }.escape()}:${returnOrigin.encode().escape()}" +
         target.options.joinToString(separator = "", transform = { ":${it.escape()}" })
     is AppRoute.ComicDetails ->
         "comic:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}"
@@ -66,6 +66,7 @@ fun decodeAppRoute(encoded: String): AppRoute? {
             val options = parts.drop(8).map { it.unescapeOrNull().orEmpty() }
             val target = when (parts.getOrNull(4)) {
                 "search" -> TagNavigation.Search(keyword, options)
+                "author-search" -> TagNavigation.Search(keyword, options, parts.getOrNull(6)?.unescapeOrNull() ?: return null)
                 "category" -> TagNavigation.Category(keyword, parts.getOrNull(6)?.unescapeOrNull(), options)
                 else -> return null
             }

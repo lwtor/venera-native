@@ -64,6 +64,13 @@ class EngineSourceCore(
             is SourceOutcome.Success -> result.value
         }
         if (!description.capabilities.canNavigateTags) return SourceOutcome.Success(null)
+        if (description.usesKomiicAuthorLookup) {
+            if (namespace != "作者" || tag.isBlank()) return SourceOutcome.Success(null)
+            return when (val result = invoke(comicKey.sourceId, KomiicAuthorCompatibility.resolveCall(tag))) {
+                is SourceOutcome.Failure -> result
+                is SourceOutcome.Success -> parseAuthorResponse { KomiicAuthorCompatibility.resolve(result.value, tag) }
+            }
+        }
         return when (val result = invoke(comicKey.sourceId, SourceProtocol.onClickTag(namespace, tag))) {
             is SourceOutcome.Failure -> result
             is SourceOutcome.Success -> SourceOutcome.Success(SourceProtocolParser.parseTagNavigation(result.value))
@@ -71,6 +78,7 @@ class EngineSourceCore(
     }
 
     override suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation): SourceOutcome<List<SourceFilter>> {
+        if (target is TagNavigation.Search && target.authorId != null) return SourceOutcome.Success(emptyList())
         if (target is TagNavigation.Search) {
             return when (val result = capabilities(sourceId)) {
                 is SourceOutcome.Failure -> result
@@ -189,6 +197,16 @@ class EngineSourceCore(
         val capabilities = description.capabilities
         if (!capabilities.supports(SourceCapability.SEARCH)) {
             return SourceOutcome.unsupported(SourceCapability.SEARCH)
+        }
+
+        request.authorId?.let { authorId ->
+            if (request.sourceId.value != KomiicAuthorCompatibility.SOURCE_KEY || authorId.isBlank()) {
+                return SourceOutcome.Failure(SourceRuntimeError.InvalidCall("Author lookup is unavailable."))
+            }
+            return when (val result = invoke(request.sourceId, KomiicAuthorCompatibility.worksCall(authorId))) {
+                is SourceOutcome.Failure -> result
+                is SourceOutcome.Success -> parseAuthorResponse { KomiicAuthorCompatibility.works(request.sourceId, result.value) }
+            }
         }
 
         val pageNumber = (request.cursor as? PageCursor.Page)?.number ?: FIRST_PAGE
@@ -318,17 +336,26 @@ class EngineSourceCore(
             if (comic.entry("loadEp").isCallable()) add(SourceCapability.PAGES)
         }
 
+        val usesKomiicAuthorLookup = if (sourceId.value == KomiicAuthorCompatibility.SOURCE_KEY &&
+            !comic.entry("onClickTag").isCallable() && SourceCapability.SEARCH in supported) {
+            when (val result = probe(sourceId, listOf("queryJson"))) {
+                is SourceOutcome.Failure -> return result
+                is SourceOutcome.Success -> result.value.isCallable()
+            }
+        } else false
+
         val description =
             SourceDescription(
                 capabilities = SourceCapabilities(
                     supported = supported,
                     explorePages = pages,
                     searchFilters = searchFilters(probed["search.optionList"]),
-                    canNavigateTags = comic.entry("onClickTag").isCallable(),
+                    canNavigateTags = comic.entry("onClickTag").isCallable() || usesKomiicAuthorLookup,
                 ),
                 explorePages = declaredPages,
                 searchUsesLoad = searchUsesLoad,
                 usesImageLoadConfig = comic.entry("onImageLoad").isCallable(),
+                usesKomiicAuthorLookup = usesKomiicAuthorLookup,
             )
         return SourceOutcome.Success(description)
     }
@@ -439,7 +466,14 @@ class EngineSourceCore(
         val explorePages: Map<String, ExplorePageRuntime>,
         val searchUsesLoad: Boolean,
         val usesImageLoadConfig: Boolean,
+        val usesKomiicAuthorLookup: Boolean,
     )
+
+    private fun <T> parseAuthorResponse(parse: () -> T): SourceOutcome<T> = try {
+        SourceOutcome.Success(parse())
+    } catch (_: Exception) {
+        SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid author response."))
+    }
 
     private data class ExplorePageRuntime(val index: Int, val usesLoadNext: Boolean)
 

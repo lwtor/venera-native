@@ -218,6 +218,14 @@ Stage 3/4 的内容提前拖进 Stage 1。
 
 参考基线：[Venera a0eba914](https://github.com/venera-app/venera/tree/a0eba914f4c2a84ac1bc925adec2baabe920b9be)，重点核对 [actions.dart](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/lib/pages/comic_details_page/actions.dart)、[parser.dart](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/lib/foundation/comic_source/parser.dart)、[models.dart](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/lib/foundation/comic_source/models.dart)、category_comics_page.dart 和漫画源协议文档。上游 [LICENSE](https://github.com/venera-app/venera/blob/a0eba914f4c2a84ac1bc925adec2baabe920b9be/LICENSE) 为 GPL-3.0。本任务仅对照公开协议和行为独立实现 Kotlin，未复制上游 Flutter/JS 源码或资源；测试为仓库内合成 fixture，不含真实来源脚本、账号或漫画内容。
 
+### 4.9 Komiic 作者兼容适配（2026-10-13，S4-10A6K）
+
+用户实测拷贝漫画作者跳转正常、Komiic 不可用。核对 [Komiic 1.0.3 脚本基线 78c87f00](https://github.com/venera-app/venera-configs/blob/78c87f00aa708b4740fd5ccae4e9bced5b8ae583/komiic.js)：只有作者标签，没有 onClickTag；普通搜索的 searchComicsAndAuthors 响应虽然包含 authors，但脚本只返回 comics。上游详情没有无回调兜底，因此仅实现上游标签回调无法满足本次用户要求。
+
+只读核对 [Komiic 官方页面](https://komiic.com/) 的公开前端 bundle `/assets/index-BAq7RFlu.js`：作者页先确定 ID，再以 `comicsByAuthor` 操作查询 `getComicsByAuthor(authorId: ID!)`，不提供分页参数。本项目在 source/core 独立实现最小 GraphQL 查询与解析，借助源实例的 queryJson 保持原有网络、登录及会话行为，没有复制上游脚本或网站前端代码；参考文件仅位于忽略的 build 目录。
+
+这是 §4.8 的显式例外：仅 source key 为 Komiic、缺少 onClickTag 且 queryJson/search 可调用时启用；只处理原始 namespace 为“作者”的标签。按 name/chName/enName 精确匹配并去重 ID，歧义不自动选第一个；显式源回调始终优先，其他源仍保持无回调不跳转。Search 目标及 SearchRequest 通过可空 authorId 表达精确作者检索，源适配执行专门作品接口，不转为标题关键词搜索。路由以 author-search 类型保留 ID，既有 search/category 编码保持兼容。无 API 错误、但确实没有作品时展示空结果；错误不得伪装为空列表。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |

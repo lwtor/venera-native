@@ -90,6 +90,8 @@ data class SearchRequest(
     val filters: FilterSelection = FilterSelection.Empty,
     /** Exact positional options supplied by a source's tag navigation callback. */
     val optionsOverride: List<String>? = null,
+    /** Exact author identity resolved by a supported source adapter, rather than a title keyword. */
+    val authorId: String? = null,
 ) {
     init {
         require(keyword.isNotBlank()) { "search keyword must not be blank" }

@@ -93,6 +93,8 @@ S1-05 已建立 `:core:image`，S0-06 的解码代码随之从 `:feature:reader`
 
 S4-10A6 在既有模块内增加作者作品闭环：纯 `TagNavigation` 模型承载源回调的 Search / Category 目标；SourceCore 负责原始 namespace/tag 调用与 categoryComics 协议，ComicCatalog 转发并提供分类 PagingSource。Details 只发 Action 并产生可消费导航状态，Search 承载作者作品结果，App 装配 `AuthorWorks` 路由与原详情返回来源。没有 Feature 之间的依赖，也没有 UI 拼接脚本；分类首页、标签通用跳转与分类筛选编辑不属于本次交付。
 
+S4-10A6K 为缺少 onClickTag 的 Komiic 增加 source/core 专用作者适配，复用源 queryJson 获取精确作者 ID 与作品；Search 目标和请求保存 authorId，既有 PagingSource 继续承担结果和重试。该例外不扩散为所有源的关键词 fallback，源显式回调优先；模型、导航和 UI 不依赖 Komiic 的 GraphQL 实现，决定记录于 ADR-0007 §4.9。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

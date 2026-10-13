@@ -27,4 +27,8 @@ class AuthorWorksRequestTest {
         assertEquals(listOf("old"), authorWorksRequest(origin, TagNavigation.Category("A", options = listOf("old")), filters).second!!.options)
         assertEquals(listOf("opaque"), authorWorksRequest(origin, TagNavigation.Category("A", options = listOf("opaque")), emptyList()).second!!.options)
     }
+    @Test fun `exact author identity survives result request construction`() {
+        val request = authorWorksRequest(origin, TagNavigation.Search("A", authorId = "author-7"), emptyList()).first!!
+        assertEquals("author-7", request.authorId)
+    }
 }

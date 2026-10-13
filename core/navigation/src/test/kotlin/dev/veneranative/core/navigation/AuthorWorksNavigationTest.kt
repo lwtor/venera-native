@@ -10,7 +10,7 @@ import org.junit.Test
 class AuthorWorksNavigationTest {
     private val origin = ComicKey(SourceId("source:%"), RemoteComicId("comic:%"))
     @Test fun `author routes preserve target parameters options and return origin`() {
-        listOf(TagNavigation.Search("作者:A:%", listOf("new", "")), TagNavigation.Category("A", "id:%", listOf("1"))).forEach { target ->
+        listOf(TagNavigation.Search("作者:A:%", listOf("new", "")), TagNavigation.Search("A", authorId = "author:%"), TagNavigation.Category("A", "id:%", listOf("1"))).forEach { target ->
             val route = AppRoute.AuthorWorks(origin, "A:%", target, AppRoute.Search("source:%"))
             assertEquals(route, decodeAppRoute(route.encode()))
             assertEquals(AppRoute.ComicDetails(origin), backDestination(route, AppRoute.Home))

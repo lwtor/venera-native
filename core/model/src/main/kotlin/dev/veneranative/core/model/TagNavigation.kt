@@ -4,8 +4,8 @@ package dev.veneranative.core.model
 sealed interface TagNavigation {
     val keyword: String
     val options: List<String>
-    data class Search(override val keyword: String, override val options: List<String> = emptyList()) : TagNavigation {
-        init { require(keyword.isNotBlank()) }
+    data class Search(override val keyword: String, override val options: List<String> = emptyList(), val authorId: String? = null) : TagNavigation {
+        init { require(keyword.isNotBlank()); require(authorId == null || authorId.isNotBlank()) }
     }
     data class Category(override val keyword: String, val param: String? = null, override val options: List<String> = emptyList()) : TagNavigation {
         init { require(keyword.isNotBlank()) }
