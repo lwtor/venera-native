@@ -369,7 +369,7 @@ private fun Results(
                                 modifier = Modifier.fillMaxSize(),
                                 placeholder = { Box(Modifier.size(80.dp, 120.dp), contentAlignment = Alignment.Center) { Text("漫") } },
                                 imageContent = { painter ->
-                                    val backdropOpacity = if (android.os.Build.VERSION.SDK_INT >= 31) 0.5f else 0.08f
+                                    val backdropOpacity = if (android.os.Build.VERSION.SDK_INT >= 31) 0.7f else 0.08f
                                     Box(Modifier.fillMaxSize()) {
                                         Image(painter, contentDescription = null, contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
