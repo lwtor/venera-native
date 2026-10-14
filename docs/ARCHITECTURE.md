@@ -278,7 +278,7 @@ SharedPreferences 不用于新功能。数据库实体不得直接传到 UI；�
 
 ## 12. 测试归属
 
-S3-00Y1 在 data/comic 共享仅用于读取的 retrySourceRead，Details ViewModel 与 SourcePageProvider 使用它进行最多三次有界重试；不改变 SourceRuntimeError 的全局可重试语义。UI ViewModel 负责总加载截止和失败状态，取消仍透传；Reader 图片预热不持有章节锁。未新增依赖或源 Host 能力，细则见 ADR-0007 §4.12。
+S3-00Y1 的源重试在 Y2 收拢到 source/core 的 SourceCallExecutor；EngineSourceCore 全部协议通过这一入口，复用 Runtime 排队及废弃/重建引擎。SourceProtocolCall 强制 READ/WRITE，读最多三次、每次新 ID、总截止 120 秒，写只执行一次。Feature/Provider 不再叠加来源重试，继续负责页面失败状态及等待截止；图片预热不持有章节锁。未新增模块依赖或 Host 能力，见 ADR-0007 §4.12/4.13。
 
 | 测试 | 位置 |
 | --- | --- |

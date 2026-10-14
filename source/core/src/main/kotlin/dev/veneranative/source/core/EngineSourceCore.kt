@@ -1,6 +1,7 @@
 package dev.veneranative.source.core
 
 import dev.veneranative.source.api.CategoryRequest
+import dev.veneranative.source.api.protocol.SourceOperationKind
 import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
@@ -54,9 +55,11 @@ class EngineSourceCore(
     private val timeoutMillis: Long = DEFAULT_SOURCE_OPERATION_TIMEOUT_MILLIS,
     private val chapterLoadTimeoutMillis: Long = DEFAULT_CHAPTER_LOAD_TIMEOUT_MILLIS,
     private val onCallFailure: (SourceId, String, String) -> Unit = { _, _, _ -> },
+    waitBeforeRetry: suspend (Int) -> Unit = { kotlinx.coroutines.delay(it * 500L) },
 ) : SourceCore {
 
     private val sequence = AtomicLong(0)
+    private val executor = SourceCallExecutor(runtime, waitBeforeRetry)
 
     override suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> {
         val description = when (val result = describe(comicKey.sourceId)) {
@@ -93,7 +96,7 @@ class EngineSourceCore(
         }
         if (!category.entry("load").isCallable()) return SourceOutcome.Failure(SourceRuntimeError.InvalidCall("Category loader is unavailable."))
         val optionList = if (category.entry("optionLoader").isCallable()) {
-            val call = SourceProtocolCall("categoryComics.optionLoader", JsonArray(listOf(JsonPrimitive(target.keyword), target.param?.let(::JsonPrimitive) ?: JsonNull)).toString())
+            val call = SourceProtocolCall("categoryComics.optionLoader", JsonArray(listOf(JsonPrimitive(target.keyword), target.param?.let(::JsonPrimitive) ?: JsonNull)).toString(), SourceOperationKind.READ)
             when (val result = invoke(sourceId, call)) {
                 is SourceOutcome.Failure -> return result
                 is SourceOutcome.Success -> runCatching { SourceShape.parse(kotlinx.serialization.json.Json.parseToJsonElement(result.value)) }.getOrNull()
@@ -163,6 +166,7 @@ class EngineSourceCore(
                 SourceProtocolCall(
                     member = "explore.${declared.index}.loadNext",
                     argumentsJson = JsonArray(listOf(cursorTokenOrNull(request.cursor))).toString(),
+                    operationKind = SourceOperationKind.READ,
                 )
             } else {
                 // The protocol knows how a page's argument depends on its kind; only the member path
@@ -373,7 +377,7 @@ class EngineSourceCore(
     private suspend fun probe(sourceId: SourceId, path: List<String>): SourceOutcome<SourceShape?> {
         val pathJson = JsonArray(path.map(::JsonPrimitive)).toString()
         val argumentsJson = JsonArray(listOf<JsonElement>(JsonPrimitive(pathJson))).toString()
-        return when (val invoked = invoke(sourceId, SourceProtocolCall(PROBE_MEMBER, argumentsJson))) {
+        return when (val invoked = invoke(sourceId, SourceProtocolCall(PROBE_MEMBER, argumentsJson, SourceOperationKind.READ))) {
             is SourceOutcome.Success -> SourceOutcome.Success(SourceShape.decode(invoked.value))
             is SourceOutcome.Failure -> invoked
         }
@@ -381,7 +385,7 @@ class EngineSourceCore(
 
     private suspend fun invoke(sourceId: SourceId, call: SourceProtocolCall): SourceOutcome<String> {
         val result =
-            runtime.invoke(
+            executor.execute(call.operationKind) {
                 SourceCall.InvokeFunction(
                     callId = "core-${sequence.incrementAndGet()}",
                     sourceId = sourceId,
@@ -394,8 +398,8 @@ class EngineSourceCore(
                     } else {
                         timeoutMillis
                     },
-                ),
-            )
+                )
+            }
         return when (result) {
             is SourceResult.Success -> SourceOutcome.Success(result.json)
 

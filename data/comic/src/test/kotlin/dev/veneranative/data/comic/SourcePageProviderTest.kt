@@ -246,7 +246,7 @@ class SourcePageProviderTest {
     }
 
     @Test
-    fun `chapter load retries briefly when the source is still unwinding a prior call`() = runTest {
+    fun `provider forwards final source failure without multiplying central retries`() = runTest {
         val references = listOf(SourcePage(index = 0, imageRef = "https://img/0"))
         var attempts = 0
         val catalog = object : ComicCatalog by FakeCatalog(pages = references) {
@@ -262,9 +262,10 @@ class SourcePageProviderTest {
         val provider = SourcePageProvider(
             catalog = catalog,
             sizer = FixedSizer(),
-            waitBeforeBusyRetry = {},
         )
 
+        assertTrue(runCatching { provider.loadChapter(chapter) }.exceptionOrNull() is SourceLoadException)
+        assertEquals(1, attempts)
         val content = provider.loadChapter(chapter)
 
         assertEquals(2, attempts)
@@ -272,7 +273,7 @@ class SourcePageProviderTest {
     }
 
     @Test
-    fun `transient detail failure is retried so next chapter metadata is not silently lost`() = runTest {
+    fun `failed directory is surfaced and subsequent load retains next chapter metadata`() = runTest {
         val next = Chapter(chapter.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
         var detailAttempts = 0
         val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
@@ -288,8 +289,9 @@ class SourcePageProviderTest {
                 }
             }
         }
-        val provider = SourcePageProvider(catalog, FixedSizer(), waitBeforeBusyRetry = {})
+        val provider = SourcePageProvider(catalog, FixedSizer())
 
+        assertTrue(runCatching { provider.loadChapter(chapter) }.exceptionOrNull() is SourceLoadException)
         val content = provider.loadChapter(chapter)
 
         assertEquals(2, detailAttempts)
@@ -306,11 +308,11 @@ class SourcePageProviderTest {
                 return SourceOutcome.Failure(failure)
             }
         }
-        val provider = SourcePageProvider(catalog, FixedSizer(), waitBeforeBusyRetry = {})
+        val provider = SourcePageProvider(catalog, FixedSizer())
 
         val thrown = runCatching { provider.loadChapter(chapter) }.exceptionOrNull()
 
-        assertEquals(MAX_RETRIES + 1, detailAttempts)
+        assertEquals(1, detailAttempts)
         assertEquals(failure, (thrown as? SourceLoadException)?.error)
     }
 
@@ -351,7 +353,4 @@ class SourcePageProviderTest {
             error?.let { failure -> SourceOutcome.Failure(failure) } ?: SourceOutcome.Success(pages)
     }
 
-    private companion object {
-        const val MAX_RETRIES = 2
-    }
 }

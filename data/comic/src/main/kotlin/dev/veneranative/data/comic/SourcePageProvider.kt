@@ -12,7 +12,6 @@ import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
@@ -24,8 +23,6 @@ class SourcePageProvider(
     private val sizer: PageImageSizer,
     /** Display title of a chapter; the remote id is used when the caller has nothing better. */
     private val chapterTitle: suspend (ChapterKey) -> String = { chapter -> chapter.remoteId.value },
-    /** Retryable source failures are retried briefly before the reader exposes its retry action. */
-    private val waitBeforeBusyRetry: suspend (attempt: Int) -> Unit = { attempt -> delay(attempt * 500L) },
     /** Application-owned scope keeps chapter warm-up alive when the current reader route leaves. */
     private val prefetchScope: CoroutineScope? = null,
 ) : PageProvider {
@@ -76,7 +73,7 @@ class SourcePageProvider(
 
     private suspend fun loadChapterFromSource(ref: ChapterRef.Remote): ChapterContent {
         val key = ref.key
-        val references = retrySourceCall { catalog.pages(key) }
+        val references = sourceValue { catalog.pages(key) }
         if (references.isEmpty()) throw IllegalStateException("Source returned no pages")
         val pages = references.mapIndexed { index, reference ->
             ComicPage(
@@ -91,7 +88,7 @@ class SourcePageProvider(
             )
         }
         val detail = try {
-            retrySourceCall { catalog.detail(key.comicKey) }
+            sourceValue { catalog.detail(key.comicKey) }
         } catch (failure: SourceLoadException) {
             // Some sources legitimately expose pages without comic details. A transient or
             // broken detail call is different: fail visibly so the reader can retry instead of
@@ -114,8 +111,9 @@ class SourcePageProvider(
         )
     }
 
-    private suspend fun <T> retrySourceCall(call: suspend () -> SourceOutcome<T>): T {
-        return when (val outcome = retrySourceRead(waitBeforeBusyRetry, call)) {
+    /** Source Core owns retries and recovery; this layer only maps the final outcome. */
+    private suspend fun <T> sourceValue(call: suspend () -> SourceOutcome<T>): T {
+        return when (val outcome = call()) {
             is SourceOutcome.Success -> outcome.value
             is SourceOutcome.Failure -> throw SourceLoadException(outcome.error)
         }

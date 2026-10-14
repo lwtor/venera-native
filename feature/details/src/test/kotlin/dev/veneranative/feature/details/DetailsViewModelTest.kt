@@ -57,13 +57,15 @@ import kotlinx.coroutines.test.runCurrent
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailsViewModelTest {
-    @Test fun `temporary script failure automatically retries`() = runTest(dispatcher) {
+    @Test fun `details exposes final central failure without its own retry loop`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
         val model = DetailsViewModel(catalog, comicKey, collection)
         runCurrent()
         assertEquals(1, catalog.detailCalls)
+        assertEquals(DetailsStatus.Failed, model.state.value.status)
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Recovered"))
+        model.onAction(DetailsAction.Retry)
         advanceUntilIdle()
         assertEquals(DetailsStatus.Ready, model.state.value.status)
         assertEquals(2, catalog.detailCalls)

@@ -11,7 +11,6 @@ import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.CollectionNameConflictException
 import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.comic.ComicCatalog
-import dev.veneranative.data.comic.retrySourceRead
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.TimeoutCancellationException
@@ -451,10 +450,7 @@ class DetailsViewModel(
                         return@withTimeout
                     }
 
-                    var attempt = 0
-                    val outcome = retrySourceRead {
-                        if (forceRefresh || attempt++ > 0) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
-                    }
+                    val outcome = if (forceRefresh) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
                     val canOpenTags = if (outcome is SourceOutcome.Success)
                         (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
                         else false

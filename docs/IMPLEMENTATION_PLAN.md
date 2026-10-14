@@ -553,6 +553,8 @@ S3-01 小任务：
 
 S3-00 小任务：
 
+S3-00Y2（依赖 Y1）— DONE：将所有漫画源协议统一到 SourceCallExecutor，复用 Runtime 恢复/排队、三次上限/新 ID/120 秒总截止；协议强制 READ/WRITE、写不重放，移除上层循环。统一策略及 QuickJS 重建合成回归、上层不叠加回归源码已加入，App 与 source/api、source/core、data/comic、details、reader 测试源码编译及差异检查通过，未运行测试或真机验证。
+
 | ID | 交付 | 状态 |
 | --- | --- | --- |
 | S3-00A | 冻结上游仓库/提交与发行版本；完成适用功能、流程、设计项及权重清单；核对本地实现和证据；记录许可证与品牌边界 | DONE（文档/源码审查，`git diff --check` 通过） |

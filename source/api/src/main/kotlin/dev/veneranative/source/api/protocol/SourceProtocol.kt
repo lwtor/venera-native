@@ -23,9 +23,12 @@ import kotlinx.serialization.json.JsonPrimitive
  * here instead of inside the engine binding. Everything is checked against a real source in
  * `venera-configs`; see ADR-0007 §4.
  */
+enum class SourceOperationKind { READ, WRITE }
+
 data class SourceProtocolCall(
     val member: String,
     val argumentsJson: String,
+    val operationKind: SourceOperationKind,
 )
 
 /**
@@ -163,5 +166,5 @@ object SourceProtocol {
         (cursor as? PageCursor.Page)?.number ?: firstPage
 
     private fun call(member: String, vararg arguments: JsonElement): SourceProtocolCall =
-        SourceProtocolCall(member = member, argumentsJson = JsonArray(arguments.toList()).toString())
+        SourceProtocolCall(member = member, argumentsJson = JsonArray(arguments.toList()).toString(), operationKind = SourceOperationKind.READ)
 }

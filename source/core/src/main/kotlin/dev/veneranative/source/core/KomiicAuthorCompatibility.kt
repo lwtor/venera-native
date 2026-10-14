@@ -59,7 +59,7 @@ internal object KomiicAuthorCompatibility {
     private fun query(operation: String, variable: String, value: String, document: String): SourceProtocolCall {
         val body = JsonObject(mapOf("operationName" to JsonPrimitive(operation), "variables" to JsonObject(mapOf(variable to JsonPrimitive(value))), "query" to JsonPrimitive(document)))
         // Use the installed source's transport, preserving its session, cookies and configured URL.
-        return SourceProtocolCall("queryJson", JsonArray(listOf(body)).toString())
+        return SourceProtocolCall("queryJson", JsonArray(listOf(body)).toString(), dev.veneranative.source.api.protocol.SourceOperationKind.READ)
     }
 
     private fun data(payload: String): JsonObject {
