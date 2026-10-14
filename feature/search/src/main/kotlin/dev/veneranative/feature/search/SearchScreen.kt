@@ -59,6 +59,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.paging.LoadState
@@ -403,12 +404,13 @@ private fun Results(
                             info.publicationStatus?.let { status ->
                                 Box(Modifier.size(80.dp, 120.dp).align(Alignment.CenterStart)) {
                                     Surface(modifier = Modifier.align(Alignment.TopEnd),
-                                        shape = RoundedCornerShape(bottomStart = 6.dp),
+                                        shape = RoundedCornerShape(bottomStart = 4.dp),
                                         color = if (status == dev.veneranative.core.model.ComicPublicationStatus.Ongoing)
                                             MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.72f)) {
                                         Text(if (status == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中",
-                                            Modifier.padding(horizontal = 5.dp, vertical = 3.dp),
-                                            style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1)
+                                            Modifier.padding(horizontal = 3.dp, vertical = 1.dp),
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp),
+                                            color = Color.White, maxLines = 1)
                                     }
                                 }
                             }
