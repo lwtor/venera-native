@@ -21,6 +21,8 @@ import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -33,6 +35,23 @@ import org.junit.Test
  * assertions below pin that failed pages retain their positions and can be resolved independently.
  */
 class SourcePageProviderTest {
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test fun `slow first image warm up does not block foreground chapter`() = runTest {
+        val provider = SourcePageProvider(
+            catalog = FakeCatalog(pages = listOf(SourcePage(0, "fixture://page"))),
+            sizer = object : PageImageSizer {
+                override suspend fun sizeOf(imageRef: String, sourceId: SourceId): ImageSize? {
+                    kotlinx.coroutines.awaitCancellation()
+                }
+            },
+        )
+        val ref = dev.veneranative.core.model.ChapterRef.Remote(chapter)
+        val warmUp = backgroundScope.launch { provider.prefetchChapter(ref) }
+        runCurrent()
+        val content = kotlinx.coroutines.withTimeout(100) { provider.loadChapter(ref) }
+        assertEquals(1, content.pages.size)
+        warmUp.cancel()
+    }
 
     private val sourceId = SourceId("source-a")
 

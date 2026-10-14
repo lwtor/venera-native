@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -24,7 +25,7 @@ class SourcePageProvider(
     /** Display title of a chapter; the remote id is used when the caller has nothing better. */
     private val chapterTitle: suspend (ChapterKey) -> String = { chapter -> chapter.remoteId.value },
     /** Retryable source failures are retried briefly before the reader exposes its retry action. */
-    private val waitBeforeBusyRetry: suspend (attempt: Int) -> Unit = { attempt -> delay(attempt * 150L) },
+    private val waitBeforeBusyRetry: suspend (attempt: Int) -> Unit = { attempt -> delay(attempt * 500L) },
     /** Application-owned scope keeps chapter warm-up alive when the current reader route leaves. */
     private val prefetchScope: CoroutineScope? = null,
 ) : PageProvider {
@@ -51,20 +52,25 @@ class SourcePageProvider(
     }
 
     private suspend fun prefetchChapterNow(ref: ChapterRef.Remote) {
-        chapterLoadMutex.withLock {
+        val content = chapterLoadMutex.withLock {
             if (prefetchedChapter?.first == ref) return
-            val content = loadChapterFromSource(ref)
-            val firstPage = content.pages.firstOrNull()
-            val warmed = if (firstPage == null) content else {
-                try {
-                    content.copy(pages = listOf(resolve(firstPage)) + content.pages.drop(1))
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    content
-                }
+            val loaded = withTimeoutOrNull(120_000L) { loadChapterFromSource(ref) } ?: return
+            prefetchedChapter = ref to loaded
+            loaded
+        }
+        // Image warm-up must not hold the chapter lock and delay a foreground next-chapter load.
+        val firstPage = content.pages.firstOrNull() ?: return
+        val warmed = try {
+            withTimeoutOrNull(30_000L) {
+                content.copy(pages = listOf(resolve(firstPage)) + content.pages.drop(1))
             }
-            prefetchedChapter = ref to warmed
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+        chapterLoadMutex.withLock {
+            if (prefetchedChapter?.first == ref && warmed != null) prefetchedChapter = ref to warmed
         }
     }
 
@@ -109,18 +115,9 @@ class SourcePageProvider(
     }
 
     private suspend fun <T> retrySourceCall(call: suspend () -> SourceOutcome<T>): T {
-        var retries = 0
-        while (true) {
-            when (val outcome = call()) {
-                is SourceOutcome.Success -> return outcome.value
-                is SourceOutcome.Failure -> {
-                    if (!outcome.error.retryable || retries >= MAX_SOURCE_RETRIES) {
-                        throw SourceLoadException(outcome.error)
-                    }
-                    retries++
-                    waitBeforeBusyRetry(retries)
-                }
-            }
+        return when (val outcome = retrySourceRead(waitBeforeBusyRetry, call)) {
+            is SourceOutcome.Success -> outcome.value
+            is SourceOutcome.Failure -> throw SourceLoadException(outcome.error)
         }
     }
 
@@ -136,7 +133,4 @@ class SourcePageProvider(
 
     override suspend fun prefetch(page: ComicPage) { resolve(page) }
 
-    private companion object {
-        const val MAX_SOURCE_RETRIES = 2
-    }
 }

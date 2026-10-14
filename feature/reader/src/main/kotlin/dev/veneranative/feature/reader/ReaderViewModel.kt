@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.delay
 
 
 /**
@@ -33,6 +35,8 @@ class ReaderViewModel(
     private val progress: ReaderProgress? = null,
     private val prefetchRadius: Int = DEFAULT_PREFETCH_RADIUS,
     private val progressFactory: (ChapterRef) -> ReaderProgress? = { ref -> progress.takeIf { ref == chapter } },
+    private val chapterLoadTimeoutMillis: Long = 120_000L,
+    private val pageLoadTimeoutMillis: Long = 30_000L,
 ) : ViewModel() {
 
     private data class ChapterSegment(
@@ -98,9 +102,11 @@ class ReaderViewModel(
                 chapters.clear()
                 loadedChapters.clear()
                 nextChapterLoadJob?.cancel()
+                previousChapterLoadJob?.cancel()
                 val chapterProgress = progressFactory(chapter)
-                val resumePage = chapterProgress?.resumePage() ?: startPageIndex
-                val content = provider.loadChapter(chapter)
+                val resumePage = withTimeoutOrNull(10_000L) { chapterProgress?.resumePage() } ?: startPageIndex
+                val content = loadChapterBounded(chapter)
+                if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
                 pageJobs.values.forEach { it.cancel() }
                 pageJobs.clear()
                 prefetched.clear()
@@ -119,6 +125,8 @@ class ReaderViewModel(
                         nextChapter = content.nextChapter,
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
+                        isLoadingPreviousChapter = false,
+                        previousChapterLoadFailed = false,
                         status = ReaderStatus.Ready,
                     )
                 }
@@ -183,7 +191,7 @@ class ReaderViewModel(
         _state.update { it.copy(isLoadingNextChapter = true, nextChapterLoadFailed = false) }
         nextChapterLoadJob = viewModelScope.launch {
             try {
-                val content = provider.loadChapter(nextRef)
+                val content = loadChapterBounded(nextRef)
                 if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
                 val startIndex = _state.value.pages.size
                 val segmentProgress = progressFactory(nextRef)
@@ -233,7 +241,7 @@ class ReaderViewModel(
         _state.update { it.copy(isLoadingPreviousChapter = true, previousChapterLoadFailed = false) }
         previousChapterLoadJob = viewModelScope.launch {
             try {
-                val content = provider.loadChapter(previousRef)
+                val content = loadChapterBounded(previousRef)
                 if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
                 val count = content.pages.size
                 val shiftedPages = _state.value.pages.map { it.copy(index = it.index + count) }
@@ -282,23 +290,23 @@ class ReaderViewModel(
         val page = _state.value.pages.getOrNull(index) ?: return
         if (index in prefetched || pageJobs[index]?.isActive == true) return
         pageJobs[index] = viewModelScope.launch {
+            val localChapter = chapters.lastOrNull { index in it.startPageIndex..it.endPageIndex }?.chapter is ChapterRef.Local
             try {
-                val localChapter = chapters.lastOrNull { index in it.startPageIndex..it.endPageIndex }?.chapter is ChapterRef.Local
                 if (page.sizeState == PageSizeState.Ready && localChapter) {
                     // A bounded SAF cache may have evicted this page while it was off screen.
                     updatePage(index, page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Pending))
-                    updatePage(index, provider.resolve(page))
+                    updatePage(index, resolvePageBounded(page))
                 } else if (page.sizeState == PageSizeState.Ready) {
-                    provider.prefetch(page)
+                    withTimeoutOrNull(pageLoadTimeoutMillis) { provider.prefetch(page) }
                 } else {
                     updatePage(index, page.copy(sizeState = PageSizeState.Pending))
-                    updatePage(index, provider.resolve(page))
+                    updatePage(index, resolvePageBounded(page))
                 }
                 prefetched.add(index)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
-                if (page.sizeState != PageSizeState.Ready) {
+                if (page.sizeState != PageSizeState.Ready || localChapter) {
                     updatePage(index, page.copy(sizeState = PageSizeState.Failed))
                 }
             }
@@ -309,6 +317,23 @@ class ReaderViewModel(
         _state.update { current ->
             current.copy(pages = current.pages.mapIndexed { position, old -> if (position == index) page else old })
         }
+    }
+
+    private suspend fun loadChapterBounded(ref: ChapterRef): ChapterContent =
+        withTimeoutOrNull(chapterLoadTimeoutMillis) { provider.loadChapter(ref) }
+            ?: throw java.io.IOException("Chapter load timed out")
+
+    private suspend fun resolvePageBounded(page: ComicPage): ComicPage {
+        repeat(3) { attempt ->
+            try {
+                return withTimeoutOrNull(pageLoadTimeoutMillis) { provider.resolve(page) }
+                    ?: throw java.io.IOException("Page load timed out")
+            } catch (failure: java.io.IOException) {
+                if (attempt == 2) throw failure
+                delay((attempt + 1) * 500L)
+            }
+        }
+        error("Unreachable retry state")
     }
 
     private companion object {

@@ -11,6 +11,10 @@ import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.collection.CollectionNameConflictException
 import dev.veneranative.data.collection.ComicSnapshot
 import dev.veneranative.data.comic.ComicCatalog
+import dev.veneranative.data.comic.retrySourceRead
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.download.DownloadChapterState
 import dev.veneranative.data.history.HistoryRepository
@@ -41,11 +45,13 @@ class DetailsViewModel(
     private val downloads: DownloadRepository? = null,
     private val history: HistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
+    private val loadTimeoutMillis: Long = 120_000L,
 ) : ViewModel() {
 
     private var screenPreferences: ScreenPreferenceRepository? = screenPreferences
     private var presentationSelectionChanged = false
     private var nextChapterLocationRequest = 0L
+    private var loadJob: Job? = null
 
     private val comicRef = ComicRef.Remote(comicKey)
 
@@ -427,45 +433,61 @@ class DetailsViewModel(
     }
 
     private fun load(forceRefresh: Boolean = false) {
+        loadJob?.cancel()
         _state.update { it.copy(status = DetailsStatus.Loading, message = null) }
-        viewModelScope.launch {
-            val source = catalog.enabledSource(comicKey.sourceId)
-            if (source == null) {
-                _state.update {
-                    it.copy(
-                        status = DetailsStatus.SourceUnavailable,
-                        detail = null,
-                        sourceName = null,
-                        message = null,
-                    )
-                }
-                return@launch
-            }
+        loadJob = viewModelScope.launch {
+            try {
+                withTimeout(loadTimeoutMillis) {
+                    val source = catalog.enabledSource(comicKey.sourceId)
+                    if (source == null) {
+                        _state.update {
+                            it.copy(
+                                status = DetailsStatus.SourceUnavailable,
+                                detail = null,
+                                sourceName = null,
+                                message = null,
+                            )
+                        }
+                        return@withTimeout
+                    }
 
-            val outcome = if (forceRefresh) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
-            val canOpenTags = (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
-            when (outcome) {
-                is SourceOutcome.Success -> _state.update { current ->
-                    current.copy(
-                        status = DetailsStatus.Ready,
-                        detail = outcome.value,
-                        sourceName = source.name,
-                        canOpenTags = canOpenTags,
-                        // A refresh can drop the group the user had selected.
-                        selectedGroup = current.selectedGroup?.takeIf { group ->
-                            outcome.value.chapters.any { it.group == group }
-                        },
-                        message = null,
-                    )
-                }
+                    var attempt = 0
+                    val outcome = retrySourceRead {
+                        if (forceRefresh || attempt++ > 0) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)
+                    }
+                    val canOpenTags = if (outcome is SourceOutcome.Success)
+                        (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
+                        else false
+                    when (outcome) {
+                        is SourceOutcome.Success -> _state.update { current ->
+                            current.copy(
+                                status = DetailsStatus.Ready,
+                                detail = outcome.value,
+                                sourceName = source.name,
+                                canOpenTags = canOpenTags,
+                                // A refresh can drop the group the user had selected.
+                                selectedGroup = current.selectedGroup?.takeIf { group ->
+                                    outcome.value.chapters.any { it.group == group }
+                                },
+                                message = null,
+                            )
+                        }
 
-                is SourceOutcome.Failure -> _state.update {
-                    it.copy(
-                        status = DetailsStatus.Failed,
-                        sourceName = source.name,
-                        message = outcome.error.toDetailsMessage(),
-                    )
+                        is SourceOutcome.Failure -> _state.update {
+                            it.copy(
+                                status = DetailsStatus.Failed,
+                                sourceName = source.name,
+                                message = outcome.error.toDetailsMessage(),
+                            )
+                        }
+                    }
                 }
+            } catch (_: TimeoutCancellationException) {
+                _state.update { it.copy(status = DetailsStatus.Failed, message = "加载超时，请重试。") }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(status = DetailsStatus.Failed, message = "无法加载漫画详情，请重试。") }
             }
         }
     }

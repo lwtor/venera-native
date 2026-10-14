@@ -416,6 +416,20 @@ fun ReaderScreen(
         ) {
             ReaderTopBar(state = state, onBack = onBack, onOpenComicDetails = onOpenComicDetails)
         }
+        if (!showControls && state.status == ReaderStatus.Ready && (state.nextChapterLoadFailed || state.previousChapterLoadFailed)) {
+            Surface(
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("reader-next-chapter-error"),
+                shape = MaterialTheme.shapes.large,
+                tonalElevation = 4.dp,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 8.dp)) {
+                    Text(if (state.nextChapterLoadFailed) "下一话加载失败" else "上一话加载失败")
+                    TextButton(onClick = {
+                        onAction(if (state.nextChapterLoadFailed) ReaderAction.RetryNextChapter else ReaderAction.RetryPreviousChapter)
+                    }) { Text("重试") }
+                }
+            }
+        }
     }
 }
 

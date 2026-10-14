@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S3-00Y1 DONE：详情与阅读器有限重试和加载截止。** 用户反馈详情手动多次重试才成功、Reader 偶发长期 loading 或不衔接下一步。详情现在取消被替代的加载任务，读请求最多尝试三次，重试等待 500/1000ms、重试绕过失败详情缓存；同样策略用于来源章节页和章节目录。仅读路径允许 ScriptExecution 的有限重试（来源会把暂时 HTTP 错误抛成脚本错误），不改变全局错误 retryable、不扩大至登录/收藏/评论等写操作，取消和不支持能力不自动重试。详情与章节加载设置 120 秒截止，Reader 恢复进度最多等待 10 秒；页面尺寸请求每次最多 30 秒，IO/超时最多三次。截止后明确 Failed，不将 TimeoutCancellationException 当作正常离开而留在 Loading。Reader 首章空页也明确失败，重开同时取消前后话加载。章节预载完成目录后立即发布缓存，第一张图片预热移出章节互斥锁，预热有 30 秒上限；前台切话不再等待图片预热。前后话失败时，工具栏收起后仍提供底部重试入口，保留当前阅读内容。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :data:comic:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成/虚拟时间回归源码覆盖第三次读成功、持久失败三次上限、取消/不支持不重试、详情自动恢复与挂起超时/手动恢复、首章及下一话挂起退出 Loading、慢图片预热不阻塞前台章节。测试仅编译，未运行，未安装或操作真机；真实来源失败恢复与动画/目录衔接仍待用户复验。持续的脚本缺陷最多重复两次并最终显示失败，不能保证自动修复源站故障。决策见 ADR-0007 §4.12；当前唯一下一任务保持 S4-02G4。
+
 **S3-00S1U DONE：阅读器详情入口改为圆形描边“详”。** 按用户指定，标题栏右侧入口使用直径 32dp、线宽 1dp 的圆形描边，中心显示单字“详”；外层沿用 IconButton 的触摸区域与涟漪，无障碍名称仍为“漫画详情”。不改变闲置计时、进度保存及详情返回逻辑。
 
 验证（2026-10-13）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅展示样式调整，未运行测试、未安装或操作真机；明暗主题视觉待用户复验。当前唯一下一任务保持 S4-02G4。

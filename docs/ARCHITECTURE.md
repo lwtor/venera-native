@@ -278,6 +278,8 @@ SharedPreferences 不用于新功能。数据库实体不得直接传到 UI；�
 
 ## 12. 测试归属
 
+S3-00Y1 在 data/comic 共享仅用于读取的 retrySourceRead，Details ViewModel 与 SourcePageProvider 使用它进行最多三次有界重试；不改变 SourceRuntimeError 的全局可重试语义。UI ViewModel 负责总加载截止和失败状态，取消仍透传；Reader 图片预热不持有章节锁。未新增依赖或源 Host 能力，细则见 ADR-0007 §4.12。
+
 | 测试 | 位置 |
 | --- | --- |
 | 纯模型、Reducer、Mapper | 对应模块 `src/test` |

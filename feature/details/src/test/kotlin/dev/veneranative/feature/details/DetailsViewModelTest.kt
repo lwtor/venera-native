@@ -53,9 +53,34 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import kotlinx.coroutines.test.runCurrent
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailsViewModelTest {
+    @Test fun `temporary script failure automatically retries`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        val model = DetailsViewModel(catalog, comicKey, collection)
+        runCurrent()
+        assertEquals(1, catalog.detailCalls)
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Recovered"))
+        advanceUntilIdle()
+        assertEquals(DetailsStatus.Ready, model.state.value.status)
+        assertEquals(2, catalog.detailCalls)
+    }
+
+    @Test fun `stalled details time out instead of retaining loading`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.stallDetail = true
+        val model = DetailsViewModel(catalog, comicKey, collection, loadTimeoutMillis = 100)
+        advanceUntilIdle()
+        assertEquals(DetailsStatus.Failed, model.state.value.status)
+        catalog.stallDetail = false
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Recovered"))
+        model.onAction(DetailsAction.Retry)
+        advanceUntilIdle()
+        assertEquals(DetailsStatus.Ready, model.state.value.status)
+    }
 
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeCatalog()
@@ -668,6 +693,7 @@ class DetailsViewModelTest {
         var detailResponse: SourceOutcome<ComicDetail> =
             SourceOutcome.Failure(SourceRuntimeError.Internal("no response configured"))
         var detailCalls: Int = 0
+        var stallDetail = false
         var pagesResponse: SourceOutcome<List<SourcePage>> = SourceOutcome.Success(emptyList())
 
         override suspend fun searchableSources(): List<InstalledSource> = emptyList()
@@ -679,6 +705,7 @@ class DetailsViewModelTest {
 
         override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
             detailCalls++
+            if (stallDetail) kotlinx.coroutines.awaitCancellation()
             return detailResponse
         }
 

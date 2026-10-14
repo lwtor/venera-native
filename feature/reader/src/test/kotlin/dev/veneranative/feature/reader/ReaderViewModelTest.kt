@@ -258,6 +258,58 @@ class ReaderViewModelTest {
         assertEquals(ReaderStatus.Failed, viewModel.state.value.status)
     }
 
+    @Test fun `hung chapter exits loading and manual retry recovers`() = runTest(dispatcher) {
+        var hung = true
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+                if (hung) kotlinx.coroutines.awaitCancellation()
+                return ChapterContent("Fixture", listOf(ComicPage(0, "fixture://page", 100, 100)))
+            }
+        }
+        val model = ReaderViewModel(ChapterRef.Remote(chapterKey), provider, chapterLoadTimeoutMillis = 100)
+        advanceUntilIdle()
+        assertEquals(ReaderStatus.Failed, model.state.value.status)
+        hung = false
+        model.onAction(ReaderAction.Retry)
+        advanceUntilIdle()
+        assertEquals(ReaderStatus.Ready, model.state.value.status)
+    }
+
+    @Test fun `hung next chapter fails visibly while current pages remain readable`() = runTest(dispatcher) {
+        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("next")), "Next", 1)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+                if ((chapter as ChapterRef.Remote).key == next.key) kotlinx.coroutines.awaitCancellation()
+                return ChapterContent("Fixture", listOf(ComicPage(0, "fixture://page", 100, 100)), nextChapter = next)
+            }
+        }
+        val model = ReaderViewModel(ChapterRef.Remote(chapterKey), provider, chapterLoadTimeoutMillis = 100)
+        advanceUntilIdle()
+        model.onAction(ReaderAction.LoadNextChapter)
+        advanceUntilIdle()
+        assertEquals(ReaderStatus.Ready, model.state.value.status)
+        assertEquals(false, model.state.value.isLoadingNextChapter)
+        assertEquals(true, model.state.value.nextChapterLoadFailed)
+        assertEquals(1, model.state.value.pages.size)
+    }
+
+    @Test fun `hung page resolution stops after three attempts and exposes page retry`() = runTest(dispatcher) {
+        var attempts = 0
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent("Fixture", listOf(
+                ComicPage(0, "fixture://page", 100, 100, sizeState = dev.veneranative.core.model.PageSizeState.Pending),
+            ))
+            override suspend fun resolve(page: ComicPage): ComicPage {
+                attempts++
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        val model = ReaderViewModel(ChapterRef.Remote(chapterKey), provider, pageLoadTimeoutMillis = 100)
+        advanceUntilIdle()
+        assertEquals(3, attempts)
+        assertEquals(dev.veneranative.core.model.PageSizeState.Failed, model.state.value.pages.single().sizeState)
+    }
+
     @Test
     fun `retry after a failure loads the chapter`() = runTest(dispatcher) {
         val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 2))
