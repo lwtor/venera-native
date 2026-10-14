@@ -263,6 +263,20 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migrate9To10PreservesFavoriteAndLeavesUnknownDateNull() {
+        helper.createDatabase(TEST_DB, 9).apply {
+            execSQL("INSERT INTO favorite_entry (ref_source, ref_comic, folder_id, title, added_at, has_update) VALUES ('fixture','one','','Comic',1,0)")
+            close()
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 10, true, MIGRATION_9_10).use { db ->
+            db.query("SELECT title, last_updated FROM favorite_entry WHERE ref_comic = 'one'").use { cursor ->
+                assertEquals(true, cursor.moveToFirst())
+                assertEquals("Comic", cursor.getString(0))
+                assertEquals(true, cursor.isNull(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

@@ -36,6 +36,7 @@ internal fun FavoriteEntryEntity.toDomainOrNull(): FavoriteItem? = runCatching {
         chapterCount = chapterCount,
         latestChapterId = latestChapterId,
         hasUpdate = hasUpdate,
+        lastUpdated = lastUpdated,
     )
 }.getOrNull()
 

@@ -523,6 +523,7 @@ internal fun ComicDetail.toSnapshot(): ComicSnapshot = ComicSnapshot(
     title = comic.title,
     subtitle = comic.subtitle,
     coverRef = comic.coverUrl,
+    lastUpdated = comic.lastUpdated ?: metadata["Updated"],
     chapterCount = chapters.size.takeIf { it > 0 },
     latestChapterId = chapters.lastOrNull()?.key?.remoteId?.value,
 )

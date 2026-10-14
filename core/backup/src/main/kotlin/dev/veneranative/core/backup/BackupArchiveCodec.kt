@@ -156,7 +156,7 @@ object BackupArchiveCodec {
         putJsonArray("favoriteEntries") {
             snapshot.favoriteEntries.forEach { row -> add(buildJsonObject {
                 put("sourceId", row.sourceId); put("comicId", row.comicId); put("legacyFolderId", row.legacyFolderId)
-                put("title", row.title); putNullable("subtitle", row.subtitle); putNullable("coverRef", row.coverRef)
+                put("title", row.title); putNullable("subtitle", row.subtitle); putNullable("coverRef", row.coverRef); putNullable("lastUpdated", row.lastUpdated)
                 put("addedAtEpochMillis", row.addedAtEpochMillis); putNullable("lastReadAtEpochMillis", row.lastReadAtEpochMillis)
                 putNullable("chapterCount", row.chapterCount); putNullable("latestChapterId", row.latestChapterId)
                 put("hasUpdate", row.hasUpdate); putNullable("updatedAtEpochMillis", row.updatedAtEpochMillis)
@@ -191,7 +191,7 @@ object BackupArchiveCodec {
         categories = getValue("categories").jsonArray.map { BackupCategory.valueOf(it.jsonPrimitive.content) }.toSet(),
         favoriteFolders = array("favoriteFolders") { FavoriteFolderBackup(string("id"), string("name"), int("sortOrder"), boolean("removable")) },
         favoriteEntries = array("favoriteEntries") {
-            FavoriteEntryBackup(string("sourceId"), string("comicId"), string("legacyFolderId"), string("title"), nullableString("subtitle"), nullableString("coverRef"), long("addedAtEpochMillis"), nullableLong("lastReadAtEpochMillis"), nullableInt("chapterCount"), nullableString("latestChapterId"), boolean("hasUpdate"), nullableLong("updatedAtEpochMillis"))
+            FavoriteEntryBackup(string("sourceId"), string("comicId"), string("legacyFolderId"), string("title"), nullableString("subtitle"), nullableString("coverRef"), long("addedAtEpochMillis"), nullableLong("lastReadAtEpochMillis"), nullableInt("chapterCount"), nullableString("latestChapterId"), boolean("hasUpdate"), nullableLong("updatedAtEpochMillis"), nullableString("lastUpdated"))
         },
         favoriteMemberships = array("favoriteMemberships") { FavoriteMembershipBackup(string("sourceId"), string("comicId"), string("folderId")) },
         readingHistory = array("readingHistory") {

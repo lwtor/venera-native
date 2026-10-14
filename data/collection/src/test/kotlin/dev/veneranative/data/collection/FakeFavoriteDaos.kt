@@ -23,6 +23,14 @@ internal class FakeFavoriteDao : FavoriteDao {
     val entries = MutableStateFlow<List<FavoriteEntryEntity>>(emptyList())
     val memberships = MutableStateFlow<List<FavoriteMembershipEntity>>(emptyList())
 
+    override suspend fun upsertFolders(rows: List<FavoriteFolderEntity>) { rows.forEach { insertFolder(it) } }
+    override suspend fun deleteAllFolders() { folders.value = emptyList() }
+    override suspend fun upsertEntries(rows: List<FavoriteEntryEntity>) { rows.forEach { upsertEntry(it) } }
+    override suspend fun memberships(): List<FavoriteMembershipEntity> = memberships.value
+    override suspend fun insertMemberships(rows: List<FavoriteMembershipEntity>) { rows.forEach { insertMembership(it) } }
+    override suspend fun deleteAllMemberships() { memberships.value = emptyList() }
+    override suspend fun deleteAllEntries() { entries.value = emptyList() }
+
     override fun observeFolders(): Flow<List<FavoriteFolderEntity>> = folders.map { rows ->
         rows.sortedWith(compareBy<FavoriteFolderEntity> { it.sortOrder }.thenBy { it.name })
     }
@@ -106,6 +114,12 @@ internal class FakeFavoriteDao : FavoriteDao {
     override suspend fun clearUpdate(refSource: String, refComic: String) {
         entries.value = entries.value.map { row ->
             if (row.refSource == refSource && row.refComic == refComic) row.copy(hasUpdate = false) else row
+        }
+    }
+
+    override suspend fun updateLastUpdated(refSource: String, refComic: String, lastUpdated: String) {
+        entries.value = entries.value.map {
+            if (it.refSource == refSource && it.refComic == refComic) it.copy(lastUpdated = lastUpdated) else it
         }
     }
 

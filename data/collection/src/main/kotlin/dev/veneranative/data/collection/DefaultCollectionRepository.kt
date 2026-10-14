@@ -130,6 +130,7 @@ class DefaultCollectionRepository internal constructor(
                 latestChapterId = snapshot.latestChapterId ?: existing?.latestChapterId,
                 hasUpdate = existing?.hasUpdate ?: false,
                 updatedAt = existing?.updatedAt,
+                lastUpdated = snapshot.lastUpdated ?: existing?.lastUpdated,
             ),
             )
             setFolders(ref, folderIds)
@@ -177,6 +178,7 @@ class DefaultCollectionRepository internal constructor(
                 UpdateState.Unknown -> Unit
 
                 is UpdateState.Unchanged -> {
+                    state.snapshot.lastUpdated?.let { dao.updateLastUpdated(source, comic, it) }
                     if (entity.differsFrom(state.snapshot)) {
                         dao.applySnapshot(
                             refSource = source,
@@ -190,6 +192,7 @@ class DefaultCollectionRepository internal constructor(
                 }
 
                 is UpdateState.Updated -> {
+                    state.snapshot.lastUpdated?.let { dao.updateLastUpdated(source, comic, it) }
                     dao.applySnapshot(
                         refSource = source,
                         refComic = comic,

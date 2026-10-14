@@ -20,6 +20,7 @@ data class ChapterSnapshot(
      * replaced at the same count; a growing count is caught either way.
      */
     val latestChapterId: String?,
+    val lastUpdated: String? = null,
 )
 
 /**
@@ -56,6 +57,7 @@ class ComicCatalogChapterProbe(
         return ChapterSnapshot(
             chapterCount = chapters.size,
             latestChapterId = chapters.last().key.remoteId.value,
+            lastUpdated = detail.comic.lastUpdated ?: detail.metadata["Updated"],
         )
     }
 }

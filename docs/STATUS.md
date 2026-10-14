@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10B1 DONE：收藏保存来源更新日期。** FavoriteItem/ComicSnapshot 和 Room 新增可空 lastUpdated；详情收藏及现有手动检查更新复用详情的 comic.lastUpdated/Updated 元数据，不新增网络调用。Room 9→10 增列，旧收藏为 null，不使用收藏/检查时间伪造来源日期。备份增加可选字段，旧包兼容。补充日期保留、章节未变化仍更新日期及迁移保留旧行的测试源码，并修复收藏测试 FakeDao 缺失既有备份接口。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :data:collection:compileDebugUnitTestKotlin :core:backup:compileDebugUnitTestKotlin :core:database:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试仅编译，未运行/未安装。当前用户任务下一切片 S4-10B2：统一竖向卡片与横向列表；原 S4-02G4 保持待续。
+
 **S4-10A6I10 DONE：缩小封面状态角标。** 按用户反馈将角标字号调为 9sp、行高 12sp，水平/垂直内边距收紧至 3dp/1dp，左下圆角缩为 4dp；仍位于封面右上角。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅样式调整，未运行测试或真机验证；实际大小待用户复验。当前唯一下一任务保持 S4-02G4。

@@ -31,6 +31,8 @@ immutable UiState
 - 数据模块不触发导航。
 - 持久化数据以数据库或 DataStore 为事实来源，ViewModel 不维护第二套长期状态。
 
+S4-10B1：收藏的 lastUpdated 保存来源日期，与用于更新排序的本地 updatedAt 独立。Room 9→10 增加可空 TEXT 列；收藏快照、手动更新检查与可选备份字段共用此值，未知日期不猜测。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |

@@ -35,6 +35,7 @@ data class FavoriteItem(
     val chapterCount: Int? = null,
     val latestChapterId: String? = null,
     val hasUpdate: Boolean = false,
+    val lastUpdated: String? = null,
 )
 
 /** How the shelf orders comics. The database answers with the rows already in this order. */
@@ -52,6 +53,7 @@ data class ComicSnapshot(
     val coverRef: String? = null,
     val chapterCount: Int? = null,
     val latestChapterId: String? = null,
+    val lastUpdated: String? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }

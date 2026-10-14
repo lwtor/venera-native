@@ -133,6 +133,9 @@ interface FavoriteDao {
     )
     suspend fun clearUpdate(refSource: String, refComic: String)
 
+    @Query("UPDATE favorite_entry SET last_updated = :lastUpdated WHERE ref_source = :refSource AND ref_comic = :refComic")
+    suspend fun updateLastUpdated(refSource: String, refComic: String, lastUpdated: String)
+
     /**
      * Applies the chapter snapshot an update check produced.
      *

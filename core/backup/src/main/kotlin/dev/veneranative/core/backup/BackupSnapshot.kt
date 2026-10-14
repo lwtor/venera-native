@@ -62,6 +62,7 @@ data class FavoriteEntryBackup(
     val latestChapterId: String?,
     val hasUpdate: Boolean,
     val updatedAtEpochMillis: Long?,
+    val lastUpdated: String? = null,
 )
 
 data class FavoriteMembershipBackup(

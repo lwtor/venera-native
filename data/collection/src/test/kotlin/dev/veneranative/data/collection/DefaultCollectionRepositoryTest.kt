@@ -33,6 +33,15 @@ class DefaultCollectionRepositoryTest {
         clock = { now },
     )
 
+    @Test fun `source update date survives readding without a date and unchanged refresh`() = runTest {
+        repository.addToFolders(comic("one"), emptySet(), ComicSnapshot("Comic", chapterCount = 2, latestChapterId = "c2", lastUpdated = "2026-10-01"))
+        repository.addToFolders(comic("one"), emptySet(), ComicSnapshot("Comic"))
+        assertEquals("2026-10-01", repository.observeItem(comic("one")).first()!!.lastUpdated)
+        probe[key("one")] = ChapterSnapshot(2, "c2", "2026-10-14")
+        repository.refreshUpdates()
+        assertEquals("2026-10-14", repository.observeItem(comic("one")).first()!!.lastUpdated)
+    }
+
     private fun folder(
         id: String,
         name: String,
