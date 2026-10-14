@@ -99,14 +99,17 @@ fun ComicHorizontalCard(
                 placeholder = { Box(Modifier.size(80.dp, 120.dp)) { ComicCoverPlaceholder(title) } },
                 imageContent = { painter ->
                     val opacity = if (android.os.Build.VERSION.SDK_INT >= 31) 0.9f else 0.08f
-                    Image(painter, contentDescription = null, contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                            .drawWithCache {
-                                val mask = Brush.horizontalGradient(0f to Color.White.copy(alpha = 0.03f),
-                                    0.28f to Color.White.copy(alpha = 0.08f), 1f to Color.White.copy(alpha = opacity))
-                                onDrawWithContent { drawContent(); drawRect(mask, blendMode = BlendMode.DstIn) }
-                            }.blur(20.dp, BlurredEdgeTreatment.Unbounded))
-                    Image(painter, title, Modifier.size(80.dp, 120.dp).align(Alignment.CenterStart), contentScale = ContentScale.Crop)
+                    // Isolate the cover from the image scope's full-row minimum constraints.
+                    Box(Modifier.fillMaxSize()) {
+                        Image(painter, contentDescription = null, contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                .drawWithCache {
+                                    val mask = Brush.horizontalGradient(0f to Color.White.copy(alpha = 0.03f),
+                                        0.28f to Color.White.copy(alpha = 0.08f), 1f to Color.White.copy(alpha = opacity))
+                                    onDrawWithContent { drawContent(); drawRect(mask, blendMode = BlendMode.DstIn) }
+                                }.blur(20.dp, BlurredEdgeTreatment.Unbounded))
+                        Image(painter, title, Modifier.size(80.dp, 120.dp).align(Alignment.CenterStart), contentScale = ContentScale.Crop)
+                    }
                 })
             Row(Modifier.fillMaxSize().padding(end = 12.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)) {
