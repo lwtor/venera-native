@@ -9,6 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -343,20 +346,31 @@ private fun Results(
                         onDispose { onResultHidden(comic.key) }
                     }
                     Card(onClick = { onOpenComic(comic.key) }, modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(Modifier.padding(horizontal = 10.dp).height(120.dp).clipToBounds(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             ComicImage(
                                 request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "search-result") },
                                 contentDescription = comic.title,
-                                modifier = Modifier.size(width = 68.dp, height = 96.dp),
+                                modifier = Modifier.size(width = 80.dp, height = 120.dp).clip(RoundedCornerShape(8.dp)),
                                 placeholder = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("漫") } },
                             )
-                            Column(Modifier.weight(1f).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(comic.title, style = MaterialTheme.typography.titleMedium, minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                comic.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                                comic.lastUpdated?.let {
-                                    Text("更新：$it", style = MaterialTheme.typography.labelSmall,
+                            Column(Modifier.weight(1f).height(120.dp).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(comic.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val authors = comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
+                                authors?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(comic.lastUpdated.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    comic.publicationStatus?.let { status ->
+                                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                            Text(if (status == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中",
+                                                Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
                                 }
+                                Spacer(Modifier.weight(1f))
                                 ComicResultTags(comic.tags.takeIf { it.any(String::isNotBlank) } ?: resultTags[comic.key].orEmpty())
                             }
                         }
@@ -380,10 +394,10 @@ private fun Results(
 private fun ComicResultTags(tags: List<String>) {
     val visibleTags = tags.filter(String::isNotBlank).distinct()
     if (visibleTags.isEmpty()) return
-    FlowRow(
-        Modifier.fillMaxWidth(),
+    Row(
+        Modifier.fillMaxWidth().height(22.dp).horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         visibleTags.forEach { tag ->
             Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer) {

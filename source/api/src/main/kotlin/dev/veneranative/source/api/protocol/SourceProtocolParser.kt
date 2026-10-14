@@ -78,6 +78,15 @@ object SourceProtocolParser {
             tags = entry["tags"].flattenedTags(),
             maxPage = entry["maxPage"].intOrNull(),
             language = entry["language"].stringOrNull(),
+            authors = (entry["authors"] ?: entry["author"]).arrayOrNull().orEmpty().mapNotNull {
+                (it.stringOrNull() ?: it.objectOrNull()?.get("name").stringOrNull())?.trim()?.takeIf(String::isNotBlank)
+            }.distinct(),
+            publicationStatus = when ((entry["status"].stringOrNull()
+                ?: entry["status"].objectOrNull()?.get("display").stringOrNull())?.uppercase()) {
+                "ONGOING", "连载", "连载中", "連載", "連載中" -> dev.veneranative.core.model.ComicPublicationStatus.Ongoing
+                "END", "COMPLETED", "完结", "已完结", "完結", "已完結" -> dev.veneranative.core.model.ComicPublicationStatus.Completed
+                else -> null
+            },
             lastUpdated = (entry["lastUpdated"].stringOrNull() ?: entry["updateTime"].stringOrNull()
                 ?: entry["dateUpdated"].stringOrNull() ?: when (sourceId.value) {
                     "copy_manga" -> entry["description"].stringOrNull()?.takeIf {

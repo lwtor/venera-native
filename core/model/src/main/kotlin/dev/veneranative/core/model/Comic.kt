@@ -12,11 +12,15 @@ data class Comic(
     val language: String? = null,
     /** Source-reported update time or relative update label; absent when the list does not expose it. */
     val lastUpdated: String? = null,
+    val authors: List<String> = emptyList(),
+    val publicationStatus: ComicPublicationStatus? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }
     }
 }
+
+enum class ComicPublicationStatus { Ongoing, Completed }
 
 /**
  * A comic with detail-level metadata.

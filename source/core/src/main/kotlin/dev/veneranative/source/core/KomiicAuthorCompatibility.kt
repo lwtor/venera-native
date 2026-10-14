@@ -25,7 +25,7 @@ internal object KomiicAuthorCompatibility {
 
     fun worksCall(authorId: String) = query(
         "comicsByAuthor", "authorId", authorId,
-        "query comicsByAuthor(\$authorId: ID!) { getComicsByAuthor(authorId: \$authorId) { id title imageUrl authors { name } categories { name } } }",
+        "query comicsByAuthor(\$authorId: ID!) { getComicsByAuthor(authorId: \$authorId) { id title imageUrl status dateUpdated authors { name } categories { name } } }",
     )
 
     fun resolve(payload: String, author: String): TagNavigation.Search? {
@@ -50,7 +50,16 @@ internal object KomiicAuthorCompatibility {
             val tags = (item["categories"] as? JsonArray).orEmpty().mapNotNull {
                 (it as? JsonObject)?.get("name").text()?.trim()?.takeIf(String::isNotBlank)
             }.distinct()
-            Comic(ComicKey(sourceId, RemoteComicId(id)), title, subtitle = (authors?.firstOrNull() as? JsonObject)?.get("name").text(), coverUrl = item["imageUrl"].text(), tags = tags)
+            Comic(ComicKey(sourceId, RemoteComicId(id)), title,
+                subtitle = (authors?.firstOrNull() as? JsonObject)?.get("name").text(),
+                coverUrl = item["imageUrl"].text(), tags = tags,
+                authors = authors.orEmpty().mapNotNull { (it as? JsonObject)?.get("name").text()?.trim()?.takeIf(String::isNotBlank) }.distinct(),
+                lastUpdated = item["dateUpdated"].text(),
+                publicationStatus = when (item["status"].text()) {
+                    "ONGOING" -> dev.veneranative.core.model.ComicPublicationStatus.Ongoing
+                    "END" -> dev.veneranative.core.model.ComicPublicationStatus.Completed
+                    else -> null
+                })
         }.distinctBy { it.key }
         // The official author endpoint returns the whole list and has no pagination arguments.
         return PagedResult(comics)

@@ -4,6 +4,12 @@
 
 ## 状态快照
 
+**S4-10A6I6 DONE：结果条目等高布局、多作者与连载状态。** 按用户反馈，将完整搜索/作者/标签结果 Card 和封面固定为 120dp 高，封面 80×120dp、圆角，右侧同高；标题仅一行省略，作者使用完整去重列表以“ / ”连接、最多两行，更新时间移除前缀，与已知连载状态并列（连载中/已完结）；标签固定单行横向查看，不再 FlowRow 撑高，迟到标签也不改变行高。超长文字省略、源未提供状态则不伪造连载标记。
+
+为避免拷贝漫画/Komiic 原脚本只保留首位作者、丢弃状态，本次在 source/api 定义受限列表元数据兼容：从同一次 Network 响应只提取作者名称、状态与更新时间，交由调用结果序列化保留到 typed Comic，不发额外请求、不改脚本。只对这两个来源启用，响应上限 1MiB、遍历深度 8/最多 100 个作品，按显式请求 invocation ID 隔离并在调用结束清除，晚到响应不污染新调用，无日志或持久化。engine 只负责通用捕获/合并接线；业务字段判定仍在 source/api。Komiic 作者查询补齐 status/dateUpdated 并保留所有作者。纯 Comic 增加 authors/publicationStatus，无数据库变更；安全与许可边界见 ADR-0007 §4.16。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :source:api:compileDebugUnitTestKotlin :source:engine:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成源码回归覆盖多作者去重/未知状态不猜测、同一次请求补齐字段且请求数不增加、后续无网络调用不沿用旧元数据、其他来源隔离及 Komiic 作者结果。测试仅编译，未运行，未安装或操作真机；120dp 行高、标签横向滚动与主题视觉、真实源字段可用性待用户复验。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6I5 DONE：撤销标签前置等待，结果条目增加最后更新时间。** 用户反馈 I4 更慢；前置标签网络准备确实会增加首次列表等待，1.5 秒截止还可能取消源调用并触发实例重建，但未取得真实耗时证据，不能断言全部慢请求均来自此原因。本次 search/category 分页发布前仅合并已完成且有效的标签缓存，使用 tryLock 跳过正在补读的作品，不再批量请求或等待标签网络；已有列表标签优先。相关作品继续保留可见行按需补读，因此无缓存时标签仍可能稍后出现；优先恢复列表响应速度，不保证完全同时展示。I4 受限批量契约保留，但分页不再调用它。
 
 Comic 新增可空 lastUpdated，搜索完整列表及作者/标签结果条目显示“更新：来源时间”。解析显式 lastUpdated/updateTime/dateUpdated；拷贝漫画的列表 description 正是 datetime_updated，只接受日期形状；Komiic 只接受带“更新”的来源相对时间，其他来源不把任意简介/排名文案误当更新时间。缺失时不显示、不补读详情，不新增时间请求或数据库迁移。

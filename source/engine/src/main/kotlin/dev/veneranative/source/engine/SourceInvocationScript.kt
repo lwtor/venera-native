@@ -57,7 +57,8 @@ internal object SourceInvocationScript {
               }
               function serializeSourceValue(value) {
                 return JSON.stringify({ value: value === undefined ? null : value }, function(_key, entry) {
-                  if (!(entry instanceof Map)) return entry;
+                  if (!(entry instanceof Map)) return globalThis.__veneraListMetadata
+                    ? globalThis.__veneraListMetadata.enrich(entry) : entry;
                   const object = Object.create(null);
                   entry.forEach(function(mapValue, mapKey) {
                     object[String(mapKey)] = mapValue;
@@ -72,6 +73,7 @@ internal object SourceInvocationScript {
                   return serializeSourceValue(value);
                 })
                 .finally(function() {
+                  if (globalThis.__veneraListMetadata) globalThis.__veneraListMetadata.clear($quotedInvocationId);
                   if (typeof globalThis.__veneraClearInvocationTimers === "function") {
                     try { globalThis.__veneraClearInvocationTimers($quotedInvocationId); } catch (_) {}
                   }

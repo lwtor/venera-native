@@ -21,6 +21,14 @@ import org.junit.Test
  * a phantom chapter out of the latest-chapter marker.
  */
 class SourceProtocolParserTest {
+    @Test fun `multiple authors and publication state are preserved without treating unknown as ongoing`() {
+        val row = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","authors":[{"name":"A"},"B","A"],"status":"END"}""")
+        val comic = SourceProtocolParser.parseComic(SourceId("fixture"), row)!!
+        assertEquals(listOf("A", "B"), comic.authors)
+        assertEquals(dev.veneranative.core.model.ComicPublicationStatus.Completed, comic.publicationStatus)
+        val unknown = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","status":"UNKNOWN"}""")
+        assertNull(SourceProtocolParser.parseComic(SourceId("fixture"), unknown)?.publicationStatus)
+    }
     @Test fun `copy list update description is preserved without interpreting other source descriptions`() {
         val row = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","description":"2026-10-14 09:30:00"}""")
         assertEquals("2026-10-14 09:30:00", SourceProtocolParser.parseComic(SourceId("copy_manga"), row)?.lastUpdated)

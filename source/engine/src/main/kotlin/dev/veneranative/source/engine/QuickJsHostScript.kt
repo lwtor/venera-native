@@ -600,7 +600,10 @@ internal object QuickJsHostScript {
             return String(body);
           }
 
-          function decodeResponse(payload) {
+          function decodeResponse(payload, invocationId) {
+            if (payload && globalThis.__veneraListMetadata) {
+              globalThis.__veneraListMetadata.capture(payload.body, invocationId);
+            }
             var rawHeaders = payload && payload.headers ? payload.headers : {};
             var headers = {};
             Object.keys(rawHeaders).forEach(function (name) {
@@ -634,7 +637,7 @@ internal object QuickJsHostScript {
               method: method,
               headers: headerObject(headers),
               body: bodyToText(body)
-            }).then(decodeResponse).catch(function (failure) {
+            }).then(function(payload) { return decodeResponse(payload, invocationId); }).catch(function (failure) {
               if (invocationId === "source-install") {
                 return { status: 0, headers: {}, body: "" };
               }

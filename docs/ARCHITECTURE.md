@@ -105,6 +105,8 @@ S4-10A6I4 在 data/comic 分页发布前有界准备 CopyManga 前六条标签�
 
 S4-10A6I5 根据用户更慢反馈撤销 I4 的前置网络调用与等待，分页只 tryLock 合并已完成的有效标签缓存，未准备标签仍按相关作品可见行补读。纯 Comic 增加可空 lastUpdated，source/api 从可靠列表字段解析、Search 只渲染，无额外请求或数据库变更；时序决定见 ADR-0007 §4.15。
 
+S4-10A6I6 的多作者/状态兼容定义于 source/api/protocol；engine 通用 Network 解码与结果序列化只接线该兼容，限定 CopyManga/Komiic，按请求调用 ID 捕获现有响应中的公开作者/状态/时间，调用结束清空，不增加 Host 能力/请求/日志。Comic.authors/publicationStatus 是纯模型，Search 以封面同高固定行和单行标签渲染；具体限额及来源边界见 ADR-0007 §4.16。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

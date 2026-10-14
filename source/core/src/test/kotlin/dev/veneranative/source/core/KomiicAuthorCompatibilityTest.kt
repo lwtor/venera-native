@@ -17,6 +17,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KomiicAuthorCompatibilityTest {
+    @Test fun `author works retain all names and completed state`() {
+        val result = KomiicAuthorCompatibility.works(SourceId("Komiic"),
+            """{"data":{"getComicsByAuthor":[{"id":"fixture","title":"Fixture","authors":[{"name":"A"},{"name":"B"}],"status":"END","dateUpdated":"2026-10-14"}]}}""")
+        assertEquals(listOf("A", "B"), result.items.single().authors)
+        assertEquals(dev.veneranative.core.model.ComicPublicationStatus.Completed, result.items.single().publicationStatus)
+        assertEquals("2026-10-14", result.items.single().lastUpdated)
+    }
     @Test fun `author lookup matches aliases but rejects ambiguous names`() {
         assertEquals(TagNavigation.Search("Alias", authorId = "7"), KomiicAuthorCompatibility.resolve(
             """{"data":{"searchComicsAndAuthors":{"authors":[{"id":"7","name":"Original","chName":"Alias"}]}}}""", "Alias",

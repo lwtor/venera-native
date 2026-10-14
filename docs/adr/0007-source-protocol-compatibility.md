@@ -260,6 +260,14 @@ CopyManga 部分列表响应没有 theme，I2/I3 在行进入后补读会造成�
 
 核对已引用的 CopyManga 1.4.2 列表 parseComic，其 description 来自 datetime_updated；利用这一现有字段展示时间，而不是额外加载详情。模型 lastUpdated 保留来源时间字符串，支持显式 lastUpdated/updateTime/dateUpdated、CopyManga 日期形式 description 与 Komiic 更新相对文案。其他任意 description 不解释为时间，无数据不显示。独立实现解析与渲染，未复制源脚本、密钥或真实漫画数据。
 
+### 4.16 同请求保留列表元数据（2026-10-14，S4-10A6I6）
+
+用户要求显示多作者和连载状态并避免列表变高。核对已引用 CopyManga 1.4.2 和 Komiic 1.0.3：列表原始数据有作者数组，脚本输出仅取首位；CopyManga 的状态为 status.display，Komiic 为 ONGOING/END。不能靠丢失信息后的 subtitle 还原其他作者，也不应为每项再取完整详情。
+
+在 source/api/protocol 独立实现 ListMetadataCompatibility，针对这两个明确源 key 从已有 Network 响应保留作者名称、状态、更新时间；engine 仅通用接线捕获与序列化合并，不承载站点业务或复制源脚本。只遍历 JSON 公开作品字段，最大响应 1MiB、深度 8、最多 100 个作品；网络回调必须传入原 invocation ID 并与当前调用匹配。合并只补源未给出的 authors/status/lastUpdated，不覆盖其他字段；按调用隔离并在完成时清空，不记录用户参数、原响应、认证头或元数据，无持久化，不开放新的网络能力。取消/异常时 Runtime 废弃引擎路径仍有效。Komiic 作者适配查询同样补 status/dateUpdated，解析所有作者。模型状态仅表示明确的连载/完结，未知不猜测。沿用 §4.8/§4.11 来源与许可证判断，未复制上游代码或真实内容。
+
+Search 条目和封面同为 120dp，标题单行，作者最多两行；日期无前缀，状态小标记，标签固定单行横向滚动，迟到标签不改变高度。完整作者数组保留，文本过长仅展示省略，不对数据截为一名。合成回归覆盖同请求补全、跨调用不泄漏、其他源隔离及零额外请求；普通节点只编译，真实字段及视觉仍待用户验收。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |
