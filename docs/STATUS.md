@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A6I9 DONE：连载状态改为封面角标。** 完整搜索及作者/标签结果页的“连载中 / 已完结”从右侧信息区移至 80×120dp 封面右上角，使用白字、半透明底色及左下圆角；右侧时间单独显示，行高与背景透明度保持。角标随已知状态更新，未知状态仍隐藏，不增加请求。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅展示位置与样式调整，未运行测试或真机验证，实际视觉待用户复验。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6I8 DONE：背景透明度 10%，补全相关作品的缺失状态。** Android 12+ 模糊背景右端 alpha 调为 90%（透明度 10%），左侧渐淡及旧系统降级保留。此前 I6 只从已有列表响应展示状态，列表未带状态时仍不可见；现在普通完整搜索与相关作品共用可见行控制器，通过 typed comicListInfo 补读，拷贝漫画复用现有固定 comic2 基础资料请求，一次返回标签/全部作者/状态/更新时间，不读取章节或收藏。已有标签但缺状态不再跳过补读，最多两条并发、离开取消、成功结果路由去重及五分钟/源版本缓存，继续先显示列表；缺标签时状态与标签共用请求，标签已齐但状态缺失时需一次基础资料读取。保持原标题、封面、已有标签，未知状态不伪造。结果页 resultInfo StateFlow 驱动状态更新，不改变固定行高。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成回归源码覆盖基础资料一次补齐状态/作者/标签且不加载完整详情、原封面/标题保留、信息与标签共享缓存、已有标签缺状态仍补读且只调用一次。测试仅编译，未运行，未安装或操作真机；实际标签/状态返回及背景强度待用户复验。普通完整搜索与作者/标签结果共用 ResultInfoLoader，均仅补读可见条目；决定见 ADR-0007 §4.17。当前唯一下一任务保持 S4-02G4。

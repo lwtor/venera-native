@@ -365,6 +365,7 @@ private fun Results(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))) {
                       Box(Modifier.fillMaxWidth().height(120.dp).clipToBounds()) {
+                            val info = resultInfo[comic.key] ?: comic
                             ComicImageWithContent(
                                 request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "search-result") },
                                 contentDescription = null,
@@ -390,27 +391,26 @@ private fun Results(
                               Spacer(Modifier.size(80.dp, 120.dp))
                               Column(Modifier.weight(1f).height(120.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(comic.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                val info = resultInfo[comic.key] ?: comic
                                 val authors = info.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
                                 authors?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(info.lastUpdated.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
+                                Text(info.lastUpdated.orEmpty(), style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    info.publicationStatus?.let { status ->
-                                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)) {
-                                            Text(if (status == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中",
-                                                Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = if (status == dev.veneranative.core.model.ComicPublicationStatus.Ongoing)
-                                                    MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                }
                                 Spacer(Modifier.weight(1f))
                                 ComicResultTags(comic.tags.takeIf { it.any(String::isNotBlank) } ?: resultTags[comic.key].orEmpty())
                               }
+                            }
+                            info.publicationStatus?.let { status ->
+                                Box(Modifier.size(80.dp, 120.dp).align(Alignment.CenterStart)) {
+                                    Surface(modifier = Modifier.align(Alignment.TopEnd),
+                                        shape = RoundedCornerShape(bottomStart = 6.dp),
+                                        color = if (status == dev.veneranative.core.model.ComicPublicationStatus.Ongoing)
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.72f)) {
+                                        Text(if (status == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中",
+                                            Modifier.padding(horizontal = 5.dp, vertical = 3.dp),
+                                            style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1)
+                                    }
+                                }
                             }
                         }
                     }
