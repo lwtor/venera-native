@@ -5,6 +5,7 @@ import dev.veneranative.core.model.TagNavigation
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
+import dev.veneranative.core.model.withListMetadata
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
@@ -62,8 +63,26 @@ class DefaultComicCatalog(
         var sourceVersion: String? = null,
         var expiresAtMillis: Long = 0,
         var value: List<String>? = null,
+        var info: Comic? = null,
     )
     private val tags = ConcurrentHashMap<ComicKey, TagsEntry>()
+
+    override suspend fun comicListInfo(comic: Comic): SourceOutcome<Comic> {
+        val version = sources.installed().firstOrNull { it.sourceId == comic.key.sourceId }?.version
+        val entry = tags.getOrPut(comic.key) { TagsEntry() }
+        return entry.mutex.withLock {
+            entry.info?.takeIf { entry.sourceVersion == version && nowMillis() < entry.expiresAtMillis }
+                ?.let { return@withLock SourceOutcome.Success(comic.withListMetadata(it)) }
+            core.comicListInfo(comic).also { result ->
+                if (result is SourceOutcome.Success) {
+                    entry.info = result.value
+                    entry.value = result.value.tags
+                    entry.sourceVersion = version
+                    entry.expiresAtMillis = nowMillis() + detailCacheTtlMillis
+                }
+            }
+        }
+    }
 
     override suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> {
         val version = sources.installed().firstOrNull { it.sourceId == comicKey.sourceId }?.version
@@ -76,6 +95,7 @@ class DefaultComicCatalog(
                     entry.sourceVersion = version
                     entry.expiresAtMillis = nowMillis() + detailCacheTtlMillis
                     entry.value = result.value
+                    entry.info = null
                 }
             }
         }
@@ -166,7 +186,7 @@ class DefaultComicCatalog(
             if (!entry.mutex.tryLock()) return@map comic
             try {
                 entry.value?.takeIf { entry.sourceVersion == version && nowMillis() < entry.expiresAtMillis }
-                    ?.let { comic.copy(tags = it) } ?: comic
+                    ?.let { entry.info?.let(comic::withListMetadata) ?: comic.copy(tags = it) } ?: comic
             } finally {
                 entry.mutex.unlock()
             }

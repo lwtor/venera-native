@@ -38,7 +38,7 @@ object CopyMangaMetadataAdapter {
     """.trimIndent()
 
     val functionExpression = """
-        async function (id) {
+        async function (id, includeInfo) {
           var source = globalThis.__veneraSource;
           if (!source || source.key !== "copy_manga" || typeof id !== "string" || !id.trim() ||
               typeof source.apiUrl !== "string" || typeof source.getReqID !== "function") {
@@ -52,8 +52,15 @@ object CopyMangaMetadataAdapter {
           var data = JSON.parse(response.body);
           var comic = data && data.results && data.results.comic;
           if (!comic || !Array.isArray(comic.theme)) throw new Error("Invalid comic tag metadata.");
-          return comic.theme.map(function (item) { return item && item.name; })
+          var tags = comic.theme.map(function (item) { return item && item.name; })
             .filter(function (name) { return typeof name === "string" && name.trim(); });
+          if (includeInfo === true) {
+            return {id: id, title: comic.name || id, tags: tags,
+              authors: (comic.author || []).map(function(author) { return author && author.name; }),
+              status: comic.status && typeof comic.status === "object" ? comic.status.display : comic.status,
+              lastUpdated: comic.datetime_updated};
+          }
+          return tags;
         }
     """.trimIndent()
 }

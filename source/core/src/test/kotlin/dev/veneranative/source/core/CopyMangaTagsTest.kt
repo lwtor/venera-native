@@ -27,7 +27,7 @@ class CopyMangaTagsTest {
             override suspend fun invoke(request: SourceHostRequest): SourceHostResult {
                 calls += request
                 return SourceHostResult.Success(request.requestId, JSONObject().put("statusCode", 200).put("headers", JSONObject())
-                    .put("body", """{"results":{"comic":{"theme":[{"name":"Adventure"},{"name":""},{"name":"Adventure"},{"name":"Fantasy"}]}}}""").toString())
+                    .put("body", """{"results":{"comic":{"name":"Fixture","author":[{"name":"A"},{"name":"B"}],"status":{"display":"连载中"},"theme":[{"name":"Adventure"},{"name":""},{"name":"Adventure"},{"name":"Fantasy"}]}}}""").toString())
             }
         }
         val runtime = QuickJsRuntime(hostApi = host)
@@ -65,6 +65,14 @@ class CopyMangaTagsTest {
             assertEquals("1", count.json) // Invalid input discarded the old isolate; the batch shares one ID.
             assertTrue(EngineSourceCore(runtime).comicTagsBatch(List(7) { keys.first() }) is SourceOutcome.Failure)
             assertEquals(3, calls.size)
+            val original = dev.veneranative.core.model.Comic(keys.first(), "Original", coverUrl = "fixture://cover")
+            val info = (EngineSourceCore(runtime).comicListInfo(original) as SourceOutcome.Success).value
+            assertEquals(dev.veneranative.core.model.ComicPublicationStatus.Ongoing, info.publicationStatus)
+            assertEquals(listOf("A", "B"), info.authors)
+            assertEquals("Original", info.title)
+            assertEquals("fixture://cover", info.coverUrl)
+            assertEquals(listOf("Adventure", "Fantasy"), info.tags)
+            assertEquals(4, calls.size)
         } finally { runtime.close() }
     }
 }

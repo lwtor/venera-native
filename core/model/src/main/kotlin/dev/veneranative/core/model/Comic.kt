@@ -22,6 +22,17 @@ data class Comic(
 
 enum class ComicPublicationStatus { Ongoing, Completed }
 
+/** Keep the original list identity and artwork while supplementing available metadata. */
+fun Comic.withListMetadata(metadata: Comic): Comic {
+    require(key == metadata.key)
+    return copy(
+        tags = tags.takeIf { it.any(String::isNotBlank) } ?: metadata.tags,
+        authors = metadata.authors.takeIf { it.isNotEmpty() } ?: authors,
+        lastUpdated = metadata.lastUpdated ?: lastUpdated,
+        publicationStatus = metadata.publicationStatus ?: publicationStatus,
+    )
+}
+
 /**
  * A comic with detail-level metadata.
  *

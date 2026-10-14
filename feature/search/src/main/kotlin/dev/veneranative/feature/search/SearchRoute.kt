@@ -35,11 +35,15 @@ fun SearchRoute(
     }
     val results = viewModel.results.collectAsLazyPagingItems()
     val aggregateResults by viewModel.aggregateResults.collectAsStateWithLifecycle()
+    val resultInfo by viewModel.resultInfo.collectAsStateWithLifecycle()
+    val resultTags by viewModel.resultTags.collectAsStateWithLifecycle()
 
     if (state.hasSubmitted) {
         SearchResultScreen(
             state = state,
             results = results,
+            resultInfo = resultInfo, resultTags = resultTags,
+            onResultVisible = viewModel::onResultVisible, onResultHidden = viewModel::onResultHidden,
             aggregateResults = aggregateResults,
             onAction = viewModel::onAction,
             onOpenComic = onOpenComic,

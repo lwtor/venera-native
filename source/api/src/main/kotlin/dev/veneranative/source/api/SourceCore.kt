@@ -29,6 +29,10 @@ import dev.veneranative.core.model.SourcePage
  * failure (ADR-0007).
  */
 interface SourceCore {
+    suspend fun comicListInfo(comic: Comic): SourceOutcome<Comic> = when (val result = comicTags(comic.key)) {
+        is SourceOutcome.Failure -> result
+        is SourceOutcome.Success -> SourceOutcome.Success(comic.copy(tags = comic.tags.takeIf { it.any(String::isNotBlank) } ?: result.value))
+    }
 
     /** Null means the source provided no supported destination; callers must not guess a search. */
     suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> = SourceOutcome.Success(null)

@@ -141,6 +141,7 @@ fun SearchResultScreen(
     resultTags: Map<ComicKey, List<String>> = emptyMap(),
     onResultVisible: (Comic) -> Unit = {},
     onResultHidden: (ComicKey) -> Unit = {},
+    resultInfo: Map<ComicKey, Comic> = emptyMap(),
 ) {
     BackHandler(onBack = onBackToSearch)
     val showingSourceResults = state.aggregateSourceResultsId != null
@@ -165,9 +166,9 @@ fun SearchResultScreen(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (showingSourceResults) Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden)
+            if (showingSourceResults) Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden, resultInfo)
             else if (state.aggregateSearch) AggregateResults(aggregateResults, onAction, onOpenComic)
-            else Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden)
+            else Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden, resultInfo)
         }
     }
 }
@@ -341,6 +342,7 @@ private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (Searc
 private fun Results(
     results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> Unit,
     resultTags: Map<ComicKey, List<String>>, onResultVisible: (Comic) -> Unit, onResultHidden: (ComicKey) -> Unit,
+    resultInfo: Map<ComicKey, Comic>,
 ) {
     when (val refresh = results.loadState.refresh) {
         is LoadState.Loading -> Centered { CircularProgressIndicator(Modifier.testTag(SEARCH_LOADING_TAG)) }
@@ -369,7 +371,7 @@ private fun Results(
                                 modifier = Modifier.fillMaxSize(),
                                 placeholder = { Box(Modifier.size(80.dp, 120.dp), contentAlignment = Alignment.Center) { Text("漫") } },
                                 imageContent = { painter ->
-                                    val backdropOpacity = if (android.os.Build.VERSION.SDK_INT >= 31) 0.7f else 0.08f
+                                    val backdropOpacity = if (android.os.Build.VERSION.SDK_INT >= 31) 0.9f else 0.08f
                                     Box(Modifier.fillMaxSize()) {
                                         Image(painter, contentDescription = null, contentScale = ContentScale.Crop,
                                             modifier = Modifier.fillMaxSize()
@@ -388,14 +390,15 @@ private fun Results(
                               Spacer(Modifier.size(80.dp, 120.dp))
                               Column(Modifier.weight(1f).height(120.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(comic.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                val authors = comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
+                                val info = resultInfo[comic.key] ?: comic
+                                val authors = info.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
                                 authors?.let { Text(it, style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    Text(comic.lastUpdated.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
+                                    Text(info.lastUpdated.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    comic.publicationStatus?.let { status ->
+                                    info.publicationStatus?.let { status ->
                                         Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)) {
                                             Text(if (status == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中",
                                                 Modifier.padding(horizontal = 5.dp, vertical = 2.dp),

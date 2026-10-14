@@ -40,37 +40,13 @@ class AuthorWorksViewModel(
     val state = _state.asStateFlow()
     private val ready = MutableStateFlow<Pair<SearchRequest?, CategoryRequest?>?>(null)
     private var loadJob: kotlinx.coroutines.Job? = null
-    private val _resultTags = MutableStateFlow<Map<ComicKey, List<String>>>(emptyMap())
-    val resultTags = _resultTags.asStateFlow()
-    private val tagJobs = mutableMapOf<ComicKey, Job>()
-    private val tagPermits = Semaphore(2)
-
+    private val resultInfoLoader = ResultInfoLoader(catalog, viewModelScope)
+    val resultInfo = resultInfoLoader.info
+    val resultTags = resultInfoLoader.tags
     fun onResultVisible(comic: Comic) {
-        if (_state.value.status != SearchStatus.Ready || comic.key.sourceId != origin.sourceId ||
-            comic.tags.any(String::isNotBlank) || _resultTags.value.containsKey(comic.key) || tagJobs[comic.key]?.isActive == true) return
-        tagJobs[comic.key] = viewModelScope.launch {
-            try {
-                tagPermits.withPermit {
-                    val result = catalog.comicTags(comic.key)
-                    coroutineContext.ensureActive()
-                    if (result is SourceOutcome.Success) {
-                        _resultTags.update { it + (comic.key to result.value) }
-                    }
-                }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                // Optional tags must not hide an otherwise usable result or fail its paging load.
-            } finally {
-                if (tagJobs[comic.key] === coroutineContext[Job]) tagJobs.remove(comic.key)
-            }
-        }
+        if (_state.value.status == SearchStatus.Ready && comic.key.sourceId == origin.sourceId) resultInfoLoader.visible(comic)
     }
-
-    fun onResultHidden(key: ComicKey) {
-        tagJobs.remove(key)?.cancel()
-    }
-
+    fun onResultHidden(key: ComicKey) = resultInfoLoader.hidden(key)
     @OptIn(ExperimentalCoroutinesApi::class)
     val results = ready.flatMapLatest { request ->
         if (request == null) flowOf(PagingData.empty<Comic>()) else Pager(

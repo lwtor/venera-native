@@ -6,6 +6,7 @@ import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
+import dev.veneranative.core.model.withListMetadata
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
@@ -253,6 +254,20 @@ class EngineSourceCore(
                     ?: SourceOutcome.Failure(
                         SourceRuntimeError.ScriptExecution("Source returned no comic details."),
                     )
+        }
+    }
+
+    override suspend fun comicListInfo(comic: Comic): SourceOutcome<Comic> {
+        if (comic.key.sourceId.value != "copy_manga") return super<SourceCore>.comicListInfo(comic)
+        return when (val result = invoke(comic.key.sourceId, SourceProtocol.copyMangaListInfo(comic.key))) {
+            is SourceOutcome.Failure -> result
+            is SourceOutcome.Success -> {
+                val metadata = runCatching {
+                    SourceProtocolParser.parseComic(comic.key.sourceId, kotlinx.serialization.json.Json.parseToJsonElement(result.value))
+                }.getOrNull()?.takeIf { it.key == comic.key }
+                metadata?.let { SourceOutcome.Success(comic.withListMetadata(it)) }
+                    ?: SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid comic list metadata."))
+            }
         }
     }
 

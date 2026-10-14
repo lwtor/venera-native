@@ -56,6 +56,13 @@ class SearchViewModel(
 
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
+    private val resultInfoLoader = ResultInfoLoader(catalog, viewModelScope)
+    val resultInfo = resultInfoLoader.info
+    val resultTags = resultInfoLoader.tags
+    fun onResultVisible(comic: Comic) {
+        if (comic.key.sourceId.value == "copy_manga") resultInfoLoader.visible(comic)
+    }
+    fun onResultHidden(key: dev.veneranative.core.model.ComicKey) = resultInfoLoader.hidden(key)
 
     private val query = MutableStateFlow<SearchRequest?>(null)
     private var historyRepository: SearchHistoryRepository? = initialHistoryRepository

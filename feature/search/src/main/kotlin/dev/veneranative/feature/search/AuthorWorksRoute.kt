@@ -41,11 +41,13 @@ fun AuthorWorksRoute(
     }
     val state by model.state.collectAsStateWithLifecycle()
     val resultTags by model.resultTags.collectAsStateWithLifecycle()
+    val resultInfo by model.resultInfo.collectAsStateWithLifecycle()
     val results = model.results.collectAsLazyPagingItems()
     if (state.status == SearchStatus.Ready) {
         SearchResultScreen(
             state, results, emptyList(), {}, onOpenComic, onBack,
             resultTags = resultTags, onResultVisible = model::onResultVisible, onResultHidden = model::onResultHidden,
+            resultInfo = resultInfo,
         )
     } else {
         Scaffold(topBar = {

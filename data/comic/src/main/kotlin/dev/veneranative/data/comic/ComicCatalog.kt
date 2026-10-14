@@ -30,6 +30,10 @@ import dev.veneranative.source.api.SourceRuntimeError
  * rather than lower-layer diagnostics, so features map them to copy directly.
  */
 interface ComicCatalog {
+    suspend fun comicListInfo(comic: Comic): SourceOutcome<Comic> = when (val result = comicTags(comic.key)) {
+        is SourceOutcome.Failure -> result
+        is SourceOutcome.Success -> SourceOutcome.Success(comic.copy(tags = comic.tags.takeIf { it.any(String::isNotBlank) } ?: result.value))
+    }
 
     suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> = when (val result = detail(comicKey)) {
         is SourceOutcome.Failure -> result

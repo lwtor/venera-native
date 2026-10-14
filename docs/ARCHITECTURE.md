@@ -286,6 +286,8 @@ S4-10A6I7 的 ComicImageWithContent 由 core/image 保持 Coil、认证及重试
 
 ## 12. 测试归属
 
+S4-10A6I8 的 comicListInfo 是 SourceCore/ComicCatalog 类型化读取；CopyManga 固定基础资料适配可返回同请求的标签、作者、状态与时间，data/comic 统一缓存并以纯模型 withListMetadata 合并，保持列表标题/封面。Search 与相关作品 ViewModel 共用控制器只补可见缺失条目、StateFlow 渲染，不在 UI 调用网络或扩大基础资料访问范围；见 ADR-0007 §4.17。
+
 S3-00Y1 的源重试在 Y2 收拢到 source/core 的 SourceCallExecutor；EngineSourceCore 全部协议通过这一入口，复用 Runtime 排队及废弃/重建引擎。SourceProtocolCall 强制 READ/WRITE，读最多三次、每次新 ID、总截止 120 秒，写只执行一次。Feature/Provider 不再叠加来源重试，继续负责页面失败状态及等待截止；图片预热不持有章节锁。未新增模块依赖或 Host 能力，见 ADR-0007 §4.12/4.13。
 
 | 测试 | 位置 |

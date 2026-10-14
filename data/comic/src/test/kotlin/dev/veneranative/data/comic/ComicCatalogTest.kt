@@ -35,6 +35,20 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
+    @Test fun `list metadata is cached together with tags`() = runTest {
+        val source = source("copy_manga")
+        val original = Comic(ComicKey(source.sourceId, RemoteComicId("comic")), "Work")
+        val core = FakeSourceCore()
+        core.listInfoHandler = { SourceOutcome.Success(it.copy(tags = listOf("Tag"),
+            publicationStatus = dev.veneranative.core.model.ComicPublicationStatus.Completed)) }
+        val catalog = DefaultComicCatalog(FakeSourceRepository(listOf(source)), core)
+        val info = (catalog.comicListInfo(original) as SourceOutcome.Success).value
+        assertEquals(dev.veneranative.core.model.ComicPublicationStatus.Completed, info.publicationStatus)
+        catalog.comicListInfo(original)
+        assertEquals(listOf("Tag"), (catalog.comicTags(original.key) as SourceOutcome.Success).value)
+        assertEquals(1, core.listInfoCalls)
+        assertEquals(0, core.detailCalls)
+    }
     @Test fun `copy results merge cached tags without starting metadata requests`() = runTest {
         val id = SourceId("copy_manga")
         val core = FakeSourceCore()
@@ -381,6 +395,12 @@ class ComicCatalogTest {
         var detailResponse: SourceOutcome<ComicDetail>? = null
         var detailCalls: Int = 0
         var capabilityCalls: Int = 0
+        var listInfoCalls = 0
+        var listInfoHandler: (suspend (Comic) -> SourceOutcome<Comic>)? = null
+        override suspend fun comicListInfo(comic: Comic): SourceOutcome<Comic> {
+            listInfoCalls++
+            return listInfoHandler?.invoke(comic) ?: super<SourceCore>.comicListInfo(comic)
+        }
         val batchCalls = mutableListOf<List<ComicKey>>()
         var batchHandler: (suspend (List<ComicKey>) -> SourceOutcome<Map<ComicKey, List<String>>>)? = null
         override suspend fun comicTagsBatch(keys: List<ComicKey>): SourceOutcome<Map<ComicKey, List<String>>> {
