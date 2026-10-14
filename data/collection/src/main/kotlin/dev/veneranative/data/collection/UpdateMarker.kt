@@ -29,6 +29,9 @@ class UpdateMarker(
     private val probe: RemoteChapterProbe,
 ) {
 
+    suspend fun chapterSnapshot(ref: ComicRef): ChapterSnapshot? =
+        (ref as? ComicRef.Remote)?.key?.let { probe.chapterSnapshot(it) }
+
     suspend fun evaluate(stored: FavoriteItem): UpdateState {
         val comicKey = (stored.ref as? ComicRef.Remote)?.key ?: return UpdateState.Unknown
         val remote = probe.chapterSnapshot(comicKey) ?: return UpdateState.Unknown

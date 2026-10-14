@@ -96,6 +96,9 @@ interface CollectionRepository {
     suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot)
 
     /** Updates only an existing favorite directory; never changes collection membership. */
+    /** Loads a missing stored directory for one visible favorite; false means unavailable. */
+    suspend fun ensureChapters(ref: ComicRef): Boolean
+
     suspend fun updateChapters(ref: ComicRef, chapters: List<dev.veneranative.core.model.Chapter>)
 
     suspend fun remove(ref: ComicRef)

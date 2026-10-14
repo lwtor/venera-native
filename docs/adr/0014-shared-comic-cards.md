@@ -34,3 +34,9 @@ core:image 的 ComicImageWithDominantColor 复用加载结果，在 Default disp
 core:model 纯模型 ComicChapterEntry/ComicReadingChapter 与 comicChapterProgressLabel 集中规则。data:collection 使用现有 JSON 依赖保存 ID、标题、版本，Room chapters_json 可空；收藏观察合并 ReadingHistoryDao 的每漫画最新记录，以 source/comic 索引查找，不逐行订阅/请求。data:history 在 ReaderProgressSession 保存 ChapterRef.Remote.group 到 chapter_group。Room 10→11 增列不改变既有主键；跨版本重复 ID 的旧记录覆盖问题不在此处扩展，但最新记录的版本能正确展示/续读。
 
 目录来自既有收藏/手动更新/详情响应；Details 成功加载时 updateChapters 只更新已有收藏目录，空目录不覆写既有数据。缺失旧目录通过打开详情或手动检查更新补齐，不在列表后台批量请求详情。旧版本无明确 group 时仅由唯一 ID/唯一版本解析，跨版本歧义不猜测；显式版本已移除则显示未知。聚合预览无目录也显示未知，不取日期替代、不新增详情请求。可选备份字段随目录和阅读版本往返，旧包缺键仍兼容。
+
+## S4-10B5：可见补读与浅色模糊背景
+
+日期：2026-10-14。用户反馈 B3 依赖手动补目录导致大量未知；替代其仅由手动/详情补齐策略，为缺目录的可见远端收藏显式 ensureChapters。Feature 共用 data:collection/FavoriteChapterLoader，每页最多两条、离开取消、成功目录存 Room，已有目录不再读源；失败结束加载，单次可见周期不无限重复，重新可见可重试。读取复用 ComicCatalogChapterProbe 和现有统一源重试/超时/取消，不增加脚本协议；代价是首次缺目录收藏要加载来源详情，未对整书架批量扫描或扩大到聚合预览。Home 使用 LazyRow 限制进入组成的条目，UI 不直接访问源。未知/歧义仍不伪造章节。
+
+竖向底部替代纯主色块：在主题底上叠加 16dp 模糊封面，API 31+ 透明度 50%；同一 Painter 一次加载，core:image 旧主色 API 保留但卡片不再使用软件取色。API 26–30 极淡图片 alpha 12% 降级，无高斯承诺。主体通过前景 Column 决定高度，背景 matchParentSize 不影响 LazyGrid 约束；清晰封面比例 0.9，42dp 底部。外沿圆角/直角连接与角标保留，横向独立约束不变。紧凑文案省去“第/共”，当前章节与总数分开排版，长当前文字先省略，保留总数。

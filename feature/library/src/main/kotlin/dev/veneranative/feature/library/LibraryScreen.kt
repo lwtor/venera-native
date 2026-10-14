@@ -371,6 +371,9 @@ internal fun LibraryScreen(
                     state.filteredItems.isEmpty() -> EmptyLibraryState("没有匹配的漫画。", "换一个作品名或副标题试试。", Modifier.weight(1f))
                     else -> FavoriteGrid(
                         items = state.filteredItems,
+                        catalogStates = state.catalogStates,
+                        onVisible = { onAction(LibraryAction.FavoriteVisible(it)) },
+                        onHidden = { onAction(LibraryAction.FavoriteHidden(it)) },
                         onOpenComic = onOpenComic,
                         onLongPress = { ref -> onAction(LibraryAction.ShowFavoriteActions(ref)) },
                         modifier = Modifier.weight(1f),

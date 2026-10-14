@@ -43,6 +43,8 @@ class LibraryViewModel(
 
     private val _state = MutableStateFlow(LibraryUiState(tab = initialTab))
     val state: StateFlow<LibraryUiState> = _state.asStateFlow()
+    private val chapterLoader = dev.veneranative.data.collection.FavoriteChapterLoader(repository, viewModelScope)
+    init { viewModelScope.launch { chapterLoader.states.collect { states -> _state.update { it.copy(catalogStates = states) } } } }
 
     /** The current query. Distinct values only, so re-selecting the same folder costs nothing. */
     private val selection = MutableStateFlow(LibrarySelection())
@@ -64,6 +66,8 @@ class LibraryViewModel(
 
     fun onAction(action: LibraryAction) {
         when (action) {
+            is LibraryAction.FavoriteVisible -> chapterLoader.visible(action.item)
+            is LibraryAction.FavoriteHidden -> chapterLoader.hidden(action.ref)
             is LibraryAction.SelectFolder -> selectFolder(action.folderId)
             is LibraryAction.ChangeSort -> changeSort(action.sort)
 

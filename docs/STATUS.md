@@ -4,6 +4,12 @@
 
 ## 状态快照
 
+**S4-10B5 DONE：可见收藏补目录、竖向卡片浅色模糊底与紧凑高度。** 用户反馈大量未知目录及信息区太深/文案过长。新增 CollectionRepository.ensureChapters，复用既有 ComicCatalogChapterProbe/统一源重试入口，缺目录的可见远端收藏才读取完整来源目录并保存，已存目录跳过；收藏及首页共用 FavoriteChapterLoader，每页最多两条并发，排队/运行条目离开时取消，加载/失败均有短文案，失败不持续重发，重新进入可见区域可重试。UI 只发送可见/离开动作，未在 Compose 调用网络。首页收藏更新改 LazyRow，避免组成全部八张卡片就加载全部目录。来源无法返回或旧历史版本歧义时仍未知，不用合并数量伪造总数；聚合预览不触发完整详情补读。
+
+仅调整 ComicCoverCard：封面比例 0.75→0.9（相同宽度约降低六分之一高度），信息区固定 42dp。使用一次加载的 Painter 绘制清晰封面及信息区 16dp 模糊封面底，Android 12+ 不透明度 50%（透明度 50%）叠在主题底色上；不再使用深色纯主色块，无额外封面请求。API 26–30 沿用淡图降级（alpha 12%），不声明有高斯效果。章节文案改“10/111话”、未读“111话”，长非数字章节名缩短，当前部分可省略但优先保留总数。横向布局与 B4 独立封面容器均未修改。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :data:collection:compileDebugUnitTestKotlin :feature:home:compileDebugUnitTestKotlin :feature:library:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增加载器合成回归源码覆盖并发二、可见外取消、成功目录持久化/缓存跳过、失败结束加载与重进重试、不用 330 的合并数；话号/版本规则沿用，补充紧凑长标题回归。测试仅编译，未运行/安装/真机验证；实际来源加载时延与模糊视觉待用户复验。取目录会增加缺失可见收藏的详情请求成本，成功后本地复用，未批量扫描整书架；决定补充 ADR-0014。当前唯一下一任务保持 S4-02G4。
+
 **S4-10B4 DONE：恢复横向列表的独立封面约束。** 用户反馈横向封面被改变；B2 提取公共组件时漏掉成功图片内容内的独立 Box，使清晰封面继承图片槽位的整行最小约束。恢复与 I10 原实现一致的内层 Box，清晰封面继续为 80×120dp、左侧贴边；模糊背景铺满整行，原透明度和状态角标保持。B3 的章节信息调整仍仅应用于竖向卡片。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。恢复布局容器，未运行测试或真机视觉验证；实际封面效果待用户复验。当前唯一下一任务保持 S4-02G4。

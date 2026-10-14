@@ -79,6 +79,8 @@ fun HomeRoute(
         onOpenSearch = onOpenSearch,
         onOpenLibrary = onOpenLibrary,
         onOpenBackup = onOpenBackup,
+        onFavoriteVisible = homeViewModel::onFavoriteVisible,
+        onFavoriteHidden = homeViewModel::onFavoriteHidden,
     )
 }
 
@@ -91,6 +93,8 @@ internal fun HomeScreen(
     onOpenLibrary: () -> Unit,
     onOpenBackup: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onFavoriteVisible: (dev.veneranative.data.collection.FavoriteItem) -> Unit = {},
+    onFavoriteHidden: (dev.veneranative.core.model.ComicRef) -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier,
@@ -138,18 +142,18 @@ internal fun HomeScreen(
                         action = "书架",
                         onClick = onOpenLibrary,
                     )
-                    Row(
-                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    androidx.compose.foundation.lazy.LazyRow(
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Spacer(Modifier.width(8.dp))
-                        updated.take(8).forEach { favorite ->
-                            FavoriteUpdateCard(
-                                item = favorite,
-                                onClick = onOpenLibrary,
-                            )
+                        items(count = updated.take(8).size, key = { updated[it].ref.toString() }) { index ->
+                            val favorite = updated[index]
+                            androidx.compose.runtime.DisposableEffect(favorite.ref, favorite.chapters.isEmpty()) {
+                                onFavoriteVisible(favorite)
+                                onDispose { onFavoriteHidden(favorite.ref) }
+                            }
+                            FavoriteUpdateCard(item = favorite, onClick = onOpenLibrary, catalogState = state.catalogStates[favorite.ref])
                         }
-                        Spacer(Modifier.width(8.dp))
                     }
                 }
             }
@@ -295,7 +299,8 @@ private fun ResumeCard(entry: ReadingHistoryEntry, onClick: () -> Unit) {
 }
 
 @Composable
-private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteItem, onClick: () -> Unit) {
+private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteItem, onClick: () -> Unit,
+    catalogState: dev.veneranative.data.collection.FavoriteCatalogState? = null) {
     val comicKey = item.ref.comicKeyOrNull()
     val coverRef = item.coverRef
     val request = if (comicKey != null && coverRef != null) {
@@ -303,7 +308,7 @@ private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteIt
     } else null
     ComicCoverCard(
         title = item.title, request = request,
-        chapterLabel = dev.veneranative.core.model.comicChapterProgressLabel(item.chapters, item.readingChapter),
+        chapterLabel = dev.veneranative.data.collection.favoriteChapterLabel(item, catalogState),
         sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
         onClick = onClick, hasUpdate = item.hasUpdate, modifier = Modifier.width(138.dp),
     )

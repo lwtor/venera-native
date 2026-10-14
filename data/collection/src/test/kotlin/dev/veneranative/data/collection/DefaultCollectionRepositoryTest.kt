@@ -53,13 +53,13 @@ class DefaultCollectionRepositoryTest {
         )
         shelf.addToFolders(comic("one"), emptySet(), ComicSnapshot("Comic", chapterCount = 3, chapters = chapters))
         fun label(item: FavoriteItem) = dev.veneranative.core.model.comicChapterProgressLabel(item.chapters, item.readingChapter)
-        assertEquals("共111话", label(shelf.observeItems(null, ShelfSort.AddedAt).first().single()))
+        assertEquals("111话", label(shelf.observeItems(null, ShelfSort.AddedAt).first().single()))
         history.upsert(dev.veneranative.core.database.ReadingHistoryEntity("source-a", "one", "same", "Comic", "第10话", null, 0, 1, 1, "A"))
-        assertEquals("第10话 / 共110话", label(shelf.observeItems(null, ShelfSort.AddedAt).first().single()))
+        assertEquals("10/110话", label(shelf.observeItems(null, ShelfSort.AddedAt).first().single()))
         history.upsert(history.rows.value.single().copy(chapterGroup = "B", updatedAtEpochMillis = 2))
-        assertEquals("第10话 / 共111话", label(shelf.observeItem(comic("one")).first()!!))
+        assertEquals("10/111话", label(shelf.observeItem(comic("one")).first()!!))
         shelf.updateChapters(comic("one"), chapters.map { if (it.group == "B") it.copy(title = "第112话") else it })
-        assertEquals("第10话 / 共112话", label(shelf.observeItem(comic("one")).first()!!))
+        assertEquals("10/112话", label(shelf.observeItem(comic("one")).first()!!))
         assertEquals(emptySet<String>(), shelf.observeItem(comic("one")).first()!!.folderIds)
     }
 

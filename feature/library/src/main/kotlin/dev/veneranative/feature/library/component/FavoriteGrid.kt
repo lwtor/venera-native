@@ -24,6 +24,9 @@ fun FavoriteGrid(
     onOpenComic: (ComicKey) -> Unit,
     onLongPress: (ComicRef) -> Unit,
     modifier: Modifier = Modifier,
+    catalogStates: Map<ComicRef, dev.veneranative.data.collection.FavoriteCatalogState> = emptyMap(),
+    onVisible: (FavoriteItem) -> Unit = {},
+    onHidden: (ComicRef) -> Unit = {},
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
@@ -34,13 +37,17 @@ fun FavoriteGrid(
     ) {
         items(count = items.size, key = { index -> items[index].ref.toString() }) { index ->
             val item = items[index]
+            androidx.compose.runtime.DisposableEffect(item.ref, item.chapters.isEmpty()) {
+                onVisible(item)
+                onDispose { onHidden(item.ref) }
+            }
             val comicKey = item.ref.comicKeyOrNull()
             val coverRef = item.coverRef
             ComicCoverCard(
                 title = item.title,
                 request = if (comicKey != null && coverRef != null)
                     ComicImageRequest(coverRef, sourceId = comicKey.sourceId, variant = "comic-cover") else null,
-                chapterLabel = dev.veneranative.core.model.comicChapterProgressLabel(item.chapters, item.readingChapter),
+                chapterLabel = dev.veneranative.data.collection.favoriteChapterLabel(item, catalogStates[item.ref]),
                 sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
                 onClick = { comicKey?.let(onOpenComic) },
                 onLongClick = { onLongPress(item.ref) },

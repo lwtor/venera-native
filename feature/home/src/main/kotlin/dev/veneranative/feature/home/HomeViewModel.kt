@@ -18,17 +18,22 @@ class HomeViewModel(
     local: LocalComicRepository?,
 ) : ViewModel() {
 
+    private val chapterLoader = collection?.let { dev.veneranative.data.collection.FavoriteChapterLoader(it, viewModelScope) }
+    fun onFavoriteVisible(item: dev.veneranative.data.collection.FavoriteItem) { chapterLoader?.visible(item) }
+    fun onFavoriteHidden(ref: dev.veneranative.core.model.ComicRef) { chapterLoader?.hidden(ref) }
+
     private val recent = history?.observeRecent(5) ?: flowOf(emptyList())
     private val favorites = collection?.observeItems(folderId = null, sort = ShelfSort.Updated)
         ?: flowOf(emptyList())
     private val localComics = local?.observeComics() ?: flowOf(emptyList())
 
-    val state = combine(recent, favorites, localComics) { recentItems, favoriteItems, localItems ->
+    val state = combine(recent, favorites, localComics, chapterLoader?.states ?: flowOf(emptyMap())) { recentItems, favoriteItems, localItems, catalogStates ->
         HomeUiState(
             recentReading = recentItems
                 .sortedByDescending { it.updatedAtEpochMillis }
                 .distinctBy { it.comicKey },
             favorites = favoriteItems,
+            catalogStates = catalogStates,
             localComics = localItems,
             historyAvailable = history != null,
             favoritesAvailable = collection != null,

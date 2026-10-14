@@ -38,6 +38,7 @@ enum class LibraryTab { Favorites, Downloads, Local }
 /** Everything the library screen needs to render. */
 data class LibraryUiState(
     val status: LibraryStatus = LibraryStatus.Loading,
+    val catalogStates: Map<ComicRef, dev.veneranative.data.collection.FavoriteCatalogState> = emptyMap(),
     val tab: LibraryTab = LibraryTab.Favorites,
     val localComics: List<LocalComic> = emptyList(),
     val localChapters: Map<LocalComicId, List<LocalChapter>> = emptyMap(),
@@ -80,6 +81,8 @@ data class LibraryUiState(
 
 /** What the user did. Actions name intent, not the storage call behind it. */
 sealed interface LibraryAction {
+    data class FavoriteVisible(val item: FavoriteItem) : LibraryAction
+    data class FavoriteHidden(val ref: ComicRef) : LibraryAction
 
     /** Null selects every folder. */
     data class SelectFolder(val folderId: String?) : LibraryAction

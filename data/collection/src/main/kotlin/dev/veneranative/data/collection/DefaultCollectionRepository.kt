@@ -8,6 +8,7 @@ import dev.veneranative.core.database.FavoriteFolderEntity
 import dev.veneranative.core.database.FavoriteMembershipEntity
 import dev.veneranative.core.database.VeneraDatabase
 import dev.veneranative.core.model.ComicRef
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
@@ -145,6 +146,15 @@ class DefaultCollectionRepository internal constructor(
             )
             setFolders(ref, folderIds)
         }
+    }
+
+    override suspend fun ensureChapters(ref: ComicRef): Boolean {
+        val stored = dao.entry(ref.refSource(), ref.refComic()) ?: return false
+        if (decodeChapterCatalog(stored.chaptersJson).isNotEmpty()) return true
+        val chapters = updateMarker.chapterSnapshot(ref)?.chapters?.takeIf { it.isNotEmpty() } ?: return false
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        updateChapters(ref, chapters)
+        return true
     }
 
     override suspend fun updateChapters(ref: ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) {

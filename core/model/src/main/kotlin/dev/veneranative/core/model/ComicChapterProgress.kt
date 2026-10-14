@@ -32,11 +32,11 @@ fun comicChapterProgressLabel(chapters: List<ComicChapterEntry>, reading: ComicR
     }
     val number = candidates.mapNotNull { chapterNumber(it.title) }.maxOrNull()
     val total = when {
-        number != null -> "共${number.stripTrailingZeros().toPlainString()}话"
-        candidates.isEmpty() -> "总章节未知"
-        else -> "共${candidates.groupBy { it.version }.values.maxOf { it.size }}章"
+        number != null -> "${number.stripTrailingZeros().toPlainString()}话"
+        candidates.isEmpty() -> "章节未知"
+        else -> "${candidates.groupBy { it.version }.values.maxOf { it.size }}章"
     }
     if (reading == null) return total
-    val current = chapterNumber(reading.title)?.let { "第${it.stripTrailingZeros().toPlainString()}话" } ?: reading.title
-    return "$current / $total"
+    val current = chapterNumber(reading.title)?.let { it.stripTrailingZeros().toPlainString() } ?: reading.title.replace('/', '·').let { if (it.length > 6) it.take(5) + "…" else it }
+    return "$current/${if (total == "章节未知") "未知" else total}"
 }

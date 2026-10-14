@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImageWithContent
-import dev.veneranative.core.image.compose.ComicImageWithDominantColor
 
 /** Names supplied by root assembly, including disabled installed sources. No repository in UI. */
 val LocalComicSourceNames = compositionLocalOf<Map<String, String>> { emptyMap() }
@@ -50,28 +49,46 @@ fun ComicCoverCard(
     onLongClick: (() -> Unit)? = null,
     hasUpdate: Boolean = false,
 ) {
-    var dominant by remember(request) { mutableStateOf<Color?>(null) }
-    val background = dominant ?: MaterialTheme.colorScheme.surfaceContainer
-    val foreground = if (background.luminance() > 0.179f) Color.Black else Color.White
     Surface(modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
-        shape = RoundedCornerShape(8.dp), color = background,
+        shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)),
         shadowElevation = 1.dp) {
-        Column {
-            Box(Modifier.fillMaxWidth().aspectRatio(0.75f)) {
-                ComicImageWithDominantColor(request, title, Modifier.fillMaxSize(),
-                    onDominantColor = { dominant = it }, placeholder = { ComicCoverPlaceholder(title) })
-                ComicCornerBadge(sourceLabel, Modifier.align(Alignment.TopEnd).widthIn(max = 80.dp))
-                if (hasUpdate) Surface(modifier = Modifier.align(Alignment.TopStart),
-                    shape = RoundedCornerShape(bottomEnd = 4.dp), color = MaterialTheme.colorScheme.error) {
-                    Text("更新", Modifier.padding(horizontal = 3.dp, vertical = 1.dp), color = MaterialTheme.colorScheme.onError,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp))
+        Box {
+            // This layer follows the foreground's height instead of stretching a lazy-grid item.
+            ComicImageWithContent(request = request, contentDescription = title, modifier = Modifier.matchParentSize(),
+                placeholder = { ComicCoverPlaceholder(title) },
+                imageContent = { painter ->
+                    Box(Modifier.fillMaxSize()) {
+                        Column {
+                            Image(painter, title, Modifier.fillMaxWidth().aspectRatio(0.9f), contentScale = ContentScale.Crop)
+                            Image(painter, null, contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxWidth().height(42.dp).clipToBounds()
+                                    .blur(16.dp, BlurredEdgeTreatment.Unbounded)
+                                    .graphicsLayer { alpha = if (android.os.Build.VERSION.SDK_INT >= 31) 0.5f else 0.12f })
+                        }
+                    }
+                })
+            Column {
+                Box(Modifier.fillMaxWidth().aspectRatio(0.9f)) {
+                    ComicCornerBadge(sourceLabel, Modifier.align(Alignment.TopEnd).widthIn(max = 80.dp))
+                    if (hasUpdate) Surface(modifier = Modifier.align(Alignment.TopStart),
+                        shape = RoundedCornerShape(bottomEnd = 4.dp), color = MaterialTheme.colorScheme.error) {
+                        Text("更新", Modifier.padding(horizontal = 3.dp, vertical = 1.dp), color = MaterialTheme.colorScheme.onError,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, lineHeight = 12.sp))
+                    }
                 }
-            }
-            Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title, style = MaterialTheme.typography.bodyMedium, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(chapterLabel, style = MaterialTheme.typography.labelSmall,
-                    color = foreground.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(Modifier.fillMaxWidth().height(42.dp).padding(horizontal = 7.dp, vertical = 5.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(title, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 16.sp),
+                        color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val chapterStyle = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp)
+                    val parts = chapterLabel.split('/', limit = 2)
+                    if (parts.size == 2) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(parts[0], Modifier.weight(1f, fill = false), style = chapterStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("/${parts[1]}", style = chapterStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    } else Text(chapterLabel, style = chapterStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
