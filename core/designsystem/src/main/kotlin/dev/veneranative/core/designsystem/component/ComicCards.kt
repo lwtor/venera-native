@@ -64,7 +64,7 @@ fun ComicCoverCard(
                             Image(painter, null, contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxWidth().height(42.dp).clipToBounds()
                                     .blur(16.dp, BlurredEdgeTreatment.Unbounded)
-                                    .graphicsLayer { alpha = if (android.os.Build.VERSION.SDK_INT >= 31) 0.5f else 0.12f })
+                                    .graphicsLayer { alpha = if (android.os.Build.VERSION.SDK_INT >= 31) 0.3f else 0.12f })
                         }
                     }
                 })
