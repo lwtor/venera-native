@@ -93,7 +93,9 @@ internal fun AppRoot(
         mutableStateOf<AppRoute>(AppRoute.Home)
     }
 
-    CompositionLocalProvider(LocalComicImageLoader provides imageLoader) {
+    val comicSourceNames by graph.comicSourceNames.collectAsStateWithLifecycle()
+    CompositionLocalProvider(LocalComicImageLoader provides imageLoader,
+        dev.veneranative.core.designsystem.component.LocalComicSourceNames provides comicSourceNames) {
         AppNavHost(
             route = route,
             onAuthorWorksBack = { current ->

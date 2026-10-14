@@ -25,6 +25,12 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.ImageRequest
+import coil3.request.allowHardware
+import coil3.toBitmap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
@@ -70,6 +76,16 @@ fun ComicImageWithContent(
     placeholder: @Composable () -> Unit = {},
 ) = ComicImageRenderer(request, contentDescription, modifier, contentScale, placeholder, imageContent)
 
+/** Reports only the sampled color; decoded bitmaps remain within the image pipeline. */
+@Composable
+fun ComicImageWithDominantColor(
+    request: ComicImageRequest?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    onDominantColor: (Color) -> Unit,
+    placeholder: @Composable () -> Unit = {},
+) = ComicImageRenderer(request, contentDescription, modifier, ContentScale.Crop, placeholder, null, onDominantColor)
+
 @Composable
 private fun ComicImageRenderer(
     request: ComicImageRequest?,
@@ -79,6 +95,7 @@ private fun ComicImageRenderer(
     placeholder: @Composable () -> Unit = {},
     /** Reuse one loaded painter for a cover and decorative backdrop without a second image load. */
     imageContent: (@Composable (Painter) -> Unit)? = null,
+    onDominantColor: ((Color) -> Unit)? = null,
 ) {
     val imageLoader = LocalComicImageLoader.current
     if (request == null || imageLoader == null) {
@@ -86,6 +103,10 @@ private fun ComicImageRenderer(
         return
     }
 
+    val context = LocalContext.current
+    val model = remember(request, context, onDominantColor != null) {
+        if (onDominantColor == null) request else ImageRequest.Builder(context).data(request).allowHardware(false).build()
+    }
     var retryAttempt by remember(request) { mutableIntStateOf(0) }
     var failed by remember(request) { mutableStateOf(false) }
     LaunchedEffect(request, retryAttempt, failed) {
@@ -98,13 +119,26 @@ private fun ComicImageRenderer(
 
     key(request, retryAttempt) {
         SubcomposeAsyncImage(
-            model = request,
+            model = model,
             contentDescription = contentDescription,
             imageLoader = imageLoader,
             modifier = modifier,
             contentScale = contentScale,
             loading = { placeholder() },
-            success = {
+            success = { state ->
+                if (onDominantColor != null) {
+                    LaunchedEffect(state.result.image) {
+                        val color = withContext(Dispatchers.Default) {
+                            val image = state.result.image
+                            val sample = image.toBitmap(32, 32)
+                            val pixels = IntArray(32 * 32)
+                            sample.getPixels(pixels, 0, 32, 0, 0, 32, 32)
+                            // Do not recycle: toBitmap can return an image-loader-owned bitmap.
+                            dominantCoverColor(pixels)?.let { Color(it) }
+                        }
+                        color?.let(onDominantColor)
+                    }
+                }
                 if (imageContent == null) SubcomposeAsyncImageContent() else imageContent(painter)
             },
             onError = { failed = true },

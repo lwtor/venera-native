@@ -191,7 +191,7 @@ object BackupArchiveCodec {
         categories = getValue("categories").jsonArray.map { BackupCategory.valueOf(it.jsonPrimitive.content) }.toSet(),
         favoriteFolders = array("favoriteFolders") { FavoriteFolderBackup(string("id"), string("name"), int("sortOrder"), boolean("removable")) },
         favoriteEntries = array("favoriteEntries") {
-            FavoriteEntryBackup(string("sourceId"), string("comicId"), string("legacyFolderId"), string("title"), nullableString("subtitle"), nullableString("coverRef"), long("addedAtEpochMillis"), nullableLong("lastReadAtEpochMillis"), nullableInt("chapterCount"), nullableString("latestChapterId"), boolean("hasUpdate"), nullableLong("updatedAtEpochMillis"), nullableString("lastUpdated"))
+            FavoriteEntryBackup(string("sourceId"), string("comicId"), string("legacyFolderId"), string("title"), nullableString("subtitle"), nullableString("coverRef"), long("addedAtEpochMillis"), nullableLong("lastReadAtEpochMillis"), nullableInt("chapterCount"), nullableString("latestChapterId"), boolean("hasUpdate"), nullableLong("updatedAtEpochMillis"), get("lastUpdated")?.jsonPrimitive?.contentOrNull)
         },
         favoriteMemberships = array("favoriteMemberships") { FavoriteMembershipBackup(string("sourceId"), string("comicId"), string("folderId")) },
         readingHistory = array("readingHistory") {

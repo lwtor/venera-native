@@ -1,5 +1,8 @@
 package dev.veneranative.feature.home
 
+import dev.veneranative.core.designsystem.component.comicSourceLabel
+import dev.veneranative.core.designsystem.component.ComicHorizontalCard
+import dev.veneranative.core.designsystem.component.ComicCoverCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -34,7 +37,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -46,14 +48,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.image.ComicImageRequest
-import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.comicKeyOrNull
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.history.ReadingHistoryEntry
 import dev.veneranative.data.local.LocalComicRepository
 
-private const val HOME_COVER_VARIANT = "home-cover"
 
 @Composable
 fun HomeRoute(
@@ -278,39 +278,20 @@ private fun EmptyResumeCard(waitingForData: Boolean, onOpenSearch: () -> Unit) {
 @Composable
 private fun ResumeCard(entry: ReadingHistoryEntry, onClick: () -> Unit) {
     val request = entry.coverUrl?.let {
-        ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = HOME_COVER_VARIANT)
+        ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = "comic-cover")
     }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            ComicImage(
-                request = request,
-                contentDescription = entry.comicTitle,
-                modifier = Modifier
-                    .size(width = 78.dp, height = 108.dp)
-                    .clip(RoundedCornerShape(14.dp)),
-                contentScale = ContentScale.Crop,
-                placeholder = { CoverPlaceholder(entry.comicTitle) },
-            )
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text(entry.comicTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(entry.chapterTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                val progress = if (entry.pageCount > 0) (entry.pageIndex + 1f) / entry.pageCount else 0f
-                LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-                Text("第 ${entry.pageIndex + 1} / ${entry.pageCount.coerceAtLeast(1)} 页", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("继续阅读  ›", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-    }
+    ComicHorizontalCard(
+        title = entry.comicTitle, request = request, onClick = onClick,
+        modifier = Modifier.padding(horizontal = 20.dp),
+        badge = comicSourceLabel(entry.comicKey.sourceId.value),
+        supportingContent = {
+            Text(entry.chapterTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val progress = if (entry.pageCount > 0) (entry.pageIndex + 1f) / entry.pageCount else 0f
+            LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+            Text("第 ${entry.pageIndex + 1} / ${entry.pageCount.coerceAtLeast(1)} 页", style = MaterialTheme.typography.labelSmall)
+        },
+        bottomContent = { Text("继续阅读  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
+    )
 }
 
 @Composable
@@ -318,51 +299,13 @@ private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteIt
     val comicKey = item.ref.comicKeyOrNull()
     val coverRef = item.coverRef
     val request = if (comicKey != null && coverRef != null) {
-        ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = HOME_COVER_VARIANT)
+        ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = "comic-cover")
     } else null
-    Card(
-        modifier = Modifier
-            .width(138.dp)
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column {
-            ComicImage(
-                request = request,
-                contentDescription = item.title,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(124.dp),
-                contentScale = ContentScale.Crop,
-                placeholder = { CoverPlaceholder(item.title) },
-            )
-            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(item.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("有新章节", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CoverPlaceholder(title: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primaryContainer),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = title.take(2),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(8.dp),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+    ComicCoverCard(
+        title = item.title, request = request, lastUpdated = item.lastUpdated,
+        sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
+        onClick = onClick, hasUpdate = item.hasUpdate, modifier = Modifier.width(138.dp),
+    )
 }
 
 @Composable

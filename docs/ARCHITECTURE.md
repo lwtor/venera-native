@@ -33,6 +33,8 @@ immutable UiState
 
 S4-10B1：收藏的 lastUpdated 保存来源日期，与用于更新排序的本地 updatedAt 独立。Room 9→10 增加可空 TEXT 列；收藏快照、手动更新检查与可选备份字段共用此值，未知日期不猜测。
 
+S4-10B2：core:designsystem 新增两种公共漫画条目，Feature 只提供显示值、事件和内容槽；core:image 独占软件解码与 32×32 主色取样，仅向 UI 返回 Color。来源名由 AppGraph 从本地来源索引装配为 StateFlow/CompositionLocal，不在 UI 访问仓库。规则及使用范围见 ADR-0014。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |
@@ -54,13 +56,13 @@ S4-10B1：收藏的 lastUpdated 保存来源日期，与用于更新排序的本
 | `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
 | `:data:local` | SAF 目录/归档授权、扫描、自然排序、本地索引及有界页面缓存物化；按需复用图片头尺寸解析 | `:core:model`、`:core:database`、`:core:archive`、`:core:image`、DocumentFile |
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
-| `:core:designsystem` | Theme 与设计 Token | Compose、`:core:model`（按需） |
+| `:core:designsystem` | Theme、设计 Token、共享漫画竖向卡片/横向列表与角标 | Compose、`:core:image`（封面渲染及取色；传递纯模型契约） |
 | `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索、来源管理和书架入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
 | `:feature:library` | 书架页：收藏常驻主视图，下载队列与本地漫画从菜单进入；收藏支持用户收藏夹筛选、多选归属、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
 | `:feature:backup` | GitHub 数据备份页面：选择快照类别、密码输入、手动备份与确认后合并恢复；账号授权移到我的页，Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |
 | `:feature:profile` | 我的根页、GitHub 账号授权与资料、最近成功同步时间、关于页；通过导航回调进入备份，不依赖其他 Feature | Design System、`:core:image`、`:data:backup`、Lifecycle |
-| `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic` |
+| `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic`、`:core:image` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |
 | `:feature:sources` | 来源管理：分开展示可用目录和已安装来源；安装、启停、卸载，以及加载 / 空 / 失败 / 成功页面状态 | Design System、`:core:model`、`:data:source` |

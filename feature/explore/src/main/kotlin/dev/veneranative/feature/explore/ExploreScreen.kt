@@ -1,5 +1,7 @@
 package dev.veneranative.feature.explore
 
+import dev.veneranative.core.designsystem.component.comicSourceLabel
+import dev.veneranative.core.designsystem.component.ComicHorizontalCard
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -21,7 +22,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -230,24 +230,16 @@ private fun ComicRow(
     comic: Comic,
     onOpen: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onOpen) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = comic.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            comic.subtitle?.let { subtitle ->
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
+    ComicHorizontalCard(
+        title = comic.title,
+        request = comic.coverUrl?.let { dev.veneranative.core.image.ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "search-result") },
+        onClick = onOpen,
+        badge = comicSourceLabel(comic.key.sourceId.value),
+        supportingContent = {
+            comic.subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+            Text(comic.lastUpdated.orEmpty(), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        },
+    )
 }
 
 @Composable

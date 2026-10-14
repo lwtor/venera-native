@@ -143,12 +143,18 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val runtime = QuickJsRuntime(
         hostApi = SourceNetworkHostApi(network), appLocale = Locale.getDefault().toString(),
     )
+    private val comicSourceNamesState = kotlinx.coroutines.flow.MutableStateFlow<Map<String, String>>(emptyMap())
+    val comicSourceNames: kotlinx.coroutines.flow.StateFlow<Map<String, String>> = comicSourceNamesState
+    private val sourcePackageStore = SourcePackageStore(File(getApplication<android.app.Application>().filesDir, "sources"))
+    private fun refreshComicSourceNames() {
+        comicSourceNamesState.value = sourcePackageStore.list().associate { it.sourceId.value to it.name }
+    }
     val sourceRepository = DefaultSourceRepository(
-        SourcePackageStore(File(getApplication<android.app.Application>().filesDir, "sources")),
+        sourcePackageStore,
         runtime,
         QuickJsMetadataReader(),
         AndroidSourceScriptFetcher(getApplication(), httpClient),
-        onSourceChanged = { network.clearSource(it) },
+        onSourceChanged = { network.clearSource(it); scope.launch { refreshComicSourceNames() } },
     )
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
     val catalog = DefaultComicCatalog(
@@ -164,6 +170,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     )
     private val sourceRuntimeWarmup = scope.launch {
         val startedAt = android.os.SystemClock.elapsedRealtime()
+        refreshComicSourceNames()
         val installed = runCatching { sourceRepository.installed() }.getOrDefault(emptyList())
         localSearchStartupLog?.append(
             "stage=source_runtime_warmup sources=${installed.size} elapsedMs=${android.os.SystemClock.elapsedRealtime() - startedAt}",

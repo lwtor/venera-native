@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10B2 DONE：统一漫画竖向卡片与横向列表。** 收藏卡片保持封面顶部 8dp 圆角，封面底部直角连接信息区，底部同样 8dp 圆角；标题/来源更新日期各一行，来源名小角标放封面右上，更新标记与长按保留。底色来自已加载封面主色，32×32 软件取样及 RGB 色簇统计在 core:image/Default dispatcher 内完成，只返回 Color，不存 Bitmap、不额外请求封面；亮度自动选择黑白字，加载/失败时主题底色。core:designsystem 公共 ComicCoverCard/ComicHorizontalCard 统一布局。收藏、首页更新和聚合预览用竖向；完整搜索/相关作品、探索、首页最近阅读、本地条目和下载分组用横向，保留分页、标签/状态补读、进度、展开、菜单与多选。来源名从 AppGraph 本地索引 StateFlow 装配，UI 不访问仓库。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :core:image:compileDebugUnitTestKotlin :core:backup:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。取色合成测试源码覆盖透明像素及多数色簇；最终检查修正新可选备份字段的缺键读取，新增旧格式加密包恢复回归源码；测试仅编译，未运行/安装/真机验证。B1 日期/备份/迁移源码编译证据见下。代码入口检查见 `docs/reviews/shared-comic-cards-audit.md`，架构见 ADR-0014。本地与下载没有可加载封面时显示统一标题占位；未知来源日期显示“暂无更新日期”，旧收藏需手动检查更新或重新收藏补齐。深浅主题、取色效果与交互待用户复验。当前唯一下一任务恢复 S4-02G4。
+
 **S4-10B1 DONE：收藏保存来源更新日期。** FavoriteItem/ComicSnapshot 和 Room 新增可空 lastUpdated；详情收藏及现有手动检查更新复用详情的 comic.lastUpdated/Updated 元数据，不新增网络调用。Room 9→10 增列，旧收藏为 null，不使用收藏/检查时间伪造来源日期。备份增加可选字段，旧包兼容。补充日期保留、章节未变化仍更新日期及迁移保留旧行的测试源码，并修复收藏测试 FakeDao 缺失既有备份接口。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug :data:collection:compileDebugUnitTestKotlin :core:backup:compileDebugUnitTestKotlin :core:database:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试仅编译，未运行/未安装。当前用户任务下一切片 S4-10B2：统一竖向卡片与横向列表；原 S4-02G4 保持待续。

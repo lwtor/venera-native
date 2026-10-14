@@ -25,6 +25,35 @@ class BackupArchiveCodecTest {
         assertNotEquals(snapshot.toString().toByteArray().toList(), encoded.toList())
     }
 
+    @Test fun `legacy encrypted archive without source update date restores`() {
+        // Fixed synthetic archive contents, using the old JSON format with no lastUpdated field.
+        val legacyJson = """{"schemaVersion":1,"createdAtEpochMillis":1,"categories":["Favorites"],
+            "favoriteFolders":[],"favoriteMemberships":[],"readingHistory":[],"readingProgress":[],"appPreferences":[],
+            "favoriteEntries":[{"sourceId":"fixture","comicId":"one","legacyFolderId":"","title":"Comic",
+            "subtitle":null,"coverRef":null,"addedAtEpochMillis":1,"lastReadAtEpochMillis":null,"chapterCount":null,
+            "latestChapterId":null,"hasUpdate":false,"updatedAtEpochMillis":null}]}""".toByteArray()
+        val salt = ByteArray(16)
+        val nonce = ByteArray(12)
+        val header = java.io.ByteArrayOutputStream().also { bytes ->
+            java.io.DataOutputStream(bytes).use {
+                it.write(byteArrayOf(0x56, 0x4e, 0x42, 0x4b)); it.writeByte(1); it.writeInt(210_000)
+                it.write(salt); it.write(nonce)
+            }
+        }.toByteArray()
+        val compressed = java.io.ByteArrayOutputStream().also { bytes ->
+            java.util.zip.GZIPOutputStream(bytes).use { it.write(legacyJson) }
+        }.toByteArray()
+        val key = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+            .generateSecret(javax.crypto.spec.PBEKeySpec(PASSWORD, salt, 210_000, 256)).encoded
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding").apply {
+            init(javax.crypto.Cipher.ENCRYPT_MODE, javax.crypto.spec.SecretKeySpec(key, "AES"), javax.crypto.spec.GCMParameterSpec(128, nonce))
+            updateAAD(header)
+        }
+        val restored = BackupArchiveCodec.decode(header + cipher.doFinal(compressed), PASSWORD)
+        assertEquals("Comic", restored.favoriteEntries.single().title)
+        assertEquals(null, restored.favoriteEntries.single().lastUpdated)
+    }
+
     @Test fun `wrong password and modified ciphertext are rejected`() {
         val encoded = BackupArchiveCodec.encode(snapshot, PASSWORD)
         val modified = encoded.copyOf().apply { this[this.lastIndex] = (this.last().toInt() xor 1).toByte() }

@@ -1,5 +1,7 @@
 package dev.veneranative.feature.library
 
+import dev.veneranative.core.designsystem.component.comicSourceLabel
+import dev.veneranative.core.designsystem.component.ComicHorizontalCard
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,8 +43,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Card
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
@@ -616,31 +616,23 @@ private fun LocalComicCard(
 ) {
     var expanded by remember(comic.id) { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
-    Card(Modifier.fillMaxWidth()) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(if (comic.kind == dev.veneranative.data.local.LocalKind.Archive) "▣" else "▤", style = MaterialTheme.typography.titleLarge)
-                Column(Modifier.weight(1f).padding(start = 14.dp)) {
-                    Text(comic.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${comic.chapterCount} 章 · ${if (comic.kind == dev.veneranative.data.local.LocalKind.Archive) "压缩包" else "文件夹"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(if (expanded) "⌃" else "⌄", style = MaterialTheme.typography.titleMedium)
+    Column(Modifier.fillMaxWidth()) {
+        ComicHorizontalCard(
+            title = comic.title, request = null, badge = "本地", onClick = { expanded = !expanded },
+            supportingContent = {
+                Text("${comic.chapterCount} 章 · ${if (comic.kind == dev.veneranative.data.local.LocalKind.Archive) "压缩包" else "文件夹"}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            bottomContent = { Text(if (expanded) "收起章节  ⌃" else "展开章节  ⌄", style = MaterialTheme.typography.labelLarge) },
+            trailingContent = {
                 Box {
                     IconButton(onClick = { menuExpanded = true }) { Text("⋮", style = MaterialTheme.typography.titleLarge) }
                     DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text("从本地移除") },
-                            onClick = {
-                                menuExpanded = false
-                                onRemove()
-                            },
-                        )
+                        DropdownMenuItem(text = { Text("从本地移除") }, onClick = { menuExpanded = false; onRemove() })
                     }
                 }
-            }
+            },
+        )
             if (expanded) {
                 HorizontalDivider()
                 if (chapters.isEmpty()) {
@@ -654,7 +646,6 @@ private fun LocalComicCard(
                     }
                 }
             }
-        }
     }
 }
 
@@ -684,40 +675,24 @@ private fun DownloadComicRow(
     val baseTitle = tasks.firstNotNullOfOrNull { it.comicTitle?.takeIf(String::isNotBlank) }
         ?: tasks.firstOrNull()?.title.orEmpty()
     val title = groupKey.versionGroup?.let { "$baseTitle · $it" } ?: baseTitle
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { if (selectionMode) onToggleSelection() else onOpen() },
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    "$complete / ${tasks.size} 话完成 · $active 话处理中 · $failed 话需处理",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-                LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(3.dp))
-            }
-            if (selectionMode) {
-                TriStateCheckbox(
-                    state = when {
-                        partiallySelected -> ToggleableState.Indeterminate
-                        selected -> ToggleableState.On
-                        else -> ToggleableState.Off
-                    },
-                    onClick = onToggleSelection,
-                    modifier = Modifier.padding(start = 6.dp),
-                )
-            } else {
-                Text("${tasks.size} 话  ›", modifier = Modifier.padding(start = 12.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-    }
+    ComicHorizontalCard(
+        title = title, request = null,
+        badge = comicSourceLabel(groupKey.comicKey.sourceId.value),
+        onClick = { if (selectionMode) onToggleSelection() else onOpen() },
+        modifier = Modifier.padding(vertical = 4.dp),
+        supportingContent = {
+            Text("$complete / ${tasks.size} 话完成 · $active 话处理中 · $failed 话需处理",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(3.dp))
+        },
+        bottomContent = { Text("${tasks.size} 话  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
+        trailingContent = {
+            if (selectionMode) TriStateCheckbox(
+                state = when { partiallySelected -> ToggleableState.Indeterminate; selected -> ToggleableState.On; else -> ToggleableState.Off },
+                onClick = onToggleSelection,
+            )
+        },
+    )
 }
 
 @Composable
