@@ -29,4 +29,5 @@ data class ReadingHistoryEntity(
     @ColumnInfo(name = "page_index") val pageIndex: Int,
     @ColumnInfo(name = "page_count") val pageCount: Int,
     @ColumnInfo(name = "updated_at") val updatedAtEpochMillis: Long,
+    @ColumnInfo(name = "chapter_group") val chapterGroup: String? = null,
 )

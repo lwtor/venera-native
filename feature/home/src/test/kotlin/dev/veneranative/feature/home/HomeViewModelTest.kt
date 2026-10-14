@@ -54,6 +54,7 @@ class HomeViewModelTest {
         )
         val remote = local.copy(
             comicKey = ComicKey(SourceId("fixture"), RemoteComicId("remote-comic")),
+            chapterGroup = "Version B",
         )
 
         assertEquals(
@@ -61,7 +62,7 @@ class HomeViewModelTest {
             local.toChapterRef(),
         )
         assertEquals(
-            ChapterRef.Remote(ChapterKey(remote.comicKey, remote.chapterId)),
+            ChapterRef.Remote(ChapterKey(remote.comicKey, remote.chapterId), "Version B"),
             remote.toChapterRef(),
         )
     }
@@ -164,7 +165,9 @@ class HomeViewModelTest {
         override suspend fun deleteFolder(id: String) = error("Not used in this test")
         override suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot) = error("Not used in this test")
         override suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot) = error("Not used in this test")
-        override suspend fun remove(ref: ComicRef) = error("Not used in this test")
+        override suspend fun updateChapters(ref: dev.veneranative.core.model.ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) = Unit
+
+    override suspend fun remove(ref: ComicRef) = error("Not used in this test")
         override suspend fun moveTo(ref: ComicRef, folderId: String) = error("Not used in this test")
         override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) = error("Not used in this test")
         override suspend fun clearUpdate(ref: ComicRef) = error("Not used in this test")

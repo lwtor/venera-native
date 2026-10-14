@@ -87,6 +87,8 @@ internal class FakeCollectionRepository : CollectionRepository {
         items.value = items.value.map { if (it.ref == ref) it.copy(folderIds = folderIds) else it }
     }
 
+    override suspend fun updateChapters(ref: dev.veneranative.core.model.ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) = Unit
+
     override suspend fun remove(ref: ComicRef) {
         removed += ref
     }

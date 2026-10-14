@@ -117,6 +117,12 @@ internal class FakeFavoriteDao : FavoriteDao {
         }
     }
 
+    override suspend fun updateChapterCatalog(refSource: String, refComic: String, chaptersJson: String) {
+        entries.value = entries.value.map {
+            if (it.refSource == refSource && it.refComic == refComic) it.copy(chaptersJson = chaptersJson) else it
+        }
+    }
+
     override suspend fun updateLastUpdated(refSource: String, refComic: String, lastUpdated: String) {
         entries.value = entries.value.map {
             if (it.refSource == refSource && it.refComic == refComic) it.copy(lastUpdated = lastUpdated) else it

@@ -302,7 +302,8 @@ private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteIt
         ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = "comic-cover")
     } else null
     ComicCoverCard(
-        title = item.title, request = request, lastUpdated = item.lastUpdated,
+        title = item.title, request = request,
+        chapterLabel = dev.veneranative.core.model.comicChapterProgressLabel(item.chapters, item.readingChapter),
         sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
         onClick = onClick, hasUpdate = item.hasUpdate, modifier = Modifier.width(138.dp),
     )

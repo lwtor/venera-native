@@ -35,6 +35,8 @@ S4-10B1：收藏的 lastUpdated 保存来源日期，与用于更新排序的本
 
 S4-10B2：core:designsystem 新增两种公共漫画条目，Feature 只提供显示值、事件和内容槽；core:image 独占软件解码与 32×32 主色取样，仅向 UI 返回 Color。来源名由 AppGraph 从本地来源索引装配为 StateFlow/CompositionLocal，不在 UI 访问仓库。规则及使用范围见 ADR-0014。
 
+S4-10B3：core:model 定义分版本目录与当前阅读展示规则；data:collection 保存紧凑章节目录 JSON 并结合 core:database 的每漫画最近阅读 Flow，未新增 data:history 依赖。Room 10→11 增收藏目录与阅读版本可空字段；data:history 将 ChapterRef.Remote.group 带入历史，首页/详情恢复已知版本。详情成功加载只更新已有收藏目录，手动检查更新复用原响应；UI 只接收展示值。决定补充 ADR-0014。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |
@@ -53,7 +55,7 @@ S4-10B2：core:designsystem 新增两种公共漫画条目，Feature 只提供�
 | `:data:backup` | 按用户选择从 Room 创建快照与事务化恢复；GitHub Device Flow、私有仓库传输、共享账号资料与成功同步回执；不包含漫画文件 | `:core:backup`、`:core:database`、Room、OkHttp、Android Keystore/AtomicFile |
 | `:data:search` | 最近搜索词仓库：规范化查询词、去重置顶、有界保留及单项删除/清空；数据保存在 Room | `:core:database`、Coroutines |
 | `:data:settings` | 轻量页面选择偏好的类型无关持久化仓库；为 S4-01 设置模块前的页面状态切片提供 Room 存储 | `:core:database` |
-| `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现） |
+| `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现）、kotlinx.serialization JSON（章节目录持久化） |
 | `:data:local` | SAF 目录/归档授权、扫描、自然排序、本地索引及有界页面缓存物化；按需复用图片头尺寸解析 | `:core:model`、`:core:database`、`:core:archive`、`:core:image`、DocumentFile |
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme、设计 Token、共享漫画竖向卡片/横向列表与角标 | Compose、`:core:image`（封面渲染及取色；传递纯模型契约） |

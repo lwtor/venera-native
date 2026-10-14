@@ -29,6 +29,7 @@ data class DetailsUiState(
     val tagMessage: String? = null,
     /** Last chapter recorded by the reader, if this comic has reading history. */
     val lastReadChapterId: RemoteChapterId? = null,
+    val lastReadGroup: String? = null,
     /** A pending, consumable request to reveal the current chapter in the directory. */
     val chapterLocationRequest: Long? = null,
     /** Chapters whose persisted position reached the final page. */
@@ -66,9 +67,9 @@ data class DetailsUiState(
 
     private val chapters: List<Chapter> get() = detail?.chapters.orEmpty()
 
-    // Matches the reader's existing resume behavior; history currently stores no version group.
+    // Explicit history versions take priority; old records keep their existing ID fallback.
     val currentReadingChapter: Chapter?
-        get() = chapters.firstOrNull { it.key.remoteId == lastReadChapterId }
+        get() = chapters.firstOrNull { it.key.remoteId == lastReadChapterId && (lastReadGroup == null || it.group == lastReadGroup) }
 
     /** Groups the source declared, in the order it declared them. */
     val groups: List<String> get() = chapters.mapNotNull { it.group }.distinct()

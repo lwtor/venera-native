@@ -38,6 +38,7 @@ class ReaderProgressSession(
             comicTitle = content.comicTitle ?: comicKey.remoteId.value,
             chapterId = chapterId,
             chapterTitle = content.title,
+            chapterGroup = (chapter as? ChapterRef.Remote)?.group,
             coverUrl = content.coverUrl,
             pageIndex = pageIndex,
             pageCount = content.pages.size,

@@ -308,7 +308,7 @@ private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (Searc
                             ComicCoverCard(
                                 title = comic.title,
                                 request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "comic-cover") },
-                                lastUpdated = comic.lastUpdated, sourceLabel = row.sourceName,
+                                chapterLabel = "总章节未知", sourceLabel = row.sourceName,
                                 onClick = { onOpenComic(comic.key) }, modifier = Modifier.width(128.dp),
                             )
                         }

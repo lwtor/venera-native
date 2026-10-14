@@ -262,6 +262,7 @@ class DetailsViewModel(
                 repository.observeComicHistory(comicKey).collect { entries ->
                     _state.update { current ->
                         current.copy(
+                            lastReadGroup = entries.maxByOrNull { it.updatedAtEpochMillis }?.chapterGroup,
                             readChapterIds = entries.asSequence()
                                 .filter { it.pageCount > 0 && it.pageIndex >= it.pageCount - 1 }
                                 .map { it.chapterId }
@@ -454,6 +455,13 @@ class DetailsViewModel(
                     val canOpenTags = if (outcome is SourceOutcome.Success)
                         (catalog.capabilities(comicKey.sourceId) as? SourceOutcome.Success)?.value?.canNavigateTags == true
                         else false
+                    if (outcome is SourceOutcome.Success) collection?.let { repository ->
+                        viewModelScope.launch {
+                            try { repository.updateChapters(ComicRef.Remote(comicKey), outcome.value.chapters) }
+                            catch (cancelled: CancellationException) { throw cancelled }
+                            catch (_: Exception) { _state.update { it.copy(message = "无法更新书架章节信息。") } }
+                        }
+                    }
                     when (outcome) {
                         is SourceOutcome.Success -> _state.update { current ->
                             current.copy(
@@ -524,6 +532,7 @@ internal fun ComicDetail.toSnapshot(): ComicSnapshot = ComicSnapshot(
     subtitle = comic.subtitle,
     coverRef = comic.coverUrl,
     lastUpdated = comic.lastUpdated ?: metadata["Updated"],
+    chapters = chapters,
     chapterCount = chapters.size.takeIf { it > 0 },
     latestChapterId = chapters.lastOrNull()?.key?.remoteId?.value,
 )

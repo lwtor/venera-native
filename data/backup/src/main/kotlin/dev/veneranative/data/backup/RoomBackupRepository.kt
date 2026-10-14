@@ -90,19 +90,19 @@ private fun FavoriteFolderEntity.toBackup() = FavoriteFolderBackup(folderId, nam
 private fun FavoriteFolderBackup.toEntity() = FavoriteFolderEntity(id, name, sortOrder, removable)
 private fun FavoriteEntryEntity.toBackup() = FavoriteEntryBackup(
     refSource, refComic, folderId, title, subtitle, coverRef, addedAt, lastReadAt,
-    chapterCount, latestChapterId, hasUpdate, updatedAt, lastUpdated,
+    chapterCount, latestChapterId, hasUpdate, updatedAt, lastUpdated, chaptersJson,
 )
 private fun FavoriteEntryBackup.toEntity() = FavoriteEntryEntity(
     sourceId, comicId, legacyFolderId, title, subtitle, coverRef, addedAtEpochMillis,
-    lastReadAtEpochMillis, chapterCount, latestChapterId, hasUpdate, updatedAtEpochMillis, lastUpdated,
+    lastReadAtEpochMillis, chapterCount, latestChapterId, hasUpdate, updatedAtEpochMillis, lastUpdated, chaptersJson,
 )
 private fun FavoriteMembershipEntity.toBackup() = FavoriteMembershipBackup(refSource, refComic, folderId)
 private fun FavoriteMembershipBackup.toEntity() = FavoriteMembershipEntity(sourceId, comicId, folderId)
 private fun ReadingHistoryEntity.toBackup() = ReadingHistoryBackup(
-    sourceId, comicId, chapterId, comicTitle, chapterTitle, coverUrl, pageIndex, pageCount, updatedAtEpochMillis,
+    sourceId, comicId, chapterId, comicTitle, chapterTitle, coverUrl, pageIndex, pageCount, updatedAtEpochMillis, chapterGroup,
 )
 private fun ReadingHistoryBackup.toEntity() = ReadingHistoryEntity(
-    sourceId, comicId, chapterId, comicTitle, chapterTitle, coverUrl, pageIndex, pageCount, updatedAtEpochMillis,
+    sourceId, comicId, chapterId, comicTitle, chapterTitle, coverUrl, pageIndex, pageCount, updatedAtEpochMillis, chapterGroup,
 )
 private fun ReadingProgressEntity.toBackup() = ReadingProgressBackup(
     sourceId, comicId, chapterId, pageIndex, updatedAtEpochMillis,

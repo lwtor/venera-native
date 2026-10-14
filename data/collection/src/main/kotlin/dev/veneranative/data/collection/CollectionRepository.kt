@@ -36,6 +36,8 @@ data class FavoriteItem(
     val latestChapterId: String? = null,
     val hasUpdate: Boolean = false,
     val lastUpdated: String? = null,
+    val chapters: List<dev.veneranative.core.model.ComicChapterEntry> = emptyList(),
+    val readingChapter: dev.veneranative.core.model.ComicReadingChapter? = null,
 )
 
 /** How the shelf orders comics. The database answers with the rows already in this order. */
@@ -54,6 +56,7 @@ data class ComicSnapshot(
     val chapterCount: Int? = null,
     val latestChapterId: String? = null,
     val lastUpdated: String? = null,
+    val chapters: List<dev.veneranative.core.model.Chapter>? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }
@@ -91,6 +94,9 @@ interface CollectionRepository {
 
     /** Adds a comic to All and selected user collections in one operation. */
     suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot)
+
+    /** Updates only an existing favorite directory; never changes collection membership. */
+    suspend fun updateChapters(ref: ComicRef, chapters: List<dev.veneranative.core.model.Chapter>)
 
     suspend fun remove(ref: ComicRef)
 

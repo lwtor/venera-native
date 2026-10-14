@@ -29,13 +29,22 @@ class DefaultCollectionRepository internal constructor(
     private val updateMarker: UpdateMarker,
     private val clock: () -> Long = { System.currentTimeMillis() },
     private val transaction: suspend (suspend () -> Unit) -> Unit = { it() },
+    private val historyDao: dev.veneranative.core.database.ReadingHistoryDao? = null,
 ) : CollectionRepository {
 
     constructor(database: VeneraDatabase, probe: RemoteChapterProbe) : this(
         dao = database.favoriteDao(),
+        historyDao = database.readingHistoryDao(),
         updateMarker = UpdateMarker(probe),
         transaction = { operation -> database.withTransaction { operation() } },
     )
+
+    private val recentHistory = (historyDao?.observeRecent(Int.MAX_VALUE) ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+        .map { rows -> rows.associateBy { it.sourceId to it.comicId } }
+    private fun FavoriteItem.withReading(rows: Map<Pair<String, String>, dev.veneranative.core.database.ReadingHistoryEntity>): FavoriteItem {
+        val latest = rows[ref.refSource() to ref.refComic()]
+        return copy(readingChapter = latest?.let { dev.veneranative.core.model.ComicReadingChapter(it.chapterId, it.chapterTitle, it.chapterGroup) })
+    }
 
     override fun observeFolders(): Flow<List<FavoriteFolder>> =
         dao.observeFolders().map { rows -> rows.map { it.toDomain() } }
@@ -58,14 +67,14 @@ class DefaultCollectionRepository internal constructor(
             rows.mapNotNull { row -> row.toDomainOrNull()?.copy(
                 folderIds = grouped[row.refSource to row.refComic]?.map { it.folderId }?.toSet().orEmpty(),
             ) }
-        }
+        }.combine(recentHistory) { items, history -> items.map { it.withReading(history) } }
 
     override fun observeItem(ref: ComicRef): Flow<FavoriteItem?> =
         dao.observeEntry(ref.refSource(), ref.refComic()).combine(dao.observeMemberships()) { row, memberships ->
             row?.toDomainOrNull()?.copy(folderIds = memberships.asSequence()
                 .filter { it.refSource == ref.refSource() && it.refComic == ref.refComic() }
                 .map { it.folderId }.toSet())
-        }
+        }.combine(recentHistory) { item, history -> item?.withReading(history) }
 
     override suspend fun createFolder(name: String): String {
         val trimmed = name.trim()
@@ -131,10 +140,15 @@ class DefaultCollectionRepository internal constructor(
                 hasUpdate = existing?.hasUpdate ?: false,
                 updatedAt = existing?.updatedAt,
                 lastUpdated = snapshot.lastUpdated ?: existing?.lastUpdated,
+                chaptersJson = snapshot.chapters?.let(::encodeChapterCatalog) ?: existing?.chaptersJson,
             ),
             )
             setFolders(ref, folderIds)
         }
+    }
+
+    override suspend fun updateChapters(ref: ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) {
+        if (chapters.isNotEmpty()) dao.updateChapterCatalog(ref.refSource(), ref.refComic(), encodeChapterCatalog(chapters))
     }
 
     override suspend fun remove(ref: ComicRef) {
@@ -179,6 +193,7 @@ class DefaultCollectionRepository internal constructor(
 
                 is UpdateState.Unchanged -> {
                     state.snapshot.lastUpdated?.let { dao.updateLastUpdated(source, comic, it) }
+                    state.snapshot.chapters?.let { updateChapters(item.ref, it) }
                     if (entity.differsFrom(state.snapshot)) {
                         dao.applySnapshot(
                             refSource = source,
@@ -193,6 +208,7 @@ class DefaultCollectionRepository internal constructor(
 
                 is UpdateState.Updated -> {
                     state.snapshot.lastUpdated?.let { dao.updateLastUpdated(source, comic, it) }
+                    state.snapshot.chapters?.let { updateChapters(item.ref, it) }
                     dao.applySnapshot(
                         refSource = source,
                         refComic = comic,

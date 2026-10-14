@@ -277,6 +277,22 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migrate10To11PreservesFavoritesAndReadingWithoutGuessingVersion() {
+        helper.createDatabase(TEST_DB, 10).apply {
+            execSQL("INSERT INTO favorite_entry (ref_source, ref_comic, folder_id, title, added_at, has_update) VALUES ('fixture','one','','Comic',1,0)")
+            execSQL("INSERT INTO reading_history (source_id, comic_id, chapter_id, comic_title, chapter_title, page_index, page_count, updated_at) VALUES ('fixture','one','c1','Comic','第1话',0,1,1)")
+            close()
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 11, true, MIGRATION_10_11).use { db ->
+            db.query("SELECT title, chapters_json FROM favorite_entry").use { c ->
+                assertEquals(true, c.moveToFirst()); assertEquals("Comic", c.getString(0)); assertEquals(true, c.isNull(1))
+            }
+            db.query("SELECT chapter_title, chapter_group FROM reading_history").use { c ->
+                assertEquals(true, c.moveToFirst()); assertEquals("第1话", c.getString(0)); assertEquals(true, c.isNull(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

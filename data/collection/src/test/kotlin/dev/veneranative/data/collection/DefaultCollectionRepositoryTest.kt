@@ -10,6 +10,7 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.comicKeyOrNull
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -40,6 +41,26 @@ class DefaultCollectionRepositoryTest {
         probe[key("one")] = ChapterSnapshot(2, "c2", "2026-10-14")
         repository.refreshUpdates()
         assertEquals("2026-10-14", repository.observeItem(comic("one")).first()!!.lastUpdated)
+    }
+
+    @Test fun `favorite version totals follow persisted reading changes and directory refresh`() = runTest {
+        val history = ShelfReadingHistoryDao()
+        val shelf = DefaultCollectionRepository(dao, UpdateMarker(probe), historyDao = history)
+        val chapters = listOf(
+            dev.veneranative.core.model.Chapter(dev.veneranative.core.model.ChapterKey(key("one"), dev.veneranative.core.model.RemoteChapterId("same")), "第110话", 0, "A"),
+            dev.veneranative.core.model.Chapter(dev.veneranative.core.model.ChapterKey(key("one"), dev.veneranative.core.model.RemoteChapterId("same")), "第111话", 1, "B"),
+            dev.veneranative.core.model.Chapter(dev.veneranative.core.model.ChapterKey(key("one"), dev.veneranative.core.model.RemoteChapterId("third")), "第110话", 2, "C"),
+        )
+        shelf.addToFolders(comic("one"), emptySet(), ComicSnapshot("Comic", chapterCount = 3, chapters = chapters))
+        fun label(item: FavoriteItem) = dev.veneranative.core.model.comicChapterProgressLabel(item.chapters, item.readingChapter)
+        assertEquals("共111话", label(shelf.observeItems(null, ShelfSort.AddedAt).first().single()))
+        history.upsert(dev.veneranative.core.database.ReadingHistoryEntity("source-a", "one", "same", "Comic", "第10话", null, 0, 1, 1, "A"))
+        assertEquals("第10话 / 共110话", label(shelf.observeItems(null, ShelfSort.AddedAt).first().single()))
+        history.upsert(history.rows.value.single().copy(chapterGroup = "B", updatedAtEpochMillis = 2))
+        assertEquals("第10话 / 共111话", label(shelf.observeItem(comic("one")).first()!!))
+        shelf.updateChapters(comic("one"), chapters.map { if (it.group == "B") it.copy(title = "第112话") else it })
+        assertEquals("第10话 / 共112话", label(shelf.observeItem(comic("one")).first()!!))
+        assertEquals(emptySet<String>(), shelf.observeItem(comic("one")).first()!!.folderIds)
     }
 
     private fun folder(
@@ -310,4 +331,18 @@ class DefaultCollectionRepositoryTest {
         assertEquals(1, repository.refreshUpdates())
         assertEquals(listOf(true, false), shelf(sort = ShelfSort.Title).map { it.hasUpdate })
     }
+}
+
+private class ShelfReadingHistoryDao : dev.veneranative.core.database.ReadingHistoryDao {
+    val rows = kotlinx.coroutines.flow.MutableStateFlow<List<dev.veneranative.core.database.ReadingHistoryEntity>>(emptyList())
+    override suspend fun all() = rows.value
+    override suspend fun deleteAll() { rows.value = emptyList() }
+    override fun observeRecent(limit: Int) = rows.map { list -> list.sortedByDescending { it.updatedAtEpochMillis }.distinctBy { it.sourceId to it.comicId }.take(limit) }
+    override fun observeComic(sourceId: String, comicId: String) = rows.map { list -> list.filter { it.sourceId == sourceId && it.comicId == comicId } }
+    override suspend fun find(sourceId: String, comicId: String) = rows.value.firstOrNull { it.sourceId == sourceId && it.comicId == comicId }
+    override suspend fun upsert(entry: dev.veneranative.core.database.ReadingHistoryEntity) {
+        rows.value = rows.value.filterNot { it.sourceId == entry.sourceId && it.comicId == entry.comicId && it.chapterId == entry.chapterId } + entry
+    }
+    override suspend fun upsertAll(entries: List<dev.veneranative.core.database.ReadingHistoryEntity>) { entries.forEach { upsert(it) } }
+    override suspend fun delete(sourceId: String, comicId: String) { rows.value = rows.value.filterNot { it.sourceId == sourceId && it.comicId == comicId } }
 }

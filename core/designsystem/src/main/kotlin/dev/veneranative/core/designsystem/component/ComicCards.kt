@@ -43,7 +43,7 @@ fun ComicCornerBadge(text: String, modifier: Modifier = Modifier, color: Color =
 fun ComicCoverCard(
     title: String,
     request: ComicImageRequest?,
-    lastUpdated: String?,
+    chapterLabel: String,
     sourceLabel: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -70,7 +70,7 @@ fun ComicCoverCard(
             }
             Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = MaterialTheme.typography.bodyMedium, color = foreground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(lastUpdated?.takeIf(String::isNotBlank) ?: "暂无更新日期", style = MaterialTheme.typography.labelSmall,
+                Text(chapterLabel, style = MaterialTheme.typography.labelSmall,
                     color = foreground.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

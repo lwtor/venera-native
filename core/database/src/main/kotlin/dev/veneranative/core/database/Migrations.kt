@@ -183,4 +183,11 @@ val MIGRATION_9_10: Migration = object : Migration(9, 10) {
     }
 }
 
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+val MIGRATION_10_11: Migration = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE favorite_entry ADD COLUMN chapters_json TEXT")
+        db.execSQL("ALTER TABLE reading_history ADD COLUMN chapter_group TEXT")
+    }
+}
+
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)

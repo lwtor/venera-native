@@ -28,6 +28,7 @@ internal fun ReadingHistoryEntity.toDomainOrNull(): ReadingHistoryEntry? = runCa
         coverUrl = coverUrl,
         pageIndex = pageIndex,
         pageCount = pageCount,
+        chapterGroup = chapterGroup,
         updatedAtEpochMillis = updatedAtEpochMillis,
     )
 }.getOrNull()
@@ -50,6 +51,7 @@ internal fun ReadingHistoryEntry.toEntity(): ReadingHistoryEntity = ReadingHisto
     coverUrl = coverUrl,
     pageIndex = pageIndex,
     pageCount = pageCount,
+    chapterGroup = chapterGroup,
     updatedAtEpochMillis = updatedAtEpochMillis,
 )
 

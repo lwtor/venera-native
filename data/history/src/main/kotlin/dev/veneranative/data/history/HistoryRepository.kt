@@ -22,6 +22,7 @@ data class ReadingHistoryEntry(
     val pageIndex: Int,
     val pageCount: Int,
     val updatedAtEpochMillis: Long,
+    val chapterGroup: String? = null,
 )
 
 /**

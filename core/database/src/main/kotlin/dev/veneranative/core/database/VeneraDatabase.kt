@@ -31,7 +31,7 @@ import androidx.room.RoomDatabase
         SearchHistoryEntity::class,
         ScreenPreferenceEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class VeneraDatabase : RoomDatabase() {

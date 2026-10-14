@@ -28,7 +28,7 @@ WebView 系引擎来提供异步 Host API。
 Stage 0 的关键结论与遗留项见 `docs/STATUS.md`；设备侧验证（解码耗时、PSS、掉帧、手势冲突）
 按项目决定推迟，需要时用 `LargeImageProbeTest` 采集。
 
-漫画列表统一使用 `core:designsystem` 的 `ComicCoverCard`（封面主色信息底、单行名称/更新日期、来源角标）和 `ComicHorizontalCard`（封面等高横向信息行）。收藏、首页、搜索、探索、本地与下载分组共享组件，新增展示应复用它们；取色留在 `core:image`。未知来源更新日期显示“暂无更新日期”，旧收藏可经手动检查更新补齐。设计决定见 [ADR-0014](docs/adr/0014-shared-comic-cards.md)。
+漫画列表统一使用 `core:designsystem` 的 `ComicCoverCard`（封面主色信息底、单行名称/阅读与总话数、来源角标）和 `ComicHorizontalCard`（封面等高横向信息行）。收藏、首页、搜索、探索、本地与下载分组共享组件，新增展示应复用它们；取色留在 `core:image`。读过的总话数只取当前版本，未读取所有版本最大话号，不相加；缺目录显示“总章节未知”，旧收藏打开详情或手动检查更新后补齐。设计决定见 [ADR-0014](docs/adr/0014-shared-comic-cards.md)。
 
 开发接管入口：
 

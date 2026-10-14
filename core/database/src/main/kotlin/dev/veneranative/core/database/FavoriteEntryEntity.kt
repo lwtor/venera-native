@@ -44,4 +44,5 @@ data class FavoriteEntryEntity(
     @ColumnInfo(name = "has_update") val hasUpdate: Boolean,
     @ColumnInfo(name = "updated_at") val updatedAt: Long?,
     @ColumnInfo(name = "last_updated") val lastUpdated: String? = null,
+    @ColumnInfo(name = "chapters_json") val chaptersJson: String? = null,
 )

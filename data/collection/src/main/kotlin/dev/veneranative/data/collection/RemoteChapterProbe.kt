@@ -5,7 +5,7 @@ import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.source.api.SourceOutcome
 
 /**
- * A comic's chapter list, reduced to the two facts update detection can compare.
+ * A comic's chapter list with update-comparison facts and an optional versioned display directory.
  *
  * Sources do not publish timestamps, so "is there something new" can only be answered by comparing
  * what the source says now with what it said last time.
@@ -21,6 +21,7 @@ data class ChapterSnapshot(
      */
     val latestChapterId: String?,
     val lastUpdated: String? = null,
+    val chapters: List<dev.veneranative.core.model.Chapter>? = null,
 )
 
 /**
@@ -58,6 +59,7 @@ class ComicCatalogChapterProbe(
             chapterCount = chapters.size,
             latestChapterId = chapters.last().key.remoteId.value,
             lastUpdated = detail.comic.lastUpdated ?: detail.metadata["Updated"],
+            chapters = chapters,
         )
     }
 }

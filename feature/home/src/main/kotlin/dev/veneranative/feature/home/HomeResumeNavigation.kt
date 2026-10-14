@@ -15,5 +15,5 @@ fun ReadingHistoryEntry.toChapterRef(): ChapterRef =
             chapterId = LocalChapterId(chapterId.value),
         )
     } else {
-        ChapterRef.Remote(ChapterKey(comicKey, chapterId))
+        ChapterRef.Remote(ChapterKey(comicKey, chapterId), chapterGroup)
     }

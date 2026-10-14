@@ -11,10 +11,10 @@ class BackupArchiveCodecTest {
         categories = setOf(BackupCategory.Favorites, BackupCategory.ReadingHistory),
         favoriteFolders = listOf(FavoriteFolderBackup("f-1", "想看", 2, true)),
         favoriteEntries = listOf(
-            FavoriteEntryBackup("source-a", "comic-9", "default", "作品", null, "https://example.org/cover", 10, null, 12, "c-12", false, 20, lastUpdated = "2026-10-14"),
+            FavoriteEntryBackup("source-a", "comic-9", "default", "作品", null, "https://example.org/cover", 10, null, 12, "c-12", false, 20, lastUpdated = "2026-10-14", chaptersJson = "[]"),
         ),
         favoriteMemberships = listOf(FavoriteMembershipBackup("source-a", "comic-9", "f-1")),
-        readingHistory = listOf(ReadingHistoryBackup("source-a", "comic-9", "c-12", "作品", "第十二话", null, 3, 20, 100)),
+        readingHistory = listOf(ReadingHistoryBackup("source-a", "comic-9", "c-12", "作品", "第十二话", null, 3, 20, 100, chapterGroup = "B")),
         readingProgress = listOf(ReadingProgressBackup("source-a", "comic-9", "c-12", 3, 100)),
     )
 

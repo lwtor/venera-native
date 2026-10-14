@@ -23,6 +23,13 @@ class DetailsChaptersTest {
 
     private val comicKey = ComicKey(SourceId("s"), RemoteComicId("c1"))
 
+    @Test fun `current chapter preserves saved version when chapter ids repeat`() {
+        val chapters = groupedChaptersOf(comicKey, linkedMapOf("A" to mapOf("same" to "第10话"), "B" to mapOf("same" to "第10话")))
+        val state = ready(chapters).copy(lastReadChapterId = dev.veneranative.core.model.RemoteChapterId("same"), lastReadGroup = "B")
+        assertEquals("B", state.currentReadingChapter?.group)
+    }
+
+
     @Test
     fun `a flat source declares no groups`() {
         val state = ready(chaptersOf(comicKey, linkedMapOf("1" to "Chapter 1", "2" to "Chapter 2")))

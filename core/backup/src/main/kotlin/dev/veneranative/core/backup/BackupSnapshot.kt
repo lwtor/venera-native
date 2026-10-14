@@ -63,6 +63,7 @@ data class FavoriteEntryBackup(
     val hasUpdate: Boolean,
     val updatedAtEpochMillis: Long?,
     val lastUpdated: String? = null,
+    val chaptersJson: String? = null,
 )
 
 data class FavoriteMembershipBackup(
@@ -81,6 +82,7 @@ data class ReadingHistoryBackup(
     val pageIndex: Int,
     val pageCount: Int,
     val updatedAtEpochMillis: Long,
+    val chapterGroup: String? = null,
 )
 
 data class ReadingProgressBackup(

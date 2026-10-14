@@ -18,6 +18,10 @@ internal class FakeReadingHistoryDao : ReadingHistoryDao {
 
     val rows = MutableStateFlow<List<ReadingHistoryEntity>>(emptyList())
 
+    override suspend fun all(): List<ReadingHistoryEntity> = rows.value
+    override suspend fun deleteAll() { rows.value = emptyList() }
+    override suspend fun upsertAll(entries: List<ReadingHistoryEntity>) { entries.forEach { upsert(it) } }
+
     override fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntity>> =
         rows.map { list ->
             list.sortedByDescending { it.updatedAtEpochMillis }
@@ -46,6 +50,10 @@ internal class FakeReadingHistoryDao : ReadingHistoryDao {
 internal class FakeReadingProgressDao : ReadingProgressDao {
 
     val rows = MutableStateFlow<List<ReadingProgressEntity>>(emptyList())
+
+    override suspend fun all(): List<ReadingProgressEntity> = rows.value
+    override suspend fun deleteAll() { rows.value = emptyList() }
+    override suspend fun upsertAll(progress: List<ReadingProgressEntity>) { progress.forEach { upsert(it) } }
 
     override suspend fun find(sourceId: String, comicId: String): ReadingProgressEntity? =
         rows.value.firstOrNull { it.sourceId == sourceId && it.comicId == comicId }

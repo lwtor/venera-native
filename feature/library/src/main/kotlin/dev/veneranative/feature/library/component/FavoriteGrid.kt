@@ -40,7 +40,7 @@ fun FavoriteGrid(
                 title = item.title,
                 request = if (comicKey != null && coverRef != null)
                     ComicImageRequest(coverRef, sourceId = comicKey.sourceId, variant = "comic-cover") else null,
-                lastUpdated = item.lastUpdated,
+                chapterLabel = dev.veneranative.core.model.comicChapterProgressLabel(item.chapters, item.readingChapter),
                 sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
                 onClick = { comicKey?.let(onOpenComic) },
                 onLongClick = { onLongPress(item.ref) },

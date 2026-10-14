@@ -59,6 +59,16 @@ class DefaultHistoryRepositoryTest {
         assertEquals("cover", recent.coverUrl)
     }
 
+    @Test fun `reader records version and history roundtrip preserves it`() = runTest {
+        val tracker = ReadingProgressTracker(repository, this, { 2_000L })
+        val chapter = ChapterRef.Remote(dev.veneranative.core.model.ChapterKey(key, RemoteChapterId("shared")), "B")
+        val session = ReaderProgressSession(chapter, repository, tracker, { 2_000L })
+        session.record(dev.veneranative.core.model.ChapterContent("第10话", listOf(dev.veneranative.core.model.ComicPage(0, "fixture", 10, 10))), 0)
+        tracker.flush()
+        assertEquals("B", historyDao.rows.value.single().chapterGroup)
+        assertEquals("B", repository.observeRecent(1).first().single().chapterGroup)
+    }
+
     @Test fun `recording writes to both history and progress`() = runTest {
         repository.record(entry())
 

@@ -540,7 +540,7 @@ private fun Content(
                             ChapterRow(
                                 chapter = chapter,
                                 selected = chapter.key in state.selectedChapters,
-                                current = chapter.key.remoteId == state.lastReadChapterId,
+                                current = chapter.key.remoteId == state.lastReadChapterId && (state.lastReadGroup == null || chapter.group == state.lastReadGroup),
                                 read = chapter.key.remoteId in state.readChapterIds,
                                 downloaded = state.isDownloaded(chapter),
                                 selectionMode = state.isChapterSelectionMode,

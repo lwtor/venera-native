@@ -66,6 +66,8 @@ internal class FakeCollectionRepository : CollectionRepository {
         )
     }
 
+    override suspend fun updateChapters(ref: dev.veneranative.core.model.ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) = Unit
+
     override suspend fun remove(ref: ComicRef) {
         removeError?.let { throw it }
         removed += ref

@@ -37,6 +37,7 @@ internal fun FavoriteEntryEntity.toDomainOrNull(): FavoriteItem? = runCatching {
         latestChapterId = latestChapterId,
         hasUpdate = hasUpdate,
         lastUpdated = lastUpdated,
+        chapters = decodeChapterCatalog(chaptersJson),
     )
 }.getOrNull()
 

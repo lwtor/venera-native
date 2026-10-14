@@ -4,6 +4,12 @@
 
 ## 状态快照
 
+**S4-10B3 DONE：竖向卡片改为当前阅读章节 / 分版本总话数。** 收藏及首页收藏卡片移除日期；读过显示“第10话 / 共110话”，总数仅取当前阅读版本；未读比较各版本正篇话号最大值，例如 110/111/110 显示“共111话”，不累计版本。话号支持中英数字标题和小数，倒序目录取最大话号，番外/卷等无可靠话号时退回该版本目录数量。core:model 统一纯展示规则；来源目录保存 ID/标题/版本的 JSON，收藏快照、已有手动检查更新和成功详情加载补齐（仅修改已有收藏目录、不变更归属、不新增网络调用）。收藏 Flow 合并 Room 每漫画最近阅读记录，阅读后自动更新卡片。阅读会话保存版本，首页续读、详情当前章定位及继续阅读保留已知版本。
+
+Room 10→11 为收藏新增可空 chapters_json、阅读历史新增可空 chapter_group，备份同步可选字段且旧包缺键兼容。既有历史主键未改变，跨版本复用同章节 ID 仍沿用既有最后记录覆盖语义；本次确保最近记录带版本，不扩展为逐版本独立历史。旧收藏没有目录时显示“总章节未知”，打开详情或手动检查更新后补齐；旧历史无版本且目录 ID 跨版本歧义时不猜测总数。聚合预览没有目录，竖向卡片显示未知且不额外请求；横向结果原日期不变。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :core:model:compileDebugUnitTestKotlin :data:collection:compileDebugUnitTestKotlin :data:history:compileDebugUnitTestKotlin :core:backup:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:home:compileDebugUnitTestKotlin :feature:library:compileDebugUnitTestKotlin :core:database:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。新增合成源码覆盖 110/111/110、当前版本/歧义旧 ID/倒序/番外/非数字目录、不合并计数、收藏阅读与目录更新、阅读版本写入/恢复、详情重复 ID、旧数据迁移与备份。修复历史 FakeDao 缺失既有备份接口。测试仅编译，未运行/安装/真机验证，真实源话名及卡片视觉待用户复验；规则见 ADR-0014。当前唯一下一任务保持 S4-02G4。
+
 **S4-10B2 DONE：统一漫画竖向卡片与横向列表。** 收藏卡片保持封面顶部 8dp 圆角，封面底部直角连接信息区，底部同样 8dp 圆角；标题/来源更新日期各一行，来源名小角标放封面右上，更新标记与长按保留。底色来自已加载封面主色，32×32 软件取样及 RGB 色簇统计在 core:image/Default dispatcher 内完成，只返回 Color，不存 Bitmap、不额外请求封面；亮度自动选择黑白字，加载/失败时主题底色。core:designsystem 公共 ComicCoverCard/ComicHorizontalCard 统一布局。收藏、首页更新和聚合预览用竖向；完整搜索/相关作品、探索、首页最近阅读、本地条目和下载分组用横向，保留分页、标签/状态补读、进度、展开、菜单与多选。来源名从 AppGraph 本地索引 StateFlow 装配，UI 不访问仓库。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug :core:image:compileDebugUnitTestKotlin :core:backup:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。取色合成测试源码覆盖透明像素及多数色簇；最终检查修正新可选备份字段的缺键读取，新增旧格式加密包恢复回归源码；测试仅编译，未运行/安装/真机验证。B1 日期/备份/迁移源码编译证据见下。代码入口检查见 `docs/reviews/shared-comic-cards-audit.md`，架构见 ADR-0014。本地与下载没有可加载封面时显示统一标题占位；未知来源日期显示“暂无更新日期”，旧收藏需手动检查更新或重新收藏补齐。深浅主题、取色效果与交互待用户复验。当前唯一下一任务恢复 S4-02G4。
