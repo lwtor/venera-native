@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A6I7 DONE：贴边封面与渐变模糊背景。** 按用户截图反馈，结果 item 清晰封面贴齐卡片左侧，移除原水平内边距与厚灰底；卡片固定 120dp、圆角 12dp，右侧信息留独立间距。使用同一已加载 Painter 绘制清晰封面和铺满卡片的 20dp 模糊背景，左端不透明度约 3%、封面附近 8%，向右渐变至 50%，背景遮罩不影响前景文字/封面；标签改为透明底细描边，连载状态保持低强度标记，收紧信息间距。通过 core/image 新增 ComicImageWithContent 复用一次加载，原 ComicImage 签名及默认加载/错误/重试行为保持，未新增封面请求、图片资产或依赖。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅可逆展示调整，不新增镜像实现测试，未运行测试、未安装或操作真机；模糊层、明暗主题与滚动视觉待用户复验。Compose blur 官方仅支持 Android 12+，API 26–30 降级为最高 8% 的淡渐变封面背景，避免未模糊图片干扰文字，不声明旧版有高斯效果；依据：[Android blur](https://developer.android.com/reference/kotlin/androidx/compose/ui/draw/blur.modifier)。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6I6 DONE：结果条目等高布局、多作者与连载状态。** 按用户反馈，将完整搜索/作者/标签结果 Card 和封面固定为 120dp 高，封面 80×120dp、圆角，右侧同高；标题仅一行省略，作者使用完整去重列表以“ / ”连接、最多两行，更新时间移除前缀，与已知连载状态并列（连载中/已完结）；标签固定单行横向查看，不再 FlowRow 撑高，迟到标签也不改变行高。超长文字省略、源未提供状态则不伪造连载标记。
 
 为避免拷贝漫画/Komiic 原脚本只保留首位作者、丢弃状态，本次在 source/api 定义受限列表元数据兼容：从同一次 Network 响应只提取作者名称、状态与更新时间，交由调用结果序列化保留到 typed Comic，不发额外请求、不改脚本。只对这两个来源启用，响应上限 1MiB、遍历深度 8/最多 100 个作品，按显式请求 invocation ID 隔离并在调用结束清除，晚到响应不污染新调用，无日志或持久化。engine 只负责通用捕获/合并接线；业务字段判定仍在 source/api。Komiic 作者查询补齐 status/dateUpdated 并保留所有作者。纯 Comic 增加 authors/publicationStatus，无数据库变更；安全与许可边界见 ADR-0007 §4.16。

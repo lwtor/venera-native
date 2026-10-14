@@ -274,6 +274,8 @@ SharedPreferences 不用于新功能。数据库实体不得直接传到 UI；�
 
 ## 11. 导航边界
 
+S4-10A6I7 的 ComicImageWithContent 由 core/image 保持 Coil、认证及重试边界，在加载成功时提供稳定 Painter 供 Feature 绘制清晰封面和装饰背景；共享一次加载，不让 Feature 引入 Coil 或持有 Bitmap。Search 只负责渐变遮罩、API 31+ 的模糊修饰及固定布局，旧系统使用极淡背景降级。
+
 - 单 Activity。
 - Route 使用可序列化、类型安全的小型参数。
 - 大对象、Bitmap、脚本文本不得作为导航参数。

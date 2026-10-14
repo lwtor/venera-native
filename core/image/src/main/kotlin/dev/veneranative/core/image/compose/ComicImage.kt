@@ -21,11 +21,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImageContent
 import dev.veneranative.core.image.ComicImageRequest
 import kotlinx.coroutines.delay
 
@@ -55,6 +57,28 @@ fun ComicImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     placeholder: @Composable () -> Unit = {},
+) = ComicImageRenderer(request, contentDescription, modifier, contentScale, placeholder, null)
+
+/** Draw several visual layers from one load while keeping the regular image API unchanged. */
+@Composable
+fun ComicImageWithContent(
+    request: ComicImageRequest?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    imageContent: @Composable (Painter) -> Unit,
+    placeholder: @Composable () -> Unit = {},
+) = ComicImageRenderer(request, contentDescription, modifier, contentScale, placeholder, imageContent)
+
+@Composable
+private fun ComicImageRenderer(
+    request: ComicImageRequest?,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    placeholder: @Composable () -> Unit = {},
+    /** Reuse one loaded painter for a cover and decorative backdrop without a second image load. */
+    imageContent: (@Composable (Painter) -> Unit)? = null,
 ) {
     val imageLoader = LocalComicImageLoader.current
     if (request == null || imageLoader == null) {
@@ -80,6 +104,9 @@ fun ComicImage(
             modifier = modifier,
             contentScale = contentScale,
             loading = { placeholder() },
+            success = {
+                if (imageContent == null) SubcomposeAsyncImageContent() else imageContent(painter)
+            },
             onError = { failed = true },
             error = {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {

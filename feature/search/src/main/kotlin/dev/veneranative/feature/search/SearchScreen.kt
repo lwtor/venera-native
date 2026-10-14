@@ -3,6 +3,18 @@ package dev.veneranative.feature.search
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.material3.CardDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +65,7 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
+import dev.veneranative.core.image.compose.ComicImageWithContent
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.SourceFilter
@@ -345,15 +358,35 @@ private fun Results(
                         onResultVisible(comic)
                         onDispose { onResultHidden(comic.key) }
                     }
-                    Card(onClick = { onOpenComic(comic.key) }, modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.padding(horizontal = 10.dp).height(120.dp).clipToBounds(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ComicImage(
+                    Card(onClick = { onOpenComic(comic.key) }, modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))) {
+                      Box(Modifier.fillMaxWidth().height(120.dp).clipToBounds()) {
+                            ComicImageWithContent(
                                 request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "search-result") },
-                                contentDescription = comic.title,
-                                modifier = Modifier.size(width = 80.dp, height = 120.dp).clip(RoundedCornerShape(8.dp)),
-                                placeholder = { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("漫") } },
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                placeholder = { Box(Modifier.size(80.dp, 120.dp), contentAlignment = Alignment.Center) { Text("漫") } },
+                                imageContent = { painter ->
+                                    val backdropOpacity = if (android.os.Build.VERSION.SDK_INT >= 31) 0.5f else 0.08f
+                                    Box(Modifier.fillMaxSize()) {
+                                        Image(painter, contentDescription = null, contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                                                .drawWithCache {
+                                                    val mask = Brush.horizontalGradient(0f to Color.White.copy(alpha = 0.03f),
+                                                        0.28f to Color.White.copy(alpha = 0.08f), 1f to Color.White.copy(alpha = backdropOpacity))
+                                                    onDrawWithContent { drawContent(); drawRect(mask, blendMode = BlendMode.DstIn) }
+                                                }.blur(20.dp, BlurredEdgeTreatment.Unbounded))
+                                        Image(painter, contentDescription = comic.title, contentScale = ContentScale.Crop,
+                                            modifier = Modifier.size(80.dp, 120.dp).align(Alignment.CenterStart))
+                                    }
+                                },
                             )
-                            Column(Modifier.weight(1f).height(120.dp).padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Row(Modifier.fillMaxSize().padding(end = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                              Spacer(Modifier.size(80.dp, 120.dp))
+                              Column(Modifier.weight(1f).height(120.dp).padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(comic.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 val authors = comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
                                 authors?.let { Text(it, style = MaterialTheme.typography.bodySmall,
@@ -363,15 +396,18 @@ private fun Results(
                                     Text(comic.lastUpdated.orEmpty(), Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     comic.publicationStatus?.let { status ->
-                                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
+                                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)) {
                                             Text(if (status == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中",
                                                 Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = if (status == dev.veneranative.core.model.ComicPublicationStatus.Ongoing)
+                                                    MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
                                 Spacer(Modifier.weight(1f))
                                 ComicResultTags(comic.tags.takeIf { it.any(String::isNotBlank) } ?: resultTags[comic.key].orEmpty())
+                              }
                             }
                         }
                     }
@@ -400,11 +436,12 @@ private fun ComicResultTags(tags: List<String>) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         visibleTags.forEach { tag ->
-            Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+            Surface(shape = RoundedCornerShape(5.dp), color = Color.Transparent,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f))) {
                 Text(
                     tag, Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
