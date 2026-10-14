@@ -10,6 +10,8 @@ data class Comic(
     /** Page count of the last opened chapter, when the source reports one. */
     val maxPage: Int? = null,
     val language: String? = null,
+    /** Source-reported update time or relative update label; absent when the list does not expose it. */
+    val lastUpdated: String? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }

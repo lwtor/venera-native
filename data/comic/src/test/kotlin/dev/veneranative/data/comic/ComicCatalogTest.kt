@@ -35,7 +35,7 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
-    @Test fun `copy result prefix arrives with prepared tags and subsequent pages reuse cache`() = runTest {
+    @Test fun `copy results merge cached tags without starting metadata requests`() = runTest {
         val id = SourceId("copy_manga")
         val core = FakeSourceCore()
         core.items = List(7) { Comic(ComicKey(id, RemoteComicId("c$it")), "Work", tags = if (it == 0) listOf("Existing") else emptyList()) }
@@ -44,16 +44,19 @@ class ComicCatalogTest {
             SourceOutcome.Success(keys.associateWith { listOf("Adventure") })
         }
         val catalog = DefaultComicCatalog(FakeSourceRepository(listOf(source(id.value))), core)
+        core.detailResponse = SourceOutcome.Success(ComicDetail(core.items[1], tagGroups = mapOf("标签" to listOf("Adventure"))))
+        catalog.comicTags(core.items[1].key)
         val result = catalog.search(SearchRequest(id, "fixture")).load(refresh(PageKey.Start)) as PagingSource.LoadResult.Page
         assertEquals(listOf("Existing"), result.data[0].tags)
-        assertEquals(listOf("Adventure"), result.data[5].tags)
+        assertEquals(listOf("Adventure"), result.data[1].tags)
         assertEquals(emptyList<String>(), result.data[6].tags)
-        assertEquals(5, core.batchCalls.single().size)
+        assertEquals(0, core.batchCalls.size)
         catalog.search(SearchRequest(id, "fixture")).load(refresh(PageKey.Start))
-        assertEquals(1, core.batchCalls.size)
+        assertEquals(0, core.batchCalls.size)
+        assertEquals(0L, testScheduler.currentTime)
     }
 
-    @Test fun `hung optional tags cannot hold results beyond short preparation budget`() = runTest {
+    @Test fun `hung optional metadata never delays result publishing`() = runTest {
         val id = SourceId("copy_manga")
         val core = FakeSourceCore()
         core.items = listOf(Comic(ComicKey(id, RemoteComicId("c")), "Work"))
@@ -61,7 +64,8 @@ class ComicCatalogTest {
         val catalog = DefaultComicCatalog(FakeSourceRepository(listOf(source(id.value))), core)
         val result = catalog.search(SearchRequest(id, "fixture")).load(refresh(PageKey.Start)) as PagingSource.LoadResult.Page
         assertEquals(core.items, result.data)
-        assertEquals(1_500L, testScheduler.currentTime)
+        assertEquals(0L, testScheduler.currentTime)
+        assertEquals(0, core.batchCalls.size)
     }
     @Test fun `content tag cache avoids repeated source reads and expires`() = runTest {
         var now = 0L

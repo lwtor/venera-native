@@ -103,6 +103,8 @@ S4-10A6I3 将补读入口改为类型化 ComicCatalog/SourceCore.comicTags，并
 
 S4-10A6I4 在 data/comic 分页发布前有界准备 CopyManga 前六条标签；source/api 的受限批量基础资料函数由 engine 附着，source/core 经统一执行器调用，最多三条网络并发和一次 request ID。最多等待 1500ms 后仍发布列表，已有/缓存标签优先，不改变 Feature 依赖。
 
+S4-10A6I5 根据用户更慢反馈撤销 I4 的前置网络调用与等待，分页只 tryLock 合并已完成的有效标签缓存，未准备标签仍按相关作品可见行补读。纯 Comic 增加可空 lastUpdated，source/api 从可靠列表字段解析、Search 只渲染，无额外请求或数据库变更；时序决定见 ADR-0007 §4.15。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

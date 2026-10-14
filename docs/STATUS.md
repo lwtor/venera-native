@@ -4,6 +4,12 @@
 
 ## 状态快照
 
+**S4-10A6I5 DONE：撤销标签前置等待，结果条目增加最后更新时间。** 用户反馈 I4 更慢；前置标签网络准备确实会增加首次列表等待，1.5 秒截止还可能取消源调用并触发实例重建，但未取得真实耗时证据，不能断言全部慢请求均来自此原因。本次 search/category 分页发布前仅合并已完成且有效的标签缓存，使用 tryLock 跳过正在补读的作品，不再批量请求或等待标签网络；已有列表标签优先。相关作品继续保留可见行按需补读，因此无缓存时标签仍可能稍后出现；优先恢复列表响应速度，不保证完全同时展示。I4 受限批量契约保留，但分页不再调用它。
+
+Comic 新增可空 lastUpdated，搜索完整列表及作者/标签结果条目显示“更新：来源时间”。解析显式 lastUpdated/updateTime/dateUpdated；拷贝漫画的列表 description 正是 datetime_updated，只接受日期形状；Komiic 只接受带“更新”的来源相对时间，其他来源不把任意简介/排名文案误当更新时间。缺失时不显示、不补读详情，不新增时间请求或数据库迁移。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :source:api:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖列表发布零标签批量请求/零虚拟等待、缓存标签合并，以及拷贝原始时间、显式时间、其他源描述/非日期不误判；测试仅编译，未运行，未安装或操作真机。用户复验响应速度及时间展示；当前唯一下一任务保持 S4-02G4。
+
 **S4-10A6I4 DONE：拷贝漫画结果首屏标签与列表一起发布。** 针对先显示列表后逐条出现标签，search/category PagingSource 在发布页面前通过 data/comic 准备前六条的缺失标签，适用于普通单源完整搜索与作者/标签结果。先合并有效缓存，已有标签不请求；缺失部分通过受限 CopyManga 批量基础资料调用补齐，一次最多六个作品、最多三个并发请求，共用一次源 getReqID，保留动态 headers、固定 comic2 端点与 ID 编码。成功数组（包括空标签）复用五分钟/源版本缓存，并随 Comic.tags 一起发布，避免已准备条目挂载后逐行补读。整个准备过程最多额外等待 1500ms；超时/部分失败仍返回可用列表，不等待完整章节；相关作品后续可见条目的既有补读继续保留。仅准备每页前六项，不能保证慢网络或所有后续条目都同时带标签；无真实时延数据，不声称完全零等待。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug :source:api:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :source:engine:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖固定批量端点/共享请求 ID/六项上限、标签随列表返回、保留已有标签、缓存避免重复请求、挂起标签 1500ms 截止后仍发布列表；测试仅编译，未运行，未安装或操作真机。真实首屏时延及滚动效果待用户复验。受限请求与许可边界沿用 ADR-0007 §4.11，时序决定见 §4.14；当前唯一下一任务保持 S4-02G4。

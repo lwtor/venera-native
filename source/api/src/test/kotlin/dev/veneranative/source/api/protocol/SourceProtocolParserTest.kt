@@ -21,6 +21,15 @@ import org.junit.Test
  * a phantom chapter out of the latest-chapter marker.
  */
 class SourceProtocolParserTest {
+    @Test fun `copy list update description is preserved without interpreting other source descriptions`() {
+        val row = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","description":"2026-10-14 09:30:00"}""")
+        assertEquals("2026-10-14 09:30:00", SourceProtocolParser.parseComic(SourceId("copy_manga"), row)?.lastUpdated)
+        assertNull(SourceProtocolParser.parseComic(SourceId("other"), row)?.lastUpdated)
+        val missing = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","description":"ranking #1"}""")
+        assertNull(SourceProtocolParser.parseComic(SourceId("copy_manga"), missing)?.lastUpdated)
+        val explicit = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","updateTime":"2026-10-14"}""")
+        assertEquals("2026-10-14", SourceProtocolParser.parseComic(SourceId("other"), explicit)?.lastUpdated)
+    }
 
     private val sourceId = SourceId("source-a")
     private val comicKey = ComicKey(sourceId, RemoteComicId("comic-1"))

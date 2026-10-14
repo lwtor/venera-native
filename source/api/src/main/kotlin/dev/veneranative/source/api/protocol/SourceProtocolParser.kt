@@ -78,6 +78,14 @@ object SourceProtocolParser {
             tags = entry["tags"].flattenedTags(),
             maxPage = entry["maxPage"].intOrNull(),
             language = entry["language"].stringOrNull(),
+            lastUpdated = (entry["lastUpdated"].stringOrNull() ?: entry["updateTime"].stringOrNull()
+                ?: entry["dateUpdated"].stringOrNull() ?: when (sourceId.value) {
+                    "copy_manga" -> entry["description"].stringOrNull()?.takeIf {
+                        Regex("^\\d{4}-\\d{2}-\\d{2}(?:[ T].*)?$").matches(it.trim())
+                    }
+                    "Komiic" -> entry["description"].stringOrNull()?.takeIf { it.contains("更新") }
+                    else -> null
+                })?.trim()?.takeIf(String::isNotBlank),
         )
     }
 
