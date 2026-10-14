@@ -49,6 +49,17 @@ interface SourceCore {
     suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail>
 
     /** Content labels only; adapters can avoid loading chapters and account state. */
+    suspend fun comicTagsBatch(keys: List<ComicKey>): SourceOutcome<Map<ComicKey, List<String>>> {
+        val tags = mutableMapOf<ComicKey, List<String>>()
+        for (key in keys) {
+            when (val result = comicTags(key)) {
+                is SourceOutcome.Success -> tags[key] = result.value
+                is SourceOutcome.Failure -> Unit
+            }
+        }
+        return SourceOutcome.Success(tags)
+    }
+
     suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> = when (val result = detail(comicKey)) {
         is SourceOutcome.Failure -> result
         is SourceOutcome.Success -> SourceOutcome.Success(result.value.contentTags())

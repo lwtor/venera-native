@@ -101,6 +101,8 @@ S4-10A6I2 在相关作品 ViewModel 内补全缺失的列表标签：UI 仅报�
 
 S4-10A6I3 将补读入口改为类型化 ComicCatalog/SourceCore.comicTags，并在 data/comic 按作品与源版本缓存五分钟。CopyManga 的固定兼容操作定义于 source/api/protocol，engine 仅附着到源实例，source/core 按 sourceId 选择；该操作只接受作品 ID，只读固定 comic2 基础资料端点，沿用源 apiUrl/headers/getReqID 和既有带调用 ID、超时、取消的 Network Host 桥，不接受调用者指定 URL、路径或认证头。其他源保留详情标签回退；标签分组筛选位于纯模型层。见 ADR-0007 §4.11。
 
+S4-10A6I4 在 data/comic 分页发布前有界准备 CopyManga 前六条标签；source/api 的受限批量基础资料函数由 engine 附着，source/core 经统一执行器调用，最多三条网络并发和一次 request ID。最多等待 1500ms 后仍发布列表，已有/缓存标签优先，不改变 Feature 依赖。
+
 ```text
                          ┌──────────────────┐
                          │       :app       │

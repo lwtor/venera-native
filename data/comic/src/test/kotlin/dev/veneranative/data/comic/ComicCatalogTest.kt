@@ -35,6 +35,34 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
+    @Test fun `copy result prefix arrives with prepared tags and subsequent pages reuse cache`() = runTest {
+        val id = SourceId("copy_manga")
+        val core = FakeSourceCore()
+        core.items = List(7) { Comic(ComicKey(id, RemoteComicId("c$it")), "Work", tags = if (it == 0) listOf("Existing") else emptyList()) }
+        core.batchHandler = { keys ->
+            kotlinx.coroutines.delay(500)
+            SourceOutcome.Success(keys.associateWith { listOf("Adventure") })
+        }
+        val catalog = DefaultComicCatalog(FakeSourceRepository(listOf(source(id.value))), core)
+        val result = catalog.search(SearchRequest(id, "fixture")).load(refresh(PageKey.Start)) as PagingSource.LoadResult.Page
+        assertEquals(listOf("Existing"), result.data[0].tags)
+        assertEquals(listOf("Adventure"), result.data[5].tags)
+        assertEquals(emptyList<String>(), result.data[6].tags)
+        assertEquals(5, core.batchCalls.single().size)
+        catalog.search(SearchRequest(id, "fixture")).load(refresh(PageKey.Start))
+        assertEquals(1, core.batchCalls.size)
+    }
+
+    @Test fun `hung optional tags cannot hold results beyond short preparation budget`() = runTest {
+        val id = SourceId("copy_manga")
+        val core = FakeSourceCore()
+        core.items = listOf(Comic(ComicKey(id, RemoteComicId("c")), "Work"))
+        core.batchHandler = { kotlinx.coroutines.awaitCancellation() }
+        val catalog = DefaultComicCatalog(FakeSourceRepository(listOf(source(id.value))), core)
+        val result = catalog.search(SearchRequest(id, "fixture")).load(refresh(PageKey.Start)) as PagingSource.LoadResult.Page
+        assertEquals(core.items, result.data)
+        assertEquals(1_500L, testScheduler.currentTime)
+    }
     @Test fun `content tag cache avoids repeated source reads and expires`() = runTest {
         var now = 0L
         val source = source("tag-source")
@@ -349,6 +377,12 @@ class ComicCatalogTest {
         var detailResponse: SourceOutcome<ComicDetail>? = null
         var detailCalls: Int = 0
         var capabilityCalls: Int = 0
+        val batchCalls = mutableListOf<List<ComicKey>>()
+        var batchHandler: (suspend (List<ComicKey>) -> SourceOutcome<Map<ComicKey, List<String>>>)? = null
+        override suspend fun comicTagsBatch(keys: List<ComicKey>): SourceOutcome<Map<ComicKey, List<String>>> {
+            batchCalls += keys
+            return batchHandler?.invoke(keys) ?: super<SourceCore>.comicTagsBatch(keys)
+        }
 
         override suspend fun capabilities(sourceId: SourceId): SourceOutcome<SourceCapabilities> {
             capabilityCalls++

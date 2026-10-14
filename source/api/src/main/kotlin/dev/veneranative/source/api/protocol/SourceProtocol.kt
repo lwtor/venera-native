@@ -45,6 +45,9 @@ object SourceProtocol {
 
     fun copyMangaTags(comicKey: ComicKey): SourceProtocolCall = call(CopyMangaMetadataAdapter.MEMBER, JsonPrimitive(comicKey.remoteId.value))
 
+    fun copyMangaTagsBatch(keys: List<ComicKey>): SourceProtocolCall =
+        call(CopyMangaMetadataAdapter.BATCH_MEMBER, JsonArray(keys.map { JsonPrimitive(it.remoteId.value) }))
+
     fun onClickTag(namespace: String, tag: String): SourceProtocolCall =
         call("comic.onClickTag", JsonPrimitive(namespace), JsonPrimitive(tag))
 

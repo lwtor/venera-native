@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A6I4 DONE：拷贝漫画结果首屏标签与列表一起发布。** 针对先显示列表后逐条出现标签，search/category PagingSource 在发布页面前通过 data/comic 准备前六条的缺失标签，适用于普通单源完整搜索与作者/标签结果。先合并有效缓存，已有标签不请求；缺失部分通过受限 CopyManga 批量基础资料调用补齐，一次最多六个作品、最多三个并发请求，共用一次源 getReqID，保留动态 headers、固定 comic2 端点与 ID 编码。成功数组（包括空标签）复用五分钟/源版本缓存，并随 Comic.tags 一起发布，避免已准备条目挂载后逐行补读。整个准备过程最多额外等待 1500ms；超时/部分失败仍返回可用列表，不等待完整章节；相关作品后续可见条目的既有补读继续保留。仅准备每页前六项，不能保证慢网络或所有后续条目都同时带标签；无真实时延数据，不声称完全零等待。
+
+验证（2026-10-14）：JDK 17 `:app:assembleDebug :source:api:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :source:engine:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:search:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖固定批量端点/共享请求 ID/六项上限、标签随列表返回、保留已有标签、缓存避免重复请求、挂起标签 1500ms 截止后仍发布列表；测试仅编译，未运行，未安装或操作真机。真实首屏时延及滚动效果待用户复验。受限请求与许可边界沿用 ADR-0007 §4.11，时序决定见 §4.14；当前唯一下一任务保持 S4-02G4。
+
 **S3-00Y2 DONE：统一漫画源调用的重试与恢复入口。** Source Core 全部协议调用改经 SourceCallExecutor，覆盖探测、搜索/探索/分类、详情、章节、标签/作者及图片配置；读取最多三次、500/1000ms 间隔、每次新 call ID，含排队/恢复的总截止 120 秒。执行器复用 SourceScriptRuntime 的同源排队、取消、JS 异常/超时后废弃引擎及下次构造/初始化，不重复实现引擎恢复。SourceProtocolCall 必须明确 READ/WRITE、无默认值，写操作只执行一次。移除详情 ViewModel、SourcePageProvider 的重试循环和 data/comic 旧 helper，避免重试相乘；成功详情缓存保留、失败不缓存、手动刷新清缓存。图片尺寸 PageProvider 保留自身 IO 重试与等待截止。取消/不支持/无效调用不重试，仅读脚本异常有限重试，解析后的无效业务内容仍显式失败。决定见 ADR-0007 §4.13。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug :source:api:compileDebugUnitTestKotlin :source:core:compileDebugUnitTestKotlin :data:comic:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:reader:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖统一调用次数/新 ID、写和取消不重试、总截止，以及真实 QuickJS fixture 请求异常留下脏状态后由统一重试重建实例而成功；上层回归调整为转发最终失败、不叠加重试。测试仅编译，未运行，未安装或操作真机；实际源恢复待用户复验。当前唯一下一任务保持 S4-02G4。

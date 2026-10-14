@@ -34,6 +34,9 @@ import kotlinx.serialization.json.contentOrNull
  */
 object SourceProtocolParser {
 
+    fun parseContentTagsBatch(payload: String): Map<String, List<String>>? = payload.objectOrNull()?.entries
+        ?.mapNotNull { (id, tags) -> parseContentTags(tags.toString())?.let { id to it } }?.toMap()
+
     fun parseContentTags(payload: String): List<String>? =
         (runCatching { json.parseToJsonElement(payload) }.getOrNull() as? JsonArray)?.mapNotNull {
             it.stringOrNull()?.trim()?.takeIf(String::isNotBlank)

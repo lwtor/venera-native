@@ -256,6 +256,19 @@ class EngineSourceCore(
         }
     }
 
+    override suspend fun comicTagsBatch(keys: List<ComicKey>): SourceOutcome<Map<ComicKey, List<String>>> {
+        if (keys.isEmpty()) return SourceOutcome.Success(emptyMap())
+        if (keys.size > 6 || keys.any { it.sourceId.value != "copy_manga" }) {
+            return SourceOutcome.Failure(SourceRuntimeError.InvalidCall("Invalid tag batch."))
+        }
+        return when (val result = invoke(keys.first().sourceId, SourceProtocol.copyMangaTagsBatch(keys))) {
+            is SourceOutcome.Failure -> result
+            is SourceOutcome.Success -> SourceProtocolParser.parseContentTagsBatch(result.value)?.let { tags ->
+                SourceOutcome.Success(keys.mapNotNull { key -> tags[key.remoteId.value]?.let { key to it } }.toMap())
+            } ?: SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("Invalid comic tag metadata."))
+        }
+    }
+
     override suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> {
         if (comicKey.sourceId.value != "copy_manga") return super<SourceCore>.comicTags(comicKey)
         return when (val result = invoke(comicKey.sourceId, SourceProtocol.copyMangaTags(comicKey))) {

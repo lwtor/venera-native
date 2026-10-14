@@ -20,6 +20,7 @@ import dev.veneranative.source.api.SourceOutcome
 internal class SearchPagingSource(
     private val core: SourceCore,
     private val request: SearchRequest,
+    private val prepareItems: suspend (List<Comic>) -> List<Comic> = { it },
 ) : PagingSource<PageKey, Comic>() {
 
     override fun getRefreshKey(state: PagingState<PageKey, Comic>): PageKey = PageKey.Start
@@ -28,7 +29,7 @@ internal class SearchPagingSource(
         when (val outcome = core.search(request.copy(cursor = params.key.cursor()))) {
             is SourceOutcome.Success ->
                 LoadResult.Page(
-                    data = outcome.value.items,
+                    data = prepareItems(outcome.value.items),
                     prevKey = null,
                     nextKey = outcome.value.next?.let(PageKey::At),
                 )
@@ -40,11 +41,12 @@ internal class SearchPagingSource(
 internal class CategoryPagingSource(
     private val core: SourceCore,
     private val request: CategoryRequest,
+    private val prepareItems: suspend (List<Comic>) -> List<Comic> = { it },
 ) : PagingSource<PageKey, Comic>() {
     override fun getRefreshKey(state: PagingState<PageKey, Comic>): PageKey = PageKey.Start
     override suspend fun load(params: LoadParams<PageKey>): LoadResult<PageKey, Comic> =
         when (val outcome = core.category(request.copy(cursor = params.key.cursor()))) {
-            is SourceOutcome.Success -> LoadResult.Page(outcome.value.items, null, outcome.value.next?.let(PageKey::At))
+            is SourceOutcome.Success -> LoadResult.Page(prepareItems(outcome.value.items), null, outcome.value.next?.let(PageKey::At))
             is SourceOutcome.Failure -> LoadResult.Error(SourceLoadException(outcome.error))
         }
 }

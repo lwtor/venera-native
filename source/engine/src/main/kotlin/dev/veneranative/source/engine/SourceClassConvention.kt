@@ -89,7 +89,8 @@ internal object SourceClassConvention {
         """
         Object.defineProperty($INSTANCE, "__venera", {
           value: Object.freeze(Object.assign({}, globalThis.__venera, {
-            copyMangaTags: ${CopyMangaMetadataAdapter.functionExpression}
+            copyMangaTags: ${CopyMangaMetadataAdapter.functionExpression},
+            copyMangaTagsBatch: ${CopyMangaMetadataAdapter.batchFunctionExpression}
           })),
           enumerable: false,
           writable: false,

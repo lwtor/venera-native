@@ -24,6 +24,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * [ComicCatalog] over the installed sources and one [SourceCore].
@@ -46,7 +47,7 @@ class DefaultComicCatalog(
 
     override suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation) = core.relatedWorksFilters(sourceId, target)
 
-    override fun category(request: CategoryRequest): PagingSource<PageKey, Comic> = CategoryPagingSource(core, request)
+    override fun category(request: CategoryRequest): PagingSource<PageKey, Comic> = CategoryPagingSource(core, request, ::prepareResultTags)
 
     private data class DetailEntry(
         val mutex: Mutex = Mutex(),
@@ -147,7 +148,49 @@ class DefaultComicCatalog(
         ExplorePagingSource(core, request)
 
     override fun search(request: SearchRequest): PagingSource<PageKey, Comic> =
-        SearchPagingSource(core, request)
+        SearchPagingSource(core, request, ::prepareResultTags)
+
+    /** Prepare likely visible rows as one page, but never hold results indefinitely for labels. */
+    private suspend fun prepareResultTags(items: List<Comic>): List<Comic> {
+        if (items.firstOrNull()?.key?.sourceId?.value != "copy_manga") return items
+        val sourceId = items.first().key.sourceId
+        val prepared = mutableMapOf<ComicKey, List<String>>()
+        try {
+            withTimeoutOrNull(1_500L) {
+                val version = sources.installed().firstOrNull { it.sourceId == sourceId }?.version
+                for (comic in items) {
+                    val entry = tags[comic.key] ?: continue
+                    entry.mutex.withLock {
+                        entry.value?.takeIf { entry.sourceVersion == version && nowMillis() < entry.expiresAtMillis }
+                            ?.let { prepared[comic.key] = it }
+                    }
+                }
+                val missing = items.take(6).filter { it.tags.none(String::isNotBlank) && !prepared.containsKey(it.key) }
+                    .map { it.key }.distinct()
+                if (missing.isNotEmpty()) {
+                    when (val result = core.comicTagsBatch(missing)) {
+                        is SourceOutcome.Failure -> Unit
+                        is SourceOutcome.Success -> for ((key, value) in result.value) {
+                            prepared[key] = value
+                            val entry = tags.getOrPut(key) { TagsEntry() }
+                            entry.mutex.withLock {
+                                entry.sourceVersion = version
+                                entry.expiresAtMillis = nowMillis() + detailCacheTtlMillis
+                                entry.value = value
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Optional metadata must not fail a successfully loaded results page.
+        }
+        return items.map { comic ->
+            if (comic.tags.any(String::isNotBlank)) comic else prepared[comic.key]?.let { comic.copy(tags = it) } ?: comic
+        }
+    }
 
     private suspend fun usable(capability: SourceCapability): List<InstalledSource> {
         val installedStartedAt = System.nanoTime()

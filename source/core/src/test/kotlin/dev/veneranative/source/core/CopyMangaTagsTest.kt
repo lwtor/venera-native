@@ -36,7 +36,8 @@ class CopyMangaTagsTest {
               name = 'Fixture'; key = 'copy_manga'; version = '1';
               apiUrl = 'https://fixture.invalid';
               get headers() { return {'X-Fixture': 'configured'}; }
-              getReqID() { return 'fixture-id'; }
+              getReqID() { this.requestIds = (this.requestIds || 0) + 1; return 'fixture-id'; }
+              requestCount() { return this.requestIds; }
               comic = {loadInfo: async () => { throw new Error('full details must not load'); }};
             }
         """.trimIndent()
@@ -56,6 +57,14 @@ class CopyMangaTagsTest {
             ))
             assertTrue(rejected is SourceResult.Failure)
             assertEquals(1, calls.size)
+            val keys = listOf("first", "second").map { ComicKey(id, RemoteComicId(it)) }
+            val batch = EngineSourceCore(runtime).comicTagsBatch(keys) as SourceOutcome.Success
+            assertEquals(keys.associateWith { listOf("Adventure", "Fantasy") }, batch.value)
+            assertEquals(3, calls.size)
+            val count = runtime.invoke(SourceCall.InvokeFunction("request-count", id, "requestCount")) as SourceResult.Success
+            assertEquals("1", count.json) // Invalid input discarded the old isolate; the batch shares one ID.
+            assertTrue(EngineSourceCore(runtime).comicTagsBatch(List(7) { keys.first() }) is SourceOutcome.Failure)
+            assertEquals(3, calls.size)
         } finally { runtime.close() }
     }
 }
