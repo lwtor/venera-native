@@ -293,6 +293,24 @@ class VeneraDatabaseMigrationTest {
         }
     }
 
+    @Test fun migrate11To12SeparatesComicMetadataWithoutDroppingUserState() {
+        helper.createDatabase(TEST_DB, 11).apply {
+            execSQL("INSERT INTO favorite_entry (ref_source, ref_comic, folder_id, title, cover_ref, added_at, has_update, chapters_json) VALUES ('fixture','one','','Comic','https://example.org/cover',1,1,'[]')")
+            execSQL("INSERT INTO reading_history (source_id, comic_id, chapter_id, comic_title, chapter_title, page_index, page_count, updated_at, chapter_group) VALUES ('fixture','one','c1','Comic','Chapter 1',2,10,1,'B')")
+            close()
+        }
+        helper.runMigrationsAndValidate(TEST_DB, 12, true, MIGRATION_11_12).use { db ->
+            db.query("SELECT title, cover_url, metadata_refreshed_at, legacy_chapters_json FROM comic_record").use { c ->
+                assertEquals(true, c.moveToFirst()); assertEquals("Comic", c.getString(0))
+                assertEquals("https://example.org/cover", c.getString(1)); assertEquals(true, c.isNull(2)); assertEquals("[]", c.getString(3))
+            }
+            db.query("SELECT has_update FROM favorite_entry").use { c -> assertEquals(true, c.moveToFirst()); assertEquals(1, c.getInt(0)) }
+            db.query("SELECT page_index, chapter_group FROM reading_history").use { c ->
+                assertEquals(true, c.moveToFirst()); assertEquals(2, c.getInt(0)); assertEquals("B", c.getString(1))
+            }
+        }
+    }
+
     private fun SupportSQLiteDatabase.readPairs(table: String): List<Pair<String, Int>> =
         query("SELECT chapter_id, page_index FROM $table").use { cursor ->
             buildList {

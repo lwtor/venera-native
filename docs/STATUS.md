@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10C1 DONE：独立漫画资料/分版本章节表与无损迁移。** Room 11→12 新增 comic_record/comic_chapter，保存基础资料、来源更新时间、成功刷新/尝试/下次刷新时间、封面取得时间。收藏与下载已有作品迁入，旧目录快照留待仓库规范化，收藏/历史/下载表不删除。DAO 支持独立资料与分版本目录、过期查询。决定 ADR-0015。
+
+验证（2026-10-15）：JDK 17 `:app:assembleDebug :core:database:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。迁移回归源码覆盖旧封面/目录、更新标记、阅读页码与版本保留；测试仅编译，未运行/安装。当前用户任务下一项 S4-10C2：持久封面与既有资源目录；随后 C3 接入资料事实来源及前台过期刷新，当前基础表尚未代替 UI 旧查询。原 S4-02G4 暂待续。
+
 **S4-10B6 DONE：竖向卡片背景透明度提高至 70%。** 按用户反馈，将 Android 12+ 信息区模糊封面 alpha 从 0.5 调为 0.3（透明度 70%），让背景更淡；旧系统降级及横向样式保持。
 
 验证（2026-10-14）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。仅样式参数调整，未运行测试或真机验证。当前唯一下一任务保持 S4-02G4。

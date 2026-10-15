@@ -39,6 +39,8 @@ S4-10B3：core:model 定义分版本目录与当前阅读展示规则；data:col
 
 S4-10B5：data:collection 的 ensureChapters 显式为可见缺目录收藏复用 ChapterProbe；共享 FavoriteChapterLoader 在 Feature ViewModel scope 中管理两并发、取消与领域加载状态，持久化完成由 Room Flow 刷新界面。Home/Library 只报告条目进入/离开；没有 Feature 间依赖。ComicCoverCard 改为单 Painter 的清晰封面/模糊信息背景，沿用 core:image 的加载边界，横向组件不改。成本及策略见 ADR-0014。
 
+S4-10C1：comic_record/comic_chapter 与收藏归属独立，Room 11→12 保留旧字段及目录快照以便兼容迁移。C2/C3 的持久资源与过期协调遵循 ADR-0015；在完成接入前，不把表存在视为 UI 已切换。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |

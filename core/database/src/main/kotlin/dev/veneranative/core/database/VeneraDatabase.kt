@@ -21,6 +21,8 @@ import androidx.room.RoomDatabase
         ReadingProgressEntity::class,
         FavoriteFolderEntity::class,
         FavoriteEntryEntity::class,
+        ComicRecordEntity::class,
+        ComicChapterEntity::class,
         FavoriteMembershipEntity::class,
         DownloadTaskEntity::class,
         DownloadPageEntity::class,
@@ -31,7 +33,7 @@ import androidx.room.RoomDatabase
         SearchHistoryEntity::class,
         ScreenPreferenceEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = true,
 )
 abstract class VeneraDatabase : RoomDatabase() {
@@ -41,6 +43,8 @@ abstract class VeneraDatabase : RoomDatabase() {
     abstract fun readingProgressDao(): ReadingProgressDao
 
     abstract fun favoriteDao(): FavoriteDao
+
+    abstract fun comicRecordDao(): ComicRecordDao
 
     abstract fun downloadDao(): DownloadDao
 

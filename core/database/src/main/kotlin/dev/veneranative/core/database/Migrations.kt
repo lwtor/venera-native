@@ -190,4 +190,26 @@ val MIGRATION_10_11: Migration = object : Migration(10, 11) {
     }
 }
 
-val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+val MIGRATION_11_12: Migration = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""CREATE TABLE IF NOT EXISTS comic_record (
+            source_id TEXT NOT NULL, comic_id TEXT NOT NULL, title TEXT NOT NULL, subtitle TEXT,
+            cover_url TEXT, description TEXT, authors_json TEXT, tags_json TEXT, publication_status TEXT,
+            source_updated_at TEXT, metadata_refreshed_at INTEGER, last_attempt_at INTEGER,
+            next_refresh_at INTEGER NOT NULL DEFAULT 0, cover_fetched_at INTEGER, legacy_chapters_json TEXT,
+            PRIMARY KEY(source_id, comic_id))""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_comic_record_next_refresh_at ON comic_record(next_refresh_at)")
+        db.execSQL("""CREATE TABLE IF NOT EXISTS comic_chapter (
+            source_id TEXT NOT NULL, comic_id TEXT NOT NULL, version_key TEXT NOT NULL,
+            chapter_id TEXT NOT NULL, title TEXT NOT NULL, position INTEGER NOT NULL, group_name TEXT,
+            PRIMARY KEY(source_id, comic_id, version_key, chapter_id),
+            FOREIGN KEY(source_id, comic_id) REFERENCES comic_record(source_id, comic_id) ON UPDATE NO ACTION ON DELETE CASCADE)""")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_comic_chapter_source_id_comic_id ON comic_chapter(source_id, comic_id)")
+        db.execSQL("""INSERT OR IGNORE INTO comic_record (source_id, comic_id, title, subtitle, cover_url, source_updated_at, legacy_chapters_json)
+            SELECT ref_source, ref_comic, title, subtitle, cover_ref, last_updated, chapters_json FROM favorite_entry""")
+        db.execSQL("""INSERT OR IGNORE INTO comic_record (source_id, comic_id, title)
+            SELECT ref_source, ref_comic, COALESCE(MAX(NULLIF(comic_title, '')), ref_comic) FROM download_task GROUP BY ref_source, ref_comic""")
+    }
+}
+
+val VENERA_DATABASE_MIGRATIONS: List<Migration> = listOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
