@@ -30,8 +30,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,8 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Person
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.core.designsystem.VeneraNativeTheme
@@ -61,10 +57,8 @@ fun HomeRoute(
     collection: CollectionRepository?,
     localRepository: LocalComicRepository?,
     onResumeReading: (ReadingHistoryEntry) -> Unit,
-    onOpenSources: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
-    onOpenBackup: () -> Unit = {},
 ) {
     val viewModelKey = "home-${history != null}-${collection != null}-${localRepository != null}"
     val homeViewModel: HomeViewModel = viewModel(key = viewModelKey) {
@@ -75,10 +69,8 @@ fun HomeRoute(
     HomeScreen(
         state = state,
         onResumeReading = onResumeReading,
-        onOpenSources = onOpenSources,
         onOpenSearch = onOpenSearch,
         onOpenLibrary = onOpenLibrary,
-        onOpenBackup = onOpenBackup,
         onFavoriteVisible = homeViewModel::onFavoriteVisible,
         onFavoriteHidden = homeViewModel::onFavoriteHidden,
     )
@@ -88,10 +80,8 @@ fun HomeRoute(
 internal fun HomeScreen(
     state: HomeUiState,
     onResumeReading: (ReadingHistoryEntry) -> Unit,
-    onOpenSources: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
-    onOpenBackup: () -> Unit = {},
     modifier: Modifier = Modifier,
     onFavoriteVisible: (dev.veneranative.data.collection.FavoriteItem) -> Unit = {},
     onFavoriteHidden: (dev.veneranative.core.model.ComicRef) -> Unit = {},
@@ -111,7 +101,7 @@ internal fun HomeScreen(
                     modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    HomeHeader(onOpenSources = onOpenSources, onOpenBackup = onOpenBackup)
+                    HomeHeader()
                     SearchEntry(onOpenSearch = onOpenSearch)
                 }
             }
@@ -178,7 +168,7 @@ internal fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(onOpenSources: () -> Unit, onOpenBackup: () -> Unit) {
+private fun HomeHeader() {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -197,12 +187,6 @@ private fun HomeHeader(onOpenSources: () -> Unit, onOpenBackup: () -> Unit) {
             Text("漫画，随时继续", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.weight(1f))
-        IconButton(onClick = onOpenBackup, modifier = Modifier.clip(CircleShape)) {
-            Icon(Icons.Default.Person, contentDescription = "我的与备份", tint = MaterialTheme.colorScheme.primary)
-        }
-        IconButton(onClick = onOpenSources, modifier = Modifier.clip(CircleShape)) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "管理漫画源", tint = MaterialTheme.colorScheme.primary)
-        }
     }
 }
 
@@ -361,7 +345,7 @@ private fun HomeScreenPreview() {
         HomeScreen(
             state = HomeUiState(historyAvailable = true, favoritesAvailable = true, localLibraryAvailable = true),
             onResumeReading = {},
-            onOpenSources = {},
+
             onOpenSearch = {},
             onOpenLibrary = {},
         )

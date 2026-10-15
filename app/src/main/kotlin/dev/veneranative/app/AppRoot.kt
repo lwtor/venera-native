@@ -237,10 +237,8 @@ private fun AppNavHost(
                         onResumeReading = { entry ->
                             onRouteChange(AppRoute.Reader(entry.toChapterRef()))
                         },
-                        onOpenSources = { onRouteChange(AppRoute.Sources) },
                         onOpenSearch = { onRouteChange(AppRoute.Search(null)) },
                         onOpenLibrary = { onRouteChange(AppRoute.Library) },
-                        onOpenBackup = { onRouteChange(AppRoute.Profile) },
                     )
 
                     AppRoute.Backup -> BackupRoute(
@@ -252,6 +250,7 @@ private fun AppNavHost(
                         factory = backupFactory,
                         onOpenBackup = { onRouteChange(AppRoute.Backup) },
                         onOpenAbout = { onRouteChange(AppRoute.About) },
+                        onOpenSources = { onRouteChange(AppRoute.Sources) },
                     )
 
                     AppRoute.About -> {

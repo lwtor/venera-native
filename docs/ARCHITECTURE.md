@@ -49,7 +49,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 
 | 模块 | 当前职责 | 可依赖 |
 | --- | --- | --- |
-| `:app` | MainActivity 生命周期入口、应用 Theme、AppRoot 根装配与首页/书架/我的三个根级 Tab 导航壳；搜索、探索、来源由页面入口进入 | Feature、Core、实现模块 |
+| `:app` | MainActivity 生命周期入口、应用 Theme、AppRoot 根装配与首页/书架/我的三个根级 Tab 导航壳；搜索、探索由页面入口进入；来源管理从“我的-设置”进入 | Feature、Core、实现模块 |
 | `:core:model` | 稳定领域 ID 与跨层模型（包括远端/本地 `ChapterRef`） | 尽量只依赖 Kotlin |
 | `:core:archive` | ZIP/CBZ、7z/CB7 只读访问接口与 Commons Compress 适配 | Commons Compress、XZ、Android Framework |
 | `:core:backup` | 与存储无关、带格式版本的选择性数据快照 DTO；压缩并使用用户密码加密/解密备份包 | kotlinx.serialization JSON、Java Cryptography |
@@ -71,7 +71,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:feature:library` | 书架页：收藏常驻主视图，下载队列与本地漫画从菜单进入；收藏支持用户收藏夹筛选、多选归属、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
 | `:feature:backup` | GitHub 数据备份页面：选择快照类别、密码输入、手动备份与确认后合并恢复；账号授权移到我的页，Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |
-| `:feature:profile` | 我的根页、GitHub 账号授权与资料、最近成功同步时间、关于页；通过导航回调进入备份，不依赖其他 Feature | Design System、`:core:image`、`:data:backup`、Lifecycle |
+| `:feature:profile` | 我的根页、GitHub 账号授权与资料、最近成功同步时间、漫画源管理与关于页设置入口；通过导航回调进入来源管理、备份和关于页，不依赖其他 Feature | Design System、`:core:image`、`:data:backup`、Lifecycle |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic`、`:core:image` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |

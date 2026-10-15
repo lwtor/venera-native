@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,11 +31,11 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun ProfileRoute(factory: GitHubBackupGatewayFactory?, onOpenBackup: () -> Unit, onOpenAbout: () -> Unit) {
+fun ProfileRoute(factory: GitHubBackupGatewayFactory?, onOpenBackup: () -> Unit, onOpenAbout: () -> Unit, onOpenSources: () -> Unit) {
     val model: ProfileViewModel = viewModel(key = "profile-${factory != null}") { ProfileViewModel(factory?.create()) }
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(model) { model.onAction(ProfileAction.Refresh) }
-    ProfileScreen(state, factory != null, model::onAction, onOpenBackup, onOpenAbout)
+    ProfileScreen(state, factory != null, model::onAction, onOpenBackup, onOpenAbout, onOpenSources)
 }
 
 @Composable
@@ -44,6 +45,7 @@ internal fun ProfileScreen(
     onAction: (ProfileAction) -> Unit,
     onOpenBackup: () -> Unit,
     onOpenAbout: () -> Unit,
+    onOpenSources: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     Column(
@@ -120,14 +122,25 @@ internal fun ProfileScreen(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("设置", style = MaterialTheme.typography.titleSmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
             Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerLow)) {
-                ListItem(
-                    headlineContent = { Text("关于 Venera Native") },
-                    supportingContent = { Text("版本信息") },
-                    leadingContent = { Icon(Icons.Default.Info, null, tint = colors.primary) },
-                    trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
-                    modifier = Modifier.fillMaxWidth().testTag("profile_about").clickable(onClick = onOpenAbout),
-                    colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
-                )
+                Column {
+                    ListItem(
+                        headlineContent = { Text("漫画源管理") },
+                        supportingContent = { Text("添加、更新和管理漫画源") },
+                        leadingContent = { Icon(Icons.Default.Settings, null, tint = colors.primary) },
+                        trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
+                        modifier = Modifier.fillMaxWidth().testTag("profile_sources").clickable(onClick = onOpenSources),
+                        colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
+                    )
+                    HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.5f))
+                    ListItem(
+                        headlineContent = { Text("关于 Venera Native") },
+                        supportingContent = { Text("版本信息") },
+                        leadingContent = { Icon(Icons.Default.Info, null, tint = colors.primary) },
+                        trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
+                        modifier = Modifier.fillMaxWidth().testTag("profile_about").clickable(onClick = onOpenAbout),
+                        colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
+                    )
+                }
             }
         }
         if (state.account.connected) {
