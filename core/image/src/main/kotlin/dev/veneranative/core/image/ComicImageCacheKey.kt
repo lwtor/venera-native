@@ -39,7 +39,7 @@ internal object ComicImageCacheKey {
             append(request.url).append('|')
             append(request.sourceId?.value.orEmpty()).append('|')
             append(request.variant.orEmpty()).append('|')
-            request.retainedCoverKey?.let { append("retained:").append(it.sourceId.value).append('|').append(it.remoteId.value).append('|') }
+            request.retainedCoverKey?.let { append("retained:").append(it.sourceId.value).append('|').append(it.remoteId.value).append('|').append(request.retainedCoverRevision ?: 0).append('|') }
             append("hdr:")
             canonicalHeaders(request.headers + authHeaders + refererHeader(request))
                 .forEach { (name, value) -> append(name).append('=').append(value).append(';') }

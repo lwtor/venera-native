@@ -66,6 +66,10 @@ internal class FakeCollectionRepository : CollectionRepository {
         )
     }
 
+    override suspend fun maintainWhileActive() = Unit
+    override suspend fun refreshExpired(): Int = 0
+    override suspend fun updateDetails(ref: dev.veneranative.core.model.ComicRef, detail: dev.veneranative.core.model.ComicDetail) = Unit
+
     override suspend fun ensureChapters(ref: dev.veneranative.core.model.ComicRef): Boolean = false
 
     override suspend fun updateChapters(ref: dev.veneranative.core.model.ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) = Unit

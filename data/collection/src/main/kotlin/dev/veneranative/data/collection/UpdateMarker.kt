@@ -29,13 +29,18 @@ class UpdateMarker(
     private val probe: RemoteChapterProbe,
 ) {
 
-    suspend fun chapterSnapshot(ref: ComicRef): ChapterSnapshot? =
-        (ref as? ComicRef.Remote)?.key?.let { probe.chapterSnapshot(it) }
+    suspend fun chapterSnapshot(ref: ComicRef, force: Boolean = false): ChapterSnapshot? =
+        (ref as? ComicRef.Remote)?.key?.let { probe.refreshSnapshot(it, force) }
 
     suspend fun evaluate(stored: FavoriteItem): UpdateState {
         val comicKey = (stored.ref as? ComicRef.Remote)?.key ?: return UpdateState.Unknown
         val remote = probe.chapterSnapshot(comicKey) ?: return UpdateState.Unknown
 
+        return evaluateSnapshot(stored, remote)
+    }
+
+    fun evaluateSnapshot(stored: FavoriteItem, remote: ChapterSnapshot): UpdateState {
+        if (remote.chapterCount <= 0) return UpdateState.Unchanged(remote)
         val previousCount = stored.chapterCount
         val previousLatest = stored.latestChapterId
         if (previousCount == null || previousLatest == null) return UpdateState.Unchanged(remote)

@@ -21,7 +21,7 @@ class ComicResourceStore(
         require(it.canonicalPath.startsWith(root.canonicalPath + File.separator))
     }
     fun openCover(key: ComicKey): ComicImageFile? {
-        val file = File(coverDir(key), "cover.bin")
+        val file = File(coverDir(key), "cover.image")
         return if (file.isFile && validate(file)) ComicImageFile(file, null) else null
     }
     fun fetchedAt(key: ComicKey, url: String): Long? = try {
@@ -52,7 +52,7 @@ class ComicResourceStore(
             if (!validate(part)) return false
             currentCoroutineContext().ensureActive()
             // Same-directory atomic replace: readers keep either the old or the new complete image.
-            Files.move(part.toPath(), File(dir, "cover.bin").toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            Files.move(part.toPath(), File(dir, "cover.image").toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
             val metadata = File.createTempFile("source-", ".part", dir)
             try {
                 metadata.writeText(digest(url) + "\n" + fetchedAt)

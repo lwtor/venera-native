@@ -157,6 +157,8 @@ object BackupArchiveCodec {
             snapshot.favoriteEntries.forEach { row -> add(buildJsonObject {
                 put("sourceId", row.sourceId); put("comicId", row.comicId); put("legacyFolderId", row.legacyFolderId)
                 put("title", row.title); putNullable("subtitle", row.subtitle); putNullable("coverRef", row.coverRef); putNullable("lastUpdated", row.lastUpdated); putNullable("chaptersJson", row.chaptersJson)
+                putNullable("description", row.description); putNullable("authorsJson", row.authorsJson); putNullable("tagsJson", row.tagsJson)
+                putNullable("publicationStatus", row.publicationStatus); putNullable("metadataRefreshedAtMillis", row.metadataRefreshedAtMillis)
                 put("addedAtEpochMillis", row.addedAtEpochMillis); putNullable("lastReadAtEpochMillis", row.lastReadAtEpochMillis)
                 putNullable("chapterCount", row.chapterCount); putNullable("latestChapterId", row.latestChapterId)
                 put("hasUpdate", row.hasUpdate); putNullable("updatedAtEpochMillis", row.updatedAtEpochMillis)
@@ -191,7 +193,7 @@ object BackupArchiveCodec {
         categories = getValue("categories").jsonArray.map { BackupCategory.valueOf(it.jsonPrimitive.content) }.toSet(),
         favoriteFolders = array("favoriteFolders") { FavoriteFolderBackup(string("id"), string("name"), int("sortOrder"), boolean("removable")) },
         favoriteEntries = array("favoriteEntries") {
-            FavoriteEntryBackup(string("sourceId"), string("comicId"), string("legacyFolderId"), string("title"), nullableString("subtitle"), nullableString("coverRef"), long("addedAtEpochMillis"), nullableLong("lastReadAtEpochMillis"), nullableInt("chapterCount"), nullableString("latestChapterId"), boolean("hasUpdate"), nullableLong("updatedAtEpochMillis"), get("lastUpdated")?.jsonPrimitive?.contentOrNull, get("chaptersJson")?.jsonPrimitive?.contentOrNull)
+            FavoriteEntryBackup(string("sourceId"), string("comicId"), string("legacyFolderId"), string("title"), nullableString("subtitle"), nullableString("coverRef"), long("addedAtEpochMillis"), nullableLong("lastReadAtEpochMillis"), nullableInt("chapterCount"), nullableString("latestChapterId"), boolean("hasUpdate"), nullableLong("updatedAtEpochMillis"), get("lastUpdated")?.jsonPrimitive?.contentOrNull, get("chaptersJson")?.jsonPrimitive?.contentOrNull, get("description")?.jsonPrimitive?.contentOrNull, get("authorsJson")?.jsonPrimitive?.contentOrNull, get("tagsJson")?.jsonPrimitive?.contentOrNull, get("publicationStatus")?.jsonPrimitive?.contentOrNull, get("metadataRefreshedAtMillis")?.jsonPrimitive?.longOrNull)
         },
         favoriteMemberships = array("favoriteMemberships") { FavoriteMembershipBackup(string("sourceId"), string("comicId"), string("folderId")) },
         readingHistory = array("readingHistory") {

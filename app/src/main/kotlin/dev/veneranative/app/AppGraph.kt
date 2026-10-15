@@ -91,6 +91,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class AppGraph(application: android.app.Application) : androidx.lifecycle.AndroidViewModel(application) {
@@ -259,13 +260,25 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             _history.value = repository
             // The shelf asks installed sources for chapter snapshots; the assembly layer is the only
             // place that can see both the repository and the catalog.
-            _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog))
+            _collection.value = DefaultCollectionRepository(db, ComicCatalogChapterProbe(catalog), covers = host.savedComicCovers, maintenanceScope = scope)
             _download.value = DownloadEnvironment.get(getApplication()).repository()
             _local.value = DefaultLocalComicRepository(
                 db, AndroidSafTreeAccess(getApplication()), archiveAccess = localArchiveAccess,
             )
         }
     }
+    private val foreground = kotlinx.coroutines.flow.MutableStateFlow(false)
+    init {
+        scope.launch {
+            kotlinx.coroutines.flow.combine(foreground, collection) { active, repository -> if (active) repository else null }
+                .collectLatest { repository ->
+                    if (repository != null) try { repository.maintainWhileActive() }
+                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { android.util.Log.w("VeneraLibrary", "Retained comic refresh unavailable") }
+                }
+        }
+    }
+    fun setForeground(active: Boolean) { foreground.value = active }
     fun flushProgress() { scope.launch { runCatching { progressTracker.get()?.flush() } } }
     override fun onCleared() {
         scope.launch(NonCancellable) {

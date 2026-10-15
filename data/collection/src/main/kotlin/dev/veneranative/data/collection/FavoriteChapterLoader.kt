@@ -17,7 +17,7 @@ class FavoriteChapterLoader(private val repository: CollectionRepository, privat
 
     fun visible(item: FavoriteItem) {
         val ref = item.ref
-        if (item.chapters.isNotEmpty() || ref !is ComicRef.Remote || ref in jobs || ref in attempted) return
+        if ((item.chapters.isNotEmpty() && item.hasStoredCover) || ref !is ComicRef.Remote || ref in jobs || ref in attempted) return
         val job = scope.launch(start = CoroutineStart.LAZY) {
             mutableStates.update { it + (ref to FavoriteCatalogState.Loading) }
             try {

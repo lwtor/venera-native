@@ -37,7 +37,7 @@ fun FavoriteGrid(
     ) {
         items(count = items.size, key = { index -> items[index].ref.toString() }) { index ->
             val item = items[index]
-            androidx.compose.runtime.DisposableEffect(item.ref, item.chapters.isEmpty()) {
+            androidx.compose.runtime.DisposableEffect(item.ref, item.chapters.isEmpty(), item.hasStoredCover) {
                 onVisible(item)
                 onDispose { onHidden(item.ref) }
             }
@@ -46,7 +46,7 @@ fun FavoriteGrid(
             ComicCoverCard(
                 title = item.title,
                 request = if (comicKey != null && coverRef != null)
-                    ComicImageRequest(coverRef, sourceId = comicKey.sourceId, variant = "comic-cover", retainedCoverKey = comicKey) else null,
+                    ComicImageRequest(coverRef, sourceId = comicKey.sourceId, variant = "comic-cover", retainedCoverKey = comicKey, retainedCoverRevision = item.storedCoverAt) else null,
                 chapterLabel = dev.veneranative.data.collection.favoriteChapterLabel(item, catalogStates[item.ref]),
                 sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
                 onClick = { comicKey?.let(onOpenComic) },

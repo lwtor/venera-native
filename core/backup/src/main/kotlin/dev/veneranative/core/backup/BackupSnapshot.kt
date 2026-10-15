@@ -64,6 +64,11 @@ data class FavoriteEntryBackup(
     val updatedAtEpochMillis: Long?,
     val lastUpdated: String? = null,
     val chaptersJson: String? = null,
+    val description: String? = null,
+    val authorsJson: String? = null,
+    val tagsJson: String? = null,
+    val publicationStatus: String? = null,
+    val metadataRefreshedAtMillis: Long? = null,
 )
 
 data class FavoriteMembershipBackup(

@@ -129,7 +129,8 @@ internal fun HomeScreen(
                         )
                     } else {
                         state.recentReading.take(3).forEach { entry ->
-                            ResumeCard(entry = entry, onClick = { onResumeReading(entry) })
+                            ResumeCard(entry = entry, onClick = { onResumeReading(entry) },
+                                coverRevision = state.favorites.firstOrNull { it.ref.comicKeyOrNull() == entry.comicKey }?.storedCoverAt)
                         }
                     }
                 }
@@ -148,7 +149,7 @@ internal fun HomeScreen(
                     ) {
                         items(count = updated.take(8).size, key = { updated[it].ref.toString() }) { index ->
                             val favorite = updated[index]
-                            androidx.compose.runtime.DisposableEffect(favorite.ref, favorite.chapters.isEmpty()) {
+                            androidx.compose.runtime.DisposableEffect(favorite.ref, favorite.chapters.isEmpty(), favorite.hasStoredCover) {
                                 onFavoriteVisible(favorite)
                                 onDispose { onFavoriteHidden(favorite.ref) }
                             }
@@ -280,9 +281,9 @@ private fun EmptyResumeCard(waitingForData: Boolean, onOpenSearch: () -> Unit) {
 }
 
 @Composable
-private fun ResumeCard(entry: ReadingHistoryEntry, onClick: () -> Unit) {
+private fun ResumeCard(entry: ReadingHistoryEntry, onClick: () -> Unit, coverRevision: Long? = null) {
     val request = entry.coverUrl?.let {
-        ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = "comic-cover", retainedCoverKey = entry.comicKey)
+        ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = "comic-cover", retainedCoverKey = entry.comicKey, retainedCoverRevision = coverRevision)
     }
     ComicHorizontalCard(
         title = entry.comicTitle, request = request, onClick = onClick,
@@ -304,7 +305,7 @@ private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteIt
     val comicKey = item.ref.comicKeyOrNull()
     val coverRef = item.coverRef
     val request = if (comicKey != null && coverRef != null) {
-        ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = "comic-cover", retainedCoverKey = comicKey)
+        ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = "comic-cover", retainedCoverKey = comicKey, retainedCoverRevision = item.storedCoverAt)
     } else null
     ComicCoverCard(
         title = item.title, request = request,

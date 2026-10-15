@@ -165,7 +165,11 @@ class HomeViewModelTest {
         override suspend fun deleteFolder(id: String) = error("Not used in this test")
         override suspend fun add(ref: ComicRef, folderId: String, snapshot: ComicSnapshot) = error("Not used in this test")
         override suspend fun addToFolders(ref: ComicRef, folderIds: Set<String>, snapshot: ComicSnapshot) = error("Not used in this test")
-        override suspend fun ensureChapters(ref: dev.veneranative.core.model.ComicRef): Boolean = false
+        override suspend fun maintainWhileActive() = Unit
+    override suspend fun refreshExpired(): Int = 0
+    override suspend fun updateDetails(ref: dev.veneranative.core.model.ComicRef, detail: dev.veneranative.core.model.ComicDetail) = Unit
+
+    override suspend fun ensureChapters(ref: dev.veneranative.core.model.ComicRef): Boolean = false
 
     override suspend fun updateChapters(ref: dev.veneranative.core.model.ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) = Unit
 

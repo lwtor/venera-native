@@ -22,6 +22,7 @@ data class ChapterSnapshot(
     val latestChapterId: String?,
     val lastUpdated: String? = null,
     val chapters: List<dev.veneranative.core.model.Chapter>? = null,
+    val detail: dev.veneranative.core.model.ComicDetail? = null,
 )
 
 /**
@@ -33,6 +34,7 @@ data class ChapterSnapshot(
 interface RemoteChapterProbe {
 
     /** Null when the comic's source cannot answer right now: uninstalled, offline, unsupported. */
+    suspend fun refreshSnapshot(comicKey: ComicKey, force: Boolean): ChapterSnapshot? = chapterSnapshot(comicKey)
     suspend fun chapterSnapshot(comicKey: ComicKey): ChapterSnapshot?
 }
 
@@ -46,20 +48,23 @@ class ComicCatalogChapterProbe(
     private val catalog: ComicCatalog,
 ) : RemoteChapterProbe {
 
-    override suspend fun chapterSnapshot(comicKey: ComicKey): ChapterSnapshot? {
-        val detail = when (val outcome = catalog.detail(comicKey)) {
+    override suspend fun chapterSnapshot(comicKey: ComicKey): ChapterSnapshot? = refreshSnapshot(comicKey, false)?.takeIf { it.chapterCount > 0 }
+
+    override suspend fun refreshSnapshot(comicKey: ComicKey, force: Boolean): ChapterSnapshot? {
+        val detail = when (val outcome = if (force) catalog.refreshDetail(comicKey) else catalog.detail(comicKey)) {
             is SourceOutcome.Success -> outcome.value
             is SourceOutcome.Failure -> return null
         }
         val chapters = detail.chapters
         // A comic with no chapters has nothing to compare; reporting zero would look like "empty"
         // rather than "unknown" and would mark everything as updated on the next real answer.
-        if (chapters.isEmpty()) return null
+
         return ChapterSnapshot(
             chapterCount = chapters.size,
-            latestChapterId = chapters.last().key.remoteId.value,
+            latestChapterId = chapters.lastOrNull()?.key?.remoteId?.value,
             lastUpdated = detail.comic.lastUpdated ?: detail.metadata["Updated"],
             chapters = chapters,
+            detail = detail,
         )
     }
 }

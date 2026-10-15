@@ -457,7 +457,7 @@ class DetailsViewModel(
                         else false
                     if (outcome is SourceOutcome.Success) collection?.let { repository ->
                         viewModelScope.launch {
-                            try { repository.updateChapters(ComicRef.Remote(comicKey), outcome.value.chapters) }
+                            try { repository.updateDetails(ComicRef.Remote(comicKey), outcome.value) }
                             catch (cancelled: CancellationException) { throw cancelled }
                             catch (_: Exception) { _state.update { it.copy(message = "无法更新书架章节信息。") } }
                         }
@@ -533,6 +533,7 @@ internal fun ComicDetail.toSnapshot(): ComicSnapshot = ComicSnapshot(
     coverRef = comic.coverUrl,
     lastUpdated = comic.lastUpdated ?: metadata["Updated"],
     chapters = chapters,
+    detail = this,
     chapterCount = chapters.size.takeIf { it > 0 },
     latestChapterId = chapters.lastOrNull()?.key?.remoteId?.value,
 )

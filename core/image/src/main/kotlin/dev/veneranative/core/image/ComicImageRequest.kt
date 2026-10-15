@@ -34,6 +34,8 @@ data class ComicImageRequest(
     val variant: String? = null,
     /** Explicit offline artwork lookup; never used for arbitrary page/network requests. */
     val retainedCoverKey: dev.veneranative.core.model.ComicKey? = null,
+    /** Changes after a successful local replacement, so a previously failed painter can reload. */
+    val retainedCoverRevision: Long? = null,
 ) {
     init {
         require(retainedCoverKey == null || retainedCoverKey.sourceId == sourceId)

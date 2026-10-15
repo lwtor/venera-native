@@ -24,7 +24,7 @@ internal fun FavoriteFolderEntity.toDomain(): FavoriteFolder = FavoriteFolder(
     removable = removable,
 )
 
-internal fun FavoriteEntryEntity.toDomainOrNull(): FavoriteItem? = runCatching {
+internal fun FavoriteEntryEntity.toDomainOrNull(includeLegacyChapters: Boolean = true): FavoriteItem? = runCatching {
     FavoriteItem(
         ref = comicRefOf(refSource, refComic),
         title = title,
@@ -37,7 +37,7 @@ internal fun FavoriteEntryEntity.toDomainOrNull(): FavoriteItem? = runCatching {
         latestChapterId = latestChapterId,
         hasUpdate = hasUpdate,
         lastUpdated = lastUpdated,
-        chapters = decodeChapterCatalog(chaptersJson),
+        chapters = if (includeLegacyChapters) decodeChapterCatalog(chaptersJson) else emptyList(),
     )
 }.getOrNull()
 

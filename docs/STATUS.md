@@ -4,6 +4,12 @@
 
 ## 状态快照
 
+**S4-10C3 DONE：收藏资料统一读取、持久封面修复与前台过期刷新。** 收藏/Home 从独立 comic_record/comic_chapter 读取资料与分版本目录，旧快照首次使用时事务规范化；旧收藏列仅维持排序/备份兼容投影。收藏及详情成功后异步保留封面；图片请求包含封面取得时间，已失败的图片在本地保存后重新加载。资源文件使用 covers/cover.image，避免被下载恢复的 *.bin 页面扫描误报。沿用原 chapters/ 路径，取消收藏保留资料/资源。
+
+应用在前台立即检查，并每 15 分钟再检查一次；资料成功刷新后 12 小时过期，共享二并发、同漫画互斥，失败退避 15 分钟，保留旧资料/目录/有效封面。可见缺目录/缺封面项复用同一入口，封面 URL 失效时可刷新资料修复；手动检查更新强制绕过详情短缓存。离开前台取消循环，无后台定时任务，GitHub 仍手动同步。备份可选字段保留公开资料与成功刷新时间，不包含文件/设备路径；旧备份可读，恢复后本机补资源。详见 ADR-0015 与 `docs/reviews/retained-comic-storage-review.md`。
+
+验证（2026-10-15）：JDK 17 `:app:assembleDebug :core:image:compileDebugUnitTestKotlin :data:collection:compileDebugUnitTestKotlin :data:download:compileDebugUnitTestKotlin :data:backup:compileDebugUnitTestKotlin :core:backup:compileDebugUnitTestKotlin :feature:details:compileDebugUnitTestKotlin :feature:home:compileDebugUnitTestKotlin :feature:library:compileDebugUnitTestKotlin :core:database:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖过期/退避/保留旧值、失效封面 URL 修复、分版本规范化、强制刷新、前台循环与取消、独立资源不混入下载扫描及新旧备份。测试仅编译，未运行/安装/真机验证；旧收藏首次保留仍需至少一次成功联网，源认证/服务不可用不能由持久化消除。当前唯一下一任务恢复 S4-02G4；本任务不代表 Stage 退出。
+
 **S4-10C2 DONE：持久封面资源层与本地读取入口。** core:image 新增 ComicResourceStore/PersistentComicCoverStorage，沿用既有 downloads/<来源 hash>/<漫画 hash>/，仅增加 covers/，不搬动下载；纯契约 ComicCoverStorage 位于 core:model。封面最多 8MiB/3200 万像素，经采样解码验证，同目录临时文件原子替换，失败保留旧图；索引只保存 URL 摘要与实际取得时间，不保存认证头。显式 retainedCoverKey 请求优先读取用户保留资源，其余请求继续现有认证隔离缓存；收藏/首页封面已传入该键。App 只装配资源层，C3 接入收藏写入与刷新后才自动填充资源。
 
 验证（2026-10-15）：JDK 17 `:app:assembleDebug :core:image:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖安全目录、失败保留旧图、成功替换、缓存复用、关闭网络缓存仍从显式本地资源读取。测试仅编译，未运行/安装，来源真实封面仍待用户复验。当前唯一下一任务 S4-10C3：资料事实来源、兼容恢复与前台过期刷新；原 S4-02G4 暂待续。

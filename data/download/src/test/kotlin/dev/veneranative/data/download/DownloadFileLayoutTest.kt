@@ -18,6 +18,17 @@ class DownloadFileLayoutTest {
 
     private fun layout(): DownloadFileLayout = DownloadFileLayout(folder.root)
 
+    @Test fun `retained artwork shares the comic directory without becoming a download page`() = runTest {
+        val layout = layout()
+        val resources = dev.veneranative.core.image.ComicResourceStore(folder.root) { it.readText() == "valid" }
+        val key = dev.veneranative.core.model.ComicKey(dev.veneranative.core.model.SourceId("s"), dev.veneranative.core.model.RemoteComicId("c"))
+        assertEquals(layout.comicDir("s", "c").canonicalFile, resources.comicDir(key).canonicalFile)
+        val source = folder.newFile("fixture-cover").apply { writeText("valid") }
+        assertTrue(resources.saveCover(key, "https://example.org/cover", source, 1))
+        assertTrue(layout.pageFiles().isEmpty())
+        assertTrue(layout.manifestFiles().isEmpty())
+    }
+
     private fun File.siblings(): List<File> = parentFile!!.listFiles()!!.toList()
 
     @Test

@@ -26,6 +26,7 @@ class ComicResourceStoreTest {
         assertTrue(store.saveCover(key, "https://example.org/new", source, 30))
         assertEquals("valid-two", store.openCover(key)!!.use { it.file.readText() })
         assertTrue(root.walkTopDown().none { it.extension == "part" })
+        assertTrue(root.walkTopDown().none { it.extension == "bin" })
         assertTrue(root.walkTopDown().filter { it.name == "source.sha256" }.none { it.readText().contains("secret") })
     }
     @Test fun explicitRetainedRequestWorksWithClosedNetworkCacheAndNoAuthenticationLookup() = runTest {
@@ -38,6 +39,11 @@ class ComicResourceStoreTest {
             ComicImageAuthProvider { _, _ -> error("Retained artwork must not depend on an active source session") }, resources = store)
         val request = ComicImageRequest("https://example.org/cover", sourceId = key.sourceId, retainedCoverKey = key)
         assertEquals("valid", pipeline.cachedFileOf(request)!!.use { it.file.readText() })
+    }
+
+    @Test fun replacedLocalCoverAtSameUrlHasANewImageIdentity() {
+        val request = ComicImageRequest("https://example.org/cover", sourceId = key.sourceId, retainedCoverKey = key, retainedCoverRevision = 10)
+        assertNotEquals(ComicImageCacheKey.of(request, emptyMap()), ComicImageCacheKey.of(request.copy(retainedCoverRevision = 20), emptyMap()))
     }
 
     @Test fun retainedArtworkIsReusedWithoutFetchingAndRefreshFailureKeepsFallback() = runTest {

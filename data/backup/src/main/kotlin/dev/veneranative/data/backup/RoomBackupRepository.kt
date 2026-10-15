@@ -31,7 +31,13 @@ class RoomBackupRepository(
             createdAtEpochMillis = nowEpochMillis(),
             categories = selection.categories,
             favoriteFolders = if (favorites) database.favoriteDao().folders().map(FavoriteFolderEntity::toBackup) else emptyList(),
-            favoriteEntries = if (favorites) database.favoriteDao().entries().map(FavoriteEntryEntity::toBackup) else emptyList(),
+            favoriteEntries = if (favorites) database.favoriteDao().entries().map { entry ->
+                val record = database.comicRecordDao().record(entry.refSource, entry.refComic)
+                entry.toBackup().let { backup -> if (record == null) backup else backup.copy(
+                    title = record.title, subtitle = record.subtitle, coverRef = record.coverUrl,
+                    lastUpdated = record.sourceUpdatedAt, description = record.description, authorsJson = record.authorsJson,
+                    tagsJson = record.tagsJson, publicationStatus = record.publicationStatus, metadataRefreshedAtMillis = record.metadataRefreshedAt) }
+            } else emptyList(),
             favoriteMemberships = if (favorites) database.favoriteDao().memberships().map(FavoriteMembershipEntity::toBackup) else emptyList(),
             readingHistory = if (history) database.readingHistoryDao().all().map(ReadingHistoryEntity::toBackup) else emptyList(),
             readingProgress = if (history) database.readingProgressDao().all().map(ReadingProgressEntity::toBackup) else emptyList(),
@@ -53,6 +59,18 @@ class RoomBackupRepository(
                 dao.upsertFolders(snapshot.favoriteFolders.map(FavoriteFolderBackup::toEntity))
                 dao.upsertEntries(snapshot.favoriteEntries.map(FavoriteEntryBackup::toEntity))
                 dao.insertMemberships(snapshot.favoriteMemberships.map(FavoriteMembershipBackup::toEntity))
+                snapshot.favoriteEntries.forEach { entry ->
+                    val records = database.comicRecordDao()
+                    val old = records.record(entry.sourceId, entry.comicId)
+                    if (entry.chaptersJson != null) records.deleteChapters(entry.sourceId, entry.comicId)
+                    records.upsert(dev.veneranative.core.database.ComicRecordEntity(entry.sourceId, entry.comicId, entry.title,
+                        entry.subtitle, entry.coverRef?.takeIf(String::isNotBlank) ?: old?.coverUrl, entry.description ?: old?.description,
+                        entry.authorsJson ?: old?.authorsJson, entry.tagsJson ?: old?.tagsJson,
+                        entry.publicationStatus ?: old?.publicationStatus, entry.lastUpdated ?: old?.sourceUpdatedAt,
+                        entry.metadataRefreshedAtMillis ?: old?.metadataRefreshedAt,
+                        nextRefreshAt = 0, coverFetchedAt = old?.coverFetchedAt,
+                        legacyChaptersJson = entry.chaptersJson ?: old?.legacyChaptersJson))
+                }
             }
             if (BackupCategory.ReadingHistory in categories) {
                 val historyDao = database.readingHistoryDao()

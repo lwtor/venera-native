@@ -43,6 +43,8 @@ S4-10C1：comic_record/comic_chapter 与收藏归属独立，Room 11→12 保留
 
 S4-10C2：core:image 增 ComicResourceStore 与 PersistentComicCoverStorage，持久资源和可回收网络缓存独立。纯 ComicCoverStorage 契约在 core:model；显式 retainedCoverKey 仅供用户保留漫画封面，优先本地读取不作为任意网络请求缓存，不保存认证信息。App 复用 downloads 根装配，下载文件路径未迁移。
 
+S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/分版本目录，旧字段作为排序与旧备份兼容投影；ComicCoverStorage 只依赖 core:model 纯契约，由 AppGraph 注入 core:image 实现，未新增 data:collection → core:image 依赖。App 转发生命周期，仓库维护前台检查循环（立即/15分钟、12h过期、二并发、15分钟失败退避）。成功详情更新资料并异步保留封面，失败保留旧内容；封面取得时间作为图片请求版本触发重载。备份传公开资料/时间，不传文件路径或二进制，恢复后重新检查资源。具体存储与兼容规则见 ADR-0015。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |
@@ -56,12 +58,12 @@ S4-10C2：core:image 增 ComicResourceStore 与 PersistentComicCoverStorage，�
 | `:core:image` | 漫画图片管线：`ComicImageRequest` 与稳定缓存键、自建 Fetcher（走 `:core:network` 的共享 OkHttp）、Coil 磁盘缓存、图片头部尺寸解析、封面渲染的 `ComicImage`，以及从 `:feature:reader` 迁来的页面解码与分块 | `:core:model`、`:core:network`、Coil 3.6.3、Compose |
 | `:core:navigation` | 路由契约：`AppRoute` 与它的字符串编码（供 `rememberSaveable` 使用），不含导航库 | `:core:model` |
 | `:data:comic` | 漫画数据访问：可用来源的判定（已安装 + 已启用 + 声明能力）、详情与章节的读取，以及来源分页到 Paging 3 的适配 | `:core:model`、`:data:source`、`:source:api`、Paging |
-| `:core:database` | Room 持久化：阅读历史/进度、收藏、下载、本地库索引、搜索历史和轻量页面偏好实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
+| `:core:database` | Room 持久化：阅读历史/进度、独立漫画资料/分版本章节、收藏、下载、本地库索引、搜索历史和轻量页面偏好实体与 DAO，以及 `schemas/<version>.json` 基线。**不依赖 `:core:model`**，主键一律用字符串列 | Room 2.8.5 |
 | `:data:history` | 阅读历史与恢复：保存每漫画/章节进度、最近阅读按漫画返回最新章节、实体↔领域映射、节流保存与 `flush()` | `:core:model`、`:core:database` |
 | `:data:backup` | 按用户选择从 Room 创建快照与事务化恢复；GitHub Device Flow、私有仓库传输、共享账号资料与成功同步回执；不包含漫画文件 | `:core:backup`、`:core:database`、Room、OkHttp、Android Keystore/AtomicFile |
 | `:data:search` | 最近搜索词仓库：规范化查询词、去重置顶、有界保留及单项删除/清空；数据保存在 Room | `:core:database`、Coroutines |
 | `:data:settings` | 轻量页面选择偏好的类型无关持久化仓库；为 S4-01 设置模块前的页面状态切片提供 Room 存储 | `:core:database` |
-| `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现）、kotlinx.serialization JSON（章节目录持久化） |
+| `:data:collection` | 书架收藏：隐式“全部”视图、用户收藏夹及多对多归属、排序查询、独立漫画资料/目录、持久封面协调、前台过期刷新及更新标记（`CollectionRepository` / `UpdateMarker`）。Room 是唯一事实来源，UI 只订阅 Flow | `:core:model`、`:core:database`、`:data:comic`（仅 `RemoteChapterProbe` 的实现）、kotlinx.serialization JSON（章节目录持久化） |
 | `:data:local` | SAF 目录/归档授权、扫描、自然排序、本地索引及有界页面缓存物化；按需复用图片头尺寸解析 | `:core:model`、`:core:database`、`:core:archive`、`:core:image`、DocumentFile |
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme、设计 Token、共享漫画竖向卡片/横向列表与角标 | Compose、`:core:image`（封面渲染及取色；传递纯模型契约） |

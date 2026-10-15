@@ -24,7 +24,13 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        graph.setForeground(true)
+    }
+
     override fun onStop() {
+        graph.setForeground(false)
         graph.flushProgress()
         super.onStop()
     }

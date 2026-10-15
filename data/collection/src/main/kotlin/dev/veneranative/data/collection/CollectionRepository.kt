@@ -37,8 +37,11 @@ data class FavoriteItem(
     val hasUpdate: Boolean = false,
     val lastUpdated: String? = null,
     val chapters: List<dev.veneranative.core.model.ComicChapterEntry> = emptyList(),
+    val storedCoverAt: Long? = null,
     val readingChapter: dev.veneranative.core.model.ComicReadingChapter? = null,
-)
+) {
+    val hasStoredCover: Boolean get() = storedCoverAt != null
+}
 
 /** How the shelf orders comics. The database answers with the rows already in this order. */
 enum class ShelfSort { AddedAt, Title, LastRead, Updated }
@@ -57,6 +60,7 @@ data class ComicSnapshot(
     val latestChapterId: String? = null,
     val lastUpdated: String? = null,
     val chapters: List<dev.veneranative.core.model.Chapter>? = null,
+    val detail: dev.veneranative.core.model.ComicDetail? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }
@@ -97,6 +101,11 @@ interface CollectionRepository {
 
     /** Updates only an existing favorite directory; never changes collection membership. */
     /** Loads a missing stored directory for one visible favorite; false means unavailable. */
+    /** Runs only while its caller owns an active foreground lifecycle. */
+    suspend fun maintainWhileActive()
+    suspend fun refreshExpired(): Int
+    suspend fun updateDetails(ref: ComicRef, detail: dev.veneranative.core.model.ComicDetail)
+
     suspend fun ensureChapters(ref: ComicRef): Boolean
 
     suspend fun updateChapters(ref: ComicRef, chapters: List<dev.veneranative.core.model.Chapter>)
