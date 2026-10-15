@@ -2,6 +2,13 @@ package dev.veneranative.feature.details
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.os.Build
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.animateScrollBy
@@ -838,13 +845,14 @@ private fun InfoLabel(text: String) {
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun HeroTagGroups(
     groups: Map<String, List<String>>,
     onTagClick: ((String, String) -> Unit)? = null,
     trailingFavorite: (@Composable () -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     val visibleGroups = groups.filterValues { it.isNotEmpty() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         visibleGroups.entries.forEachIndexed { index, (name, values) ->
@@ -872,10 +880,21 @@ private fun HeroTagGroups(
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = Color.White.copy(alpha = 0.2f),
-                                modifier = if (onTagClick != null) {
-                                    Modifier.clickable { onTagClick(name, value) }
-                                        .semantics { contentDescription = "查看 $name 标签 $value 的相关作品" }
-                                } else Modifier,
+                                modifier = Modifier.combinedClickable(
+                                    onClickLabel = if (onTagClick != null) "查看相关作品" else null,
+                                    onClick = { onTagClick?.invoke(name, value) },
+                                    onLongClickLabel = "复制$value",
+                                    onLongClick = {
+                                        context.getSystemService(ClipboardManager::class.java)
+                                            .setPrimaryClip(ClipData.newPlainText(name.toChineseTagGroupLabel(), value))
+                                        // Android 13+ supplies its own clipboard confirmation.
+                                        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                                            Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                ).semantics {
+                                    contentDescription = if (onTagClick != null) "查看 $name 标签 $value 的相关作品" else value
+                                },
                             ) {
                                 androidx.compose.foundation.text.BasicText(
                                     text = value,
