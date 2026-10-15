@@ -41,6 +41,8 @@ S4-10B5：data:collection 的 ensureChapters 显式为可见缺目录收藏复�
 
 S4-10C1：comic_record/comic_chapter 与收藏归属独立，Room 11→12 保留旧字段及目录快照以便兼容迁移。C2/C3 的持久资源与过期协调遵循 ADR-0015；在完成接入前，不把表存在视为 UI 已切换。
 
+S4-10C2：core:image 增 ComicResourceStore 与 PersistentComicCoverStorage，持久资源和可回收网络缓存独立。纯 ComicCoverStorage 契约在 core:model；显式 retainedCoverKey 仅供用户保留漫画封面，优先本地读取不作为任意网络请求缓存，不保存认证信息。App 复用 downloads 根装配，下载文件路径未迁移。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |

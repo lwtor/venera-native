@@ -32,8 +32,11 @@ data class ComicImageRequest(
     val referer: String? = null,
     /** Distinguishes otherwise identical requests, e.g. a cover and a page from the same URL. */
     val variant: String? = null,
+    /** Explicit offline artwork lookup; never used for arbitrary page/network requests. */
+    val retainedCoverKey: dev.veneranative.core.model.ComicKey? = null,
 ) {
     init {
+        require(retainedCoverKey == null || retainedCoverKey.sourceId == sourceId)
         require(url.isNotBlank()) { "url must not be blank" }
         require(method == ComicImageMethod.POST || body == null) { "only POST may carry a body" }
     }

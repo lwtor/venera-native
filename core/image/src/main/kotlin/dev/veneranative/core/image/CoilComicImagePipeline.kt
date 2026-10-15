@@ -32,6 +32,7 @@ class CoilComicImagePipeline(
     private val maxBytes: Long = DEFAULT_MAX_BYTES,
     private val headerBytes: Int = DEFAULT_HEADER_BYTES,
     private val callTimeoutMillis: Long = DEFAULT_CALL_TIMEOUT_MILLIS,
+    private val resources: ComicResourceStore? = null,
     private val onDiagnostic: (ComicImageRequest, String) -> Unit = { _, _ -> },
 ) : ComicImagePipeline {
 
@@ -44,6 +45,10 @@ class CoilComicImagePipeline(
     private val locks = Array(32) { kotlinx.coroutines.sync.Mutex() }
 
     override suspend fun cachedFileOf(request: ComicImageRequest): ComicImageFile? {
+        request.retainedCoverKey?.let { key ->
+            val retained = withContext(Dispatchers.IO) { resources?.openCover(key) }
+            if (retained != null) return retained
+        }
         // Freeze authentication once: key and HTTP must describe the exact same identity.
         val headers = auth.headersFor(request.sourceId, request.url).toMap()
         val key = ComicImageCacheKey.of(request, headers)

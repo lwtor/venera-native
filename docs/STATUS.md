@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10C2 DONE：持久封面资源层与本地读取入口。** core:image 新增 ComicResourceStore/PersistentComicCoverStorage，沿用既有 downloads/<来源 hash>/<漫画 hash>/，仅增加 covers/，不搬动下载；纯契约 ComicCoverStorage 位于 core:model。封面最多 8MiB/3200 万像素，经采样解码验证，同目录临时文件原子替换，失败保留旧图；索引只保存 URL 摘要与实际取得时间，不保存认证头。显式 retainedCoverKey 请求优先读取用户保留资源，其余请求继续现有认证隔离缓存；收藏/首页封面已传入该键。App 只装配资源层，C3 接入收藏写入与刷新后才自动填充资源。
+
+验证（2026-10-15）：JDK 17 `:app:assembleDebug :core:image:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。合成回归源码覆盖安全目录、失败保留旧图、成功替换、缓存复用、关闭网络缓存仍从显式本地资源读取。测试仅编译，未运行/安装，来源真实封面仍待用户复验。当前唯一下一任务 S4-10C3：资料事实来源、兼容恢复与前台过期刷新；原 S4-02G4 暂待续。
+
 **S4-10C1 DONE：独立漫画资料/分版本章节表与无损迁移。** Room 11→12 新增 comic_record/comic_chapter，保存基础资料、来源更新时间、成功刷新/尝试/下次刷新时间、封面取得时间。收藏与下载已有作品迁入，旧目录快照留待仓库规范化，收藏/历史/下载表不删除。DAO 支持独立资料与分版本目录、过期查询。决定 ADR-0015。
 
 验证（2026-10-15）：JDK 17 `:app:assembleDebug :core:database:compileDebugAndroidTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。迁移回归源码覆盖旧封面/目录、更新标记、阅读页码与版本保留；测试仅编译，未运行/安装。当前用户任务下一项 S4-10C2：持久封面与既有资源目录；随后 C3 接入资料事实来源及前台过期刷新，当前基础表尚未代替 UI 旧查询。原 S4-02G4 暂待续。

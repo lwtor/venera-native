@@ -46,7 +46,7 @@ fun FavoriteGrid(
             ComicCoverCard(
                 title = item.title,
                 request = if (comicKey != null && coverRef != null)
-                    ComicImageRequest(coverRef, sourceId = comicKey.sourceId, variant = "comic-cover") else null,
+                    ComicImageRequest(coverRef, sourceId = comicKey.sourceId, variant = "comic-cover", retainedCoverKey = comicKey) else null,
                 chapterLabel = dev.veneranative.data.collection.favoriteChapterLabel(item, catalogStates[item.ref]),
                 sourceLabel = comicSourceLabel(comicKey?.sourceId?.value),
                 onClick = { comicKey?.let(onOpenComic) },

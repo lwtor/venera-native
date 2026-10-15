@@ -282,7 +282,7 @@ private fun EmptyResumeCard(waitingForData: Boolean, onOpenSearch: () -> Unit) {
 @Composable
 private fun ResumeCard(entry: ReadingHistoryEntry, onClick: () -> Unit) {
     val request = entry.coverUrl?.let {
-        ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = "comic-cover")
+        ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = "comic-cover", retainedCoverKey = entry.comicKey)
     }
     ComicHorizontalCard(
         title = entry.comicTitle, request = request, onClick = onClick,
@@ -304,7 +304,7 @@ private fun FavoriteUpdateCard(item: dev.veneranative.data.collection.FavoriteIt
     val comicKey = item.ref.comicKeyOrNull()
     val coverRef = item.coverRef
     val request = if (comicKey != null && coverRef != null) {
-        ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = "comic-cover")
+        ComicImageRequest(url = coverRef, sourceId = comicKey.sourceId, variant = "comic-cover", retainedCoverKey = comicKey)
     } else null
     ComicCoverCard(
         title = item.title, request = request,

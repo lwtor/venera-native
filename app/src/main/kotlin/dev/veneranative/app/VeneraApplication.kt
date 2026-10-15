@@ -53,11 +53,14 @@ class VeneraApplication : Application() {
 
     val diskCache: DiskCache by lazy { comicImageDiskCache(this) }
 
+    val comicResources by lazy { dev.veneranative.core.image.ComicResourceStore(File(filesDir, DOWNLOAD_DIRECTORY)) }
+    val savedComicCovers by lazy { dev.veneranative.core.image.PersistentComicCoverStorage(comicResources, imagePipeline) }
     val imagePipeline: ComicImagePipeline by lazy {
         CoilComicImagePipeline(
             httpClient,
             diskCache,
             authProvider,
+            resources = comicResources,
             onDiagnostic = { request, event ->
                 if (request.sourceId?.value.equals("jm", ignoreCase = true)) {
                     debugJmReaderLog?.append("stage=image_pipeline $event")
