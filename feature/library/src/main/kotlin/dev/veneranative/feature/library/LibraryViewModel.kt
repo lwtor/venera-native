@@ -423,11 +423,13 @@ class LibraryViewModel(
     }
 
     private fun refreshUpdates() {
-        _state.update { it.copy(message = null) }
+        if (_state.value.isRefreshing) return
+        _state.update { it.copy(message = null, isRefreshing = true) }
         viewModelScope.launch {
             val marked = runCatching { repository.refreshUpdates() }.getOrNull()
             _state.update { current ->
                 current.copy(
+                    isRefreshing = false,
                     message = when (marked) {
                         null -> "无法检查书架更新。"
                         0 -> "没有发现新章节。"

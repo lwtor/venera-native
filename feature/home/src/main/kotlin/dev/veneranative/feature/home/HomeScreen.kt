@@ -30,6 +30,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -76,6 +78,7 @@ fun HomeRoute(
     )
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeScreen(
     state: HomeUiState,
@@ -90,6 +93,13 @@ internal fun HomeScreen(
         modifier = modifier,
         contentWindowInsets = WindowInsets(0.dp),
         containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            TopAppBar(
+                title = { Text("首页") },
+                windowInsets = WindowInsets(0.dp),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+            )
+        },
     ) { contentPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -97,13 +107,10 @@ internal fun HomeScreen(
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             item {
-                Column(
-                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    HomeHeader()
-                    SearchEntry(onOpenSearch = onOpenSearch)
-                }
+                SearchEntry(
+                    onOpenSearch = onOpenSearch,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
             }
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -168,32 +175,9 @@ internal fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader() {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Surface(
-            modifier = Modifier.size(46.dp),
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text("V", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
-            }
-        }
-        Column(modifier = Modifier.padding(start = 12.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-            Text("Venera", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("漫画，随时继续", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun SearchEntry(onOpenSearch: () -> Unit) {
+private fun SearchEntry(onOpenSearch: () -> Unit, modifier: Modifier = Modifier) {
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(54.dp)
             .clip(RoundedCornerShape(18.dp))
@@ -345,7 +329,6 @@ private fun HomeScreenPreview() {
         HomeScreen(
             state = HomeUiState(historyAvailable = true, favoritesAvailable = true, localLibraryAvailable = true),
             onResumeReading = {},
-
             onOpenSearch = {},
             onOpenLibrary = {},
         )

@@ -38,6 +38,7 @@ fun ProfileRoute(factory: GitHubBackupGatewayFactory?, onOpenBackup: () -> Unit,
     ProfileScreen(state, factory != null, model::onAction, onOpenBackup, onOpenAbout, onOpenSources)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ProfileScreen(
     state: ProfileUiState,
@@ -48,105 +49,116 @@ internal fun ProfileScreen(
     onOpenSources: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    Column(
-        Modifier.fillMaxSize().background(colors.background).verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        Text("我的", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
-        Card(
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = colors.primaryContainer),
-            modifier = Modifier.fillMaxWidth(),
+    Scaffold(
+        containerColor = colors.background,
+        contentWindowInsets = WindowInsets(0.dp),
+        topBar = {
+            TopAppBar(
+                title = { Text("我的") },
+                windowInsets = WindowInsets(0.dp),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = colors.background),
+            )
+        },
+    ) { contentPadding ->
+        Column(
+            Modifier.fillMaxSize().background(colors.background).padding(contentPadding)
+                .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    val profile = state.account.profile
-                    ComicImage(
-                        request = profile?.avatarUrl?.let { ComicImageRequest(url = it, variant = "github-avatar") },
-                        contentDescription = "GitHub 头像",
-                        modifier = Modifier.size(72.dp).clip(CircleShape),
-                        placeholder = {
-                            Box(Modifier.fillMaxSize().background(colors.surface), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Default.AccountCircle, null, Modifier.size(52.dp), tint = colors.primary)
-                            }
-                        },
-                    )
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            profile?.displayName ?: if (state.account.connected) "GitHub 已连接" else "连接你的 GitHub",
-                            style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                            color = colors.onPrimaryContainer, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = colors.primaryContainer),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        val profile = state.account.profile
+                        ComicImage(
+                            request = profile?.avatarUrl?.let { ComicImageRequest(url = it, variant = "github-avatar") },
+                            contentDescription = "GitHub 头像",
+                            modifier = Modifier.size(72.dp).clip(CircleShape),
+                            placeholder = {
+                                Box(Modifier.fillMaxSize().background(colors.surface), contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.AccountCircle, null, Modifier.size(52.dp), tint = colors.primary)
+                                }
+                            },
                         )
-                        Text(
-                            profile?.let { "@${it.login}" } ?: if (state.account.connected) "正在获取账号信息" else "安全保存收藏与阅读进度",
-                            style = MaterialTheme.typography.bodyMedium, color = colors.onPrimaryContainer.copy(alpha = 0.75f),
-                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                profile?.displayName ?: if (state.account.connected) "GitHub 已连接" else "连接你的 GitHub",
+                                style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
+                                color = colors.onPrimaryContainer, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                profile?.let { "@${it.login}" } ?: if (state.account.connected) "正在获取账号信息" else "安全保存收藏与阅读进度",
+                                style = MaterialTheme.typography.bodyMedium, color = colors.onPrimaryContainer.copy(alpha = 0.75f),
+                            )
+                        }
                     }
-                }
-                if (state.account.connected) {
-                    HorizontalDivider(color = colors.onPrimaryContainer.copy(alpha = 0.12f))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("最近同步", style = MaterialTheme.typography.labelMedium, color = colors.onPrimaryContainer.copy(alpha = 0.7f))
-                        val sync = state.account.lastSync
-                        Text(
-                            sync?.let {
-                                val time = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
-                                    .format(Instant.ofEpochMilli(it.completedAtEpochMillis))
-                                "$time · ${if (it.operation == GitHubSyncOperation.Backup) "备份成功" else "恢复成功"}"
-                            } ?: "尚未在此设备同步",
-                            style = MaterialTheme.typography.bodyLarge, color = colors.onPrimaryContainer,
-                        )
-                    }
-                    Button(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) { Text("备份与恢复") }
-                } else {
-                    Button(
-                        onClick = { onAction(ProfileAction.Connect) },
-                        enabled = ready && !state.busy && state.authorization == null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Text(if (ready) "连接 GitHub" else "正在准备账号服务…")
+                    if (state.account.connected) {
+                        HorizontalDivider(color = colors.onPrimaryContainer.copy(alpha = 0.12f))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("最近同步", style = MaterialTheme.typography.labelMedium, color = colors.onPrimaryContainer.copy(alpha = 0.7f))
+                            val sync = state.account.lastSync
+                            Text(
+                                sync?.let {
+                                    val time = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
+                                        .format(Instant.ofEpochMilli(it.completedAtEpochMillis))
+                                    "$time · ${if (it.operation == GitHubSyncOperation.Backup) "备份成功" else "恢复成功"}"
+                                } ?: "尚未在此设备同步",
+                                style = MaterialTheme.typography.bodyLarge, color = colors.onPrimaryContainer,
+                            )
+                        }
+                        Button(onClick = onOpenBackup, modifier = Modifier.fillMaxWidth()) { Text("备份与恢复") }
+                    } else {
+                        Button(
+                            onClick = { onAction(ProfileAction.Connect) },
+                            enabled = ready && !state.busy && state.authorization == null,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (state.busy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                            else Text(if (ready) "连接 GitHub" else "正在准备账号服务…")
+                        }
                     }
                 }
             }
-        }
-        state.error?.let { error ->
-            Surface(shape = RoundedCornerShape(16.dp), color = colors.errorContainer) {
-                Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    Text(error, color = colors.onErrorContainer)
-                    if (state.account.connected) TextButton(onClick = { onAction(ProfileAction.Refresh) }) { Text("重试") }
+            state.error?.let { error ->
+                Surface(shape = RoundedCornerShape(16.dp), color = colors.errorContainer) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text(error, color = colors.onErrorContainer)
+                        if (state.account.connected) TextButton(onClick = { onAction(ProfileAction.Refresh) }) { Text("重试") }
+                    }
                 }
             }
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("设置", style = MaterialTheme.typography.titleSmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
-            Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerLow)) {
-                Column {
-                    ListItem(
-                        headlineContent = { Text("漫画源管理") },
-                        supportingContent = { Text("添加、更新和管理漫画源") },
-                        leadingContent = { Icon(Icons.Default.Settings, null, tint = colors.primary) },
-                        trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
-                        modifier = Modifier.fillMaxWidth().testTag("profile_sources").clickable(onClick = onOpenSources),
-                        colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
-                    )
-                    HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.5f))
-                    ListItem(
-                        headlineContent = { Text("关于 Venera Native") },
-                        supportingContent = { Text("版本信息") },
-                        leadingContent = { Icon(Icons.Default.Info, null, tint = colors.primary) },
-                        trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
-                        modifier = Modifier.fillMaxWidth().testTag("profile_about").clickable(onClick = onOpenAbout),
-                        colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("设置", style = MaterialTheme.typography.titleSmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 4.dp))
+                Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerLow)) {
+                    Column {
+                        ListItem(
+                            headlineContent = { Text("漫画源管理") },
+                            supportingContent = { Text("添加、更新和管理漫画源") },
+                            leadingContent = { Icon(Icons.Default.Settings, null, tint = colors.primary) },
+                            trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
+                            modifier = Modifier.fillMaxWidth().testTag("profile_sources").clickable(onClick = onOpenSources),
+                            colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
+                        )
+                        HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.5f))
+                        ListItem(
+                            headlineContent = { Text("关于 Venera Native") },
+                            supportingContent = { Text("版本信息") },
+                            leadingContent = { Icon(Icons.Default.Info, null, tint = colors.primary) },
+                            trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
+                            modifier = Modifier.fillMaxWidth().testTag("profile_about").clickable(onClick = onOpenAbout),
+                            colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
+                        )
+                    }
                 }
             }
-        }
-        if (state.account.connected) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = { onAction(ProfileAction.RequestDisconnect) }) {
-                    Text("断开 GitHub", color = colors.onSurfaceVariant)
+            if (state.account.connected) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                    TextButton(onClick = { onAction(ProfileAction.RequestDisconnect) }) {
+                        Text("断开 GitHub", color = colors.onSurfaceVariant)
+                    }
                 }
             }
         }

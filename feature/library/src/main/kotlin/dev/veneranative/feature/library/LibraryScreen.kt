@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -26,7 +28,6 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
@@ -47,6 +48,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -124,6 +127,7 @@ internal fun LibraryScreen(
                         )
                     },
                     windowInsets = WindowInsets(0.dp),
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                     navigationIcon = {
                         if (state.tab != LibraryTab.Favorites) {
                             IconButton(onClick = {
@@ -145,9 +149,6 @@ internal fun LibraryScreen(
                                     imageVector = Icons.Filled.Search,
                                     contentDescription = if (state.favoriteSearchVisible) "关闭搜索" else "搜索收藏",
                                 )
-                            }
-                            IconButton(onClick = { onAction(LibraryAction.RefreshUpdates) }) {
-                                Icon(Icons.Filled.Refresh, contentDescription = "检查书架更新")
                             }
                         } else if (state.tab == LibraryTab.Local) {
                             IconButton(onClick = { onAction(LibraryAction.RequestLocalImport) }) {
@@ -292,92 +293,114 @@ internal fun LibraryScreen(
             }
 
             if (state.tab == LibraryTab.Favorites) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FolderChips(
-                        folders = state.folders,
-                        selectedFolderId = state.selectedFolderId,
-                        onSelect = { folderId -> onAction(LibraryAction.SelectFolder(folderId)) },
-                        modifier = Modifier.weight(1f).height(56.dp),
-                    )
-                    var folderMenuExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        IconButton(onClick = { folderMenuExpanded = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "收藏夹管理")
-                        }
-                        DropdownMenu(expanded = folderMenuExpanded, onDismissRequest = { folderMenuExpanded = false }) {
-                            DropdownMenuItem(
-                                text = { Text("新建收藏夹") },
-                                onClick = {
-                                    folderMenuExpanded = false
-                                    onAction(LibraryAction.EditFolder(null))
-                                },
-                            )
-                            DropdownMenuItem(
-                                enabled = selectedFolder != null,
-                                text = { Text("重命名当前收藏夹") },
-                                onClick = {
-                                    folderMenuExpanded = false
-                                    selectedFolder?.let { onAction(LibraryAction.EditFolder(it.id)) }
-                                },
-                            )
-                            DropdownMenuItem(
-                                enabled = selectedFolder?.removable == true,
-                                text = { Text("删除当前收藏夹") },
-                                onClick = {
-                                    folderMenuExpanded = false
-                                    selectedFolder?.let { onAction(LibraryAction.RequestDeleteFolder(it.id)) }
-                                },
-                            )
-                        }
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                PullToRefreshBox(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = { onAction(LibraryAction.RefreshUpdates) },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                 ) {
-                    Text("${state.filteredItems.size} 部漫画", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    ShelfSortMenu(sort = state.sort, onSortChange = { onAction(LibraryAction.ChangeSort(it)) })
-                }
+                    Column(Modifier.fillMaxSize()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            FolderChips(
+                                folders = state.folders,
+                                selectedFolderId = state.selectedFolderId,
+                                onSelect = { folderId -> onAction(LibraryAction.SelectFolder(folderId)) },
+                                modifier = Modifier.weight(1f).height(56.dp),
+                            )
+                            var folderMenuExpanded by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { folderMenuExpanded = true }) {
+                                    Icon(Icons.Filled.MoreVert, contentDescription = "收藏夹管理")
+                                }
+                                DropdownMenu(expanded = folderMenuExpanded, onDismissRequest = { folderMenuExpanded = false }) {
+                                    DropdownMenuItem(
+                                        text = { Text("新建收藏夹") },
+                                        onClick = {
+                                            folderMenuExpanded = false
+                                            onAction(LibraryAction.EditFolder(null))
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        enabled = selectedFolder != null,
+                                        text = { Text("重命名当前收藏夹") },
+                                        onClick = {
+                                            folderMenuExpanded = false
+                                            selectedFolder?.let { onAction(LibraryAction.EditFolder(it.id)) }
+                                        },
+                                    )
+                                    DropdownMenuItem(
+                                        enabled = selectedFolder?.removable == true,
+                                        text = { Text("删除当前收藏夹") },
+                                        onClick = {
+                                            folderMenuExpanded = false
+                                            selectedFolder?.let { onAction(LibraryAction.RequestDeleteFolder(it.id)) }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text("${state.filteredItems.size} 部漫画", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            ShelfSortMenu(sort = state.sort, onSortChange = { onAction(LibraryAction.ChangeSort(it)) })
+                        }
 
-                if (state.favoriteSearchVisible) {
-                    OutlinedTextField(
-                        value = state.favoriteQuery,
-                        onValueChange = { onAction(LibraryAction.FavoriteQueryChanged(it)) },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                        singleLine = true,
-                        label = { Text("搜索收藏") },
-                        placeholder = { Text("漫画名称或副标题") },
-                    )
-                }
+                        if (state.favoriteSearchVisible) {
+                            OutlinedTextField(
+                                value = state.favoriteQuery,
+                                onValueChange = { onAction(LibraryAction.FavoriteQueryChanged(it)) },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                                singleLine = true,
+                                label = { Text("搜索收藏") },
+                                placeholder = { Text("漫画名称或副标题") },
+                            )
+                        }
 
-                when {
-                    state.status == LibraryStatus.Loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        when {
+                            state.status == LibraryStatus.Loading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                            state.status == LibraryStatus.Empty -> EmptyLibraryState(
+                                if (state.selectedFolderId == null) "书架还是空的。" else "这个收藏夹还没有漫画。",
+                                if (state.selectedFolderId == null) "收藏的漫画会显示在这里。" else "长按书架中的漫画，可以加入这个收藏夹。",
+                                Modifier.weight(1f),
+                            )
+                            state.status == LibraryStatus.Failed -> Column(
+                                modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+                            ) {
+                                Text("无法读取书架内容。")
+                                Button(onClick = { onAction(LibraryAction.Retry) }) { Text("重试") }
+                            }
+                            state.filteredItems.isEmpty() -> EmptyLibraryState("没有匹配的漫画。", "换一个作品名或副标题试试。", Modifier.weight(1f))
+                            else -> FavoriteGrid(
+                                items = state.filteredItems,
+                                catalogStates = state.catalogStates,
+                                onVisible = { onAction(LibraryAction.FavoriteVisible(it)) },
+                                onHidden = { onAction(LibraryAction.FavoriteHidden(it)) },
+                                onOpenComic = onOpenComic,
+                                onLongPress = { ref -> onAction(LibraryAction.ShowFavoriteActions(ref)) },
+                                modifier = Modifier.weight(1f).pointerInput(state.selectedFolderId, state.folders) {
+                                    var dragDistance = 0f
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { dragDistance = 0f },
+                                        onHorizontalDrag = { _, amount -> dragDistance += amount },
+                                        onDragEnd = {
+                                            val folderIds = listOf<String?>(null) + state.folders.map { it.id }
+                                            val current = folderIds.indexOf(state.selectedFolderId)
+                                            if (kotlin.math.abs(dragDistance) >= 64.dp.toPx() && current >= 0) {
+                                                val next = (current + if (dragDistance < 0) 1 else -1).coerceIn(folderIds.indices)
+                                                if (next != current) onAction(LibraryAction.SelectFolder(folderIds[next]))
+                                            }
+                                        },
+                                    )
+                                },
+                            )
+                        }
                     }
-                    state.status == LibraryStatus.Empty -> EmptyLibraryState(
-                        if (state.selectedFolderId == null) "书架还是空的。" else "这个收藏夹还没有漫画。",
-                        if (state.selectedFolderId == null) "收藏的漫画会显示在这里。" else "长按书架中的漫画，可以加入这个收藏夹。",
-                        Modifier.weight(1f),
-                    )
-                    state.status == LibraryStatus.Failed -> Column(
-                        modifier = Modifier.weight(1f).fillMaxWidth().padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                    ) {
-                        Text("无法读取书架内容。")
-                        Button(onClick = { onAction(LibraryAction.Retry) }) { Text("重试") }
-                    }
-                    state.filteredItems.isEmpty() -> EmptyLibraryState("没有匹配的漫画。", "换一个作品名或副标题试试。", Modifier.weight(1f))
-                    else -> FavoriteGrid(
-                        items = state.filteredItems,
-                        catalogStates = state.catalogStates,
-                        onVisible = { onAction(LibraryAction.FavoriteVisible(it)) },
-                        onHidden = { onAction(LibraryAction.FavoriteHidden(it)) },
-                        onOpenComic = onOpenComic,
-                        onLongPress = { ref -> onAction(LibraryAction.ShowFavoriteActions(ref)) },
-                        modifier = Modifier.weight(1f),
-                    )
                 }
             } else if (state.tab == LibraryTab.Local) {
                 if (state.localComics.isEmpty()) {

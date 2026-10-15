@@ -68,6 +68,7 @@ data class LibraryUiState(
     val pendingDeleteFolderId: String? = null,
     /** Product copy for the last outcome; never a lower layer's wording. */
     val message: String? = null,
+    val isRefreshing: Boolean = false,
 ) {
     val filteredItems: List<FavoriteItem>
         get() {
