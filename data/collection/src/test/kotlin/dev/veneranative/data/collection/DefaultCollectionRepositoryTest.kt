@@ -320,6 +320,48 @@ class DefaultCollectionRepositoryTest {
         assertTrue(shelfWithHistory.observeItem(ref).first()!!.hasUpdate)
     }
 
+    @Test fun `finishing the latest chapter in the reading version clears update from another version`() = runTest {
+        val history = ShelfReadingHistoryDao()
+        val shelfWithHistory = DefaultCollectionRepository(
+            dao, UpdateMarker(probe), historyDao = history, maintenanceScope = this,
+        )
+        val ref = comic("comic-1")
+        val chapters = listOf(
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("a-1")),
+                "第45话", 0, "版本 A",
+            ),
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("a-2")),
+                "第46话", 1, "版本 A",
+            ),
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("b-1")),
+                "第133话", 2, "版本 B",
+            ),
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("b-2")),
+                "第134话", 3, "版本 B",
+            ),
+        )
+        shelfWithHistory.addToFolders(
+            ref, emptySet(), ComicSnapshot("Comic One", chapterCount = 4, latestChapterId = "b-2", chapters = chapters),
+        )
+        probe[key("comic-1")] = ChapterSnapshot(5, "b-3")
+        shelfWithHistory.refreshUpdates()
+        assertTrue(shelfWithHistory.observeItem(ref).first()!!.hasUpdate)
+
+        history.upsert(dev.veneranative.core.database.ReadingHistoryEntity(
+            sourceId = "source-a", comicId = "comic-1", chapterId = "a-2", comicTitle = "Comic One",
+            chapterTitle = "第46话", coverUrl = null, pageIndex = 19, pageCount = 20,
+            updatedAtEpochMillis = 2_000, chapterGroup = "版本 A",
+        ))
+
+        assertFalse(shelfWithHistory.observeItem(ref).first()!!.hasUpdate)
+        testScheduler.advanceUntilIdle()
+        assertFalse(dao.entries.value.single().hasUpdate)
+    }
+
     @Test fun `a refresh after clearing does not raise the flag again`() = runTest {
         seedFolders()
         repository.add(

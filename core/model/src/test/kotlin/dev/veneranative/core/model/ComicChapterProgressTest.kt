@@ -1,9 +1,24 @@
 package dev.veneranative.core.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ComicChapterProgressTest {
+
+    @Test fun `latest chapter check follows the reading version and chapter number instead of source order`() {
+        val chapters = listOf(
+            ComicChapterEntry("a-46", "第46话", "A"),
+            ComicChapterEntry("a-45", "第45话", "A"),
+            ComicChapterEntry("b-134", "第134话", "B"),
+            ComicChapterEntry("b-133", "第133话", "B"),
+        )
+
+        assertTrue(isLatestComicChapterInReadingVersion(chapters, ComicReadingChapter("a-46", "第46话", "A")))
+        assertFalse(isLatestComicChapterInReadingVersion(chapters, ComicReadingChapter("a-45", "第45话", "A")))
+        assertTrue(isLatestComicChapterInReadingVersion(chapters, ComicReadingChapter("b-134", "第134话", "B")))
+    }
     private val chapters = listOf(
         ComicChapterEntry("same", "第110话", "A"),
         ComicChapterEntry("same", "第111话", "B"),

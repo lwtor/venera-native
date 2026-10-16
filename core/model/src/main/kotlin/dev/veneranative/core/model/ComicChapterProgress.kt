@@ -16,6 +16,29 @@ private fun chapterNumber(title: String): java.math.BigDecimal? {
     return value?.toBigDecimalOrNull()
 }
 
+/** Whether [reading] is the highest numbered chapter in its own version. */
+fun isLatestComicChapterInReadingVersion(
+    chapters: List<ComicChapterEntry>,
+    reading: ComicReadingChapter,
+): Boolean {
+    val candidates = if (reading.version != null) {
+        chapters.filter { it.version == reading.version }
+    } else {
+        val matchingVersions = chapters.filter { it.id == reading.id }.map { it.version }.distinct()
+        when {
+            matchingVersions.size == 1 -> chapters.filter { it.version == matchingVersions.single() }
+            chapters.map { it.version }.distinct().size == 1 -> chapters
+            else -> emptyList()
+        }
+    }
+    if (candidates.isEmpty()) return false
+    val readingNumber = candidates.firstOrNull { it.id == reading.id }?.title?.let(::chapterNumber)
+        ?: chapterNumber(reading.title)
+        ?: return false
+    val candidateNumbers = candidates.map { chapterNumber(it.title) ?: return false }
+    return readingNumber >= candidateNumbers.maxOrNull()!!
+}
+
 /** Unread: highest numbered chapter across versions. Read: exclusively the reader's version. */
 fun comicChapterProgressLabel(chapters: List<ComicChapterEntry>, reading: ComicReadingChapter?): String {
     val versions = chapters.groupBy { it.version }

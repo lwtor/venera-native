@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A13 DONE：按当前阅读版本的末话清除更新标记。** A12 只比较全局最新章节 ID，无法识别“当前版本已读完、其他版本仍有更晚章节”的情况。现在也检查当前阅读版本目录中数字最大的章节，并要求阅读进度到达末页；其它版本、当前版本中间章节或未到末页不清除。新增多版本回归用例，验证持久化清除。
+
+验证（2026-10-16）：JDK 17 `:core:model:testDebugUnitTest` 与 `:data:collection:testDebugUnitTest` 的两个定向回归用例 — BUILD SUCCESSFUL；`:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未安装或真机复验。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A12 DONE：读完最新更新章节后自动清除“有更新”。** 书架合并最新阅读记录时，若章节 ID 与最近一次更新快照一致且阅读进度到达末页，立即隐藏更新标记，并通过前台维护作用域持久清除；未读完、旧章节或本地漫画不清除。增加回归用例验证读完后清除、未到末页保留及持久化。
 
 验证（2026-10-16）：JDK 17 `:app:assembleDebug :data:collection:compileDebugUnitTestKotlin` — BUILD SUCCESSFUL；`git diff --check` — PASS。测试源码已编译，未运行测试、安装或真机复验。命令行沙箱失败为 Windows 错误 1385“未授予请求登录类型”；通过受限外的任务级 shell 执行完成验证，未修改系统登录策略。当前唯一下一任务保持 S4-02G4。

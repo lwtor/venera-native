@@ -8,6 +8,8 @@ import dev.veneranative.core.database.FavoriteFolderEntity
 import dev.veneranative.core.database.FavoriteMembershipEntity
 import dev.veneranative.core.database.VeneraDatabase
 import dev.veneranative.core.model.ComicRef
+import dev.veneranative.core.model.ComicReadingChapter
+import dev.veneranative.core.model.isLatestComicChapterInReadingVersion
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -69,7 +71,10 @@ class DefaultCollectionRepository internal constructor(
         // Keep the persisted flag in sync as well as projecting it away immediately, so a later
         // shelf refresh does not resurrect an already-read marker.
         val acknowledgedUpdate = ref is ComicRef.Remote && hasUpdate && latestChapterId != null &&
-            latest != null && latest.chapterId == latestChapterId &&
+            latest != null && (latest.chapterId == latestChapterId || isLatestComicChapterInReadingVersion(
+                chapters,
+                ComicReadingChapter(latest.chapterId, latest.chapterTitle, latest.chapterGroup),
+            )) &&
             latest.pageCount > 0 && latest.pageIndex >= latest.pageCount - 1
         if (acknowledgedUpdate) {
             maintenanceScope?.launch { dao.clearUpdate(ref.refSource(), ref.refComic()) }
