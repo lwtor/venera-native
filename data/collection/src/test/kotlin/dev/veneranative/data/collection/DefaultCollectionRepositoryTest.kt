@@ -276,7 +276,7 @@ class DefaultCollectionRepositoryTest {
         assertFalse(shelf().single().hasUpdate)
     }
 
-    @Test fun `finishing the latest updated chapter clears its marker`() = runTest {
+    @Test fun `opening the latest updated chapter clears its marker`() = runTest {
         val history = ShelfReadingHistoryDao()
         val shelfWithHistory = DefaultCollectionRepository(
             dao, UpdateMarker(probe), historyDao = history, maintenanceScope = this,
@@ -292,7 +292,7 @@ class DefaultCollectionRepositoryTest {
 
         history.upsert(dev.veneranative.core.database.ReadingHistoryEntity(
             sourceId = "source-a", comicId = "comic-1", chapterId = "ch-11", comicTitle = "Comic One",
-            chapterTitle = "第11话", coverUrl = null, pageIndex = 19, pageCount = 20,
+            chapterTitle = "第11话", coverUrl = null, pageIndex = 0, pageCount = 20,
             updatedAtEpochMillis = 2_000,
         ))
 
@@ -301,7 +301,7 @@ class DefaultCollectionRepositoryTest {
         assertFalse(dao.entries.value.single().hasUpdate)
     }
 
-    @Test fun `an update marker remains until the latest chapter reaches its final page`() = runTest {
+    @Test fun `an update marker remains while reading an older chapter`() = runTest {
         val history = ShelfReadingHistoryDao()
         val shelfWithHistory = DefaultCollectionRepository(dao, UpdateMarker(probe), historyDao = history)
         val ref = comic("comic-1")
@@ -312,15 +312,15 @@ class DefaultCollectionRepositoryTest {
         probe[key("comic-1")] = ChapterSnapshot(11, "ch-11")
         shelfWithHistory.refreshUpdates()
         history.upsert(dev.veneranative.core.database.ReadingHistoryEntity(
-            sourceId = "source-a", comicId = "comic-1", chapterId = "ch-11", comicTitle = "Comic One",
-            chapterTitle = "第11话", coverUrl = null, pageIndex = 18, pageCount = 20,
+            sourceId = "source-a", comicId = "comic-1", chapterId = "ch-10", comicTitle = "Comic One",
+            chapterTitle = "第10话", coverUrl = null, pageIndex = 0, pageCount = 20,
             updatedAtEpochMillis = 2_000,
         ))
 
         assertTrue(shelfWithHistory.observeItem(ref).first()!!.hasUpdate)
     }
 
-    @Test fun `finishing the latest chapter in the reading version clears update from another version`() = runTest {
+    @Test fun `opening the latest chapter in the reading version clears update from another version`() = runTest {
         val history = ShelfReadingHistoryDao()
         val shelfWithHistory = DefaultCollectionRepository(
             dao, UpdateMarker(probe), historyDao = history, maintenanceScope = this,
@@ -353,7 +353,7 @@ class DefaultCollectionRepositoryTest {
 
         history.upsert(dev.veneranative.core.database.ReadingHistoryEntity(
             sourceId = "source-a", comicId = "comic-1", chapterId = "a-2", comicTitle = "Comic One",
-            chapterTitle = "第46话", coverUrl = null, pageIndex = 19, pageCount = 20,
+            chapterTitle = "第46话", coverUrl = null, pageIndex = 0, pageCount = 20,
             updatedAtEpochMillis = 2_000, chapterGroup = "版本 A",
         ))
 
