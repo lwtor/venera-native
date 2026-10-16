@@ -666,8 +666,8 @@ Release 流水线：
 
 在开始阶段 0 前完成：
 
-- [ ] 确认 GitHub 组织或用户名与最终 applicationId。
-- [ ] 确认项目许可证和 Venera 名称使用方式。
+- [x] 确认 GitHub 组织或用户名与最终 applicationId：沿用 `dev.veneranative`。
+- [x] 确认项目采用 Apache-2.0；Venera 名称仅用于描述兼容关系，项目为独立非官方实现。
 - [ ] 创建全新 Logo 和 Material 3 视觉基线。
 - [x] 创建 Gradle Version Catalog 与 Convention Plugins。
 - [x] 创建基础 Module；依赖规则的自动检查仍待补充。

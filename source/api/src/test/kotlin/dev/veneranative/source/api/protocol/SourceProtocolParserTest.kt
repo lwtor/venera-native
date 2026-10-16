@@ -21,6 +21,12 @@ import org.junit.Test
  * a phantom chapter out of the latest-chapter marker.
  */
 class SourceProtocolParserTest {
+    @Test fun `comic tags are trimmed and deduplicated in source order`() {
+        val comic = SourceProtocolParser.parseComic(SourceId("fixture"), kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"id":"c1","title":"Fixture","tags":[" Adventure ","Adventure","Fantasy"]}"""
+        ))!!
+        assertEquals(listOf("Adventure", "Fantasy"), comic.tags)
+    }
     @Test fun `multiple authors and publication state are preserved without treating unknown as ongoing`() {
         val row = kotlinx.serialization.json.Json.parseToJsonElement("""{"id":"fixture","title":"Fixture","authors":[{"name":"A"},"B","A"],"status":"END"}""")
         val comic = SourceProtocolParser.parseComic(SourceId("fixture"), row)!!

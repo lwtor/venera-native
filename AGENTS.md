@@ -133,6 +133,13 @@ git diff --check
 
 ## 8. 完成任务后的文档与提交协议
 
+### 8.0 应用版本协议
+
+- 应用版本使用三段式 Semantic Versioning：`MAJOR.MINOR.PATCH`。兼容性修复递增 PATCH；新增兼容功能递增 MINOR 并将 PATCH 归零；不兼容数据或行为变更递增 MAJOR 并将其余段归零。
+- `versionCode = MAJOR * 1,000,000 + MINOR * 1,000 + PATCH`，不得超过 Android 正整数上限；`versionName` 必须与版本一致。
+- 1.0.0 之后，每个提交都必须递增版本：该提交只要包含修复/维护就递增 PATCH；新增功能递增 MINOR；破坏性变更递增 MAJOR。文档或工具链提交也递增 PATCH，确保每个可安装提交都能区分。
+- 正式版本使用 `vMAJOR.MINOR.PATCH` Git tag；发布 APK 必须使用独立 Release 签名，禁止用共享 Debug 签名。
+
 ### 8.1 文档协议
 
 每个任务完成后必须：

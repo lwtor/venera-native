@@ -1,6 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("venera.android.application")
 }
+
+val releasePropertiesFile = rootProject.file("keystore.properties")
+val releaseProperties = Properties().apply {
+    if (releasePropertiesFile.isFile) releasePropertiesFile.inputStream().use { load(it) }
+}
+val releaseSigningReady = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+    .all { !releaseProperties.getProperty(it).isNullOrBlank() }
 
 android {
     namespace = "dev.veneranative.app"
@@ -11,6 +20,14 @@ android {
             storePassword = "android"
             keyAlias = "androiddebugkey"
             keyPassword = "android"
+        }
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = rootProject.file(releaseProperties.getProperty("storeFile"))
+                storePassword = releaseProperties.getProperty("storePassword")
+                keyAlias = releaseProperties.getProperty("keyAlias")
+                keyPassword = releaseProperties.getProperty("keyPassword")
+            }
         }
     }
 
@@ -26,6 +43,7 @@ android {
             signingConfig = signingConfigs.getByName("projectDebug")
         }
         release {
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -59,7 +77,7 @@ dependencies {
     implementation(project(":feature:details"))
     implementation(project(":feature:backup"))
     implementation(project(":feature:profile"))
-    implementation("androidx.compose.material:material-icons-core")
+    implementation(libs.compose.material.icons.core)
     implementation(project(":feature:explore"))
     implementation(project(":feature:home"))
     implementation(project(":feature:library"))

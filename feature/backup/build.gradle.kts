@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.kotlinx.coroutines.core)
-    implementation("androidx.compose.material:material-icons-core")
+    implementation(libs.compose.material.icons.core)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
 }

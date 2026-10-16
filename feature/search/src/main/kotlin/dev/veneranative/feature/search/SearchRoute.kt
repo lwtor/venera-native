@@ -21,10 +21,10 @@ import dev.veneranative.data.settings.ScreenPreferenceRepository
 @Composable
 fun SearchRoute(
     catalog: ComicCatalog,
-    historyRepository: SearchHistoryRepository? = null,
     onOpenComic: (ComicKey) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    historyRepository: SearchHistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
 ) {
     val viewModel: SearchViewModel = viewModel { SearchViewModel(catalog, initialHistoryRepository = historyRepository, screenPreferences = screenPreferences) }

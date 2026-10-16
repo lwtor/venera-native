@@ -29,7 +29,9 @@ class BackupViewModelTest {
         runCurrent()
         assertEquals(1, service.backups)
         assertEquals("password", service.receivedPassword)
-        service.result.complete(BackupSnapshot(createdAtEpochMillis = 1, categories = emptySet()))
+        service.result.complete(
+            BackupSnapshot(createdAtEpochMillis = 1, categories = setOf(BackupCategory.Favorites)),
+        )
         runCurrent()
         assertFalse(model.state.value.busy)
         assertEquals("", model.state.value.password)

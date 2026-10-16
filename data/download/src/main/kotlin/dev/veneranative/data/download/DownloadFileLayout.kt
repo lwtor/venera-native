@@ -5,6 +5,10 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import java.security.MessageDigest
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
 /**
  * Where a downloaded page lives, and the only writer allowed to put one there.
@@ -45,7 +49,7 @@ class DownloadFileLayout(
 
     /** The inverse of [absoluteOf], used to report a file without leaking where it lives. */
     fun relativeOf(file: File): String =
-        file.absolutePath.removePrefix("${root.absolutePath}/")
+        file.relativeTo(root).invariantSeparatorsPath
 
     fun pageFileName(index: Int): String = "p${index.toString().padStart(5, '0')}$PAGE_EXTENSION"
 
@@ -95,7 +99,11 @@ class DownloadFileLayout(
                 raw.fd.sync()
                 written = counting.count
             }
-            if (!part.renameTo(target)) throw IOException("could not move $part into place")
+            try {
+                Files.move(part.toPath(), target.toPath(), ATOMIC_MOVE, REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(part.toPath(), target.toPath(), REPLACE_EXISTING)
+            }
         } finally {
             // A leftover .part is not a page: it is debris from a run that never finished.
             if (part.exists() && !part.delete()) Unit

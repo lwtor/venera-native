@@ -6,6 +6,12 @@ android {
     namespace = "dev.veneranative.core.image"
 }
 
+configurations.configureEach {
+    if (name.endsWith("UnitTestRuntimeClasspath")) {
+        exclude(group = "com.squareup.okhttp3", module = "okhttp-android")
+    }
+}
+
 dependencies {
     // ComicPage, SourceId and PageImageSizer appear in public signatures.
     api(project(":core:model"))
@@ -22,6 +28,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
 
     testImplementation(libs.okhttp.mockwebserver)
+    testRuntimeOnly(libs.okhttp.jvm)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.coil.test)

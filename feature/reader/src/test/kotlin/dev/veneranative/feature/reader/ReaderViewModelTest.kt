@@ -349,7 +349,7 @@ class ReaderViewModelTest {
         }
         val vm = ReaderViewModel(chapterKey, provider)
         advanceUntilIdle()
-        assertEquals(listOf(0, 1), resolved)
+        assertEquals(listOf(0, 1, 1, 1), resolved)
         assertEquals(20, vm.state.value.pageCount)
         assertEquals(dev.veneranative.core.model.PageSizeState.Failed, vm.state.value.pages[1].sizeState)
         fail = false

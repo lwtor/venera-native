@@ -22,7 +22,7 @@ class BackDestinationTest {
     private val comic = ComicKey(SourceId("source"), RemoteComicId("comic"))
     private val origin = AppRoute.Search("source")
 
-    @Test fun homeAllowsSystemExitAndTopLevelPagesReturnHome() {
+    @Test fun homeAllowsSystemExitAndTopLevelPagesReturnTheirParent() {
         assertNull(backDestination(AppRoute.Home, origin))
         for (route in listOf(
             AppRoute.Sources,
@@ -31,7 +31,11 @@ class BackDestinationTest {
             AppRoute.Explore("source"),
             origin,
         )) {
-            assertEquals(if (route == AppRoute.Downloads) AppRoute.Library else AppRoute.Home, backDestination(route, origin))
+            assertEquals(when (route) {
+                AppRoute.Sources -> AppRoute.Profile
+                AppRoute.Downloads -> AppRoute.Library
+                else -> AppRoute.Home
+            }, backDestination(route, origin))
         }
     }
 

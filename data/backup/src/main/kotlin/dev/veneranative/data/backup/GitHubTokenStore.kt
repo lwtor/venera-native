@@ -1,5 +1,6 @@
 package dev.veneranative.data.backup
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -69,9 +70,13 @@ class AndroidGitHubTokenStore(context: Context) : GitHubTokenStore {
         }
     }
 
+    // Persist authorization removal before returning so an immediate process exit cannot restore it.
+    @SuppressLint("ApplySharedPref")
     @Synchronized
     override fun clear() {
-        preferences.edit().remove(TOKEN_BLOB).commit()
+        check(preferences.edit().remove(TOKEN_BLOB).commit()) {
+            "Could not clear GitHub authorization"
+        }
     }
 
     private fun loadOrCreateKey(): SecretKey {

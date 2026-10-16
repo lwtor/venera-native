@@ -611,6 +611,7 @@ S4-07 发布准备提前子任务：
 | ID | 交付与验收范围 | 状态 |
 | --- | --- | --- |
 | S4-07D1 | 为 Debug 构建固定项目级签名身份；新开发电脑复用同一密钥，并保持当前已安装 App 的覆盖更新兼容性；Release 密钥独立管理 | DONE（`:app:assembleDebug` 通过；生成 APK 证书与当前已安装 App 匹配；Debug keystore 纳入 Git，Release 签名尚未创建；未安装或操作真机） |
+| S4-07D2 | 设定 1.0.0 与逐提交 SemVer 规则；选择 Apache-2.0；完善 GitHub 首页；生成完整 Release 运行时依赖许可清单与 APK 内许可文件；配置独立 Release 签名、构建验签并发布 GitHub Release APK | DONE（2026-10-16；全量单测、Release lint、Debug/Release 构建与 APK 验签通过；v1.0.0 已发布，Stage S4-07 整体仍待 RC 与全 App 对齐验收） |
 
 S4-02 GitHub 备份子任务：
 

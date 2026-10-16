@@ -5,7 +5,7 @@ dependencies {
     implementation(project(":core:image"))
     implementation(project(":data:backup"))
     implementation(platform(libs.compose.bom))
-    implementation("androidx.compose.material:material-icons-core")
+    implementation(libs.compose.material.icons.core)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)

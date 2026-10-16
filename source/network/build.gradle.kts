@@ -10,6 +10,10 @@ android {
     }
 }
 
+configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configureEach {
+    exclude(group = "com.squareup.okhttp3", module = "okhttp-android")
+}
+
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:network"))
@@ -19,6 +23,7 @@ dependencies {
     implementation(libs.okhttp)
 
     testImplementation(libs.okhttp.mockwebserver)
+    testRuntimeOnly(libs.okhttp.jvm)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
 

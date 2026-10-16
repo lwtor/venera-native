@@ -66,7 +66,8 @@ class HttpSourceCatalogRepository(
 internal object SourceCatalogParser {
     fun parse(text: String, catalogUri: URI): List<SourceCatalogEntry> {
         require(catalogUri.scheme.equals("https", ignoreCase = true) && !catalogUri.host.isNullOrBlank())
-        val array = Json.parseToJsonElement(text) as? JsonArray ?: error("Expected source array")
+        val array = Json.parseToJsonElement(text) as? JsonArray
+            ?: throw IllegalArgumentException("Expected source array")
         return array.mapNotNull { element -> element.parseEntry(catalogUri) }
             .distinctBy { it.scriptUrl }
             .also { if (it.isEmpty()) error("No usable sources") }

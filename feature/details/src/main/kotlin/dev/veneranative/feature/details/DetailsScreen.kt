@@ -121,8 +121,8 @@ fun DetailsScreen(
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (Chapter) -> Unit,
     onBack: () -> Unit,
-    onOpenDownloads: () -> Unit = {},
     modifier: Modifier = Modifier,
+    onOpenDownloads: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }

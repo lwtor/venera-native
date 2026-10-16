@@ -80,7 +80,7 @@ object SourceProtocolParser {
             language = entry["language"].stringOrNull(),
             authors = (entry["authors"] ?: entry["author"]).arrayOrNull().orEmpty().mapNotNull {
                 (it.stringOrNull() ?: it.objectOrNull()?.get("name").stringOrNull())?.trim()?.takeIf(String::isNotBlank)
-            }.distinct(),
+            }.map(String::trim).filter(String::isNotEmpty).distinct(),
             publicationStatus = when ((entry["status"].stringOrNull()
                 ?: entry["status"].objectOrNull()?.get("display").stringOrNull())?.uppercase()) {
                 "ONGOING", "连载", "连载中", "連載", "連載中" -> dev.veneranative.core.model.ComicPublicationStatus.Ongoing
@@ -337,5 +337,5 @@ object SourceProtocolParser {
         is JsonArray -> mapNotNull { it.stringOrNull() }
         is JsonObject -> values.flatMap { it.stringList() }
         else -> emptyList()
-    }
+    }.map(String::trim).filter(String::isNotEmpty).distinct()
 }

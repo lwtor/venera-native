@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-07D2 DONE：准备并发布 Venera Native 1.0.0。** 版本统一采用 SemVer，首发 `1.0.0` / versionCode `1000000`，规则写入仓库 Agent 指南；采用 Apache-2.0，包名沿用 `dev.veneranative`。重写 GitHub 首页，整理 187 个运行时依赖的许可证清单并将许可材料打入 APK；Release 使用独立 RSA-4096 密钥签名。发布前修复 Windows 下载清单原子覆盖/路径回转、备份测试非法空类别及发布 lint 暴露的问题。
+
+验证（2026-10-16）：`:app:assembleDebug :app:assembleRelease lintRelease` — BUILD SUCCESSFUL；全量 `testDebugUnitTest` — BUILD SUCCESSFUL；`apksigner verify` — V2 签名通过，证书 SHA-256 `7d93cba634de77e3d5d77f2e85924867bcbfa00897b5802fc92678361d9e3ccb`；`aapt dump badging` 确认 `dev.veneranative`、1.0.0、minSdk 26；APK 内四份许可文件齐全；APK SHA-256 `4C943B5A8EFCEBBD17CF223586BDC54BF63D1EE11B56D05E4B96F83D905198C0`；`git diff --check` — PASS。GitHub Release `v1.0.0` 附正式 APK，仓库描述与 topics 已更新。当前唯一下一任务保持 S4-02G4；Stage S4-07 仍待 RC 与全 App 对齐验收。
+
 **S4-10A16 DONE：特别篇标题不再阻断更新标识清除。** 卡片总数使用可解析数字章节中的最大值，并忽略“番外”等非数字标题；A15 清除判断却要求目录中每条标题都可解析，可能造成卡片显示 `134/134` 而角标仍在。已让判断规则与卡片一致，新增章节模型与收藏仓库回归。定向测试、App Debug 编译和差异检查通过；2026-10-16 用同签名 `adb install -r` 覆盖安装并启动，保留应用数据，未做界面自动验收。
 
 **S4-10A15 DONE：快照缺少 latestChapterId 时按版本目录清除标识。** 用户反馈 A14 更新后仍有一部漫画保留标识。发现清除逻辑仍被 `latestChapterId != null` 前置限制，来源未提供该字段时不会执行版本目录判断。已移除门槛并添加回归用例。定向测试、App Debug 编译与差异检查通过，未做真机复验。
