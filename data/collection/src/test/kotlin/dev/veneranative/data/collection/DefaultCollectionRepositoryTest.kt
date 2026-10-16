@@ -375,6 +375,10 @@ class DefaultCollectionRepositoryTest {
                 dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("c2")),
                 "第134话", 1, "版本 A",
             ),
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("extra")),
+                "番外2026", 2, "版本 A",
+            ),
         )
         shelfWithHistory.addToFolders(
             ref, emptySet(), ComicSnapshot("Comic One", chapters = chapters),

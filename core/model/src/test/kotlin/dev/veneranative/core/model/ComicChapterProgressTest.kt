@@ -39,6 +39,8 @@ class ComicChapterProgressTest {
     @Test fun newestFirstAndSpecialChaptersDoNotInflateTotal() {
         val entries = listOf(ComicChapterEntry("new", "第111話 完结", "A"), ComicChapterEntry("old", "第1话", "A"), ComicChapterEntry("extra", "番外2026", "A"))
         assertEquals("111话", comicChapterProgressLabel(entries, null))
+        assertTrue(isLatestComicChapterInReadingVersion(entries, ComicReadingChapter("new", "第111話 完结", "A")))
+        assertFalse(isLatestComicChapterInReadingVersion(entries, ComicReadingChapter("old", "第1话", "A")))
     }
     @Test fun unnumberedDirectoriesUseLargestVersionCountRatherThanSum() {
         val entries = listOf(ComicChapterEntry("a", "开篇", "A"), ComicChapterEntry("b", "终篇", "A"), ComicChapterEntry("c", "开篇", "B"))

@@ -35,8 +35,8 @@ fun isLatestComicChapterInReadingVersion(
     val readingNumber = candidates.firstOrNull { it.id == reading.id }?.title?.let(::chapterNumber)
         ?: chapterNumber(reading.title)
         ?: return false
-    val candidateNumbers = candidates.map { chapterNumber(it.title) ?: return false }
-    return readingNumber >= candidateNumbers.maxOrNull()!!
+    val latestNumber = candidates.mapNotNull { chapterNumber(it.title) }.maxOrNull() ?: return false
+    return readingNumber >= latestNumber
 }
 
 /** Unread: highest numbered chapter across versions. Read: exclusively the reader's version. */
