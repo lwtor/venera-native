@@ -276,6 +276,18 @@ class DefaultCollectionRepositoryTest {
         assertFalse(shelf().single().hasUpdate)
     }
 
+    @Test fun `manual update check scans comics in every favorite folder`() = runTest {
+        seedFolders()
+        repository.add(comic("comic-reading"), "reading", snapshot("Reading comic", 10, "ch-10"))
+        repository.add(comic("comic-later"), "later", snapshot("Later comic", 20, "ch-20"))
+        probe[key("comic-reading")] = ChapterSnapshot(11, "ch-11")
+        probe[key("comic-later")] = ChapterSnapshot(21, "ch-21")
+
+        assertEquals(2, repository.refreshUpdates())
+        assertTrue(shelf("reading").single().hasUpdate)
+        assertTrue(shelf("later").single().hasUpdate)
+    }
+
     @Test fun `opening the latest updated chapter clears its marker`() = runTest {
         val history = ShelfReadingHistoryDao()
         val shelfWithHistory = DefaultCollectionRepository(

@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A17 DONE：书架全收藏刷新改为 FAB。** 移除会在刷新期间显示于内容区的下拉刷新控件，改为书架右下角固定刷新按钮；请求进行中按钮内显示进度，列表滚动区域不再被刷新指示器占用，并为最后一行卡片预留 FAB 空间。更新检查继续通过仓库全量扫描收藏作品，不受当前收藏夹筛选影响；新增跨两个收藏夹更新的回归。因本次新增用户可见刷新交互，按 SemVer 升级为 1.1.0 / versionCode 1001000。
+
+验证（2026-10-16）：JDK 17 `:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`aapt dump badging` 确认 `dev.veneranative`、1.1.0、1001000；`git diff --check` — PASS。未安装或真机验证。当前唯一下一任务保持 S4-02G4。
+
 **S4-07D3 DONE：修正文案并递增 PATCH 版本。** 移除 README 中无依据的“社区独立开发”，改为说明这是独立开发的 Android 应用，以及与 Venera 的关系和漫画源由用户选择配置。按仓库版本协议将当前开发版本从 1.0.0 递增到 1.0.1（versionCode 1000001）；GitHub 上已发布的 v1.0.0 不变。
 
 验证（2026-10-16）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`aapt dump badging` 确认包名 `dev.veneranative`、versionName 1.0.1、versionCode 1000001；`git diff --check` — PASS。当前唯一下一任务保持 S4-02G4。

@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.AlertDialog
@@ -37,6 +38,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -49,7 +51,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TriStateCheckbox
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -274,6 +275,26 @@ internal fun LibraryScreen(
                 )
             }
         },
+        floatingActionButton = {
+            if (state.tab == LibraryTab.Favorites) {
+                SmallFloatingActionButton(
+                    onClick = {
+                        if (!state.isRefreshing) onAction(LibraryAction.RefreshUpdates)
+                    },
+                ) {
+                    if (state.isRefreshing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).semantics {
+                                contentDescription = "正在检查全部收藏的更新"
+                            },
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Icon(Icons.Filled.Refresh, contentDescription = "检查全部收藏的更新")
+                    }
+                }
+            }
+        },
     ) { contentPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             state.message?.let { message ->
@@ -293,12 +314,7 @@ internal fun LibraryScreen(
             }
 
             if (state.tab == LibraryTab.Favorites) {
-                PullToRefreshBox(
-                    isRefreshing = state.isRefreshing,
-                    onRefresh = { onAction(LibraryAction.RefreshUpdates) },
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                ) {
-                    Column(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(1f).fillMaxWidth()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             FolderChips(
                                 folders = state.folders,
@@ -400,7 +416,6 @@ internal fun LibraryScreen(
                                 },
                             )
                         }
-                    }
                 }
             } else if (state.tab == LibraryTab.Local) {
                 if (state.localComics.isEmpty()) {
