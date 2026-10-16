@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A18 DONE：修复书架手动刷新时封面闪烁。** 原因是更新章节后强制重新保存每本收藏漫画的封面，改变封面资源修订时间并使图片请求全部重载。改为正常校验封面 URL；缺失或 URL 已变化时照常获取，不再无条件替换。回归测试验证手动检查更新不会强制封面存储。按修复类型递增为 1.1.1 / versionCode 1001001。
+
+验证（2026-10-16）：JDK 17 `:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`aapt dump badging` 确认 `dev.veneranative`、1.1.1、1001001；`git diff --check` — PASS。尚未真机确认闪烁消失。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A17 DONE：书架全收藏刷新改为 FAB。** 移除会在刷新期间显示于内容区的下拉刷新控件，改为书架右下角固定刷新按钮；请求进行中按钮内显示进度，列表滚动区域不再被刷新指示器占用，并为最后一行卡片预留 FAB 空间。更新检查继续通过仓库全量扫描收藏作品，不受当前收藏夹筛选影响；新增跨两个收藏夹更新的回归。因本次新增用户可见刷新交互，按 SemVer 升级为 1.1.0 / versionCode 1001000。
 
 验证（2026-10-16）：JDK 17 `:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`aapt dump badging` 确认 `dev.veneranative`、1.1.0、1001000；`git diff --check` — PASS。未安装或真机验证。当前唯一下一任务保持 S4-02G4。

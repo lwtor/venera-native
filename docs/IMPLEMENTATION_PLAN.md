@@ -652,6 +652,8 @@ S4-10A16 — DONE：让更新标识判定与卡片章节总数一致，目录中
 
 S4-10A17 — DONE：书架下拉刷新替换为右下角 FAB，检查中只在按钮内显示进度；刷新仓库全量检查收藏漫画，不受当前收藏夹筛选限制；底部网格预留按钮空间。新增跨多个收藏夹的仓库回归。JDK 17 `:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；版本升至 1.1.0 / versionCode 1001000；差异检查通过。未做真机视觉验收。
 
+S4-10A18 — DONE：移除漫画更新检查结束后强制保存封面的调用，避免覆盖 retainedCoverRevision 并触发所有显示中的 Coil 图片请求重建；保留封面缺失或 URL 变化时的正常保存。回归覆盖手动更新检查不 force retain；`:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；版本升至 1.1.1 / versionCode 1001001。设备复验待用户。
+
 S4-10A15 — DONE：允许在来源更新快照缺少 latestChapterId 时，仍按当前阅读版本目录判断最新章节并清除标识；定向回归、App Debug 编译和差异检查通过，未做真机复验。
 
 S4-10A14 — DONE：更新标识在用户打开当前阅读版本最新章节时清除，不再要求翻到末页；保留阅读旧章节时的标识。三条定向回归、App Debug 编译及差异检查通过，未做真机复验。

@@ -30,7 +30,11 @@ class RetainedComicRecordsTest {
         chapterCount = value.chapters.size, latestChapterId = value.chapters.last().key.remoteId.value, chapters = value.chapters, detail = value)
     private val covers = object : ComicCoverStorage {
         var failOld = false
-        override suspend fun retain(key: ComicKey, url: String, force: Boolean): Long? = if (failOld && url.endsWith("old")) null else now
+        var forcedRetains = 0
+        override suspend fun retain(key: ComicKey, url: String, force: Boolean): Long? {
+            if (force) forcedRetains++
+            return if (failOld && url.endsWith("old")) null else now + if (force) 1 else 0
+        }
         override suspend fun available(key: ComicKey): Boolean = !failOld
     }
     private fun repository(): DefaultCollectionRepository = DefaultCollectionRepository(favorites, UpdateMarker(probe), { now }, records = store, covers = covers)
@@ -109,6 +113,8 @@ class RetainedComicRecordsTest {
         repository.refreshUpdates()
         assertEquals(1, sourceCalls)
         assertTrue(forceSeen)
+        assertEquals(0, covers.forcedRetains)
+        assertEquals(now, store.find(ref)!!.coverFetchedAt)
     }
 }
 

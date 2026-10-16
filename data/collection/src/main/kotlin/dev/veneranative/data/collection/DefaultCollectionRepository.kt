@@ -310,7 +310,10 @@ class DefaultCollectionRepository internal constructor(
                 remote.latestChapterId, row.hasUpdate || state is UpdateState.Updated,
                 if (state is UpdateState.Updated) clock() else row.updatedAt ?: 0)
             records?.schedule(ref, failed = false)
-            if (!repairCover(ref, force = true)) records?.schedule(ref, failed = true)
+            // The retained store compares the current URL and replaces a missing or changed cover.
+            // Forcing it here changes every cover revision during a normal chapter check, which
+            // makes the shelf discard and reload all of its visible images.
+            if (!repairCover(ref)) records?.schedule(ref, failed = true)
             return if (state is UpdateState.Updated) 1 else 0
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
