@@ -65,7 +65,19 @@ class DefaultCollectionRepository internal constructor(
         .map { rows -> rows.associateBy { it.sourceId to it.comicId } }
     private fun FavoriteItem.withReading(rows: Map<Pair<String, String>, dev.veneranative.core.database.ReadingHistoryEntity>): FavoriteItem {
         val latest = rows[ref.refSource() to ref.refComic()]
-        return copy(readingChapter = latest?.let { dev.veneranative.core.model.ComicReadingChapter(it.chapterId, it.chapterTitle, it.chapterGroup) })
+        // Reading the final page of the chapter that raised the update marker acknowledges it.
+        // Keep the persisted flag in sync as well as projecting it away immediately, so a later
+        // shelf refresh does not resurrect an already-read marker.
+        val acknowledgedUpdate = ref is ComicRef.Remote && hasUpdate && latestChapterId != null &&
+            latest != null && latest.chapterId == latestChapterId &&
+            latest.pageCount > 0 && latest.pageIndex >= latest.pageCount - 1
+        if (acknowledgedUpdate) {
+            maintenanceScope?.launch { dao.clearUpdate(ref.refSource(), ref.refComic()) }
+        }
+        return copy(
+            hasUpdate = hasUpdate && !acknowledgedUpdate,
+            readingChapter = latest?.let { dev.veneranative.core.model.ComicReadingChapter(it.chapterId, it.chapterTitle, it.chapterGroup) },
+        )
     }
 
     override fun observeFolders(): Flow<List<FavoriteFolder>> =
