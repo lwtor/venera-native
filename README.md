@@ -4,7 +4,7 @@
 
 [下载最新版本](https://github.com/lwtor/venera-native/releases/latest) · [问题反馈](https://github.com/lwtor/venera-native/issues) · [项目文档](docs/)
 
-> 本项目由社区独立开发，与 Venera 原项目及其维护团队没有隶属或官方合作关系。应用不捆绑漫画内容；漫画源及其提供的内容由用户自行选择。
+> Venera Native 是独立开发的 Android 应用，与 Venera 原项目及其维护团队没有隶属或官方合作关系。应用不捆绑漫画内容；用户自行选择和配置漫画源，并遵守相应来源的使用规则。
 
 ## 功能
 

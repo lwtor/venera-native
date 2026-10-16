@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-07D3 DONE：修正文案并递增 PATCH 版本。** 移除 README 中无依据的“社区独立开发”，改为说明这是独立开发的 Android 应用，以及与 Venera 的关系和漫画源由用户选择配置。按仓库版本协议将当前开发版本从 1.0.0 递增到 1.0.1（versionCode 1000001）；GitHub 上已发布的 v1.0.0 不变。
+
+验证（2026-10-16）：JDK 17 `:app:assembleDebug` — BUILD SUCCESSFUL；`aapt dump badging` 确认包名 `dev.veneranative`、versionName 1.0.1、versionCode 1000001；`git diff --check` — PASS。当前唯一下一任务保持 S4-02G4。
+
 **S4-07D2 DONE：准备并发布 Venera Native 1.0.0。** 版本统一采用 SemVer，首发 `1.0.0` / versionCode `1000000`，规则写入仓库 Agent 指南；采用 Apache-2.0，包名沿用 `dev.veneranative`。重写 GitHub 首页，整理 187 个运行时依赖的许可证清单并将许可材料打入 APK；Release 使用独立 RSA-4096 密钥签名。发布前修复 Windows 下载清单原子覆盖/路径回转、备份测试非法空类别及发布 lint 暴露的问题。
 
 验证（2026-10-16）：`:app:assembleDebug :app:assembleRelease lintRelease` — BUILD SUCCESSFUL；全量 `testDebugUnitTest` — BUILD SUCCESSFUL；`apksigner verify` — V2 签名通过，证书 SHA-256 `7d93cba634de77e3d5d77f2e85924867bcbfa00897b5802fc92678361d9e3ccb`；`aapt dump badging` 确认 `dev.veneranative`、1.0.0、minSdk 26；APK 内四份许可文件齐全；APK SHA-256 `4C943B5A8EFCEBBD17CF223586BDC54BF63D1EE11B56D05E4B96F83D905198C0`；`git diff --check` — PASS。GitHub Release `v1.0.0` 附正式 APK，仓库描述与 topics 已更新。当前唯一下一任务保持 S4-02G4；Stage S4-07 仍待 RC 与全 App 对齐验收。
