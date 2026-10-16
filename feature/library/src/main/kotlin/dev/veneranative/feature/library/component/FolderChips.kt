@@ -3,10 +3,12 @@ package dev.veneranative.feature.library.component
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.veneranative.data.collection.FavoriteFolder
@@ -25,7 +27,13 @@ fun FolderChips(
     onSelect: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedFolderId, folders) {
+        val selectedIndex = selectedFolderId?.let { id -> folders.indexOfFirst { it.id == id } + 1 } ?: 0
+        if (selectedIndex >= 0) listState.animateScrollToItem(selectedIndex)
+    }
     LazyRow(
+        state = listState,
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
