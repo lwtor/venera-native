@@ -362,6 +362,33 @@ class DefaultCollectionRepositoryTest {
         assertFalse(dao.entries.value.single().hasUpdate)
     }
 
+    @Test fun `latest chapter in reading version clears update when source snapshot has no latest id`() = runTest {
+        val history = ShelfReadingHistoryDao()
+        val shelfWithHistory = DefaultCollectionRepository(dao, UpdateMarker(probe), historyDao = history)
+        val ref = comic("comic-1")
+        val chapters = listOf(
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("c1")),
+                "第133话", 0, "版本 A",
+            ),
+            dev.veneranative.core.model.Chapter(
+                dev.veneranative.core.model.ChapterKey(key("comic-1"), dev.veneranative.core.model.RemoteChapterId("c2")),
+                "第134话", 1, "版本 A",
+            ),
+        )
+        shelfWithHistory.addToFolders(
+            ref, emptySet(), ComicSnapshot("Comic One", chapters = chapters),
+        )
+        dao.upsertEntry(dao.entries.value.single().copy(hasUpdate = true, latestChapterId = null))
+        history.upsert(dev.veneranative.core.database.ReadingHistoryEntity(
+            sourceId = "source-a", comicId = "comic-1", chapterId = "c2", comicTitle = "Comic One",
+            chapterTitle = "第134话", coverUrl = null, pageIndex = 0, pageCount = 20,
+            updatedAtEpochMillis = 2_000, chapterGroup = "版本 A",
+        ))
+
+        assertFalse(shelfWithHistory.observeItem(ref).first()!!.hasUpdate)
+    }
+
     @Test fun `a refresh after clearing does not raise the flag again`() = runTest {
         seedFolders()
         repository.add(

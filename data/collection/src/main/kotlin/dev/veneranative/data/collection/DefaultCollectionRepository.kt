@@ -70,8 +70,8 @@ class DefaultCollectionRepository internal constructor(
         // Opening the chapter that raised the update marker acknowledges it.
         // Keep the persisted flag in sync as well as projecting it away immediately, so a later
         // shelf refresh does not resurrect an already-read marker.
-        val acknowledgedUpdate = ref is ComicRef.Remote && hasUpdate && latestChapterId != null &&
-            latest != null && (latest.chapterId == latestChapterId || isLatestComicChapterInReadingVersion(
+        val acknowledgedUpdate = ref is ComicRef.Remote && hasUpdate && latest != null &&
+            ((latestChapterId != null && latest.chapterId == latestChapterId) || isLatestComicChapterInReadingVersion(
                 chapters,
                 ComicReadingChapter(latest.chapterId, latest.chapterTitle, latest.chapterGroup),
             ))
