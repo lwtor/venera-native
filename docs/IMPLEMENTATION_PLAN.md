@@ -548,7 +548,7 @@ S3-02 小任务：
 | S3-02A1 | 已安装来源设置面板：按来源声明呈现 input/select/switch/callback；支持声明的账号密码登录、退出及注册页；设置按来源隔离加密，密码不持久化；登录/设置操作在仍打开的弹窗内明确反馈成功或失败 | DONE（`:app:assembleDebug :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；登录反馈 ViewModel 回归通过编译并执行；`git diff --check` — PASS。未真机验证；会话 token 不持久化，进程重启需重新登录） |
 | S3-02A2 | 将来源 `saveData` 会话快照按源用 Keystore 加密持久化；统一调用成功后导出，QuickJS 重建时恢复；密码类字段过滤，移除来源时清理；验证 token 可跨 runtime 重建恢复 | DONE（`:app:assembleDebug :source:engine:testDebugUnitTest :source:core:testDebugUnitTest :data:source:testDebugUnitTest :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；覆盖 QuickJS 重建、密码过滤及执行器持久化回调；`git diff --check` — PASS。设备 Keystore 和进程杀停复验待用户执行） |
 | S3-02A3 | 漫画源读取请求成功时，即使会话快照存储失败也保留详情/搜索结果；登录等写操作仍报告保存失败；补充读写失败差异回归 | DONE（`:source:core:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；读操作存储失败仍成功、写操作失败可见；`git diff --check` — PASS） |
-| S3-02A4 | 修复再漫画详情 `comic.loadInfo` 的 ScriptExecution；使用 Debug 专属脱敏网络阶段与错误摘要复现，测试覆盖后移除不必要诊断 | IN_PROGRESS |
+| S3-02A4 | 真机诊断再漫画详情失败；明确作品不存在/下架类脚本错误不再重复请求，并在详情页展示可理解的状态提示 | DONE（`:source:core:testDebugUnitTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；设备覆盖安装 1.2.4，未清除数据） |
 
 S3-03 小任务：
 

@@ -57,6 +57,13 @@ import kotlinx.coroutines.test.runCurrent
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailsViewModelTest {
+    @Test fun `permanent missing comic error is explained instead of looking like source timeout`() {
+        assertEquals(
+            "该漫画可能已下架或被来源删除，请尝试刷新来源后再打开。",
+            SourceRuntimeError.ScriptExecution("漫画不存在或已被删除").toDetailsMessage(),
+        )
+    }
+
     @Test fun `details exposes final central failure without its own retry loop`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))

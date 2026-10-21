@@ -556,10 +556,18 @@ internal fun SourceRuntimeError.toDetailsMessage(): String = when (this) {
 
     is SourceRuntimeError.RuntimeClosed -> "此设备暂时无法运行漫画源。"
 
+    is SourceRuntimeError.ScriptExecution -> if (
+        listOf("not found", "does not exist", "已被删除", "不存在")
+            .any(message.lowercase()::contains)
+    ) {
+        "该漫画可能已下架或被来源删除，请尝试刷新来源后再打开。"
+    } else {
+        "漫画源暂时无法响应。"
+    }
+
     is SourceRuntimeError.InvalidPackage,
     is SourceRuntimeError.InvalidCall,
     is SourceRuntimeError.ScriptSyntax,
-    is SourceRuntimeError.ScriptExecution,
     is SourceRuntimeError.Internal,
     -> "漫画源暂时无法响应。"
 }

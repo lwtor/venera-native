@@ -32,11 +32,19 @@ internal class SourceCallExecutor(
                 }
                 val error = (result as SourceResult.Failure).error
                 if (attempt == 2 || error is SourceRuntimeError.Cancelled ||
+                    isPermanentContentFailure(error) ||
                     (!error.retryable && error !is SourceRuntimeError.ScriptExecution)) return@withTimeoutOrNull result
                 wait(attempt + 1)
             }
             error("Unreachable retry state")
         } ?: SourceResult.Failure(call.callId, SourceRuntimeError.Timeout(totalTimeoutMillis))
+    }
+
+    /** A source may report a permanent content error as a JS exception; repeating it cannot help. */
+    private fun isPermanentContentFailure(error: SourceRuntimeError): Boolean {
+        val scriptError = error as? SourceRuntimeError.ScriptExecution ?: return false
+        val message = scriptError.message.lowercase()
+        return listOf("not found", "does not exist", "已被删除", "不存在").any(message::contains)
     }
 
     private suspend fun persistSourceData(

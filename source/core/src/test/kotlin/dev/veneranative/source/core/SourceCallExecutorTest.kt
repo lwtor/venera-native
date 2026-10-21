@@ -62,6 +62,7 @@ class SourceCallExecutorTest {
     @Test fun `all reads share retries with fresh call IDs while writes and cancelled calls do not retry`() = runTest {
         for ((kind, error, expected) in listOf(
             Triple(SourceOperationKind.READ, SourceRuntimeError.ScriptExecution("fixture"), 3),
+            Triple(SourceOperationKind.READ, SourceRuntimeError.ScriptExecution("漫画不存在或已被删除"), 1),
             Triple(SourceOperationKind.READ, SourceRuntimeError.Busy(), 3),
             Triple(SourceOperationKind.WRITE, SourceRuntimeError.Timeout(1), 1),
             Triple(SourceOperationKind.READ, SourceRuntimeError.Cancelled(), 1),
