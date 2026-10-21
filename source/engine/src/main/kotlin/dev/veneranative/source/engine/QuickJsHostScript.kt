@@ -511,6 +511,15 @@ internal object QuickJsHostScript {
             return min + Math.floor(Math.random() * (max - min + 1));
           };
 
+          // Picacg and compatible Venera sources use this helper to generate request nonces.
+          // Keep it inside the JS sandbox and format it as an RFC 4122 version 4 UUID.
+          globalThis.createUuid = function () {
+            return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (token) {
+              var random = Math.floor(Math.random() * 16);
+              return (token === "x" ? random : (random & 3) | 8).toString(16);
+            });
+          };
+
           function describe(value) {
             try {
               if (typeof value === "string") {

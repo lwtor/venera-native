@@ -26,6 +26,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -720,6 +721,29 @@ class QuickJsRuntimeTest {
             assertEquals("f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8", result.getString("signature"))
             assertEquals("The quick brown fox jumps over the lazy dog", result.getString("roundTrip"))
             assertEquals(4, result.getInt("random"))
+        }
+    }
+
+    @Test
+    fun `picacg request nonce helper returns a version four uuid`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    makeNonce() {
+                      return { first: createUuid(), second: createUuid() };
+                    }
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "makeNonce", "[]"))
+            val uuidPattern = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+            val first = result.getString("first")
+            val second = result.getString("second")
+            assertTrue("Invalid request nonce format: $first", uuidPattern.matches(first))
+            assertTrue("Invalid request nonce format: $second", uuidPattern.matches(second))
+            assertNotEquals(first, second)
         }
     }
 

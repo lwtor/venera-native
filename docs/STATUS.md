@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S4-10A19 DONE：修复 Picacg 源请求前崩溃。** Picacg 1.0.6 在构造请求签名时调用 `createUuid()` 生成 nonce，宿主之前没有该全局方法，请求因此在联网前失败。QuickJS 兼容层现在提供 RFC 4122 version 4 UUID，新增合成回归覆盖格式及连续调用。依据逐提交版本协议递增至 1.1.2 / versionCode 1001002。实现细节记录于 ADR-0007 §4.18。
+
+验证（2026-10-21）：JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。已验证脚本级 UUID 签名 nonce 兼容，真机访问 Picacg 尚待用户复验。当前唯一下一任务保持 S4-02G4。
+
 **S4-10A18 DONE：修复书架手动刷新时封面闪烁。** 原因是更新章节后强制重新保存每本收藏漫画的封面，改变封面资源修订时间并使图片请求全部重载。改为正常校验封面 URL；缺失或 URL 已变化时照常获取，不再无条件替换。回归测试验证手动检查更新不会强制封面存储。按修复类型递增为 1.1.1 / versionCode 1001001。
 
 验证（2026-10-16）：JDK 17 `:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`aapt dump badging` 确认 `dev.veneranative`、1.1.1、1001001；`git diff --check` — PASS。尚未真机确认闪烁消失。当前唯一下一任务保持 S4-02G4。

@@ -654,6 +654,8 @@ S4-10A17 — DONE：书架下拉刷新替换为右下角 FAB，检查中只在�
 
 S4-10A18 — DONE：移除漫画更新检查结束后强制保存封面的调用，避免覆盖 retainedCoverRevision 并触发所有显示中的 Coil 图片请求重建；保留封面缺失或 URL 变化时的正常保存。回归覆盖手动更新检查不 force retain；`:data:collection:testDebugUnitTest :feature:library:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；版本升至 1.1.1 / versionCode 1001001。设备复验待用户。
 
+S4-10A19 — DONE：补齐 Picacg 签名请求依赖的 `createUuid()` QuickJS 全局函数，并以版本 4 UUID 合成回归锁定兼容行为；`:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL；版本升至 1.1.2 / versionCode 1001002；真机复验待用户。
+
 S4-10A15 — DONE：允许在来源更新快照缺少 latestChapterId 时，仍按当前阅读版本目录判断最新章节并清除标识；定向回归、App Debug 编译和差异检查通过，未做真机复验。
 
 S4-10A14 — DONE：更新标识在用户打开当前阅读版本最新章节时清除，不再要求翻到末页；保留阅读旧章节时的标识。三条定向回归、App Debug 编译及差异检查通过，未做真机复验。
