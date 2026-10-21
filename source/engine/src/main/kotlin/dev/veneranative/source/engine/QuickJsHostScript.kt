@@ -12,6 +12,7 @@ package dev.veneranative.source.engine
  * - `Network.*` for the calls that are not `fetch`;
  * - cancellable `setTimeout` / `clearTimeout`, backed by a bounded timer Host API;
  * - `console.*`, routed to the host's log so source diagnostics are visible;
+ * - synchronous `HtmlDocument` CSS selection and element values through a bounded JSON-only parser bridge;
  * - `APP.locale` / `APP.version`.
  *
  * Deliberately **not** provided, because no source measured so far uses them and a hand-written
@@ -800,5 +801,5 @@ internal object QuickJsHostScript {
             version: ${jsQuote(appVersion)}
           });
         })();
-    """.trimIndent() + "\n\n" + SourceBaseScript.script + "\n\n" + SourceProbeScript.script
+    """.trimIndent() + "\n\n" + SourceHtmlScript.script + "\n\n" + SourceBaseScript.script + "\n\n" + SourceProbeScript.script
 }

@@ -62,6 +62,39 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `source HtmlDocument supports synchronous CSS selection and element values`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(
+                fixtureSource(
+                    """
+                    search = { load: async () => {
+                      const document = new HtmlDocument(
+                        '<ul><li class="comic-item"><a href="/book/7"><p class="title">作品标题~副标题</p><img src="cover.jpg"><span class="chapter">第7话</span></a></li></ul>'
+                      );
+                      const comics = document.querySelectorAll("li.comic-item").map((item) => ({
+                        title: item.querySelector("p.title").text.split("~")[0],
+                        cover: item.querySelector("img").attributes.src,
+                        id: item.querySelector("a").attributes.href,
+                        chapter: item.querySelector("span.chapter").text,
+                        itemId: item.id
+                      }));
+                      return { comics, maxPage: 1 };
+                    } };
+                    """.trimIndent(),
+                ),
+            )
+
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "search.load", "[]"))
+            val comic = result.getJSONArray("comics").getJSONObject(0)
+
+            assertEquals("作品标题", comic.getString("title"))
+            assertEquals("cover.jpg", comic.getString("cover"))
+            assertEquals("/book/7", comic.getString("id"))
+            assertEquals("第7话", comic.getString("chapter"))
+        }
+    }
+
+    @Test
     fun `encrypted host snapshot restores source login state in a fresh runtime`() = runBlocking {
         val script = fixtureSource(
             """

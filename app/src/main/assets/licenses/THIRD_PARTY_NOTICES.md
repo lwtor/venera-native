@@ -2,7 +2,7 @@
 
 Venera Native is distributed under Apache License 2.0; see [`LICENSE`](LICENSE). The Android release APK includes this notice, the project license, and [`docs/dependency-licenses.md`](docs/dependency-licenses.md), which inventories the resolved `:app:releaseRuntimeClasspath` components and their license evidence.
 
-The report contains 187 resolved runtime components. Maven metadata identifies most licenses; AndroidX, JetBrains Compose, Google, and Apache group artifacts with missing POM license metadata were classified from their upstream project license. The non-Apache runtime notices are reproduced below.
+The report contains 188 resolved runtime components. Maven metadata identifies most licenses; AndroidX, JetBrains Compose, Google, and Apache group artifacts with missing POM license metadata were classified from their upstream project license. The non-Apache runtime notices are reproduced below.
 
 ## QuickJS — MIT License
 
@@ -11,6 +11,18 @@ Bundled by `quickjs-kt-android 1.0.15`.
 Copyright (c) 2017-2021 Fabrice Bellard
 
 Copyright (c) 2017-2021 Charlie Gordon
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## jsoup — MIT License
+
+Applies to `org.jsoup:jsoup:1.23.2`.
+
+Copyright (c) 2009-2026 Jonathan Hedley <https://jsoup.org/>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 

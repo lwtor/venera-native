@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S3-08A DONE：修复爱看漫源因缺少 `HtmlDocument` 全局导致的搜索失败。** 在 QuickJS 中加入同步、只传递 JSON 值的 DOM 桥接，以 Jsoup 解析 HTML 并执行 CSS Selector；提供 `querySelector`/`querySelectorAll`、元素 `.text`/`.attributes`、子节点与常用元素属性。每次来源调用限制 HTML 总体积为 1 MiB、DOM 元素数为 25,000，并在调用结束释放文档；不向脚本暴露 Jsoup/Java 对象或新增网络能力。增加端到端来源脚本 fixture 覆盖爱看漫列表的嵌套 CSS 选择与作品字段提取。版本升至 1.2.6 / versionCode 1002006。**下一唯一任务仍为 S3-02A5**：核实再漫画详情请求 ID。
+
+验证（2026-10-21）：JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL。覆盖安装及爱看漫实际联网复验待执行；依赖与 APK 许可清单已同步新增 Jsoup 1.23.2 MIT 许可。
+
 **S3-02A5 IN_PROGRESS：确认再漫画多个作品详情失败的共同原因。** 之前从单次 HTTP 200 的“漫画不存在”响应推断作品已下架，结论过早。公开站点目前可通过再漫画旧详情接口成功读取五个当前列表作品；因此 App 实际传入的 ID 或请求上下文仍待核实。Debug 构建为详情失败诊断增加来源作品 ID（不含 URL、请求头或正文），供下一次设备复现比对。版本升至 1.2.5 / versionCode 1002005。
 
 **S3-02A4 DONE：确定性详情错误不再重复请求并改用中性提示。** 已识别“not found/不存在/已被删除”来源异常为不可恢复的本次内容错误，避免无效重试；用户提示不再断言作品已下架。详情临时故障重试保持不变。1.2.4 已在设备覆盖安装，但未解决用户反馈的多作品问题。

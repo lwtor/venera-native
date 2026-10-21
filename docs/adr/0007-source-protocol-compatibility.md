@@ -280,6 +280,10 @@ Search 条目和封面同为 120dp，标题单行，作者最多两行；日期�
 
 Picacg failure triage needs transport stage and HTTP status to distinguish a source script failure from endpoint rejection or connectivity failure. Enable the existing safe `SourceNetworkTraceListener` for Picacg only in debuggable builds; it records method, host, elapsed stage, HTTP status, and sanitized connection failure, never URL, headers, or body. Keep the persistent local network trace file scoped to Komiic; Picacg trace is logcat-only and disappears with normal system log retention.
 
+### 4.20 Synchronous HTML DOM compatibility for QuickJS sources（2026-10-21，S3-08A）
+
+The installed upstream `ikmmh` (爱看漫) source calls `new HtmlDocument(html)` in search, category, favorite, detail, and reader flows. The runtime had no HTML parser global, so the first such call failed before site results could be parsed. Add a QuickJS-local synchronous binding backed by Jsoup 1.23.2 (MIT); scripts receive only JSON strings and plain JS wrappers for selectors, text, attributes, and common element navigation. The DOM parser is local and introduces no network capability or arbitrary Java/context exposure. A per-invocation budget caps aggregate source HTML at 1 MiB and parsed elements at 25,000; invocation cleanup releases document and element references after result serialization. Regression uses a small synthetic search-card fixture and never fetches commercial site content or includes the source script in the repository. The official source API contract documents `HtmlDocument` and CSS selectors at https://github.com/venera-app/venera/blob/master/doc/js_api.md; the source is distributed separately by venera-configs.
+
 ## 5. 替代方案
 
 | 方案 | 结论 |

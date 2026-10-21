@@ -1,6 +1,6 @@
 # Release dependency license inventory
 
-Generated from Gradle resolved component identifiers for `:app:releaseRuntimeClasspath` on 2026-10-16. AndroidX, JetBrains Compose, Google, and Apache group entries whose cached POM omitted `<licenses>` were classified using their upstream project license. QuickJS is bundled inside the runtime wrapper and is listed separately. This is the runtime APK inventory, not the build-plugin inventory.
+Generated from Gradle resolved component identifiers for `:app:releaseRuntimeClasspath` on 2026-10-21. AndroidX, JetBrains Compose, Google, and Apache group entries whose cached POM omitted `<licenses>` were classified using their upstream project license. QuickJS is bundled inside the runtime wrapper and is listed separately. This is the runtime APK inventory, not the build-plugin inventory.
 
 | Component | Version | License | Evidence |
 | --- | --- | --- | --- |
@@ -189,6 +189,7 @@ Generated from Gradle resolved component identifiers for `:app:releaseRuntimeCla
 | `org.jetbrains.kotlinx:kotlinx-serialization-core` | 1.11.0 | Apache-2.0 | Maven POM |
 | `org.jetbrains.kotlinx:kotlinx-serialization-json-jvm` | 1.11.0 | Apache-2.0 | Maven POM |
 | `org.jetbrains.kotlinx:kotlinx-serialization-json` | 1.11.0 | Apache-2.0 | Maven POM |
+| `org.jsoup:jsoup` | 1.23.2 | MIT | Maven POM |
 | `org.jspecify:jspecify` | 1.0.0 | Apache-2.0 | Maven POM |
 | `org.checkerframework:checker-qual` | 3.33.0 | MIT | Maven POM |
 | `QuickJS native engine bundled by quickjs-kt-android 1.0.15` | bundled | MIT | upstream QuickJS license |

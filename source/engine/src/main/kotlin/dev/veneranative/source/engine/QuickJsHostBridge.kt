@@ -2,6 +2,7 @@ package dev.veneranative.source.engine
 
 import com.dokar.quickjs.QuickJs
 import com.dokar.quickjs.binding.asyncFunction
+import com.dokar.quickjs.binding.function
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.source.api.SourceHostApi
 import dev.veneranative.source.api.SourceHostError
@@ -35,6 +36,7 @@ internal class QuickJsHostBridge(
     private val logSink: (String, String) -> Unit = DEFAULT_LOG_SINK,
 ) {
     private val sequence = AtomicLong(0L)
+    private val htmlDom = QuickJsHtmlDom()
     private val bootstrapScript = QuickJsHostScript.bootstrap(
         appLocale = appLocale,
         appVersion = appVersion,
@@ -44,6 +46,7 @@ internal class QuickJsHostBridge(
     )
 
     fun install(engine: QuickJs) {
+        engine.function<String, String>("__veneraHtmlApi") { requestJson -> htmlDom.invoke(requestJson) }
         engine.asyncFunction<Any?>("__veneraHostCall") { arguments ->
             val method = arguments.getOrNull(0) as? String ?: ""
             val payloadJson = arguments.getOrNull(1) as? String ?: "{}"

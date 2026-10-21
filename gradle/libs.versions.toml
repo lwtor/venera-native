@@ -25,6 +25,7 @@ documentfile = "1.1.0"
 commonsCompress = "1.28.0"
 # Public domain. Needed by commons-compress for LZMA/LZMA2 (7z).
 xz = "1.12"
+jsoup = "1.23.2"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -72,3 +73,4 @@ androidx-work-testing = { module = "androidx.work:work-testing", version.ref = "
 androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
+jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }

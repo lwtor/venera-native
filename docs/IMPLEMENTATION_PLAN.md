@@ -541,6 +541,12 @@ S3-00 在扩展实现前冻结上游基线。后续任务按该基线维护功�
 | S3-07 | 高级图片处理 | 二进制变换、解密允许边界、缓存语义；固定 fixture 与超限/失败测试 | S3-00 | TODO |
 | S3-08 | 兼容矩阵与调试工具 | Source Contract Suite、脱敏日志、导出诊断；逐项复核 Stage 3 对照差距 | S3-01 至 S3-07 | TODO |
 
+S3-08 小任务：
+
+| ID | 交付 | 状态 |
+| --- | --- | --- |
+| S3-08A | QuickJS 提供同步 `HtmlDocument`/CSS Selector 兼容层，支持爱看漫使用的文本、属性和嵌套选择器；输入及每次调用 DOM 资源有上限并在调用结束释放；固定 HTML fixture 回归覆盖搜索卡片解析 | DONE（`:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机搜索验收待覆盖安装后复测） |
+
 S3-02 小任务：
 
 | ID | 交付 | 状态 |

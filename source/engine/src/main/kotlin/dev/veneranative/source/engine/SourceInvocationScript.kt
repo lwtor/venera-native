@@ -78,6 +78,9 @@ internal object SourceInvocationScript {
                   return serializeSourceValue(value);
                 })
                 .finally(function() {
+                  if (typeof globalThis.__veneraDisposeHtmlInvocation === "function") {
+                    try { globalThis.__veneraDisposeHtmlInvocation($quotedInvocationId); } catch (_) {}
+                  }
                   if (globalThis.__veneraListMetadata) globalThis.__veneraListMetadata.clear($quotedInvocationId);
                   if (typeof globalThis.__veneraClearInvocationTimers === "function") {
                     try { globalThis.__veneraClearInvocationTimers($quotedInvocationId); } catch (_) {}

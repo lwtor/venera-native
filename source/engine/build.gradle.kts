@@ -16,6 +16,7 @@ dependencies {
     implementation(libs.quickjs.kt)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.jsoup)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
