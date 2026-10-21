@@ -8,6 +8,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SourceCallExecutorTest {
+    @Test fun `successful calls persist the source data snapshot`() = runTest {
+        val sourceId = SourceId("fixture")
+        val runtime = object : StubRuntime() {
+            override suspend fun invoke(call: SourceCall): SourceResult =
+                SourceResult.Success(call.callId, "true", "{\"token\":\"encrypted-at-rest\"}")
+        }
+        val snapshots = mutableListOf<Pair<SourceId, String>>()
+        val executor = SourceCallExecutor(runtime, onSourceDataChanged = { id, data -> snapshots += id to data })
+
+        val result = executor.execute(SourceOperationKind.WRITE) {
+            SourceCall.InvokeFunction("login", sourceId, "account.login")
+        }
+
+        assertTrue(result is SourceResult.Success)
+        assertEquals(listOf(sourceId to "{\"token\":\"encrypted-at-rest\"}"), snapshots)
+    }
+
     @Test fun `all reads share retries with fresh call IDs while writes and cancelled calls do not retry`() = runTest {
         for ((kind, error, expected) in listOf(
             Triple(SourceOperationKind.READ, SourceRuntimeError.ScriptExecution("fixture"), 3),

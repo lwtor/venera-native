@@ -62,6 +62,41 @@ class QuickJsRuntimeTest {
     }
 
     @Test
+    fun `encrypted host snapshot restores source login state in a fresh runtime`() = runBlocking {
+        val script = fixtureSource(
+            """
+            account = {
+              login: async (account, password) => {
+                this.saveData("token", "token-for-" + account);
+                this.saveData("password", password);
+                return true;
+              }
+            };
+            currentToken() { return this.loadData("token"); }
+            """.trimIndent(),
+        )
+        val sourceId = SourceId(FIXTURE_KEY)
+        val packageFor: (String) -> SourcePackage = { data ->
+            SourcePackage(sourceId, "1", script, sha256(script), sourceDataJson = data)
+        }
+        var snapshot = "{}"
+        withRuntime(QuickJsRuntime()) { runtime ->
+            assertTrue(runtime.install(packageFor("{}")) is SourceInstallResult.Installed)
+            val result = runtime.invoke(
+                SourceCall.InvokeFunction("login", sourceId, "account.login", "[\"reader\",\"do-not-store\"]"),
+            ) as SourceResult.Success
+            assertEquals("{\"token\":\"token-for-reader\"}", result.sourceDataJson)
+            snapshot = result.sourceDataJson ?: error("Runtime did not return source data")
+        }
+
+        withRuntime(QuickJsRuntime()) { restartedRuntime ->
+            assertTrue(restartedRuntime.install(packageFor(snapshot)) is SourceInstallResult.Installed)
+            assertEquals("true", restartedRuntime.invokeSuccess(sourceId, "__veneraIsLogged"))
+            assertEquals("\"token-for-reader\"", restartedRuntime.invokeSuccess(sourceId, "currentToken"))
+        }
+    }
+
+    @Test
     fun `JM parseComic can construct and return upstream Comic values`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val script = buildString {

@@ -56,7 +56,12 @@ internal object SourceInvocationScript {
                 throw new Error("Source function arguments must be a JSON array.");
               }
               function serializeSourceValue(value) {
-                return JSON.stringify({ value: value === undefined ? null : value }, function(_key, entry) {
+                const sourceInstance = $root;
+                return JSON.stringify({
+                  value: value === undefined ? null : value,
+                  sourceData: sourceInstance && typeof sourceInstance.__veneraExportData === "function"
+                    ? sourceInstance.__veneraExportData() : null
+                }, function(_key, entry) {
                   if (!(entry instanceof Map)) return globalThis.__veneraListMetadata
                     ? globalThis.__veneraListMetadata.enrich(entry) : entry;
                   const object = Object.create(null);

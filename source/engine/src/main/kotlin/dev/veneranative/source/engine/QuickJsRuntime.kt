@@ -207,7 +207,9 @@ class QuickJsRuntime(
                 }
 
                 try {
-                    SourceResult.Success(typedCall.callId, SourceResultEnvelope.extract(envelope))
+                    SourceResultEnvelope.decode(envelope).let { decoded ->
+                        SourceResult.Success(typedCall.callId, decoded.valueJson, decoded.sourceDataJson)
+                    }
                 } catch (failure: JSONException) {
                     typedCall.failure(
                         SourceRuntimeError.ScriptExecution(
@@ -334,6 +336,7 @@ class QuickJsRuntime(
                         appLocale = appLocale,
                         appVersion = appVersion,
                         sourceSettingsJson = source.settingsJson,
+                        sourceDataJson = source.sourceDataJson,
                         logSink = logSink,
                     )
                 bridge.install(engine)

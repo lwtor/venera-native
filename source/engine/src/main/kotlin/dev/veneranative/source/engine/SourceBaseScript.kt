@@ -4,13 +4,8 @@ package dev.veneranative.source.engine
  * The JavaScript `ComicSource` base class every source extends.
  *
  * Upstream ships this in `assets/init.js`; sources rely on it for their identity fields and for the
- * data/setting helpers. Two honest Stage 1 limitations are baked in and must not be mistaken for
- * the real thing (ADR-0007 §2.1 keeps source data, settings and accounts out of Stage 1):
- *
- * - the data store lives for as long as the engine instance, so `saveData` does not survive a
- *   reload;
- * - `loadSetting` answers with the value the source declared in its own `settings` block instead of
- *   a user-chosen one, and `isLogged` is always false.
+ * data/setting helpers. Source data and settings are supplied by the host; source data is encrypted
+ * at rest and password-like fields are excluded from exported snapshots.
  *
  * Everything else follows upstream verbatim, including `translate`'s locale lookup and the
  * `sources` registry the host reaches member calls through.
@@ -22,7 +17,12 @@ internal object SourceBaseScript {
         (function () {
           "use strict";
 
-          var data = {};
+          var data = (function () {
+            try {
+              var restored = JSON.parse(globalThis.__veneraSourceDataJson || "{}");
+              return restored && typeof restored === "object" && !Array.isArray(restored) ? restored : {};
+            } catch (_) { return {}; }
+          })();
 
           // Upstream source scripts construct search/explore results with `new Comic({...})`.
           // This is a plain value object (no host capabilities); keep its fields aligned with the
@@ -120,6 +120,16 @@ internal object SourceBaseScript {
 
             deleteData(dataKey) {
               delete data[dataKey];
+            }
+
+            __veneraExportData() {
+              try {
+                return JSON.parse(JSON.stringify(data, function (key, value) {
+                  return /(?:password|passwd|pwd)/i.test(key) ? undefined : value;
+                }));
+              } catch (_) {
+                return {};
+              }
             }
 
             loadSetting(key) {

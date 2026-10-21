@@ -31,6 +31,8 @@ data class SourcePackage(
     val sha256: String,
     /** JSON object with source setting overrides; only values declared by the source are injected. */
     val settingsJson: String = "{}",
+    /** Encrypted host-owned source data restored into `ComicSource.loadData` / `saveData`. */
+    val sourceDataJson: String = "{}",
 )
 
 sealed interface SourceInstallResult {
@@ -72,6 +74,8 @@ sealed interface SourceResult {
     data class Success(
         override val callId: String,
         val json: String,
+        /** A JSON object snapshot of `ComicSource` data, to be persisted by the host. */
+        val sourceDataJson: String? = null,
     ) : SourceResult
 
     data class Failure(

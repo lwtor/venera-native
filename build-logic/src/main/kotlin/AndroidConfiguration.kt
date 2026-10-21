@@ -9,9 +9,9 @@ internal fun ApplicationExtension.configureVeneraAndroidApplication() {
         minSdk = 26
         targetSdk = 37
         // Keep this mapping monotonic and leave 1,000 values for patch/minor changes.
-        // 1.0.0 -> 1,000,000; 1.2.0 -> 1,002,000. Keep within Android's signed Int range.
-        versionCode = 1_002_000
-        versionName = "1.2.0"
+        // 1.0.0 -> 1,000,000; 1.2.1 -> 1,002,001. Keep within Android's signed Int range.
+        versionCode = 1_002_001
+        versionName = "1.2.1"
     }
 
     compileOptions {

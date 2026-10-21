@@ -12,20 +12,34 @@ import org.json.JSONObject
  */
 internal object SourceResultEnvelope {
     private const val VALUE_KEY = "value"
+    private const val SOURCE_DATA_KEY = "sourceData"
+
+    data class Decoded(val valueJson: String, val sourceDataJson: String?)
 
     /**
      * @throws JSONException when the envelope is malformed or holds a value that cannot be JSON.
      */
     fun extract(envelope: String): String {
+        return decode(envelope).valueJson
+    }
+
+    fun decode(envelope: String): Decoded {
         val result = JSONObject(envelope)
         if (!result.has(VALUE_KEY)) {
             throw JSONException("Missing result value.")
         }
-        return when (val value = result.get(VALUE_KEY)) {
+        val valueJson = when (val value = result.get(VALUE_KEY)) {
             JSONObject.NULL -> "null"
             is String -> JSONObject.quote(value)
             is Number, is Boolean, is JSONObject, is JSONArray -> value.toString()
             else -> throw JSONException("Unsupported result value.")
         }
+        val sourceData = result.opt(SOURCE_DATA_KEY)
+        val sourceDataJson = when (sourceData) {
+            null, JSONObject.NULL -> null
+            is JSONObject -> sourceData.toString()
+            else -> throw JSONException("Source data must be a JSON object.")
+        }
+        return Decoded(valueJson, sourceDataJson)
     }
 }

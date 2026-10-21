@@ -26,11 +26,13 @@ internal object QuickJsHostScript {
         appVersion: String,
         maxLogChars: Int,
         sourceSettingsJson: String = "{}",
+        sourceDataJson: String = "{}",
     ): String = """
         (function () {
           "use strict";
 
           globalThis.__veneraSettingsJson = ${jsQuote(sourceSettingsJson)};
+          globalThis.__veneraSourceDataJson = ${jsQuote(sourceDataJson)};
 
           var hostCall = globalThis.__veneraHostCall;
           var logSink = globalThis.__veneraLog;

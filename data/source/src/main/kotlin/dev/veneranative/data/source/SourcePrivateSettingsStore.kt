@@ -17,14 +17,19 @@ import org.json.JSONObject
 interface SourcePrivateSettingsStore {
     fun read(sourceId: SourceId): Map<String, String>
     fun write(sourceId: SourceId, values: Map<String, String>)
+    fun readSourceData(sourceId: SourceId): String = "{}"
+    fun writeSourceData(sourceId: SourceId, dataJson: String) = Unit
     fun clear(sourceId: SourceId)
 }
 
 class InMemorySourcePrivateSettingsStore : SourcePrivateSettingsStore {
     private val values = mutableMapOf<SourceId, Map<String, String>>()
+    private val data = mutableMapOf<SourceId, String>()
     @Synchronized override fun read(sourceId: SourceId) = values[sourceId].orEmpty()
     @Synchronized override fun write(sourceId: SourceId, values: Map<String, String>) { this.values[sourceId] = values.toMap() }
-    @Synchronized override fun clear(sourceId: SourceId) { values.remove(sourceId) }
+    @Synchronized override fun readSourceData(sourceId: SourceId) = data[sourceId] ?: "{}"
+    @Synchronized override fun writeSourceData(sourceId: SourceId, dataJson: String) { data[sourceId] = dataJson }
+    @Synchronized override fun clear(sourceId: SourceId) { values.remove(sourceId); data.remove(sourceId) }
 }
 
 class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSettingsStore {
@@ -82,10 +87,55 @@ class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSetting
         }
     }
 
+    @Synchronized
+    override fun readSourceData(sourceId: SourceId): String {
+        val encoded = preferences.getString(dataPreferenceKey(sourceId), null) ?: return "{}"
+        return runCatching {
+            val blob = Base64.decode(encoded, Base64.NO_WRAP)
+            require(blob.size > NONCE_BYTES)
+            val nonce = blob.copyOfRange(0, NONCE_BYTES)
+            val ciphertext = blob.copyOfRange(NONCE_BYTES, blob.size)
+            val cipher = Cipher.getInstance(TRANSFORMATION).apply {
+                init(Cipher.DECRYPT_MODE, loadOrCreateKey(), GCMParameterSpec(TAG_BITS, nonce))
+                updateAAD(aad(sourceId, "data"))
+            }
+            sanitizeSourceData(String(cipher.doFinal(ciphertext), Charsets.UTF_8))
+        }.getOrElse {
+            clearSourceData(sourceId)
+            "{}"
+        }
+    }
+
+    @Synchronized
+    override fun writeSourceData(sourceId: SourceId, dataJson: String) {
+        val sanitized = sanitizeSourceData(dataJson)
+        val plain = sanitized.toByteArray(Charsets.UTF_8)
+        require(plain.size <= MAX_SOURCE_DATA_BYTES) { "Source session data exceeded the allowed size." }
+        if (readSourceData(sourceId) == sanitized) return
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply {
+            init(Cipher.ENCRYPT_MODE, loadOrCreateKey())
+            updateAAD(aad(sourceId, "data"))
+        }
+        val encrypted = cipher.doFinal(plain)
+        val blob = ByteArray(cipher.iv.size + encrypted.size)
+        cipher.iv.copyInto(blob)
+        encrypted.copyInto(blob, cipher.iv.size)
+        check(preferences.edit().putString(dataPreferenceKey(sourceId), Base64.encodeToString(blob, Base64.NO_WRAP)).commit()) {
+            "Could not save source session data."
+        }
+    }
+
     @SuppressLint("ApplySharedPref")
     @Synchronized
     override fun clear(sourceId: SourceId) {
-        check(preferences.edit().remove(preferenceKey(sourceId)).commit()) { "Could not clear source settings." }
+        check(preferences.edit().remove(preferenceKey(sourceId)).remove(dataPreferenceKey(sourceId)).commit()) {
+            "Could not clear source private data."
+        }
+    }
+
+    @Synchronized
+    private fun clearSourceData(sourceId: SourceId) {
+        check(preferences.edit().remove(dataPreferenceKey(sourceId)).commit()) { "Could not clear source session data." }
     }
 
     private fun preferenceKey(sourceId: SourceId): String = "source_${
@@ -93,7 +143,33 @@ class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSetting
             .joinToString("") { "%02x".format(it) }
     }"
 
-    private fun aad(sourceId: SourceId) = "venera-native-source-settings-v1:${sourceId.value}".toByteArray(Charsets.UTF_8)
+    private fun dataPreferenceKey(sourceId: SourceId): String = preferenceKey(sourceId) + "_data"
+
+    private fun aad(sourceId: SourceId, purpose: String = "settings") =
+        "venera-native-source-$purpose-v1:${sourceId.value}".toByteArray(Charsets.UTF_8)
+
+    private fun sanitizeSourceData(dataJson: String): String {
+        val objectValue = org.json.JSONTokener(dataJson).nextValue() as? JSONObject
+            ?: throw IllegalArgumentException("Source data must be a JSON object.")
+        fun sanitize(value: Any): Any = when (value) {
+            is JSONObject -> JSONObject().also { output ->
+                val keys = value.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    if (!SENSITIVE_KEY.containsMatchIn(key)) output.put(key, sanitize(value.get(key)))
+                }
+            }
+            is org.json.JSONArray -> org.json.JSONArray().also { output ->
+                for (index in 0 until value.length()) output.put(sanitize(value.get(index)))
+            }
+            else -> value
+        }
+        val sanitized = sanitize(objectValue).toString()
+        require(sanitized.toByteArray(Charsets.UTF_8).size <= MAX_SOURCE_DATA_BYTES) {
+            "Source session data exceeded the allowed size."
+        }
+        return sanitized
+    }
 
     private fun loadOrCreateKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -117,6 +193,8 @@ class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSetting
         const val TRANSFORMATION = "AES/GCM/NoPadding"
         const val TAG_BITS = 128
         const val NONCE_BYTES = 12
+        const val MAX_SOURCE_DATA_BYTES = 256 * 1024
         val SETTING_KEY = Regex("^[A-Za-z0-9_.-]{1,80}$")
+        val SENSITIVE_KEY = Regex("password|passwd|pwd", RegexOption.IGNORE_CASE)
     }
 }

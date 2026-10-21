@@ -57,10 +57,11 @@ class EngineSourceCore(
     private val chapterLoadTimeoutMillis: Long = DEFAULT_CHAPTER_LOAD_TIMEOUT_MILLIS,
     private val onCallFailure: (SourceId, String, String) -> Unit = { _, _, _ -> },
     waitBeforeRetry: suspend (Int) -> Unit = { kotlinx.coroutines.delay(it * 500L) },
+    onSourceDataChanged: suspend (SourceId, String) -> Unit = { _, _ -> },
 ) : SourceCore {
 
     private val sequence = AtomicLong(0)
-    private val executor = SourceCallExecutor(runtime, waitBeforeRetry)
+    private val executor = SourceCallExecutor(runtime, waitBeforeRetry, onSourceDataChanged = onSourceDataChanged)
 
     override suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String): SourceOutcome<TagNavigation?> {
         val description = when (val result = describe(comicKey.sourceId)) {

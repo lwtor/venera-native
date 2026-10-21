@@ -150,6 +150,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val comicSourceNamesState = kotlinx.coroutines.flow.MutableStateFlow<Map<String, String>>(emptyMap())
     val comicSourceNames: kotlinx.coroutines.flow.StateFlow<Map<String, String>> = comicSourceNamesState
     private val sourcePackageStore = SourcePackageStore(File(getApplication<android.app.Application>().filesDir, "sources"))
+    private val sourcePrivateSettings = AndroidSourcePrivateSettingsStore(getApplication())
     private fun refreshComicSourceNames() {
         comicSourceNamesState.value = sourcePackageStore.list().associate { it.sourceId.value to it.name }
     }
@@ -158,7 +159,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         runtime,
         QuickJsMetadataReader(),
         AndroidSourceScriptFetcher(getApplication(), httpClient),
-        privateSettings = AndroidSourcePrivateSettingsStore(getApplication()),
+        privateSettings = sourcePrivateSettings,
         onSourceChanged = { network.clearSource(it); scope.launch { refreshComicSourceNames() } },
     )
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
@@ -166,7 +167,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         sourceRepository,
         EngineSourceCore(runtime, onCallFailure = { source, member, error ->
             android.util.Log.w("VeneraSource", "Source call failed: source=${source.value} member=$member error=$error")
-        }),
+        }, onSourceDataChanged = sourcePrivateSettings::writeSourceData),
         onDiscoveryTiming = { sourceCount, installMillis, capabilityMillis ->
             localSearchStartupLog?.append(
                 "stage=source_discovery sources=$sourceCount installedMs=$installMillis capabilitiesMs=$capabilityMillis",

@@ -298,8 +298,8 @@ class DefaultSourceRepository(
         )
     }
 
-    private suspend fun invokeInternal(sourceId: SourceId, member: String, argumentsJson: String = "[]"): SourceResult =
-        runtime.invoke(
+    private suspend fun invokeInternal(sourceId: SourceId, member: String, argumentsJson: String = "[]"): SourceResult {
+        val result = runtime.invoke(
             SourceCall.InvokeFunction(
                 callId = "source-management-${sourceCallSequence.incrementAndGet()}",
                 sourceId = sourceId,
@@ -307,6 +307,9 @@ class DefaultSourceRepository(
                 argumentsJson = argumentsJson,
             ),
         )
+        if (result is SourceResult.Success) result.sourceDataJson?.let { privateSettings.writeSourceData(sourceId, it) }
+        return result
+    }
 
     private fun validSettingValue(
         type: dev.veneranative.core.model.SourceSettingDefinition.Type,
@@ -336,6 +339,7 @@ class DefaultSourceRepository(
         script = script,
         sha256 = sha256,
         settingsJson = privateSettings.read(installed.sourceId).toJsonObject(),
+        sourceDataJson = privateSettings.readSourceData(installed.sourceId),
     )
 
     private companion object {

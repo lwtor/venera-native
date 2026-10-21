@@ -4,6 +4,10 @@
 
 ## 状态快照
 
+**S3-02A2 DONE：保存来源登录会话，进程重启后恢复。** 原因是 `ComicSource.saveData` 只更新 QuickJS 闭包内存。现在每次成功的来源调用都会导出来源 data 快照，通过统一 SourceCallExecutor 交给 host；QuickJS 重建时恢复快照，来源管理登录状态通过 `isLogged` 读取恢复后的 token。数据按来源使用 Android Keystore AES-GCM 加密持久化，账号密码始终只作为本次调用参数，导出时递归排除 `password`/`passwd`/`pwd` 命名字段；取消来源会一并清理其设置和 session data。纯 QuickJS 回归模拟进程重建，验证 token 恢复且密码字段被剔除。版本从 1.2.0 升至 1.2.1 / versionCode 1002001。
+
+验证（2026-10-21）：JDK 17 `:app:assembleDebug :source:engine:testDebugUnitTest :source:core:testDebugUnitTest :data:source:testDebugUnitTest :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；覆盖恢复后登录态、密码字段过滤及统一执行器持久化回调；`git diff --check` — PASS。未做设备 Keystore instrumentation 或真机进程杀停复验；Keystore 不可用/写入失败时该来源调用会报告失败，不会假装登录状态已保存。当前唯一下一任务为 S3-03A1：来源 cookie 登录与过期校验。
+
 **S3-02A1 DONE：已安装来源设置、回调与账号密码登录入口。** 对照 Venera 来源声明，在来源管理“已安装”列表行增加设置入口，按源声明呈现 input/select/switch/callback；支持声明的账号密码登录、退出登录与注册页入口。配置按来源隔离并使用 Android Keystore 加密本地持久化；账号密码只随登录调用传递，不写入磁盘。登录结果原先只更新了页面底层 `message`，被仍打开的设置对话框遮住；现将成功/失败提示显示在对话框内，并用成功/错误容器区分。运行时 token 不持久化，进程重启后需重新登录；设置变更会重新加载来源，也可能要求重新登录。版本从 1.1.3 升至 1.2.0 / versionCode 1002000。
 
 验证（2026-10-21）：JDK 17 `:app:assembleDebug :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；ViewModel 回归覆盖登录成功与失败反馈；`git diff --check` — PASS。未安装或真机验证；实际来源登录表单与会话状态待用户复验。设置加密与凭据不落盘策略见 ADR-0016。当前唯一下一任务为 S3-02A2：为设置持久化和来源调用增加存储/运行时回归，再继续 Cookie 导入能力。

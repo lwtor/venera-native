@@ -47,7 +47,8 @@ class SourceInvocationScriptTest {
         assertTrue(invocation.contains("fn.apply(target, args)"))
         assertTrue(invocation.contains("JSON.parse("))
         assertTrue(invocation.contains("Promise.resolve("))
-        assertTrue(invocation.contains("JSON.stringify({ value:"))
+        assertTrue(invocation.contains("sourceData: sourceInstance"))
+        assertTrue(invocation.contains("JSON.stringify({"))
         assertTrue(invocation.contains("__veneraInvocationId"))
         assertFalse(invocation.contains("""globalThis["search.load"]"""))
     }

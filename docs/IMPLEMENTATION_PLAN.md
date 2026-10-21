@@ -546,7 +546,13 @@ S3-02 小任务：
 | ID | 交付 | 状态 |
 | --- | --- | --- |
 | S3-02A1 | 已安装来源设置面板：按来源声明呈现 input/select/switch/callback；支持声明的账号密码登录、退出及注册页；设置按来源隔离加密，密码不持久化；登录/设置操作在仍打开的弹窗内明确反馈成功或失败 | DONE（`:app:assembleDebug :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；登录反馈 ViewModel 回归通过编译并执行；`git diff --check` — PASS。未真机验证；会话 token 不持久化，进程重启需重新登录） |
-| S3-02A2 | 为来源配置加密存储、设置更新重载及登录/退出调用增加存储和 runtime 合成回归；核对异常、来源隔离及重启后的会话行为 | TODO |
+| S3-02A2 | 将来源 `saveData` 会话快照按源用 Keystore 加密持久化；统一调用成功后导出，QuickJS 重建时恢复；密码类字段过滤，移除来源时清理；验证 token 可跨 runtime 重建恢复 | DONE（`:app:assembleDebug :source:engine:testDebugUnitTest :source:core:testDebugUnitTest :data:source:testDebugUnitTest :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；覆盖 QuickJS 重建、密码过滤及执行器持久化回调；`git diff --check` — PASS。设备 Keystore 和进程杀停复验待用户执行） |
+
+S3-03 小任务：
+
+| ID | 交付 | 状态 |
+| --- | --- | --- |
+| S3-03A1 | 支持来源声明的 cookie 字段录入与校验，按源加密保存；登录过期反馈与会话清理有回归 | TODO |
 
 S3-01 小任务：
 
