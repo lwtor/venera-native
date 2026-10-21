@@ -56,6 +56,7 @@ class EngineSourceCore(
     private val timeoutMillis: Long = DEFAULT_SOURCE_OPERATION_TIMEOUT_MILLIS,
     private val chapterLoadTimeoutMillis: Long = DEFAULT_CHAPTER_LOAD_TIMEOUT_MILLIS,
     private val onCallFailure: (SourceId, String, String) -> Unit = { _, _, _ -> },
+    private val includeComicIdsInFailureDiagnostics: Boolean = false,
     waitBeforeRetry: suspend (Int) -> Unit = { kotlinx.coroutines.delay(it * 500L) },
     onSourceDataChanged: suspend (SourceId, String) -> Unit = { _, _ -> },
 ) : SourceCore {
@@ -246,7 +247,16 @@ class EngineSourceCore(
             return SourceOutcome.unsupported(SourceCapability.DETAIL)
         }
 
-        return when (val payload = invoke(comicKey.sourceId, SourceProtocol.loadInfo(comicKey))) {
+        val diagnosticContext = if (includeComicIdsInFailureDiagnostics && comicKey.sourceId.value == "zaimanhua") {
+            "comicId=${comicKey.remoteId.value}"
+        } else {
+            null
+        }
+        return when (val payload = invoke(
+            comicKey.sourceId,
+            SourceProtocol.loadInfo(comicKey),
+            diagnosticContext = diagnosticContext,
+        )) {
             is SourceOutcome.Failure -> payload
 
             is SourceOutcome.Success ->
@@ -412,7 +422,11 @@ class EngineSourceCore(
         }
     }
 
-    private suspend fun invoke(sourceId: SourceId, call: SourceProtocolCall): SourceOutcome<String> {
+    private suspend fun invoke(
+        sourceId: SourceId,
+        call: SourceProtocolCall,
+        diagnosticContext: String? = null,
+    ): SourceOutcome<String> {
         val result =
             executor.execute(call.operationKind) {
                 SourceCall.InvokeFunction(
@@ -439,7 +453,7 @@ class EngineSourceCore(
                         onCallFailure(
                             sourceId,
                             call.member,
-                            result.error.diagnosticSummary(),
+                            listOfNotNull(diagnosticContext, result.error.diagnosticSummary()).joinToString("; "),
                         )
                     }
                 }

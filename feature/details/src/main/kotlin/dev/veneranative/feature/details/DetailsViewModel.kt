@@ -560,7 +560,7 @@ internal fun SourceRuntimeError.toDetailsMessage(): String = when (this) {
         listOf("not found", "does not exist", "已被删除", "不存在")
             .any(message.lowercase()::contains)
     ) {
-        "该漫画可能已下架或被来源删除，请尝试刷新来源后再打开。"
+        "漫画源暂时无法加载这部作品，请稍后重试。"
     } else {
         "漫画源暂时无法响应。"
     }

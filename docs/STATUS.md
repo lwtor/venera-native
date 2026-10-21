@@ -4,9 +4,11 @@
 
 ## 状态快照
 
-**S3-02A4 DONE：修正再漫画详情的失效作品错误处理。** 真机诊断确认 `comic.loadInfo` 的详情 API 返回 HTTP 200，但业务错误为“漫画不存在或已被删除”；这类确定性错误此前被统一入口当作可重试脚本异常，最多重复请求三次，最终又显示为泛化的“漫画源暂时无法响应”。现在对明确的不存在/删除错误停止自动重试，并向用户提示作品可能已下架；临时错误的统一重试保持不变。版本升至 1.2.4 / versionCode 1002004。
+**S3-02A5 IN_PROGRESS：确认再漫画多个作品详情失败的共同原因。** 之前从单次 HTTP 200 的“漫画不存在”响应推断作品已下架，结论过早。公开站点目前可通过再漫画旧详情接口成功读取五个当前列表作品；因此 App 实际传入的 ID 或请求上下文仍待核实。Debug 构建为详情失败诊断增加来源作品 ID（不含 URL、请求头或正文），供下一次设备复现比对。版本升至 1.2.5 / versionCode 1002005。
 
-验证（2026-10-21）：`:source:core:testDebugUnitTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。设备原为 1.2.3，已用 `adb install -r` 覆盖到 1.2.4 并启动，未清除数据或卸载；详情页交互尚待用户在同一作品上复验。当前唯一下一任务为 S3-03A1：来源声明的 Cookie 输入与过期校验。
+**S3-02A4 DONE：确定性详情错误不再重复请求并改用中性提示。** 已识别“not found/不存在/已被删除”来源异常为不可恢复的本次内容错误，避免无效重试；用户提示不再断言作品已下架。详情临时故障重试保持不变。1.2.4 已在设备覆盖安装，但未解决用户反馈的多作品问题。
+
+验证（2026-10-21）：A4 的 `:source:core:testDebugUnitTest :feature:details:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。A5 验证待执行。当前唯一下一任务为 S3-02A5：通过 Debug 诊断记录的 ID 核对列表与详情请求。
 
 **S3-02A3 DONE：来源会话存储故障不再阻断漫画详情和搜索。** 详情/搜索等 READ 请求即使已成功获取漫画数据，后续来源会话快照因大小上限或 Keystore 写入失败，也继续返回该漫画数据；登录等 WRITE 操作仍将持久化失败反馈给调用者。增加读写差异回归。版本从 1.2.1 升至 1.2.2 / versionCode 1002002。
 

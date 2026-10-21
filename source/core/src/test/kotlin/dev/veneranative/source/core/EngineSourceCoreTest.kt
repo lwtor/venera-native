@@ -50,6 +50,31 @@ class EngineSourceCoreTest {
         assertTrue(!summary.contains("abc"))
     }
 
+    @Test fun `zaimanhua detail failure diagnostics include only the public comic ID in debug mode`() = runBlocking {
+        val id = SourceId("zaimanhua")
+        val runtime = QuickJsRuntime()
+        val failures = mutableListOf<String>()
+        try {
+            val script = """
+                class ZaimanhuaFixture extends ComicSource {
+                  constructor() { super(); this.name = "再漫画测试"; this.key = "zaimanhua"; this.version = "1"; }
+                  comic = { loadInfo: async () => { throw new Error("not found"); } };
+                }
+            """.trimIndent()
+            assertTrue(runtime.install(SourcePackage(id, "1", script, sha256(script))) is SourceInstallResult.Installed)
+            val core = EngineSourceCore(
+                runtime,
+                onCallFailure = { _, _, error -> failures += error },
+                includeComicIdsInFailureDiagnostics = true,
+            )
+            core.detail(ComicKey(id, RemoteComicId("comic-123")))
+
+            assertTrue(failures.any { it.startsWith("comicId=comic-123;") })
+        } finally {
+            runtime.close()
+        }
+    }
+
     @Test fun `author callback receives original namespace and value without fallback`() = runBlocking {
         withCore(source("""
             comic = { onClickTag: (namespace, tag) => namespace === "作者" ? { action: "search", keyword: namespace + ":" + tag } : null };

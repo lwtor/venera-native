@@ -57,9 +57,9 @@ import kotlinx.coroutines.test.runCurrent
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailsViewModelTest {
-    @Test fun `permanent missing comic error is explained instead of looking like source timeout`() {
+    @Test fun `source content errors do not claim a comic was deleted without confirmation`() {
         assertEquals(
-            "该漫画可能已下架或被来源删除，请尝试刷新来源后再打开。",
+            "漫画源暂时无法加载这部作品，请稍后重试。",
             SourceRuntimeError.ScriptExecution("漫画不存在或已被删除").toDetailsMessage(),
         )
     }
