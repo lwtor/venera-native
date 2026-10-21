@@ -1,6 +1,7 @@
 package dev.veneranative.app
 
 import dev.veneranative.core.image.ComicImageAuthProvider
+import dev.veneranative.core.image.ComicImageSourceDefaults
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.source.network.PerSourceCookieJarRegistry
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -23,11 +24,13 @@ class SourceCookieImageAuth(
 ) : ComicImageAuthProvider {
 
     override fun headersFor(sourceId: SourceId?, url: String): Map<String, String> {
-        val target = sourceId ?: return emptyMap()
-        val httpUrl = url.toHttpUrlOrNull() ?: return emptyMap()
+        val headers = ComicImageSourceDefaults.headersFor(sourceId).toMutableMap()
+        val target = sourceId ?: return headers
+        val httpUrl = url.toHttpUrlOrNull() ?: return headers
         val cookies = cookieJars.forSource(target).loadForRequest(httpUrl)
-        if (cookies.isEmpty()) return emptyMap()
-        val header = cookies.joinToString(separator = "; ") { cookie -> "${cookie.name}=${cookie.value}" }
-        return mapOf("Cookie" to header)
+        if (cookies.isNotEmpty()) {
+            headers["Cookie"] = cookies.joinToString(separator = "; ") { cookie -> "${cookie.name}=${cookie.value}" }
+        }
+        return headers
     }
 }

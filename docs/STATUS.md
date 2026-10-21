@@ -6,6 +6,8 @@
 
 **S3-08A DONE：修复爱看漫源因缺少 `HtmlDocument` 全局导致的搜索失败。** 在 QuickJS 中加入同步、只传递 JSON 值的 DOM 桥接，以 Jsoup 解析 HTML 并执行 CSS Selector；提供 `querySelector`/`querySelectorAll`、元素 `.text`/`.attributes`、子节点与常用元素属性。每次来源调用限制 HTML 总体积为 1 MiB、DOM 元素数为 25,000，并在调用结束释放文档；不向脚本暴露 Jsoup/Java 对象或新增网络能力。增加端到端来源脚本 fixture 覆盖爱看漫列表的嵌套 CSS 选择与作品字段提取。版本升至 1.2.6 / versionCode 1002006。**下一唯一任务仍为 S3-02A5**：核实再漫画详情请求 ID。
 
+**S3-08B DONE：修复爱看漫封面请求缺少来源缩略图请求头。** 设备复现确认列表/详情通用封面请求不带爱看漫 `thumbConfig` 中的站点 Referer 和浏览器头，图片加载因此落入失败占位；现将其用于该源所有漫画图片请求，并保留各源 Cookie 注入。增加来源隔离回归，版本升至 1.2.7 / versionCode 1002007。验证（2026-10-21）：JDK 17 `:core:image:testDebugUnitTest --tests dev.veneranative.core.image.ComicImageSourceDefaultsTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。向设备覆盖安装 1.2.7 时返回 `INSTALL_FAILED_ABORTED: User rejected permissions`，未确认设备实际图片加载。当前唯一下一任务仍为 S3-02A5：核实再漫画详情请求 ID。
+
 验证（2026-10-21）：JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL。覆盖安装及爱看漫实际联网复验待执行；依赖与 APK 许可清单已同步新增 Jsoup 1.23.2 MIT 许可。
 
 **S3-02A5 IN_PROGRESS：确认再漫画多个作品详情失败的共同原因。** 之前从单次 HTTP 200 的“漫画不存在”响应推断作品已下架，结论过早。公开站点目前可通过再漫画旧详情接口成功读取五个当前列表作品；因此 App 实际传入的 ID 或请求上下文仍待核实。Debug 构建为详情失败诊断增加来源作品 ID（不含 URL、请求头或正文），供下一次设备复现比对。版本升至 1.2.5 / versionCode 1002005。

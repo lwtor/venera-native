@@ -284,6 +284,10 @@ Picacg failure triage needs transport stage and HTTP status to distinguish a sou
 
 The installed upstream `ikmmh` (爱看漫) source calls `new HtmlDocument(html)` in search, category, favorite, detail, and reader flows. The runtime had no HTML parser global, so the first such call failed before site results could be parsed. Add a QuickJS-local synchronous binding backed by Jsoup 1.23.2 (MIT); scripts receive only JSON strings and plain JS wrappers for selectors, text, attributes, and common element navigation. The DOM parser is local and introduces no network capability or arbitrary Java/context exposure. A per-invocation budget caps aggregate source HTML at 1 MiB and parsed elements at 25,000; invocation cleanup releases document and element references after result serialization. Regression uses a small synthetic search-card fixture and never fetches commercial site content or includes the source script in the repository. The official source API contract documents `HtmlDocument` and CSS selectors at https://github.com/venera-app/venera/blob/master/doc/js_api.md; the source is distributed separately by venera-configs.
 
+### 4.21 爱看漫封面沿用来源 thumbConfig 请求头（2026-10-21，S3-08B）
+
+设备复现中爱看漫详情及列表的图片均显示失败占位。已安装来源脚本的 `comic.thumbConfig(url)` 为图片请求附带站点 Referer、移动浏览器 User-Agent 与相关浏览器头；普通漫画封面组件此前只传 URL，未执行该配置。应用图片请求适配器现在为 `ikmmh` 来源加入与其 `thumbConfig` 一致的默认头，并继续从来源 Cookie Jar 获取 Cookie；其他来源不继承这些头。后续若把来源可配置的 `thumbConfig` 扩展为通用能力，应替换固定来源默认值而非叠加两套配置。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |
