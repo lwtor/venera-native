@@ -132,6 +132,7 @@ Generated from Gradle resolved component identifiers for `:app:releaseRuntimeCla
 | `com.google.j2objc:j2objc-annotations` | 2.8 | Apache-2.0 | Maven POM |
 | `com.squareup.okhttp3:okhttp-android` | 5.5.0 | Apache-2.0 | Maven POM |
 | `com.squareup.okhttp3:okhttp` | 5.5.0 | Apache-2.0 | Maven POM |
+| `com.squareup.okhttp3:okhttp-dnsoverhttps` | 5.5.0 | Apache-2.0 | Maven POM |
 | `com.squareup.okio:okio-jvm` | 3.18.1 | Apache-2.0 | Maven POM |
 | `com.squareup.okio:okio` | 3.18.1 | Apache-2.0 | Maven POM |
 | `commons-codec:commons-codec` | 1.19.0 | Apache-2.0 | upstream project license; POM metadata omitted |

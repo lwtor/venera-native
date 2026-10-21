@@ -4,6 +4,8 @@
 
 ## 状态快照
 
+**S3-08C DONE：修复爱看漫搜索域名 DNS 解析到不可达地址。** 真机日志确认 `www.ikmmh.com` 被系统 DNS 解析到不可达 IP，导致搜索请求 `ENETUNREACH`。在来源网络层仅为爱看漫两个站点主机增加 Google DNS-over-HTTPS 解析优先、系统 DNS 兜底；DNS 查询只含主机名，保留请求 HTTPS、证书校验、代理和其他来源原解析。版本升至 1.2.8 / versionCode 1002008。验证：`:source:network:testDebugUnitTest --tests dev.veneranative.source.network.IkmhDnsFallbackTest :app:assembleDebug` — BUILD SUCCESSFUL；在已连接设备保留数据覆盖安装 1.2.8 后，爱看漫单源“火影”搜索显示结果，日志无连接失败；`git diff --check` — PASS。**下一唯一任务仍为 S3-02A5**：核实再漫画详情请求 ID。
+
 **S3-08A DONE：修复爱看漫源因缺少 `HtmlDocument` 全局导致的搜索失败。** 在 QuickJS 中加入同步、只传递 JSON 值的 DOM 桥接，以 Jsoup 解析 HTML 并执行 CSS Selector；提供 `querySelector`/`querySelectorAll`、元素 `.text`/`.attributes`、子节点与常用元素属性。每次来源调用限制 HTML 总体积为 1 MiB、DOM 元素数为 25,000，并在调用结束释放文档；不向脚本暴露 Jsoup/Java 对象或新增网络能力。增加端到端来源脚本 fixture 覆盖爱看漫列表的嵌套 CSS 选择与作品字段提取。版本升至 1.2.6 / versionCode 1002006。**下一唯一任务仍为 S3-02A5**：核实再漫画详情请求 ID。
 
 **S3-08B DONE：修复爱看漫封面请求缺少来源缩略图请求头。** 设备复现确认列表/详情通用封面请求不带爱看漫 `thumbConfig` 中的站点 Referer 和浏览器头，图片加载因此落入失败占位；现将其用于该源所有漫画图片请求，并保留各源 Cookie 注入。增加来源隔离回归，版本升至 1.2.7 / versionCode 1002007。验证（2026-10-21）：JDK 17 `:core:image:testDebugUnitTest --tests dev.veneranative.core.image.ComicImageSourceDefaultsTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。向设备覆盖安装 1.2.7 时返回 `INSTALL_FAILED_ABORTED: User rejected permissions`，未确认设备实际图片加载。当前唯一下一任务仍为 S3-02A5：核实再漫画详情请求 ID。

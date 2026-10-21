@@ -13,6 +13,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,6 +31,7 @@ class SourceNetworkExecutor(
     private val onRequestFailure: (SourceId, String) -> Unit = { _, _ -> },
     private val diagnosticSourceIds: Set<SourceId> = emptySet(),
     private val onNetworkTrace: (SourceId, String) -> Unit = { _, _ -> },
+    private val ikmhDnsFallback: Dns = IkmhDnsFallback.create(baseClient),
 ) {
     private val clients = ConcurrentHashMap<SourceId, OkHttpClient>()
     private val sourcePermits = ConcurrentHashMap<SourceId, Semaphore>()
@@ -94,6 +96,7 @@ class SourceNetworkExecutor(
     private fun clientFor(sourceId: SourceId): OkHttpClient =
         clients.computeIfAbsent(sourceId) {
             baseClient.newBuilder()
+                .apply { if (sourceId.value == IKM_SOURCE_ID) dns(ikmhDnsFallback) }
                 .cookieJar(cookieJars.forSource(sourceId))
                 .callTimeout(callTimeoutMillis, TimeUnit.MILLISECONDS)
                 .apply {
@@ -224,6 +227,7 @@ class SourceNetworkExecutor(
     }
 
     private companion object {
+        const val IKM_SOURCE_ID = "ikmmh"
         const val DEFAULT_MAX_CONCURRENT_PER_SOURCE = 4
         const val DEFAULT_MAX_RESPONSE_BYTES = 1_048_576L
         const val DEFAULT_CALL_TIMEOUT_MILLIS = 15_000L

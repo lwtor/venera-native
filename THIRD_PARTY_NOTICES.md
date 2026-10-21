@@ -2,7 +2,7 @@
 
 Venera Native is distributed under Apache License 2.0; see [`LICENSE`](LICENSE). The Android release APK includes this notice, the project license, and [`docs/dependency-licenses.md`](docs/dependency-licenses.md), which inventories the resolved `:app:releaseRuntimeClasspath` components and their license evidence.
 
-The report contains 188 resolved runtime components. Maven metadata identifies most licenses; AndroidX, JetBrains Compose, Google, and Apache group artifacts with missing POM license metadata were classified from their upstream project license. The non-Apache runtime notices are reproduced below.
+The report contains 189 resolved runtime components. Maven metadata identifies most licenses; AndroidX, JetBrains Compose, Google, and Apache group artifacts with missing POM license metadata were classified from their upstream project license. The non-Apache runtime notices are reproduced below.
 
 ## QuickJS — MIT License
 

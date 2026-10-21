@@ -66,6 +66,7 @@ quickjs-kt-jvm = { module = "io.github.dokar3:quickjs-kt-jvm", version.ref = "qu
 json = { module = "org.json:json", version.ref = "json" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+okhttp-dnsoverhttps = { module = "com.squareup.okhttp3:okhttp-dnsoverhttps", version.ref = "okhttp" }
 okhttp-jvm = { module = "com.squareup.okhttp3:okhttp-jvm", version.ref = "okhttp" }
 okhttp-mockwebserver = { module = "com.squareup.okhttp3:mockwebserver3", version.ref = "okhttp" }
 androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workmanager" }

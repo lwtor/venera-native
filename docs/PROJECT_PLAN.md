@@ -292,6 +292,7 @@ interface SourceScriptRuntime {
 - 超时、取消、重试和指数退避。
 - 全局及每个来源的并发限制。
 - 可选代理与 DNS 配置。
+- 爱看漫遇到设备 DNS 污染时，以 HTTPS DNS-over-HTTPS 解析其站点域名作为回退；仅发送域名查询，搜索词、路径和 Cookie 仍只交给来源站点。
 - WebView Cookie 同步。
 - 统一错误模型和脱敏网络日志。
 

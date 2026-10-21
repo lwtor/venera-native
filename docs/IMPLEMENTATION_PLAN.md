@@ -547,6 +547,7 @@ S3-08 小任务：
 | --- | --- | --- |
 | S3-08A | QuickJS 提供同步 `HtmlDocument`/CSS Selector 兼容层，支持爱看漫使用的文本、属性和嵌套选择器；输入及每次调用 DOM 资源有上限并在调用结束释放；固定 HTML fixture 回归覆盖搜索卡片解析 | DONE（`:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。真机搜索验收待覆盖安装后复测） |
 | S3-08B | 爱看漫列表和详情封面请求沿用来源 `thumbConfig` 声明的请求头；固定回归验证 Referer 与浏览器请求头仅应用于该源 | DONE（`:core:image:testDebugUnitTest --tests dev.veneranative.core.image.ComicImageSourceDefaultsTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS；设备覆盖安装被系统拒绝，未记录设备视觉复验通过） |
+| S3-08C | 设备 DNS 将爱看漫域名解析到不可达地址时，仅对爱看漫两个站点主机使用 Google DNS-over-HTTPS 回退；固定回归验证来源隔离与解析顺序，并在设备上复测单源搜索 | DONE（`:source:network:testDebugUnitTest --tests dev.veneranative.source.network.IkmhDnsFallbackTest :app:assembleDebug` — BUILD SUCCESSFUL；设备 1.2.8 单源“火影”搜索返回结果；`git diff --check` — PASS） |
 
 S3-02 小任务：
 

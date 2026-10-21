@@ -21,6 +21,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
+    implementation(libs.okhttp.dnsoverhttps)
 
     testImplementation(libs.okhttp.mockwebserver)
     testRuntimeOnly(libs.okhttp.jvm)

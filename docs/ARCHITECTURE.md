@@ -79,7 +79,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |
 | `:source:engine` | QuickJS 主运行时、受控 Host binding，以及待移除的 AndroidX JavaScriptEngine 兼容实现 | `:source:api`、受控 Host API |
-| `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略 | `:source:api`、`:core:network`、`:core:model` |
+| `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略；仅爱看漫站点使用 Google DNS-over-HTTPS 回退 | `:source:api`、`:core:network`、`:core:model`、OkHttp DNS-over-HTTPS |
 
 表中“职责”是边界，不表示功能已经完成；当前处于 Stage 2，已落地范围见 `docs/STATUS.md`。
 
@@ -333,6 +333,8 @@ S3-00Y1 的源重试在 Y2 收拢到 source/core 的 SourceCallExecutor；Engine
 避免来源图片因 Cookie/Referer 不一致而无法保存。Application 同时安装 `DownloadEnvironment`，所以 WorkManager
 在没有 Activity 的冷启动进程里也能创建 Repository 和下载器。`AppGraph` 只关闭本图拥有的 Runtime 与内存缓存，
 不关闭仍可能被后台 Worker 使用的网络和图片资源。WorkManager 前台服务类型在 App Manifest 与 API 34+ 权限中声明。
+
+爱看漫来源的 `www.ikmmh.com` 和 `ikmmh.com` 使用 Google DNS-over-HTTPS 结果优先、系统 DNS 结果兜底，以处理设备 DNS 返回不可达地址的问题。该查询只包含主机名，不包含来源请求路径、搜索词、Cookie 或其他用户输入；DoH 沿用应用代理并正常验证 HTTPS 证书，其他来源继续使用系统 DNS。
 
 ### Stage 1 质量整改：依赖生命周期
 

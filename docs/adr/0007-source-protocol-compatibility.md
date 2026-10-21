@@ -288,6 +288,10 @@ The installed upstream `ikmmh` (爱看漫) source calls `new HtmlDocument(html)`
 
 设备复现中爱看漫详情及列表的图片均显示失败占位。已安装来源脚本的 `comic.thumbConfig(url)` 为图片请求附带站点 Referer、移动浏览器 User-Agent 与相关浏览器头；普通漫画封面组件此前只传 URL，未执行该配置。应用图片请求适配器现在为 `ikmmh` 来源加入与其 `thumbConfig` 一致的默认头，并继续从来源 Cookie Jar 获取 Cookie；其他来源不继承这些头。后续若把来源可配置的 `thumbConfig` 扩展为通用能力，应替换固定来源默认值而非叠加两套配置。
 
+### 4.22 爱看漫站点域名使用 DNS-over-HTTPS 回退（2026-10-21，S3-08C）
+
+真机复现搜索失败时，系统 DNS 将 `www.ikmmh.com` 解析到 `185.13.108.51`，该地址在设备网络上对 80/443 端口均返回 `Network is unreachable`；设备直连当前公开解析记录中的站点地址可建立 TCP 连接。普通 OkHttp 系统解析会重复命中不可达地址。为 `ikmmh` 来源的 `www.ikmmh.com` 和 `ikmmh.com` 增加 Google DNS-over-HTTPS 查询，并将其返回地址排在系统 DNS 地址前；如果 DoH 失败仍回退系统结果。DoH 客户端沿用应用代理并使用标准 TLS 证书校验，不改写站点协议或 URL，不记录/发送搜索词、路径、Cookie 或用户输入。其他来源不使用此解析器。固定测试验证来源和主机隔离；在真机 1.2.8 上以爱看漫单源搜索“火影”确认返回结果。
+
 ## 5. 替代方案
 
 | 方案 | 结论 |
