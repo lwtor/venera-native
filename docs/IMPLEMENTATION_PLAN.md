@@ -656,6 +656,8 @@ S4-10A18 — DONE：移除漫画更新检查结束后强制保存封面的调用
 
 S4-10A19 — DONE：补齐 Picacg 签名请求依赖的 `createUuid()` QuickJS 全局函数，并以版本 4 UUID 合成回归锁定兼容行为；`:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL；版本升至 1.1.2 / versionCode 1001002；真机复验待用户。
 
+S4-10A20 — IN_PROGRESS：设备复现仍为 ScriptExecution；当前网络阶段诊断只覆盖 Komiic。Debug 构建为 Picacg 启用不含 URL/headers/body 的 HTTP 阶段追踪，以区分请求前脚本异常、服务端状态和连接故障；版本升至 1.1.3 / versionCode 1001003。待设备复现日志后定位根因。
+
 S4-10A15 — DONE：允许在来源更新快照缺少 latestChapterId 时，仍按当前阅读版本目录判断最新章节并清除标识；定向回归、App Debug 编译和差异检查通过，未做真机复验。
 
 S4-10A14 — DONE：更新标识在用户打开当前阅读版本最新章节时清除，不再要求翻到末页；保留阅读旧章节时的标识。三条定向回归、App Debug 编译及差异检查通过，未做真机复验。

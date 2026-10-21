@@ -128,9 +128,11 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val network = SourceNetworkExecutor(
         baseClient = httpClient,
         cookieJars = cookieJars,
-        diagnosticSourceIds = if (debugNetworkTraceEnabled) setOf(SourceId("Komiic")) else emptySet(),
-        onNetworkTrace = { _, message ->
-            localKomiicNetworkLog?.append(message)
+        diagnosticSourceIds = if (debugNetworkTraceEnabled) {
+            setOf(SourceId("Komiic"), SourceId("picacg"))
+        } else emptySet(),
+        onNetworkTrace = { sourceId, message ->
+            if (sourceId == SourceId("Komiic")) localKomiicNetworkLog?.append(message)
             android.util.Log.d("VeneraSourceNet", message)
         },
         onRequestFailure = { source, error ->

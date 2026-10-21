@@ -276,6 +276,10 @@ Search 条目和封面同为 120dp，标题单行，作者最多两行；日期�
 
 核对 venera-configs 当前 Picacg 1.0.6 源，其 `buildHeaders()` 在每次 API 请求前调用全局 `createUuid()` 生成签名 nonce。宿主此前未提供该函数，导致脚本在发出请求前抛出 `ReferenceError`，搜索、详情及其他网络能力均不可用。QuickJS Host 增加纯 JavaScript RFC 4122 version 4 UUID helper，不暴露新的 Host API、Context 或 Java 对象；合成脚本回归验证格式及连续调用的不同值。未将第三方来源脚本、密钥或数据复制进仓库。
 
+### 4.19 Debug source network trace for Picacg（2026-10-21，S4-10A20）
+
+Picacg failure triage needs transport stage and HTTP status to distinguish a source script failure from endpoint rejection or connectivity failure. Enable the existing safe `SourceNetworkTraceListener` for Picacg only in debuggable builds; it records method, host, elapsed stage, HTTP status, and sanitized connection failure, never URL, headers, or body. Keep the persistent local network trace file scoped to Komiic; Picacg trace is logcat-only and disappears with normal system log retention.
+
 ## 5. 替代方案
 
 | 方案 | 结论 |

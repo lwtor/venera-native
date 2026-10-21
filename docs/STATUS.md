@@ -4,6 +4,8 @@
 
 ## 状态快照
 
+**S4-10A20 IN_PROGRESS：为 Picacg 设备复现补安全网络追踪。** 已确认设备安装 App 1.1.2、Picacg 源 1.0.6；logcat 有 `search.load` 的 `ScriptExecution`，但现有网络阶段追踪仅启用 Komiic。完整 Picacg 脚本在隔离 QuickJS 测试环境中可生成签名头并通过模拟的 `search.load`，因此 A19 修复了一个真实缺口，但未解释设备上的剩余错误。Debug 构建现将 Picacg 加入现有安全追踪，仅记方法、主机、阶段、耗时、状态码和已脱敏连接错误；不记 URL、请求头、请求体或响应内容。版本升至 1.1.3 / versionCode 1001003。需要在设备上再次触发 Picacg 搜索后才能判定余下问题。
+
 **S4-10A19 DONE：修复 Picacg 源请求前崩溃。** Picacg 1.0.6 在构造请求签名时调用 `createUuid()` 生成 nonce，宿主之前没有该全局方法，请求因此在联网前失败。QuickJS 兼容层现在提供 RFC 4122 version 4 UUID，新增合成回归覆盖格式及连续调用。依据逐提交版本协议递增至 1.1.2 / versionCode 1001002。实现细节记录于 ADR-0007 §4.18。
 
 验证（2026-10-21）：JDK 17 `:source:engine:testDebugUnitTest --tests dev.veneranative.source.engine.QuickJsRuntimeTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。已验证脚本级 UUID 签名 nonce 兼容，真机访问 Picacg 尚待用户复验。当前唯一下一任务保持 S4-02G4。
