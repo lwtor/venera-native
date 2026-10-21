@@ -123,6 +123,10 @@ internal object SourceBaseScript {
             }
 
             loadSetting(key) {
+              try {
+                var overrides = JSON.parse(globalThis.__veneraSettingsJson || "{}");
+                if (Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key];
+              } catch (_) {}
               var settings = this.settings;
               if (settings && typeof settings === "object") {
                 var declared = settings[key];
@@ -140,8 +144,10 @@ internal object SourceBaseScript {
             }
 
             get isLogged() {
-              return false;
+              return !!(data.token || data.account);
             }
+
+            __veneraIsLogged() { return !!this.isLogged; }
 
             translate(key) {
               var app = globalThis.APP;

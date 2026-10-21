@@ -152,6 +152,15 @@ fun SourcesScreen(
             dismissButton = { TextButton(onClick = { pendingUninstall = null }) { Text("取消") } },
         )
     }
+
+    state.configuration?.let { configuration ->
+        SourceConfigurationDialog(
+            configuration = configuration,
+            state = state,
+            onAction = onAction,
+            onDismiss = { onAction(SourcesAction.CloseConfiguration) },
+        )
+    }
 }
 
 @Composable
@@ -257,6 +266,7 @@ private fun InstalledContent(
                         busy = source.sourceId in state.busySourceIds,
                         onEnabledChange = { enabled -> onAction(SourcesAction.SetEnabled(source.sourceId, enabled)) },
                         onUninstall = { onUninstall(source) },
+                        onConfigure = { onAction(SourcesAction.OpenConfiguration(source.sourceId)) },
                     )
                 }
             }
@@ -321,6 +331,7 @@ private fun SourceRow(
     busy: Boolean,
     onEnabledChange: (Boolean) -> Unit,
     onUninstall: () -> Unit,
+    onConfigure: () -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -334,6 +345,7 @@ private fun SourceRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(source.origin, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                TextButton(onClick = onConfigure, enabled = !busy) { Text("设置") }
                 TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
             }
         }

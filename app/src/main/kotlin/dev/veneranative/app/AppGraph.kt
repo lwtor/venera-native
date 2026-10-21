@@ -69,6 +69,7 @@ import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
 import dev.veneranative.data.source.HttpSourceCatalogRepository
 import dev.veneranative.data.source.SourcePackageStore
+import dev.veneranative.data.source.AndroidSourcePrivateSettingsStore
 import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
 import dev.veneranative.feature.home.HomeRoute
@@ -157,6 +158,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         runtime,
         QuickJsMetadataReader(),
         AndroidSourceScriptFetcher(getApplication(), httpClient),
+        privateSettings = AndroidSourcePrivateSettingsStore(getApplication()),
         onSourceChanged = { network.clearSource(it); scope.launch { refreshComicSourceNames() } },
     )
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)

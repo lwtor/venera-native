@@ -333,6 +333,7 @@ class QuickJsRuntime(
                         hostApi = hostApi,
                         appLocale = appLocale,
                         appVersion = appVersion,
+                        sourceSettingsJson = source.settingsJson,
                         logSink = logSink,
                     )
                 bridge.install(engine)

@@ -541,6 +541,13 @@ S3-00 在扩展实现前冻结上游基线。后续任务按该基线维护功�
 | S3-07 | 高级图片处理 | 二进制变换、解密允许边界、缓存语义；固定 fixture 与超限/失败测试 | S3-00 | TODO |
 | S3-08 | 兼容矩阵与调试工具 | Source Contract Suite、脱敏日志、导出诊断；逐项复核 Stage 3 对照差距 | S3-01 至 S3-07 | TODO |
 
+S3-02 小任务：
+
+| ID | 交付 | 状态 |
+| --- | --- | --- |
+| S3-02A1 | 已安装来源设置面板：按来源声明呈现 input/select/switch/callback；支持声明的账号密码登录、退出及注册页；设置按来源隔离加密，密码不持久化；登录/设置操作在仍打开的弹窗内明确反馈成功或失败 | DONE（`:app:assembleDebug :feature:sources:testDebugUnitTest` — BUILD SUCCESSFUL；登录反馈 ViewModel 回归通过编译并执行；`git diff --check` — PASS。未真机验证；会话 token 不持久化，进程重启需重新登录） |
+| S3-02A2 | 为来源配置加密存储、设置更新重载及登录/退出调用增加存储和 runtime 合成回归；核对异常、来源隔离及重启后的会话行为 | TODO |
+
 S3-01 小任务：
 
 | ID | 交付 | 状态 |

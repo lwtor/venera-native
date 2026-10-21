@@ -28,6 +28,7 @@ internal class QuickJsHostBridge(
     private val hostApi: SourceHostApi?,
     appLocale: String,
     appVersion: String,
+    sourceSettingsJson: String = "{}",
     private val maxMessageBytes: Int = DEFAULT_MAX_MESSAGE_BYTES,
     private val maxLogChars: Int = DEFAULT_MAX_LOG_CHARS,
     private val logSink: (String, String) -> Unit = DEFAULT_LOG_SINK,
@@ -36,6 +37,7 @@ internal class QuickJsHostBridge(
     private val bootstrapScript = QuickJsHostScript.bootstrap(
         appLocale = appLocale,
         appVersion = appVersion,
+        sourceSettingsJson = sourceSettingsJson,
         maxLogChars = maxLogChars,
     )
 

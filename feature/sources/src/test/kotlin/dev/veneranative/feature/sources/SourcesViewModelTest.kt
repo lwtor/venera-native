@@ -8,6 +8,7 @@ import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
+import dev.veneranative.data.source.SourceLoginOutcome
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -166,6 +167,32 @@ class SourcesViewModelTest {
     }
 
     @Test
+    fun `login success is reported while the configuration remains open`() = runTest(dispatcher) {
+        repository.loginOutcome = SourceLoginOutcome.Success
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(SourcesAction.Login(SourceId("a"), "reader", "secret"))
+        advanceUntilIdle()
+
+        assertEquals("登录成功。", viewModel.state.value.message)
+        assertTrue(!viewModel.state.value.accountActionInProgress)
+    }
+
+    @Test
+    fun `login failure is reported while the configuration remains open`() = runTest(dispatcher) {
+        repository.loginOutcome = SourceLoginOutcome.Failed
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(SourcesAction.Login(SourceId("a"), "reader", "wrong"))
+        advanceUntilIdle()
+
+        assertEquals("登录失败，请检查账号密码或网络。", viewModel.state.value.message)
+        assertTrue(!viewModel.state.value.accountActionInProgress)
+    }
+
+    @Test
     fun `catalog entries load and install by their resolved script URL`() = runTest(dispatcher) {
         val entry = SourceCatalogEntry("MangaDex", "manga_dex", "1.2.0", null, "https://cdn.example/manga_dex.js")
         val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(entry)))
@@ -196,6 +223,7 @@ class SourcesViewModelTest {
         var sources: List<InstalledSource> = emptyList()
         var outcome: InstallOutcome = InstallOutcome.Failure(SourceInstallError.LocationUnreadable)
         var listFailure: Throwable? = null
+        var loginOutcome: SourceLoginOutcome = SourceLoginOutcome.Unsupported
         val installLocations = mutableListOf<String>()
         val enabledChanges = mutableListOf<Pair<SourceId, Boolean>>()
         val uninstalled = mutableListOf<SourceId>()
@@ -223,6 +251,8 @@ class SourcesViewModelTest {
             sources = sources.filterNot { it.sourceId == sourceId }
             return exists
         }
+
+        override suspend fun login(sourceId: SourceId, account: String, password: String) = loginOutcome
     }
 
     private class FakeSourceCatalogRepository(

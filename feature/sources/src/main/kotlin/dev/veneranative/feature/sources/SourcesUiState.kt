@@ -2,6 +2,7 @@ package dev.veneranative.feature.sources
 
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.InstalledSourceConfiguration
 import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 
@@ -19,6 +20,10 @@ data class SourcesUiState(
     val catalogEntries: List<SourceCatalogEntry> = emptyList(),
     val catalogStatus: CatalogStatus = CatalogStatus.Idle,
     val catalogLocation: String = defaultVeneraSourceCatalogUrl(),
+    val configuration: InstalledSourceConfiguration? = null,
+    val configurationLoading: Boolean = false,
+    val accountActionInProgress: Boolean = false,
+    val settingsSaving: Boolean = false,
 ) {
     val isEmpty: Boolean get() = status == SourcesStatus.Ready && sources.isEmpty()
 

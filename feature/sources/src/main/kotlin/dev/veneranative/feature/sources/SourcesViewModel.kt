@@ -54,6 +54,90 @@ class SourcesViewModel(
             SourcesAction.RefreshCatalog -> refreshCatalog()
 
             is SourcesAction.InstallCatalogEntry -> install(action.entry.scriptUrl)
+
+            is SourcesAction.OpenConfiguration -> openConfiguration(action.sourceId)
+
+            SourcesAction.CloseConfiguration -> _state.update { it.copy(configuration = null) }
+
+            is SourcesAction.SaveSettings -> saveSettings(action.sourceId, action.values)
+
+            is SourcesAction.InvokeSettingCallback -> invokeSettingCallback(action.sourceId, action.key)
+
+            is SourcesAction.Login -> login(action.sourceId, action.account, action.password)
+
+            is SourcesAction.Logout -> logout(action.sourceId)
+        }
+    }
+
+    private fun openConfiguration(sourceId: SourceId) {
+        if (_state.value.configurationLoading) return
+        _state.update { it.copy(configurationLoading = true, message = null) }
+        viewModelScope.launch {
+            val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
+            _state.update {
+                it.copy(
+                    configurationLoading = false,
+                    configuration = configuration,
+                    message = if (configuration == null) "无法读取该漫画源的设置。" else it.message,
+                )
+            }
+        }
+    }
+
+    private fun saveSettings(sourceId: SourceId, values: Map<String, String>) {
+        if (_state.value.settingsSaving) return
+        _state.update { it.copy(settingsSaving = true, message = null) }
+        viewModelScope.launch {
+            val saved = runCatching { repository.updateSettings(sourceId, values) }.getOrDefault(false)
+            val configuration = if (saved) runCatching { repository.configuration(sourceId) }.getOrNull() else null
+            _state.update {
+                it.copy(
+                    settingsSaving = false,
+                    configuration = configuration ?: it.configuration,
+                    message = if (saved) "设置已保存；如账号未登录，请重新登录。" else "设置保存失败，请检查输入后重试。",
+                )
+            }
+        }
+    }
+
+    private fun invokeSettingCallback(sourceId: SourceId, key: String) {
+        if (_state.value.accountActionInProgress) return
+        _state.update { it.copy(accountActionInProgress = true, message = null) }
+        viewModelScope.launch {
+            val succeeded = runCatching { repository.invokeSettingCallback(sourceId, key) }.getOrDefault(false)
+            _state.update { it.copy(accountActionInProgress = false, message = if (succeeded) "操作已完成。" else "来源设置操作失败。") }
+        }
+    }
+
+    private fun login(sourceId: SourceId, account: String, password: String) {
+        if (_state.value.accountActionInProgress) return
+        _state.update { it.copy(accountActionInProgress = true, message = null) }
+        viewModelScope.launch {
+            val result = runCatching { repository.login(sourceId, account, password) }
+                .getOrDefault(dev.veneranative.data.source.SourceLoginOutcome.Failed)
+            val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
+            val message = when (result) {
+                dev.veneranative.data.source.SourceLoginOutcome.Success -> "登录成功。"
+                dev.veneranative.data.source.SourceLoginOutcome.Unsupported -> "该来源不支持账号密码登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.Failed -> "登录失败，请检查账号密码或网络。"
+            }
+            _state.update { it.copy(accountActionInProgress = false, configuration = configuration ?: it.configuration, message = message) }
+        }
+    }
+
+    private fun logout(sourceId: SourceId) {
+        if (_state.value.accountActionInProgress) return
+        _state.update { it.copy(accountActionInProgress = true, message = null) }
+        viewModelScope.launch {
+            val result = runCatching { repository.logout(sourceId) }
+                .getOrDefault(dev.veneranative.data.source.SourceLoginOutcome.Failed)
+            val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
+            val message = when (result) {
+                dev.veneranative.data.source.SourceLoginOutcome.Success -> "已退出登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.Unsupported -> "该来源不支持退出登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.Failed -> "退出登录失败。"
+            }
+            _state.update { it.copy(accountActionInProgress = false, configuration = configuration ?: it.configuration, message = message) }
         }
     }
 

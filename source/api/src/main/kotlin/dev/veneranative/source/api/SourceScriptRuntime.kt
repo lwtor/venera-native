@@ -29,6 +29,8 @@ data class SourcePackage(
     val script: String,
     /** Lowercase or uppercase hexadecimal SHA-256 of [script] encoded as UTF-8. */
     val sha256: String,
+    /** JSON object with source setting overrides; only values declared by the source are injected. */
+    val settingsJson: String = "{}",
 )
 
 sealed interface SourceInstallResult {

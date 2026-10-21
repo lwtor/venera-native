@@ -11,12 +11,42 @@ data class SourceMetadata(
     val name: String,
     val version: String,
     val minAppVersion: String? = null,
+    val settings: List<SourceSettingDefinition> = emptyList(),
+    val supportsPasswordLogin: Boolean = false,
+    val supportsLogout: Boolean = false,
+    val registerWebsite: String? = null,
 ) {
     init {
         require(name.isNotBlank()) { "name must not be blank" }
         require(version.isNotBlank()) { "version must not be blank" }
     }
 }
+
+/** Source-declared setting that the native source settings UI can render without executing JS. */
+data class SourceSettingDefinition(
+    val key: String,
+    val title: String,
+    val type: Type,
+    /** JSON primitive encoded as text; null means the source did not declare a default. */
+    val defaultJson: String? = null,
+    val options: List<SourceSettingOption> = emptyList(),
+    val actionLabel: String? = null,
+) {
+    enum class Type { INPUT, SELECT, SWITCH, CALLBACK }
+}
+
+data class SourceSettingOption(val value: String, val text: String)
+
+data class InstalledSourceConfiguration(
+    val source: InstalledSource,
+    val settings: List<SourceSettingDefinition>,
+    /** JSON primitive values keyed by setting id; never contains account passwords. */
+    val settingValues: Map<String, String>,
+    val supportsPasswordLogin: Boolean,
+    val supportsLogout: Boolean,
+    val registerWebsite: String?,
+    val loggedIn: Boolean,
+)
 
 /**
  * A source that is installed on this device.

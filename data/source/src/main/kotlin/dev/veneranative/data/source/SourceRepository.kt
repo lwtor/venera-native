@@ -1,11 +1,14 @@
 package dev.veneranative.data.source
 
 import dev.veneranative.core.model.InstalledSource
+import dev.veneranative.core.model.InstalledSourceConfiguration
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.source.api.SourceInstallResult
 import dev.veneranative.source.api.SourceMetadataReader
 import dev.veneranative.source.api.SourceMetadataResult
 import dev.veneranative.source.api.SourcePackage
+import dev.veneranative.source.api.SourceCall
+import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.SourceScriptRuntime
 import java.security.MessageDigest
 import kotlinx.coroutines.sync.Mutex
@@ -30,6 +33,26 @@ interface SourceRepository {
 
     /** Returns false when the source was not installed. */
     suspend fun uninstall(sourceId: SourceId): Boolean
+
+    suspend fun configuration(sourceId: SourceId): InstalledSourceConfiguration? = null
+
+    /** [valueJson] is a JSON primitive matching the source-declared setting type. */
+    suspend fun updateSetting(sourceId: SourceId, key: String, valueJson: String): Boolean = false
+
+    suspend fun updateSettings(sourceId: SourceId, values: Map<String, String>): Boolean =
+        values.all { (key, value) -> updateSetting(sourceId, key, value) }
+
+    suspend fun invokeSettingCallback(sourceId: SourceId, key: String): Boolean = false
+
+    suspend fun login(sourceId: SourceId, account: String, password: String): SourceLoginOutcome = SourceLoginOutcome.Unsupported
+
+    suspend fun logout(sourceId: SourceId): SourceLoginOutcome = SourceLoginOutcome.Unsupported
+}
+
+sealed interface SourceLoginOutcome {
+    data object Success : SourceLoginOutcome
+    data object Unsupported : SourceLoginOutcome
+    data object Failed : SourceLoginOutcome
 }
 
 sealed interface InstallOutcome {
@@ -68,6 +91,7 @@ class DefaultSourceRepository(
     private val runtime: SourceScriptRuntime,
     private val metadataReader: SourceMetadataReader,
     private val fetcher: SourceScriptFetcher,
+    private val privateSettings: SourcePrivateSettingsStore = InMemorySourcePrivateSettingsStore(),
     private val onSourceChanged: (SourceId) -> Unit = {},
 ) : SourceRepository {
 
@@ -91,6 +115,70 @@ class DefaultSourceRepository(
     override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean =
         mutex.withLock { setEnabledLocked(sourceId, enabled) }
     override suspend fun uninstall(sourceId: SourceId): Boolean = mutex.withLock { uninstallLocked(sourceId) }
+
+    override suspend fun configuration(sourceId: SourceId): InstalledSourceConfiguration? = mutex.withLock {
+        configurationLocked(sourceId)
+    }
+
+    override suspend fun updateSetting(sourceId: SourceId, key: String, valueJson: String): Boolean = mutex.withLock {
+        updateSettingsLocked(sourceId, mapOf(key to valueJson))
+    }
+
+    override suspend fun updateSettings(sourceId: SourceId, values: Map<String, String>): Boolean = mutex.withLock {
+        updateSettingsLocked(sourceId, values)
+    }
+
+    private suspend fun updateSettingsLocked(sourceId: SourceId, values: Map<String, String>): Boolean {
+        val stored = store.read(sourceId) ?: return false
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata ?: return false
+        if (values.any { (key, value) ->
+                val definition = metadata.settings.firstOrNull { it.key == key } ?: return@any true
+                !validSettingValue(definition.type, value)
+            }) return false
+        val previous = privateSettings.read(sourceId)
+        privateSettings.write(sourceId, previous + values)
+        if (stored.installed.enabled) {
+            if (runtime.install(stored.toPackage()) !is SourceInstallResult.Installed) {
+                privateSettings.write(sourceId, previous)
+                runtime.install(stored.toPackage())
+                return false
+            }
+        }
+        return true
+    }
+
+    override suspend fun invokeSettingCallback(sourceId: SourceId, key: String): Boolean = mutex.withLock {
+        val stored = store.read(sourceId) ?: return@withLock false
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata ?: return@withLock false
+        if (metadata.settings.none { it.key == key && it.type == dev.veneranative.core.model.SourceSettingDefinition.Type.CALLBACK }) {
+            return@withLock false
+        }
+        invokeInternal(sourceId, "settings.$key.callback") is SourceResult.Success
+    }
+
+    override suspend fun login(sourceId: SourceId, account: String, password: String): SourceLoginOutcome = mutex.withLock {
+        if (account.isBlank() || password.isBlank()) return@withLock SourceLoginOutcome.Failed
+        val stored = store.read(sourceId) ?: return@withLock SourceLoginOutcome.Unsupported
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata
+            ?: return@withLock SourceLoginOutcome.Unsupported
+        if (!metadata.supportsPasswordLogin) return@withLock SourceLoginOutcome.Unsupported
+        val arguments = org.json.JSONArray().put(account).put(password).toString()
+        when (val result = invokeInternal(sourceId, "account.login", arguments)) {
+            is SourceResult.Success -> SourceLoginOutcome.Success
+            is SourceResult.Failure -> SourceLoginOutcome.Failed
+        }
+    }
+
+    override suspend fun logout(sourceId: SourceId): SourceLoginOutcome = mutex.withLock {
+        val stored = store.read(sourceId) ?: return@withLock SourceLoginOutcome.Unsupported
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata
+            ?: return@withLock SourceLoginOutcome.Unsupported
+        if (!metadata.supportsLogout) return@withLock SourceLoginOutcome.Unsupported
+        when (val result = invokeInternal(sourceId, "account.logout")) {
+            is SourceResult.Success -> SourceLoginOutcome.Success
+            is SourceResult.Failure -> SourceLoginOutcome.Failed
+        }
+    }
 
 
     private suspend fun installLocked(location: String): InstallOutcome {
@@ -119,6 +207,7 @@ class DefaultSourceRepository(
             // The runtime verifies this hash; computing it here produces its input, it does not
             // duplicate the check.
             sha256 = script.sha256Hex(),
+            settingsJson = privateSettings.read(metadata.sourceId).toJsonObject(),
         )
 
         return when (val installed = runtime.install(packageToInstall)) {
@@ -176,6 +265,7 @@ class DefaultSourceRepository(
         // Unload unconditionally: an unloaded source is not an error, and a stale isolate must not
         // survive an uninstall.
         runtime.unload(sourceId)
+        privateSettings.clear(sourceId)
         loaded -= sourceId
         onSourceChanged(sourceId)
         return removed
@@ -190,12 +280,67 @@ class DefaultSourceRepository(
         }
     }
 
+    private suspend fun configurationLocked(sourceId: SourceId): InstalledSourceConfiguration? {
+        val stored = store.read(sourceId) ?: return null
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata ?: return null
+        val savedValues = privateSettings.read(sourceId)
+        val loggedIn = (invokeInternal(sourceId, "__veneraIsLogged") as? SourceResult.Success)?.json == "true"
+        return InstalledSourceConfiguration(
+            source = stored.installed,
+            settings = metadata.settings,
+            settingValues = metadata.settings.associate { definition ->
+                definition.key to (savedValues[definition.key] ?: definition.defaultJson ?: "null")
+            },
+            supportsPasswordLogin = metadata.supportsPasswordLogin,
+            supportsLogout = metadata.supportsLogout,
+            registerWebsite = metadata.registerWebsite,
+            loggedIn = loggedIn,
+        )
+    }
+
+    private suspend fun invokeInternal(sourceId: SourceId, member: String, argumentsJson: String = "[]"): SourceResult =
+        runtime.invoke(
+            SourceCall.InvokeFunction(
+                callId = "source-management-${sourceCallSequence.incrementAndGet()}",
+                sourceId = sourceId,
+                functionName = member,
+                argumentsJson = argumentsJson,
+            ),
+        )
+
+    private fun validSettingValue(
+        type: dev.veneranative.core.model.SourceSettingDefinition.Type,
+        json: String,
+    ): Boolean = runCatching {
+        val value = org.json.JSONTokener(json).nextValue()
+        when (type) {
+            dev.veneranative.core.model.SourceSettingDefinition.Type.INPUT,
+            dev.veneranative.core.model.SourceSettingDefinition.Type.SELECT -> value is String
+            dev.veneranative.core.model.SourceSettingDefinition.Type.SWITCH -> value is Boolean
+            dev.veneranative.core.model.SourceSettingDefinition.Type.CALLBACK -> false
+        }
+    }.getOrDefault(false)
+
+    private fun Map<String, String>.toJsonObject(): String = buildString {
+        append('{')
+        entries.forEachIndexed { index, (key, value) ->
+            if (index > 0) append(',')
+            append(org.json.JSONObject.quote(key)).append(':').append(value)
+        }
+        append('}')
+    }
+
     private fun StoredSource.toPackage() = SourcePackage(
         sourceId = installed.sourceId,
         version = installed.version,
         script = script,
         sha256 = sha256,
+        settingsJson = privateSettings.read(installed.sourceId).toJsonObject(),
     )
+
+    private companion object {
+        val sourceCallSequence = java.util.concurrent.atomic.AtomicLong()
+    }
 }
 
 private fun String.sha256Hex(): String =
