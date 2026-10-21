@@ -439,7 +439,7 @@ class EngineSourceCore(
                         onCallFailure(
                             sourceId,
                             call.member,
-                            result.error.javaClass.simpleName.ifBlank { "SourceRuntimeError" },
+                            result.error.diagnosticSummary(),
                         )
                     }
                 }
@@ -559,4 +559,18 @@ class EngineSourceCore(
             listOf("comic"),
         )
     }
+}
+
+internal fun SourceRuntimeError.diagnosticSummary(): String {
+    val type = javaClass.simpleName.ifBlank { "SourceRuntimeError" }
+    if (this !is SourceRuntimeError.ScriptExecution && this !is SourceRuntimeError.Internal) return type
+    val safeMessage = message
+        .replace(Regex("https?://[^\\s\"'<>]+", RegexOption.IGNORE_CASE), "<url>")
+        .replace(
+            Regex("""(?i)\b(authorization|cookie|access_token|refresh_token|token|password|passwd|pwd)\b(\s*[:=]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;]+)"""),
+            "$1$2<redacted>",
+        )
+        .replace(Regex("[\\r\\n\\t]+"), " ")
+        .take(180)
+    return if (safeMessage.isBlank()) type else "$type: $safeMessage"
 }

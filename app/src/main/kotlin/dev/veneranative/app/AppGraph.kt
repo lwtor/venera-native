@@ -130,7 +130,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         baseClient = httpClient,
         cookieJars = cookieJars,
         diagnosticSourceIds = if (debugNetworkTraceEnabled) {
-            setOf(SourceId("Komiic"), SourceId("picacg"))
+            setOf(SourceId("Komiic"), SourceId("picacg"), SourceId("zaimanhua"))
         } else emptySet(),
         onNetworkTrace = { sourceId, message ->
             if (sourceId == SourceId("Komiic")) localKomiicNetworkLog?.append(message)
@@ -166,7 +166,8 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     val catalog = DefaultComicCatalog(
         sourceRepository,
         EngineSourceCore(runtime, onCallFailure = { source, member, error ->
-            android.util.Log.w("VeneraSource", "Source call failed: source=${source.value} member=$member error=$error")
+            val safeError = if (debugNetworkTraceEnabled) error else error.substringBefore(':')
+            android.util.Log.w("VeneraSource", "Source call failed: source=${source.value} member=$member error=$safeError")
         }, onSourceDataChanged = sourcePrivateSettings::writeSourceData),
         onDiscoveryTiming = { sourceCount, installMillis, capabilityMillis ->
             localSearchStartupLog?.append(

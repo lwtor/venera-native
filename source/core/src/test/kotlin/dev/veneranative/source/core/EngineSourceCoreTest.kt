@@ -40,6 +40,16 @@ import org.junit.Test
  */
 class EngineSourceCoreTest {
 
+    @Test fun `script failure diagnostic redacts urls and credential values`() {
+        val summary = SourceRuntimeError.ScriptExecution(
+            "TypeError: https://source.example/private?token=abc token=secret",
+        ).diagnosticSummary()
+
+        assertEquals("ScriptExecution: TypeError: <url> token=<redacted>", summary)
+        assertTrue(!summary.contains("secret"))
+        assertTrue(!summary.contains("abc"))
+    }
+
     @Test fun `author callback receives original namespace and value without fallback`() = runBlocking {
         withCore(source("""
             comic = { onClickTag: (namespace, tag) => namespace === "作者" ? { action: "search", keyword: namespace + ":" + tag } : null };

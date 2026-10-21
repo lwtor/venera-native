@@ -4,6 +4,8 @@
 
 ## 状态快照
 
+**S3-02A4 IN_PROGRESS：再漫画详情失败已在真机复现。** 当前设备安装 1.2.2，`zaimanhua` 来源 1.0.2。最近 logcat 在 `comic.loadInfo` 处返回 `ScriptExecution`，页面显示“漫画源暂时无法响应”；上次假设的会话存储故障不是根因。正在为 Debug 构建启用来源专属脱敏网络阶段和脱敏脚本错误摘要，以复现真实脚本故障。设备用户数据保留。
+
 **S3-02A3 DONE：来源会话存储故障不再阻断漫画详情和搜索。** 详情/搜索等 READ 请求即使已成功获取漫画数据，后续来源会话快照因大小上限或 Keystore 写入失败，也继续返回该漫画数据；登录等 WRITE 操作仍将持久化失败反馈给调用者。增加读写差异回归。版本从 1.2.1 升至 1.2.2 / versionCode 1002002。
 
 验证（2026-10-21）：`:source:core:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。设备当前前台为其他应用，既有 logcat 未包含本次详情失败，未打断前台或清理用户数据；修复针对代码中已确认的故障放大路径，尚待用户真机复验。当前唯一下一任务为 S3-03A1：来源声明的 Cookie 输入与过期校验。
