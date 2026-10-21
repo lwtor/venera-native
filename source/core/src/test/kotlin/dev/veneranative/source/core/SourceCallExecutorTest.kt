@@ -25,6 +25,40 @@ class SourceCallExecutorTest {
         assertEquals(listOf(sourceId to "{\"token\":\"encrypted-at-rest\"}"), snapshots)
     }
 
+    @Test fun `successful reads remain usable when session snapshot persistence fails`() = runTest {
+        val runtime = object : StubRuntime() {
+            override suspend fun invoke(call: SourceCall): SourceResult =
+                SourceResult.Success(call.callId, "{\"title\":\"Fixture\"}", "{\"largeCache\":true}")
+        }
+        val executor = SourceCallExecutor(
+            runtime,
+            onSourceDataChanged = { _, _ -> error("storage unavailable") },
+        )
+
+        val result = executor.execute(SourceOperationKind.READ) {
+            SourceCall.InvokeFunction("detail", SourceId("fixture"), "comic.loadInfo")
+        }
+
+        assertEquals("{\"title\":\"Fixture\"}", (result as SourceResult.Success).json)
+    }
+
+    @Test fun `write reports session snapshot persistence failure`() = runTest {
+        val runtime = object : StubRuntime() {
+            override suspend fun invoke(call: SourceCall): SourceResult =
+                SourceResult.Success(call.callId, "true", "{\"token\":\"fixture\"}")
+        }
+        val executor = SourceCallExecutor(
+            runtime,
+            onSourceDataChanged = { _, _ -> error("storage unavailable") },
+        )
+
+        val result = executor.execute(SourceOperationKind.WRITE) {
+            SourceCall.InvokeFunction("login", SourceId("fixture"), "account.login")
+        }
+
+        assertEquals("Source session data could not be saved.", (result as SourceResult.Failure).error.message)
+    }
+
     @Test fun `all reads share retries with fresh call IDs while writes and cancelled calls do not retry`() = runTest {
         for ((kind, error, expected) in listOf(
             Triple(SourceOperationKind.READ, SourceRuntimeError.ScriptExecution("fixture"), 3),

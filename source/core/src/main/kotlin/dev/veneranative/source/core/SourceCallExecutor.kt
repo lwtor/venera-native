@@ -18,12 +18,18 @@ internal class SourceCallExecutor(
 ) {
     suspend fun execute(kind: SourceOperationKind, newCall: () -> SourceCall.InvokeFunction): SourceResult {
         var call = newCall()
-        if (kind == SourceOperationKind.WRITE) return persistSourceData(call, runtime.invoke(call))
+        if (kind == SourceOperationKind.WRITE) return persistSourceData(call, runtime.invoke(call), required = true)
         return withTimeoutOrNull(totalTimeoutMillis) {
             for (attempt in 0..2) {
                 if (attempt > 0) call = newCall()
                 val result = runtime.invoke(call)
-                if (result is SourceResult.Success) return@withTimeoutOrNull persistSourceData(call, result)
+                if (result is SourceResult.Success) {
+                    // A read has already produced useful comic data. A large or temporarily
+                    // unwritable session snapshot must not turn a successful detail/search call
+                    // into a user-visible source failure. Write operations (for example login)
+                    // still report persistence errors because their main purpose is changing state.
+                    return@withTimeoutOrNull persistSourceData(call, result, required = false)
+                }
                 val error = (result as SourceResult.Failure).error
                 if (attempt == 2 || error is SourceRuntimeError.Cancelled ||
                     (!error.retryable && error !is SourceRuntimeError.ScriptExecution)) return@withTimeoutOrNull result
@@ -33,14 +39,22 @@ internal class SourceCallExecutor(
         } ?: SourceResult.Failure(call.callId, SourceRuntimeError.Timeout(totalTimeoutMillis))
     }
 
-    private suspend fun persistSourceData(call: SourceCall.InvokeFunction, result: SourceResult): SourceResult {
+    private suspend fun persistSourceData(
+        call: SourceCall.InvokeFunction,
+        result: SourceResult,
+        required: Boolean,
+    ): SourceResult {
         if (result !is SourceResult.Success) return result
         val sourceData = result.sourceDataJson ?: return result
         return try {
             onSourceDataChanged(call.sourceId, sourceData)
             result
         } catch (_: Exception) {
-            SourceResult.Failure(call.callId, SourceRuntimeError.Internal("Source session data could not be saved."))
+            if (required) {
+                SourceResult.Failure(call.callId, SourceRuntimeError.Internal("Source session data could not be saved."))
+            } else {
+                result
+            }
         }
     }
 }
