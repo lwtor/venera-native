@@ -82,7 +82,7 @@ class ReaderScreenTest {
     }
 
     @Test
-    fun centerTapShowsFullscreenReaderControls() {
+    fun centerLongPressShowsFullscreenReaderControls() {
         val next = Chapter(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
             "下一话", 1,
@@ -101,10 +101,48 @@ class ReaderScreenTest {
             )
         }
 
-        composeRule.onNodeWithTag("reader-canvas").performTouchInput { click(center) }
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(center)
+            advanceEventTime(1_100)
+            up()
+        }
         composeRule.onNodeWithContentDescription("上一话").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("下一话").assertIsDisplayed()
         composeRule.onNodeWithText("1 / 3 页").assertIsDisplayed()
+    }
+
+    @Test
+    fun shortTapDoesNotShowControlsAndTapHidesThemImmediately() {
+        val next = Chapter(
+            ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
+            "下一话", 1,
+        )
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    nextChapter = next,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+            )
+        }
+        val canvas = composeRule.onNodeWithTag("reader-canvas")
+        canvas.performTouchInput { click(center) }
+        composeRule.onAllNodesWithTag("reader-tool-overlay").assertCountEquals(0)
+
+        canvas.performTouchInput {
+            down(center)
+            advanceEventTime(1_100)
+            up()
+        }
+        composeRule.onNodeWithContentDescription("上一话").assertIsDisplayed()
+
+        canvas.performTouchInput { click(Offset(8f, 8f)) }
+        composeRule.onAllNodesWithTag("reader-tool-overlay").assertCountEquals(0)
     }
 
     @Test
@@ -302,13 +340,24 @@ class ReaderScreenTest {
     }
 
     @Test
-    fun predecodesOnlyTheImmediatePagesAroundTheCurrentPage() {
+    fun predecodesThreePagesAheadAndBehindWithoutDecodingTheVisiblePage() {
+        val preloadPages = List(7) { index ->
+            ComicPage(
+                index = index,
+                imageRef = "test://$index",
+                widthPx = 1080,
+                heightPx = 1440,
+                sizeState = PageSizeState.Ready,
+            )
+        }
         val warmedPaths = mutableListOf<String>()
+        val plannedModes = mutableListOf<Boolean>()
         val decoder = object : PageImageDecoder {
             override val strategy = DecodeStrategy.Region
-            override fun plan(page: ComicPage, viewport: PageViewport, zoom: Float, continuous: Boolean) = listOf(
-                PageTile(PageRegion(0, 0, page.widthPx, page.heightPx), viewport.widthPx, viewport.heightPx),
-            )
+            override fun plan(page: ComicPage, viewport: PageViewport, zoom: Float, continuous: Boolean): List<PageTile> {
+                plannedModes += continuous
+                return listOf(PageTile(PageRegion(0, 0, page.widthPx, page.heightPx), viewport.widthPx, viewport.heightPx))
+            }
             override suspend fun decode(request: PageDecodeRequest): DecodedPageImage = awaitCancellation()
             override suspend fun predecode(request: PageDecodeRequest) {
                 warmedPaths += request.path
@@ -317,8 +366,8 @@ class ReaderScreenTest {
         composeRule.setContent {
             ReaderScreen(
                 state = ReaderUiState(
-                    pages = pages,
-                    currentPageIndex = 1,
+                    pages = preloadPages,
+                    currentPageIndex = 3,
                     direction = ReadingDirection.LeftToRight,
                     status = ReaderStatus.Ready,
                 ),
@@ -328,10 +377,11 @@ class ReaderScreenTest {
             )
         }
 
-        composeRule.waitUntil(timeoutMillis = 5_000) { warmedPaths.size == 2 }
-        assertTrue(warmedPaths.contains("test://0"))
-        assertTrue(warmedPaths.contains("test://2"))
-        assertTrue("the visible page is decoded by its normal tile", "test://1" !in warmedPaths)
+        composeRule.waitUntil(timeoutMillis = 5_000) { warmedPaths.size == 6 }
+        assertTrue((0..2).all { "test://$it" in warmedPaths })
+        assertTrue((4..6).all { "test://$it" in warmedPaths })
+        assertTrue("the visible page is decoded by its normal tile", "test://3" !in warmedPaths)
+        assertTrue("paged predecode must use the same tiling mode as visible pages", plannedModes.isNotEmpty() && plannedModes.all { !it })
     }
 
     @Test

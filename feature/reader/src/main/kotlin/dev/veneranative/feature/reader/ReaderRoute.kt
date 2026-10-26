@@ -45,7 +45,7 @@ fun ReaderRoute(
     }
     val viewModel: ReaderViewModel = viewModel(viewModelStoreOwner = owner) {
         ReaderViewModel(chapter, provider, startPageIndex = startPageIndex, progress = progress,
-            prefetchRadius = if (chapter is ChapterRef.Local) 0 else 2,
+            prefetchRadius = if (chapter is ChapterRef.Local) 0 else 3,
             progressFactory = progressFactory ?: { target -> progress.takeIf { target == chapter } })
     }
     val state by viewModel.state.collectAsStateWithLifecycle()

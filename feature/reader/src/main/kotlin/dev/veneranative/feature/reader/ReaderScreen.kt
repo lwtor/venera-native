@@ -56,6 +56,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -97,6 +98,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import android.app.Activity
@@ -260,8 +262,12 @@ private fun averagePosition(points: List<Offset>): Offset =
 private fun averageDistance(points: List<Offset>, center: Offset): Float =
     points.sumOf { (it - center).getDistance().toDouble() }.toFloat() / points.size.coerceAtLeast(1).toFloat()
 
+private fun preferredNextPage(currentPage: Int, direction: ReadingDirection): Int =
+    currentPage + if (direction == ReadingDirection.RightToLeft) -1 else 1
+
 private const val DOUBLE_TAP_EVENT_GRACE_MILLIS = 120L
 private const val SINGLE_TAP_CALLBACK_GRACE_MILLIS = 80L
+private const val TOOLBAR_LONG_PRESS_MILLIS = 1_000L
 
 
 /**
@@ -338,16 +344,30 @@ fun ReaderScreen(
         }
     }, contentAlignment = Alignment.Center) {
         Box(
-            modifier = Modifier.fillMaxSize().testTag("reader-canvas").pointerInput(state.status) {
-                detectReaderTapGestures(
-                    handler = doubleTapZoomHandler,
-                    onTap = { tap ->
+            modifier = Modifier.fillMaxSize().testTag("reader-canvas")
+                .pointerInput(state.status) {
+                    detectTapGestures(onPress = { tap ->
+                        val releaseResult = withTimeoutOrNull(TOOLBAR_LONG_PRESS_MILLIS) {
+                            tryAwaitRelease()
+                        }
+                        val heldForOneSecond = releaseResult == null
+                        val wasTap = releaseResult == true
                         val width = size.width.toFloat()
                         val height = size.height.toFloat()
-                        if (tap.x in width * 0.28f..width * 0.72f && tap.y in height * 0.25f..height * 0.75f) {
-                            if (state.status == ReaderStatus.Ready) controlsTimer.toggle()
+                        if (state.status == ReaderStatus.Ready) {
+                            when {
+                                controlsTimer.visible.value && wasTap -> controlsTimer.hide()
+                                !controlsTimer.visible.value && heldForOneSecond &&
+                                    ReaderControlsTapTarget.contains(tap.x, tap.y, width, height) ->
+                                    controlsTimer.toggle()
+                            }
                         }
-                    },
+                    })
+                }
+                .pointerInput(state.status) {
+                detectReaderTapGestures(
+                    handler = doubleTapZoomHandler,
+                    onTap = { /* A short center tap remains available to normal reader gestures. */ },
                 )
             },
             contentAlignment = Alignment.Center,
@@ -725,6 +745,8 @@ private fun ContinuousPages(
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = items.indexOfFirst { it.page.index == state.currentPageIndex }.coerceAtLeast(0),
     )
+    val latestItems by rememberUpdatedState(items)
+    val latestPages by rememberUpdatedState(state.pages)
     LaunchedEffect(listState, items) {
         var userScrollStarted = false
         snapshotFlow {
@@ -807,13 +829,51 @@ private fun ContinuousPages(
         }
         doubleTapZoomHandler.onGestureEnd = {}
     }
-    LaunchedEffect(listState, items, viewport, decoder) {
+    LaunchedEffect(listState, viewport, decoder) {
         if (decoder == null) return@LaunchedEffect
-        snapshotFlow { items.getOrNull(listState.firstVisibleItemIndex)?.page?.index }
-            .distinctUntilChanged()
-            .collectLatest { index ->
-                if (index != null) predecodeAdjacentPages(index, state.pages, viewport, decoder)
+        val jobs = mutableMapOf<Int, Pair<ComicPage, Job>>()
+        val completed = mutableMapOf<Int, ComicPage>()
+        snapshotFlow {
+            latestItems.getOrNull(listState.firstVisibleItemIndex)?.page?.index to latestPages
+        }.collect { (index, pages) ->
+            if (index == null) return@collect
+            val nearby = (-PAGE_PREDECODE_RADIUS..PAGE_PREDECODE_RADIUS)
+                .map { index + it }
+                .filter { it in pages.indices }
+                .toSet()
+            jobs.toMap().forEach { (pageIndex, scheduled) ->
+                if (pageIndex !in nearby || pages[pageIndex] != scheduled.first) {
+                    scheduled.second.cancel()
+                    jobs.remove(pageIndex)
+                }
             }
+            completed.entries.removeAll { (pageIndex, page) -> pageIndex !in nearby || pages[pageIndex] != page }
+            nearby.filter { it != index }
+                .sortedWith(
+                    compareBy<Int> { if (it == index + 1) 0 else 1 }
+                        .thenBy { (it - index).let { distance -> if (distance < 0) -distance else distance } },
+                )
+                .forEach { pageIndex ->
+                val page = pages[pageIndex]
+                if (page.sizeState != PageSizeState.Ready || completed[pageIndex] == page || jobs[pageIndex]?.first == page) {
+                    return@forEach
+                }
+                val job = launch {
+                    try {
+                        delay(PAGE_PREDECODE_IDLE_MILLIS)
+                        predecodePage(page, viewport, decoder, continuous = true)
+                        completed[pageIndex] = page
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Visible page loading retains its regular retry path.
+                    } finally {
+                        if (jobs[pageIndex]?.first == page) jobs.remove(pageIndex)
+                    }
+                }
+                jobs[pageIndex] = page to job
+            }
+        }
     }
     LazyColumn(
         state = listState,
@@ -855,6 +915,7 @@ private fun SinglePagePager(
         initialPage = state.currentPageIndex,
         pageCount = { state.pageCount },
     )
+    val latestPages by rememberUpdatedState(state.pages)
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .collect { onAction(ReaderAction.PageShown(it)) }
@@ -865,12 +926,47 @@ private fun SinglePagePager(
         }
     }
     LaunchedEffect(pagerState.currentPage) { onChapterEndChange(false) }
-    LaunchedEffect(pagerState, state.pages, viewport, decoder) {
+    LaunchedEffect(pagerState, viewport, decoder) {
         if (decoder == null) return@LaunchedEffect
-        snapshotFlow { pagerState.currentPage }
-            .distinctUntilChanged()
-            .collectLatest { currentPage ->
-                predecodeAdjacentPages(currentPage, state.pages, viewport, decoder)
+        val jobs = mutableMapOf<Int, Pair<ComicPage, Job>>()
+        val completed = mutableMapOf<Int, ComicPage>()
+        snapshotFlow { pagerState.currentPage to latestPages }
+            .collect { (currentPage, pages) ->
+                val nearby = (-PAGE_PREDECODE_RADIUS..PAGE_PREDECODE_RADIUS)
+                    .map { currentPage + it }
+                    .filter { it in pages.indices }
+                    .toSet()
+                jobs.toMap().forEach { (index, scheduled) ->
+                    if (index !in nearby || pages[index] != scheduled.first) {
+                        scheduled.second.cancel()
+                        jobs.remove(index)
+                    }
+                }
+                completed.entries.removeAll { (index, page) -> index !in nearby || pages[index] != page }
+                nearby.filter { it != currentPage }
+                    .sortedWith(
+                        compareBy<Int> { if (it == preferredNextPage(currentPage, state.direction)) 0 else 1 }
+                            .thenBy { (it - currentPage).let { distance -> if (distance < 0) -distance else distance } },
+                    )
+                    .forEach { index ->
+                    val page = pages[index]
+                    if (page.sizeState != PageSizeState.Ready || completed[index] == page || jobs[index]?.first == page) {
+                        return@forEach
+                    }
+                    val job = launch {
+                        try {
+                            predecodePage(page, viewport, decoder, continuous = false)
+                            completed[index] = page
+                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // Visible page loading retains its regular retry path.
+                        } finally {
+                            if (jobs[index]?.first == page) jobs.remove(index)
+                        }
+                    }
+                    jobs[index] = page to job
+                }
             }
     }
     HorizontalPager(
@@ -897,21 +993,26 @@ private fun SinglePagePager(
  * Wait for active scrolling/flinging to settle before using decode time on adjacent pages. Keeping
  * the work inside collectLatest also cancels stale page decodes when the user moves on quickly.
  */
-private suspend fun predecodeAdjacentPages(
+private suspend fun predecodeNearbyPages(
     currentPage: Int,
     pages: List<ComicPage>,
     viewport: PageViewport,
     decoder: PageImageDecoder,
+    continuous: Boolean,
+    idleDelayMillis: Long = PAGE_PREDECODE_IDLE_MILLIS,
 ) {
-    delay(PAGE_PREDECODE_IDLE_MILLIS)
+    if (idleDelayMillis > 0L) delay(idleDelayMillis)
     coroutineScope {
-        listOf(currentPage - 1, currentPage + 1)
+        (-PAGE_PREDECODE_RADIUS..PAGE_PREDECODE_RADIUS)
+            .asSequence()
+            .map { currentPage + it }
+            .filter { it != currentPage }
             .filter { it in pages.indices && pages[it].sizeState == PageSizeState.Ready }
             .forEach { index ->
                 launch {
                     val page = pages[index]
                     try {
-                        val tile = decoder.plan(page, viewport, zoom = 1f, continuous = true).firstOrNull()
+                        val tile = decoder.plan(page, viewport, zoom = 1f, continuous = continuous).firstOrNull()
                             ?: return@launch
                         decoder.predecode(
                             PageDecodeRequest(
@@ -935,6 +1036,29 @@ private suspend fun predecodeAdjacentPages(
                 }
             }
     }
+}
+
+private suspend fun predecodePage(
+    page: ComicPage,
+    viewport: PageViewport,
+    decoder: PageImageDecoder,
+    continuous: Boolean,
+) {
+    val tile = decoder.plan(page, viewport, zoom = 1f, continuous = continuous).firstOrNull() ?: return
+    decoder.predecode(
+        PageDecodeRequest(
+            path = page.imageRef,
+            sourceId = page.sourceId,
+            targetWidthPx = tile.displayWidthPx,
+            targetHeightPx = tile.displayHeightPx,
+            pageIndex = page.index,
+            region = tile.region,
+            fitWidthOnly = tile.fitWidthOnly,
+            headers = page.imageHeaders,
+            reverseHorizontalBands = page.reverseHorizontalBands,
+            sourceImageHeightPx = page.heightPx,
+        ),
+    )
 }
 
 /** A horizontally paged comic page stays fitted to the screen width and scrolls vertically. */
@@ -1260,7 +1384,8 @@ private fun placeholderTile(page: ComicPage, viewport: PageViewport, continuous:
     )
 }
 
-private const val PAGE_PREDECODE_IDLE_MILLIS = 350L
+private const val PAGE_PREDECODE_RADIUS = 3
+private const val PAGE_PREDECODE_IDLE_MILLIS = 100L
 
 private fun ReadingDirection.label(): String = when (this) {
     ReadingDirection.Vertical -> "竖向"

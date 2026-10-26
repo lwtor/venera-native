@@ -199,15 +199,12 @@ class ReaderViewModelTest {
     }
 
     @Test
-    fun `prefetches the neighbourhood of the visible page`() = runTest(dispatcher) {
-        val provider = FakePageProvider(pageCount = 5)
-        val viewModel = ReaderViewModel(chapterKey, provider)
+    fun `prefetches three pages on each side of the visible page`() = runTest(dispatcher) {
+        val provider = FakePageProvider(pageCount = 7)
+        val viewModel = ReaderViewModel(chapterKey, provider, startPageIndex = 3)
         advanceUntilIdle()
 
-        viewModel.onAction(ReaderAction.PageShown(1))
-        advanceUntilIdle()
-
-        assertEquals(listOf(0, 1, 2), provider.prefetchedPages)
+        assertEquals((0..6).toList(), provider.prefetchedPages)
     }
 
     @Test

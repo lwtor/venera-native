@@ -337,7 +337,7 @@ class ReaderViewModel(
     }
 
     private companion object {
-        const val DEFAULT_PREFETCH_RADIUS = 1
+        const val DEFAULT_PREFETCH_RADIUS = 3
     }
 }
 
