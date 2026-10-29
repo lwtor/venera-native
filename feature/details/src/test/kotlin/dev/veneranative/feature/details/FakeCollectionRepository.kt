@@ -26,6 +26,7 @@ internal class FakeCollectionRepository : CollectionRepository {
 
     val added = mutableListOf<AddedToShelf>()
     val removed = mutableListOf<ComicRef>()
+    val folderChanges = mutableListOf<Pair<ComicRef, Set<String>>>()
 
     override fun observeFolders(): Flow<List<FavoriteFolder>> = folders
 
@@ -83,6 +84,7 @@ internal class FakeCollectionRepository : CollectionRepository {
     override suspend fun moveTo(ref: ComicRef, folderId: String) = Unit
 
     override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) {
+        folderChanges += ref to folderIds
         entries.value = entries.value.mapValues { (key, item) -> if (key == ref) item.copy(folderIds = folderIds) else item }
     }
 

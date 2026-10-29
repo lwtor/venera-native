@@ -4,6 +4,8 @@
 
 ## 状态快照
 
+**S4-10A22 DONE：详情页可直接管理已收藏漫画的收藏夹归属。** 点击已收藏的书签打开预选当前文件夹的管理弹窗，保存时原位替换多文件夹归属；“取消收藏”仍保留二次确认。新增 ViewModel 回归覆盖切换收藏夹且漫画继续保留在“全部”。版本升级至 1.3.0 / versionCode 1003000。验证：JDK 17 `:feature:details:testDebugUnitTest --tests dev.veneranative.feature.details.DetailsViewModelTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。尚未真机验收。当前唯一下一任务仍为 S3-02A5。
+
 **S4-10A21 DONE：优化阅读器工具栏手势。** 工具栏隐藏时需在屏幕中央长按 1 秒才展开，显示时任意轻点立即收起；将中心热区缩小为屏幕中心 32% × 20%，降低误触并保留双击缩放和翻页手势。新增热区与手势回归。版本更新至 1.2.10（versionCode 1002010）。
 
 **S3-00K1 DONE：扩展阅读器相邻页预加载。** 横向/纵向阅读分别按实际 tile 模式预解码当前页前后各 3 页，优先调度下一阅读方向的页面；页面变化时保留仍在邻近窗口的任务，避免重复取消/启动，远端尺寸预取范围同步扩大。验证：JDK 17 下 `:feature:reader:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未执行实机翻页耗时对比。当前唯一下一任务仍为 S3-02A5。

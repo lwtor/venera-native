@@ -40,6 +40,7 @@ sealed interface DetailsAction {
 
     /** Opens a collection picker or an explicit removal confirmation. */
     data object ToggleFavorite : DetailsAction
+    data object RemoveFavoriteRequested : DetailsAction
     data class FavoriteFolderToggled(val folderId: String) : DetailsAction
     data object ConfirmFavorite : DetailsAction
     data object DismissFavoriteDialog : DetailsAction

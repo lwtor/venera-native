@@ -353,7 +353,15 @@ fun DetailsScreen(
         val removing = state.favoriteDialog == FavoriteDialog.Remove
         AlertDialog(
             onDismissRequest = { if (!state.favoriteSaving) onAction(DetailsAction.DismissFavoriteDialog) },
-            title = { Text(if (removing) "取消收藏？" else "加入书架") },
+            title = {
+                Text(
+                    when {
+                        removing -> "取消收藏？"
+                        state.isFavorite -> "管理收藏夹"
+                        else -> "加入书架"
+                    },
+                )
+            },
             text = {
                 if (removing) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -387,13 +395,24 @@ fun DetailsScreen(
                 TextButton(
                     enabled = !state.favoriteSaving,
                     onClick = { onAction(DetailsAction.ConfirmFavorite) },
-                ) { Text(if (removing) "取消收藏" else "加入书架") }
+                ) {
+                    Text(
+                        when {
+                            removing -> "取消收藏"
+                            state.isFavorite -> "保存"
+                            else -> "加入书架"
+                        },
+                    )
+                }
             },
             dismissButton = {
                 TextButton(
                     enabled = !state.favoriteSaving,
-                    onClick = { onAction(DetailsAction.DismissFavoriteDialog) },
-                ) { Text("返回") }
+                    onClick = {
+                        if (!removing && state.isFavorite) onAction(DetailsAction.RemoveFavoriteRequested)
+                        else onAction(DetailsAction.DismissFavoriteDialog)
+                    },
+                ) { Text(if (!removing && state.isFavorite) "取消收藏" else "返回") }
             },
         )
     }
@@ -699,7 +718,7 @@ private fun DetailsToolbar(
                 IconButton(
                     onClick = onToggleFavorite,
                     modifier = Modifier.alpha(collapseFraction).semantics {
-                        contentDescription = if (isFavorite) "取消收藏" else "收藏"
+                        contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
                     },
                     enabled = collapseFraction >= 0.98f,
                 ) {
@@ -814,7 +833,7 @@ private fun FavoriteAction(isFavorite: Boolean, onToggleFavorite: () -> Unit) {
         IconButton(
             onClick = onToggleFavorite,
             modifier = Modifier.size(44.dp).semantics {
-                contentDescription = if (isFavorite) "取消收藏" else "收藏"
+                contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
             },
         ) { BookmarkGlyph(favorite = isFavorite, color = Color.White) }
     }

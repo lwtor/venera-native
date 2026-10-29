@@ -536,14 +536,16 @@ class DetailsViewModelTest {
     }
 
     @Test
-    fun `a comic already on the shelf shows as kept and can be removed`() = runTest(dispatcher) {
+    fun `tapping an existing favorite opens its selected folders and can still be removed`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        collection.folders.value = listOf(FavoriteFolder("reading", "在读", 0, true))
         collection.seed(
             FavoriteItem(
                 ref = ComicRef.Remote(comicKey),
                 title = "Frieren",
                 folderId = "",
+                folderIds = setOf("reading"),
                 addedAtEpochMillis = 1_000L,
             ),
         )
@@ -552,17 +554,55 @@ class DetailsViewModelTest {
         assertTrue(viewModel.state.value.isFavorite)
 
         viewModel.onAction(DetailsAction.ToggleFavorite)
-        assertEquals(FavoriteDialog.Remove, viewModel.state.value.favoriteDialog)
+        assertEquals(FavoriteDialog.Add, viewModel.state.value.favoriteDialog)
+        assertEquals(setOf("reading"), viewModel.state.value.favoriteFolderSelection)
         assertTrue(collection.removed.isEmpty())
+
+        viewModel.onAction(DetailsAction.RemoveFavoriteRequested)
+        assertEquals(FavoriteDialog.Remove, viewModel.state.value.favoriteDialog)
         viewModel.onAction(DetailsAction.DismissFavoriteDialog)
         assertTrue(collection.removed.isEmpty())
         viewModel.onAction(DetailsAction.ToggleFavorite)
+        viewModel.onAction(DetailsAction.RemoveFavoriteRequested)
         viewModel.onAction(DetailsAction.ConfirmFavorite)
         advanceUntilIdle()
 
         assertFalse(viewModel.state.value.isFavorite)
         assertFalse(collection.contains(ComicRef.Remote(comicKey)))
         assertEquals(listOf(ComicRef.Remote(comicKey)), collection.removed)
+    }
+
+    @Test
+    fun `editing a favorite replaces its folder memberships without removing it from shelf`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        collection.folders.value = listOf(
+            FavoriteFolder("reading", "在读", 0, true),
+            FavoriteFolder("later", "稍后", 1, true),
+        )
+        collection.seed(
+            FavoriteItem(
+                ref = ComicRef.Remote(comicKey),
+                title = "Frieren",
+                folderId = "",
+                folderIds = setOf("reading"),
+                addedAtEpochMillis = 1_000L,
+            ),
+        )
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ToggleFavorite)
+        assertEquals(setOf("reading"), viewModel.state.value.favoriteFolderSelection)
+        viewModel.onAction(DetailsAction.FavoriteFolderToggled("reading"))
+        viewModel.onAction(DetailsAction.FavoriteFolderToggled("later"))
+        viewModel.onAction(DetailsAction.ConfirmFavorite)
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.isFavorite)
+        assertTrue(collection.contains(ComicRef.Remote(comicKey)))
+        assertEquals(listOf(ComicRef.Remote(comicKey) to setOf("later")), collection.folderChanges)
+        assertTrue(collection.removed.isEmpty())
     }
 
     @Test

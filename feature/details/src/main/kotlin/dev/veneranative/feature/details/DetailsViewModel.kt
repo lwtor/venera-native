@@ -187,6 +187,11 @@ class DetailsViewModel(
             DetailsAction.DownloadSelectedChapters -> downloadChapters(_state.value.selectedChapters)
 
             DetailsAction.ToggleFavorite -> toggleFavorite()
+            DetailsAction.RemoveFavoriteRequested -> _state.update { current ->
+                if (current.favoriteDialog == FavoriteDialog.Add && current.isFavorite) {
+                    current.copy(favoriteDialog = FavoriteDialog.Remove, newFavoriteFolderDraft = null)
+                } else current
+            }
             is DetailsAction.FavoriteFolderToggled -> _state.update { current ->
                 if (current.favoriteFolders.none { it.id == action.folderId }) current
                 else current.copy(favoriteFolderSelection = current.favoriteFolderSelection.let { ids ->
@@ -242,7 +247,18 @@ class DetailsViewModel(
         viewModelScope.launch {
             runCatching {
                 repository.observeItem(comicRef).collect { item ->
-                    _state.update { it.copy(isFavorite = item != null) }
+                    _state.update { current ->
+                        val folderIds = item?.folderIds.orEmpty()
+                        current.copy(
+                            isFavorite = item != null,
+                            favoriteFolderIds = folderIds,
+                            favoriteFolderSelection = if (current.favoriteDialog == null) {
+                                folderIds
+                            } else {
+                                current.favoriteFolderSelection
+                            },
+                        )
+                    }
                 }
             }.onFailure { failure -> failUnlessCancelled(failure) }
         }
@@ -280,8 +296,8 @@ class DetailsViewModel(
         _state.value.detail ?: return
         if (_state.value.favoriteSaving) return
         _state.update { current -> current.copy(
-            favoriteDialog = if (current.isFavorite) FavoriteDialog.Remove else FavoriteDialog.Add,
-            favoriteFolderSelection = emptySet(),
+            favoriteDialog = FavoriteDialog.Add,
+            favoriteFolderSelection = current.favoriteFolderIds,
             newFavoriteFolderDraft = null,
             shelfMessage = null,
         ) }
@@ -293,11 +309,14 @@ class DetailsViewModel(
         val dialog = _state.value.favoriteDialog ?: return
         if (_state.value.favoriteSaving) return
         val selected = _state.value.favoriteFolderSelection
+        val wasFavorite = _state.value.isFavorite
         _state.update { it.copy(favoriteSaving = true, shelfMessage = null) }
         viewModelScope.launch {
             runCatching {
                 if (dialog == FavoriteDialog.Remove) {
                     repository.remove(comicRef)
+                } else if (wasFavorite) {
+                    repository.setFolders(comicRef, selected)
                 } else {
                     repository.addToFolders(comicRef, selected, detail.toSnapshot())
                 }

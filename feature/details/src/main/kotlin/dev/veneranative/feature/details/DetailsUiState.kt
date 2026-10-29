@@ -51,6 +51,7 @@ data class DetailsUiState(
     val isFavorite: Boolean = false,
     val favoriteFolders: List<FavoriteFolder> = emptyList(),
     val favoriteDialog: FavoriteDialog? = null,
+    val favoriteFolderIds: Set<String> = emptySet(),
     val favoriteFolderSelection: Set<String> = emptySet(),
     val newFavoriteFolderDraft: String? = null,
     val favoriteSaving: Boolean = false,
