@@ -4,6 +4,8 @@
 
 ## 状态快照
 
+**S4-10A25 DONE：扩大阅读器工具栏长按热区。** 热区从屏幕中央 32% × 20% 扩大到 60% × 40%（横向 20%–80%，纵向 30%–70%）；仅调整可触发范围，仍需长按 1 秒且未被滑动手势取消。版本升至 1.4.2 / versionCode 1004002。验证：JDK 17 `:feature:reader:compileDebugUnitTestKotlin :app:assembleDebug`（`--no-daemon --max-workers=2`）— BUILD SUCCESSFUL；`git diff --check` — PASS。未做真机手势验收。
+
 **S4-10A24 DONE：修正阅读记录删除按钮的显示时机。** 按用户澄清，删除按钮现在默认隐藏，左滑列表项后才揭示；右滑可收起，漫画卡片点击续读不变。版本升至 1.4.1 / versionCode 1004001。验证：JDK 17 `:app:assembleDebug`（`--no-daemon --max-workers=2`）— BUILD SUCCESSFUL；`git diff --check` — PASS。未做真机手势验收。
 
 **S4-10A23 DONE：增加独立的完整阅读记录页。** 首页最近阅读的“全部”现在进入独立页面，列出所有有阅读进度的漫画（每部漫画显示最近章节），复用横向列表卡片；继续阅读仍恢复章节/页码，item 右侧垃圾桶按钮删除该漫画的完整阅读记录和恢复进度，不再依赖滑动删除。增加无界阅读列表仓库回归和路由编码覆盖。版本升至 1.4.0 / versionCode 1004000。验证：JDK 17 `:data:history:testDebugUnitTest :core:navigation:testDebugUnitTest :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。未做真机验收。当前唯一下一任务仍为 S3-02A5。
