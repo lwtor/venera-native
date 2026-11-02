@@ -9,7 +9,7 @@ fun backDestination(
     readerOrigin: AppRoute? = null,
 ): AppRoute? = when (route) {
     AppRoute.Home -> null
-    AppRoute.Library, AppRoute.Profile -> AppRoute.Home
+    AppRoute.Library, AppRoute.Profile, AppRoute.ReadingHistory -> AppRoute.Home
     AppRoute.Sources -> AppRoute.Profile
     AppRoute.Backup, AppRoute.About -> AppRoute.Profile
     AppRoute.Downloads -> AppRoute.Library

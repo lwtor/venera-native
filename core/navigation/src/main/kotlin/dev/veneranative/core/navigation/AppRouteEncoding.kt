@@ -23,6 +23,7 @@ fun AppRoute.encode(): String = when (this) {
     AppRoute.Home -> "home"
     AppRoute.Sources -> "sources"
     AppRoute.Library -> "library"
+    AppRoute.ReadingHistory -> "reading-history"
     AppRoute.Downloads -> "downloads"
     AppRoute.Backup -> "backup"
     AppRoute.Profile -> "profile"
@@ -51,6 +52,7 @@ fun decodeAppRoute(encoded: String): AppRoute? {
         "home" -> AppRoute.Home
         "sources" -> AppRoute.Sources
         "library" -> AppRoute.Library
+        "reading-history" -> AppRoute.ReadingHistory
         "downloads" -> AppRoute.Downloads
         "backup" -> AppRoute.Backup
         "profile" -> AppRoute.Profile

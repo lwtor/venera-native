@@ -36,6 +36,9 @@ interface HistoryRepository {
     /** One latest chapter position per comic, ordered by the comics most recently read. */
     fun observeRecent(limit: Int): Flow<List<ReadingHistoryEntry>>
 
+    /** All comics with a saved position, newest first; unlike the home preview this is unbounded. */
+    fun observeAllRecent(): Flow<List<ReadingHistoryEntry>> = observeRecent(Int.MAX_VALUE)
+
     /** Every persisted chapter position for one comic, used for chapter read-state presentation. */
     fun observeComicHistory(comicKey: ComicKey): Flow<List<ReadingHistoryEntry>>
 

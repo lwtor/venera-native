@@ -22,6 +22,7 @@ class AppRouteEncodingTest {
         AppRoute.Home,
         AppRoute.Sources,
         AppRoute.Library,
+        AppRoute.ReadingHistory,
         AppRoute.Downloads,
         AppRoute.Profile,
         AppRoute.About,
@@ -65,6 +66,8 @@ class AppRouteEncodingTest {
         assertEquals(AppRoute.Library, decodeAppRoute("library"))
         assertEquals("downloads", AppRoute.Downloads.encode())
         assertEquals(AppRoute.Downloads, decodeAppRoute("downloads"))
+        assertEquals("reading-history", AppRoute.ReadingHistory.encode())
+        assertEquals(AppRoute.ReadingHistory, decodeAppRoute("reading-history"))
     }
 
     @Test

@@ -37,6 +37,8 @@ S4-10B2：core:designsystem 新增两种公共漫画条目，Feature 只提供�
 
 S4-10B3：core:model 定义分版本目录与当前阅读展示规则；data:collection 保存紧凑章节目录 JSON 并结合 core:database 的每漫画最近阅读 Flow，未新增 data:history 依赖。Room 10→11 增收藏目录与阅读版本可空字段；data:history 将 ChapterRef.Remote.group 带入历史，首页/详情恢复已知版本。详情成功加载只更新已有收藏目录，手动检查更新复用原响应；UI 只接收展示值。决定补充 ADR-0014。
 
+S4-10A23：AppRoute.ReadingHistory 由 `:app` 根导航至 `:feature:home` 的独立记录页；`:data:history` 提供按漫画去重的完整最近阅读 Flow，ViewModel 通过同一仓库删除记录/续读入口沿用 Reader 路由。页面复用 `ComicHorizontalCard`，显式显示删除按钮，不采用滑动删除。
+
 S4-10B5：data:collection 的 ensureChapters 显式为可见缺目录收藏复用 ChapterProbe；共享 FavoriteChapterLoader 在 Feature ViewModel scope 中管理两并发、取消与领域加载状态，持久化完成由 Room Flow 刷新界面。Home/Library 只报告条目进入/离开；没有 Feature 间依赖。ComicCoverCard 改为单 Painter 的清晰封面/模糊信息背景，沿用 core:image 的加载边界，横向组件不改。成本及策略见 ADR-0014。
 
 S4-10C1：comic_record/comic_chapter 与收藏归属独立，Room 11→12 保留旧字段及目录快照以便兼容迁移。C2/C3 的持久资源与过期协调遵循 ADR-0015；在完成接入前，不把表存在视为 UI 已切换。
@@ -67,7 +69,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:data:local` | SAF 目录/归档授权、扫描、自然排序、本地索引及有界页面缓存物化；按需复用图片头尺寸解析 | `:core:model`、`:core:database`、`:core:archive`、`:core:image`、DocumentFile |
 | `:data:download` | 下载队列与离线阅读：页级任务与状态机、并发限额（全局 4 / 单源 2）、原子写与图片头部校验、崩溃恢复扫描；`OfflineFirstPageProvider` 在章节下载完整时从文件系统提供页面，否则委托来源提供器。`worker/` 使用 WorkManager、前台通知与操作 Receiver；业务队列仍以 Room 为唯一事实来源，章节状态由页状态派生 | `:core:model`、`:core:database`、`:core:image`；Worker 子包另依赖 WorkManager 与 AndroidX Core |
 | `:core:designsystem` | Theme、设计 Token、共享漫画竖向卡片/横向列表与角标 | Compose、`:core:image`（封面渲染及取色；传递纯模型契约） |
-| `:feature:home` | Compose 首页：订阅最近阅读、收藏和本地漫画，呈现搜索、来源管理和书架入口，并把续读意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
+| `:feature:home` | Compose 首页与完整阅读记录页：订阅最近阅读、收藏和本地漫画，提供搜索、续读、逐漫画删除和书架入口，并把导航意图交给根导航 | Design System、`:core:model`、`:core:image`、`:data:history`、`:data:collection`、`:data:local` |
 | `:feature:library` | 书架页：收藏常驻主视图，下载队列与本地漫画从菜单进入；收藏支持用户收藏夹筛选、多选归属、四种排序、更新标记，本地页接入 SAF 导入、逐章阅读和移除；保存用户最后选择的收藏夹和排序 | Design System、`:core:model`、`:core:image`、`:data:collection`、`:data:download`、`:data:local`、`:data:settings` |
 | `:feature:details` | 漫画详情：元数据、封面槽位、简介与章节列表（分组、显示顺序、刷新）、收藏和批量下载；按作品保存章节排序与版本选择，从阅读历史恢复最近章节 | Design System、`:core:model`、`:core:image`、`:data:comic`、`:data:collection`、`:data:download`、`:data:history`、`:data:settings`、`:source:api` |
 | `:feature:backup` | GitHub 数据备份页面：选择快照类别、密码输入、手动备份与确认后合并恢复；账号授权移到我的页，Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |

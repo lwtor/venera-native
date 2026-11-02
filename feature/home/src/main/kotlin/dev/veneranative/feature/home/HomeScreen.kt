@@ -61,6 +61,7 @@ fun HomeRoute(
     onResumeReading: (ReadingHistoryEntry) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenHistory: () -> Unit,
 ) {
     val viewModelKey = "home-${history != null}-${collection != null}-${localRepository != null}"
     val homeViewModel: HomeViewModel = viewModel(key = viewModelKey) {
@@ -73,6 +74,7 @@ fun HomeRoute(
         onResumeReading = onResumeReading,
         onOpenSearch = onOpenSearch,
         onOpenLibrary = onOpenLibrary,
+        onOpenHistory = onOpenHistory,
         onFavoriteVisible = homeViewModel::onFavoriteVisible,
         onFavoriteHidden = homeViewModel::onFavoriteHidden,
     )
@@ -85,6 +87,7 @@ internal fun HomeScreen(
     onResumeReading: (ReadingHistoryEntry) -> Unit,
     onOpenSearch: () -> Unit,
     onOpenLibrary: () -> Unit,
+    onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
     onFavoriteVisible: (dev.veneranative.data.collection.FavoriteItem) -> Unit = {},
     onFavoriteHidden: (dev.veneranative.core.model.ComicRef) -> Unit = {},
@@ -117,7 +120,7 @@ internal fun HomeScreen(
                     SectionHeader(
                         title = "最近阅读",
                         action = if (state.recentReading.isNotEmpty()) "全部" else null,
-                        onClick = onOpenLibrary,
+                        onClick = onOpenHistory,
                     )
                     if (state.recentReading.isEmpty()) {
                         EmptyResumeCard(
@@ -331,6 +334,7 @@ private fun HomeScreenPreview() {
             onResumeReading = {},
             onOpenSearch = {},
             onOpenLibrary = {},
+            onOpenHistory = {},
         )
     }
 }

@@ -50,6 +50,7 @@ import dev.veneranative.feature.backup.BackupRoute
 import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
 import dev.veneranative.feature.home.HomeRoute
+import dev.veneranative.feature.home.ReadingHistoryRoute
 import dev.veneranative.feature.home.toChapterRef
 import dev.veneranative.feature.library.LibraryRoute
 import dev.veneranative.feature.profile.AboutRoute
@@ -239,6 +240,13 @@ private fun AppNavHost(
                         },
                         onOpenSearch = { onRouteChange(AppRoute.Search(null)) },
                         onOpenLibrary = { onRouteChange(AppRoute.Library) },
+                        onOpenHistory = { onRouteChange(AppRoute.ReadingHistory) },
+                    )
+
+                    AppRoute.ReadingHistory -> ReadingHistoryRoute(
+                        history = historyRepository,
+                        onResumeReading = { entry -> onRouteChange(AppRoute.Reader(entry.toChapterRef())) },
+                        onBack = onBack,
                     )
 
                     AppRoute.Backup -> BackupRoute(

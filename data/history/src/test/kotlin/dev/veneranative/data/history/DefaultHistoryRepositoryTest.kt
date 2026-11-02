@@ -76,6 +76,18 @@ class DefaultHistoryRepositoryTest {
         assertEquals(1, progressDao.rows.value.size)
     }
 
+    @Test fun `all recent returns more than the home preview limit`() = runTest {
+        repeat(7) { index ->
+            val comicKey = ComicKey(SourceId("source-a"), RemoteComicId("comic-$index"))
+            repository.record(entry(updatedAt = 1_000L + index).copy(comicKey = comicKey, comicTitle = "Comic $index"))
+        }
+
+        assertEquals(3, repository.observeRecent(3).first().size)
+        val all = repository.observeAllRecent().first()
+        assertEquals(7, all.size)
+        assertEquals("Comic 6", all.first().comicTitle)
+    }
+
     @Test fun `local reader progress uses a reserved history namespace and resumes`() = runTest {
         val localComic = LocalComicId("local-comic")
         val localChapter = LocalChapterId("chapter-1")

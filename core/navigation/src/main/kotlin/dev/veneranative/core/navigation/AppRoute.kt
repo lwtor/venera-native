@@ -26,6 +26,9 @@ sealed interface AppRoute {
     /** The shelf: favourite folders, downloads and imported comics. */
     data object Library : AppRoute
 
+    /** Full list of comics with saved reading progress. */
+    data object ReadingHistory : AppRoute
+
     /** A standalone download manager outside the main bottom navigation. */
     data object Downloads : AppRoute
 
