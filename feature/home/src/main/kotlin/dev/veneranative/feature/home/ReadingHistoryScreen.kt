@@ -7,9 +7,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -26,8 +34,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,6 +52,7 @@ import dev.veneranative.core.designsystem.component.comicSourceLabel
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.history.ReadingHistoryEntry
+import kotlin.math.roundToInt
 
 @Composable
 fun ReadingHistoryRoute(
@@ -120,29 +136,60 @@ private fun HistoryRow(
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val actionWidth = 72.dp
+    val actionWidthPx = with(LocalDensity.current) { actionWidth.toPx() }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    var isRevealed by remember { mutableStateOf(false) }
+    val animatedOffset by animateFloatAsState(
+        targetValue = when {
+            isDragging -> dragOffset
+            isRevealed -> -actionWidthPx
+            else -> 0f
+        },
+        label = "historyRowSwipeOffset",
+    )
     val request = entry.coverUrl?.let {
         ComicImageRequest(url = it, sourceId = entry.comicKey.sourceId, variant = "comic-cover", retainedCoverKey = entry.comicKey)
     }
-    ComicHorizontalCard(
-        title = entry.comicTitle,
-        request = request,
-        onClick = onClick,
-        badge = comicSourceLabel(entry.comicKey.sourceId.value),
-        supportingContent = {
-            Text(entry.chapterTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val progress = if (entry.pageCount > 0) (entry.pageIndex + 1f) / entry.pageCount else 0f
-            androidx.compose.material3.LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
-            Text("第 ${entry.pageIndex + 1} / ${entry.pageCount.coerceAtLeast(1)} 页", style = MaterialTheme.typography.labelSmall)
-        },
-        bottomContent = { Text("继续阅读  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
-        trailingContent = {
-            if (deleting) CircularProgressIndicator(modifier = Modifier.padding(8.dp), strokeWidth = 2.dp)
+    Box(Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.errorContainer)) {
+        Box(Modifier.align(Alignment.CenterEnd).width(actionWidth).fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (deleting) CircularProgressIndicator(strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onErrorContainer)
             else IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "删除《${entry.comicTitle}》阅读记录", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = "删除《${entry.comicTitle}》阅读记录", tint = MaterialTheme.colorScheme.onErrorContainer)
             }
-        },
-    )
+        }
+        ComicHorizontalCard(
+            title = entry.comicTitle,
+            request = request,
+            onClick = onClick,
+            modifier = Modifier.offset { IntOffset(animatedOffset.roundToInt(), 0) }
+                .draggable(
+                    orientation = Orientation.Horizontal,
+                    state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                        isDragging = true
+                        dragOffset = (dragOffset + delta).coerceIn(-actionWidthPx, 0f)
+                    },
+                    onDragStarted = {
+                        dragOffset = animatedOffset
+                        isDragging = true
+                    },
+                    onDragStopped = {
+                        isRevealed = dragOffset < -actionWidthPx * 0.35f
+                        isDragging = false
+                    },
+                ),
+            badge = comicSourceLabel(entry.comicKey.sourceId.value),
+            supportingContent = {
+                Text(entry.chapterTitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val progress = if (entry.pageCount > 0) (entry.pageIndex + 1f) / entry.pageCount else 0f
+                androidx.compose.material3.LinearProgressIndicator(progress = { progress.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                Text("第 ${entry.pageIndex + 1} / ${entry.pageCount.coerceAtLeast(1)} 页", style = MaterialTheme.typography.labelSmall)
+            },
+            bottomContent = { Text("继续阅读  ›", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
+        )
+    }
 }
 
 @Composable

@@ -37,7 +37,7 @@ S4-10B2：core:designsystem 新增两种公共漫画条目，Feature 只提供�
 
 S4-10B3：core:model 定义分版本目录与当前阅读展示规则；data:collection 保存紧凑章节目录 JSON 并结合 core:database 的每漫画最近阅读 Flow，未新增 data:history 依赖。Room 10→11 增收藏目录与阅读版本可空字段；data:history 将 ChapterRef.Remote.group 带入历史，首页/详情恢复已知版本。详情成功加载只更新已有收藏目录，手动检查更新复用原响应；UI 只接收展示值。决定补充 ADR-0014。
 
-S4-10A23：AppRoute.ReadingHistory 由 `:app` 根导航至 `:feature:home` 的独立记录页；`:data:history` 提供按漫画去重的完整最近阅读 Flow，ViewModel 通过同一仓库删除记录/续读入口沿用 Reader 路由。页面复用 `ComicHorizontalCard`，显式显示删除按钮，不采用滑动删除。
+S4-10A23：AppRoute.ReadingHistory 由 `:app` 根导航至 `:feature:home` 的独立记录页；`:data:history` 提供按漫画去重的完整最近阅读 Flow，ViewModel 通过同一仓库删除记录/续读入口沿用 Reader 路由。页面复用 `ComicHorizontalCard`，横向左滑揭示删除按钮。
 
 S4-10B5：data:collection 的 ensureChapters 显式为可见缺目录收藏复用 ChapterProbe；共享 FavoriteChapterLoader 在 Feature ViewModel scope 中管理两并发、取消与领域加载状态，持久化完成由 Room Flow 刷新界面。Home/Library 只报告条目进入/离开；没有 Feature 间依赖。ComicCoverCard 改为单 Painter 的清晰封面/模糊信息背景，沿用 core:image 的加载边界，横向组件不改。成本及策略见 ADR-0014。
 
