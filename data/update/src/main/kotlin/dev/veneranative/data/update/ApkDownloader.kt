@@ -29,6 +29,11 @@ class ApkDownloader(
     private val progressIntervalBytes: Long = DEFAULT_PROGRESS_INTERVAL_BYTES,
 ) {
     private val httpClient = baseClient.newBuilder()
+        // A public release asset needs no proxy; routing the download through the device's
+        // system proxy (VPN / ad-blocker / network accelerator) is the common reason a
+        // "check update" succeeds while the APK download fails, because those proxies often
+        // choke on GitHub's release CDN. Go direct instead.
+        .proxy(java.net.Proxy.NO_PROXY)
         // One APK download may legitimately take minutes; the call has no overall deadline and
         // each individual read gets a generous per-read timeout instead.
         .callTimeout(0, TimeUnit.MILLISECONDS)
@@ -43,7 +48,14 @@ class ApkDownloader(
         }
         val part = File(parent, target.name + ".part")
         try {
-            val response = awaitResponse(httpClient, Request.Builder().url(url).get().build())
+            val response = try {
+                awaitResponse(httpClient, Request.Builder().url(url).get().build())
+            } catch (error: IOException) {
+                if (error is java.net.SocketTimeoutException) {
+                    throw ApkDownloadException("the download timed out while connecting: ${error.message}")
+                }
+                throw ApkDownloadException("could not reach the download server: ${error.message}")
+            }
             response.use {
                 if (!it.isSuccessful) throw ApkDownloadException("download failed with HTTP ${it.code}")
                 val body = it.body ?: throw ApkDownloadException("download returned an empty body")
