@@ -69,29 +69,7 @@ class AboutViewModelTest {
         assertEquals(AboutUpdateProblem.NO_INSTALLABLE_APK, model.state.value.problem)
     }
 
-    @Test fun updateWithoutInstallPermissionWaitsForTheGrantAndResumesAfterwards() = runTest(dispatcher) {
-        val gateway = FakeGateway(check = SelfUpdateCheck.Available(RELEASE, APK, 1_006_000), canInstall = false)
-        val model = AboutViewModel(gateway, 1_005_000, dispatcher)
-        model.onAction(AboutAction.CheckForUpdate)
-        runCurrent()
-        model.onAction(AboutAction.StartUpdate)
-        runCurrent()
-        assertEquals(AboutUpdatePhase.AWAIT_PERMISSION, model.state.value.phase)
-        assertEquals(0, gateway.downloads)
-
-        model.onAction(AboutAction.OpenInstallPermission)
-        assertEquals(1, gateway.permissionPagesOpened)
-
-        // The user grants the permission and returns: the flow continues on its own.
-        gateway.canInstall = true
-        model.onAction(AboutAction.Resume)
-        runCurrent()
-        assertEquals(AboutUpdatePhase.INSTALLED, model.state.value.phase)
-        assertEquals(1, gateway.downloads)
-        assertEquals(1, gateway.installs)
-    }
-
-    @Test fun updateDownloadsInstallsAndReportsCompletion() = runTest(dispatcher) {
+    @Test fun updateDownloadsLaunchesInstallerAndReportsCompletion() = runTest(dispatcher) {
         val gateway = FakeGateway(
             check = SelfUpdateCheck.Available(RELEASE, APK, 1_006_000),
             progressBytes = listOf(1024, 2048, 3072),
@@ -105,6 +83,7 @@ class AboutViewModelTest {
         assertEquals(AboutUpdatePhase.INSTALLED, state.phase)
         assertEquals(3072L, state.downloadProgress?.bytesDownloaded)
         assertEquals(listOf(1024L, 2048L, 3072L), gateway.reportedProgress)
+        assertEquals(1, gateway.installs)
     }
 
     @Test fun downloadFailureMapsToDownloadProblemAndInstallFailureToInstallProblem() = runTest(dispatcher) {
@@ -122,7 +101,7 @@ class AboutViewModelTest {
         val installFailure = AboutViewModel(
             FakeGateway(
                 check = SelfUpdateCheck.Available(RELEASE, APK, 1_006_000),
-                installResult = ApkInstallResult.Failure(1, "aborted"),
+                installResult = ApkInstallResult.Failure("no installer available"),
             ),
             1_005_000, dispatcher,
         )
@@ -170,20 +149,14 @@ class AboutViewModelTest {
 
     private class FakeGateway(
         var check: Any,
-        var canInstall: Boolean = true,
-        var installResult: ApkInstallResult = ApkInstallResult.Success,
+        var installResult: ApkInstallResult = ApkInstallResult.Launched,
         var downloadError: Exception? = null,
         var progressBytes: List<Long> = emptyList(),
     ) : SelfUpdateGateway {
         var checks = 0
         var downloads = 0
         var installs = 0
-        var permissionPagesOpened = 0
         val reportedProgress = mutableListOf<Long>()
-
-        override fun canRequestInstalls(): Boolean = canInstall
-
-        override fun openInstallPermissionSettings() { permissionPagesOpened++ }
 
         override suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck {
             checks++
@@ -204,7 +177,7 @@ class AboutViewModelTest {
             return File("update.apk")
         }
 
-        override suspend fun install(apk: File): ApkInstallResult {
+        override fun install(apk: File): ApkInstallResult {
             installs++
             return installResult
         }

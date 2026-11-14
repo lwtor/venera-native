@@ -166,6 +166,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
     val selfUpdateService = SelfUpdateService(
         getApplication(), httpClient, SelfUpdateConfiguration.REPOSITORY_OWNER, SelfUpdateConfiguration.REPOSITORY_NAME,
+        SelfUpdateConfiguration.FILE_PROVIDER_AUTHORITY,
     )
     val catalog = DefaultComicCatalog(
         sourceRepository,

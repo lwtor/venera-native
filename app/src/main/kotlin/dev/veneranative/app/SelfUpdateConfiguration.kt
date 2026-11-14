@@ -4,4 +4,7 @@ package dev.veneranative.app
 object SelfUpdateConfiguration {
     const val REPOSITORY_OWNER = "lwtor"
     const val REPOSITORY_NAME = "venera-native"
+
+    /** Must match the `android:authorities` of the FileProvider declared in the manifest. */
+    const val FILE_PROVIDER_AUTHORITY = "dev.veneranative.selfupdate"
 }

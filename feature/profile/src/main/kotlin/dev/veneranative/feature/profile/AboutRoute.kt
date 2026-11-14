@@ -10,7 +10,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -18,9 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.data.update.SelfUpdateGateway
@@ -33,15 +29,6 @@ data class InstalledAppInfo(val versionName: String, val versionCode: Long)
 fun AboutRoute(info: InstalledAppInfo, gateway: SelfUpdateGateway, onBack: () -> Unit) {
     val model: AboutViewModel = viewModel { AboutViewModel(gateway, info.versionCode) }
     val state by model.state.collectAsStateWithLifecycle()
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner) {
-        // Returning from the one-time install-permission settings resumes the update flow.
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) model.onAction(AboutAction.Resume)
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
     AboutScreen(info, state, model::onAction, onBack)
 }
 
@@ -123,19 +110,6 @@ private fun UpdateDialogs(state: AboutUiState, onAction: (AboutAction) -> Unit) 
             dismissButton = { TextButton(onClick = { onAction(AboutAction.CancelUpdate) }) { Text("取消") } },
         )
 
-        AboutUpdatePhase.AWAIT_PERMISSION -> AlertDialog(
-            onDismissRequest = { onAction(AboutAction.CancelUpdate) },
-            title = { Text("需要安装权限") },
-            text = {
-                Text(
-                    "首次自动更新需要允许本应用安装未知应用。请点击「去授权」并在系统设置中允许，" +
-                        "返回后更新会自动继续；之后的更新不再需要这一步。",
-                )
-            },
-            confirmButton = { TextButton(onClick = { onAction(AboutAction.OpenInstallPermission) }) { Text("去授权") } },
-            dismissButton = { TextButton(onClick = { onAction(AboutAction.CancelUpdate) }) { Text("取消") } },
-        )
-
         AboutUpdatePhase.DOWNLOADING -> AlertDialog(
             onDismissRequest = { onAction(AboutAction.CancelUpdate) },
             title = { Text("正在下载新版本") },
@@ -158,17 +132,17 @@ private fun UpdateDialogs(state: AboutUiState, onAction: (AboutAction) -> Unit) 
 
         AboutUpdatePhase.INSTALLING -> AlertDialog(
             onDismissRequest = { onAction(AboutAction.CancelUpdate) },
-            title = { Text("正在安装") },
+            title = { Text("等待安装") },
             text = {
-                Text("安装确认后应用将自动完成更新并重启；期间无需任何操作。")
+                Text("请在系统弹出的安装页面点击「安装」完成更新；安装完成后应用会自动重启。")
             },
             confirmButton = {},
         )
 
         AboutUpdatePhase.INSTALLED -> AlertDialog(
             onDismissRequest = { onAction(AboutAction.DismissInstalled) },
-            title = { Text("更新完成") },
-            text = { Text("新版本已安装。如果应用没有自动重启，请重新打开它。") },
+            title = { Text("已发起安装") },
+            text = { Text("已打开系统安装页面，请确认安装。更新完成后应用会自动重启。") },
             confirmButton = { TextButton(onClick = { onAction(AboutAction.DismissInstalled) }) { Text("好的") } },
         )
 
@@ -178,7 +152,7 @@ private fun UpdateDialogs(state: AboutUiState, onAction: (AboutAction) -> Unit) 
 
 private fun updateSupportingText(state: AboutUiState): String = when (state.phase) {
     AboutUpdatePhase.CHECKING -> "正在检查…"
-    AboutUpdatePhase.CONFIRM, AboutUpdatePhase.AWAIT_PERMISSION ->
+    AboutUpdatePhase.CONFIRM ->
         state.newVersionName?.let { "发现新版本 v$it" } ?: "发现新版本"
     AboutUpdatePhase.DOWNLOADING -> state.downloadProgress?.let { progress ->
         val downloaded = formatBytes(progress.bytesDownloaded)

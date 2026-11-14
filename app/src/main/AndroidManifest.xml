@@ -11,9 +11,6 @@
     <!-- Declared here, granted at runtime: on API 33+ the user has to allow notifications. Until
          they do the download still runs, only its progress is hidden. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- In-app self-updates (ADR-0017): installing a downloaded release APK through
-         PackageInstaller requires the user to allow this app to install unknown apps once. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <application
         android:name=".VeneraApplication"
         android:icon="@drawable/ic_launcher"
@@ -35,5 +32,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Exposes the downloaded self-update APK to the system installer (ADR-0017). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.selfupdate"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

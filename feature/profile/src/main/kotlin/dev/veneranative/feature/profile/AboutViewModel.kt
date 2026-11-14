@@ -25,11 +25,9 @@ enum class AboutUpdatePhase {
     CHECKING,
     /** A newer release is known and waits for the user to confirm the update. */
     CONFIRM,
-    /** The one-time "install unknown apps" permission has not been granted yet. */
-    AWAIT_PERMISSION,
     DOWNLOADING,
     INSTALLING,
-    /** The system installed the new version; the app process may be killed at any moment. */
+    /** The system installer was launched; the app process may be killed once the user confirms. */
     INSTALLED,
 }
 
@@ -51,9 +49,6 @@ data class AboutUiState(
 sealed interface AboutAction {
     data object CheckForUpdate : AboutAction
     data object StartUpdate : AboutAction
-    data object OpenInstallPermission : AboutAction
-    /** Sent when the screen resumes, e.g. after returning from the permission settings. */
-    data object Resume : AboutAction
     data object CancelUpdate : AboutAction
     data object DismissInstalled : AboutAction
 }
@@ -71,8 +66,6 @@ class AboutViewModel(
         when (action) {
             AboutAction.CheckForUpdate -> checkForUpdate()
             AboutAction.StartUpdate -> startUpdate()
-            AboutAction.OpenInstallPermission -> gateway.openInstallPermissionSettings()
-            AboutAction.Resume -> continueAfterPermissionGrant()
             AboutAction.CancelUpdate -> cancel()
             AboutAction.DismissInstalled -> mutableState.value = AboutUiState()
         }
@@ -110,10 +103,6 @@ class AboutViewModel(
     private fun startUpdate() {
         if (job?.isActive == true) return
         val apk = state.value.apk ?: return
-        if (!gateway.canRequestInstalls()) {
-            mutableState.update { it.copy(phase = AboutUpdatePhase.AWAIT_PERMISSION) }
-            return
-        }
         job = viewModelScope.launch {
             mutableState.update { it.copy(phase = AboutUpdatePhase.DOWNLOADING, downloadProgress = null, problem = null) }
             val file: File = try {
@@ -129,8 +118,8 @@ class AboutViewModel(
             }
             mutableState.update { it.copy(phase = AboutUpdatePhase.INSTALLING) }
             try {
-                when (withContext(workerDispatcher) { gateway.install(file) }) {
-                    ApkInstallResult.Success -> mutableState.update { it.copy(phase = AboutUpdatePhase.INSTALLED) }
+                when (gateway.install(file)) {
+                    ApkInstallResult.Launched -> mutableState.update { it.copy(phase = AboutUpdatePhase.INSTALLED) }
                     is ApkInstallResult.Failure ->
                         mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, problem = AboutUpdateProblem.INSTALL) }
                 }
@@ -138,12 +127,6 @@ class AboutViewModel(
                 if (failure is CancellationException) throw failure
                 mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, problem = AboutUpdateProblem.INSTALL) }
             }
-        }
-    }
-
-    private fun continueAfterPermissionGrant() {
-        if (state.value.phase == AboutUpdatePhase.AWAIT_PERMISSION && gateway.canRequestInstalls()) {
-            startUpdate()
         }
     }
 

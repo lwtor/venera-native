@@ -1,13 +1,8 @@
 package dev.veneranative.data.update
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import java.io.File
-import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.OkHttpClient
-import kotlin.coroutines.resume
 
 sealed interface SelfUpdateCheck {
     data object UpToDate : SelfUpdateCheck
@@ -27,22 +22,17 @@ sealed interface SelfUpdateCheck {
  * `:feature:profile` stays JVM-testable without Android framework types.
  */
 interface SelfUpdateGateway {
-    /** Whether the user already allowed this app to install unknown apps. */
-    fun canRequestInstalls(): Boolean
-
-    /** Opens the system page where the user grants that one-time permission. */
-    fun openInstallPermissionSettings()
-
     suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck
 
     /** Downloads the APK; [onProgress] is invoked on the caller's dispatcher as bytes arrive. */
     suspend fun download(apk: GitHubReleaseAsset, onProgress: (ApkDownloadProgress) -> Unit): File
 
     /**
-     * Installs the downloaded APK. Suspends through any system confirmation dialog and resolves
-     * with the final outcome; on success the system usually kills the app process.
+     * Hands the downloaded APK to the system package installer. Returns immediately once the
+     * installer is launched; the user confirms the install in the system dialog. No install
+     * outcome is reported back.
      */
-    suspend fun install(apk: File): ApkInstallResult
+    fun install(apk: File): ApkInstallResult
 }
 
 /** GitHub-Releases-backed implementation, assembled by the app layer with its shared HTTP client. */
@@ -51,23 +41,14 @@ class SelfUpdateService(
     httpClient: OkHttpClient,
     private val owner: String,
     private val repository: String,
+    private val providerAuthority: String,
 ) : SelfUpdateGateway {
     private val appContext = context.applicationContext
     private val api = GitHubReleaseApi(httpClient)
     private val downloader = ApkDownloader(httpClient)
-    private val installer = ApkInstaller()
+    private val installer = ApkInstaller(providerAuthority)
     private val downloadDirectory: File
         get() = File(appContext.cacheDir, "self-update").apply { mkdirs() }
-
-    override fun canRequestInstalls(): Boolean = appContext.packageManager.canRequestPackageInstalls()
-
-    override fun openInstallPermissionSettings() {
-        val intent = Intent(
-            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-            Uri.parse("package:${appContext.packageName}"),
-        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        appContext.startActivity(intent)
-    }
 
     override suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck {
         val release = api.latestRelease(owner, repository)
@@ -86,11 +67,5 @@ class SelfUpdateService(
         return downloader.download(apk.downloadUrl, target, onProgress)
     }
 
-    override suspend fun install(apk: File): ApkInstallResult = suspendCancellableCoroutine { continuation ->
-        // The session keeps running after cancellation: a closed dialog must not abort an install
-        // the user may still confirm; the outcome callback is simply ignored when inactive.
-        installer.install(appContext, apk) { result ->
-            if (continuation.isActive) continuation.resume(result)
-        }
-    }
+    override fun install(apk: File): ApkInstallResult = installer.install(appContext, apk)
 }
