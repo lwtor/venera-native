@@ -122,23 +122,31 @@ class AboutViewModel(
     private fun startUpdate() {
         if (job?.isActive == true) return
         val apk = state.value.apk ?: return
+        val newVersionCode = state.value.newVersionCode
         job = viewModelScope.launch {
-            mutableState.update { it.copy(phase = AboutUpdatePhase.DOWNLOADING, downloadProgress = null, problem = null) }
-            // The worker reports progress as a fraction; mirror it into the UI while it runs.
-            val progressJob = launch {
-                gateway.observeDownloadProgress().collect { fraction ->
-                    mutableState.update { current -> current.copy(downloadProgress = fraction) }
+            // Reuse a prefetched APK when one is already on disk, skipping the foreground download.
+            val cached = gateway.cachedApk(newVersionCode)
+            val file: File = if (cached != null) {
+                cached
+            } else {
+                mutableState.update { it.copy(phase = AboutUpdatePhase.DOWNLOADING, downloadProgress = null, problem = null) }
+                // The worker reports progress as a fraction; mirror it into the UI while it runs.
+                val progressJob = launch {
+                    gateway.observeDownloadProgress().collect { fraction ->
+                        mutableState.update { current -> current.copy(downloadProgress = fraction) }
+                    }
                 }
-            }
-            val file: File = try {
-                gateway.downloadInForeground(apk)
-            } catch (failure: Exception) {
-                if (failure is CancellationException) throw failure
+                val downloaded = try {
+                    gateway.downloadInForeground(apk)
+                } catch (failure: Exception) {
+                    if (failure is CancellationException) throw failure
+                    progressJob.cancel()
+                    mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, problem = AboutUpdateProblem.DOWNLOAD) }
+                    return@launch
+                }
                 progressJob.cancel()
-                mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, problem = AboutUpdateProblem.DOWNLOAD) }
-                return@launch
+                downloaded
             }
-            progressJob.cancel()
             mutableState.update { it.copy(phase = AboutUpdatePhase.INSTALLING) }
             try {
                 when (gateway.install(file)) {

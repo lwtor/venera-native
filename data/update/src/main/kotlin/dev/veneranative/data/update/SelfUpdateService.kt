@@ -4,7 +4,11 @@ import android.content.Context
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
@@ -26,6 +30,20 @@ sealed interface SelfUpdateCheck {
         val apk: GitHubReleaseAsset,
         val versionCode: Long,
     ) : SelfUpdateCheck
+}
+
+/**
+ * The process-wide self-update status driven by the startup prefetch. The app layer collects it
+ * to light the badge on the profile screen; `Downloaded` means an APK is ready to install.
+ */
+sealed interface SelfUpdateStatus {
+    data object Idle : SelfUpdateStatus
+
+    /** A newer release is known; its APK is either not yet downloaded or failed to prefetch. */
+    data class UpdateAvailable(val versionCode: Long) : SelfUpdateStatus
+
+    /** The APK for [versionCode] has been downloaded and is ready to hand to the installer. */
+    data class Downloaded(val versionCode: Long, val apkFile: File) : SelfUpdateStatus
 }
 
 /**
@@ -53,6 +71,9 @@ interface SelfUpdateGateway {
      * outcome is reported back.
      */
     fun install(apk: File): ApkInstallResult
+
+    /** Returns the already-downloaded APK for [versionCode], or null when none is cached. */
+    fun cachedApk(versionCode: Long): File?
 }
 
 /** GitHub-Releases-backed implementation, assembled by the app layer with its shared HTTP client. */
@@ -67,8 +88,12 @@ class SelfUpdateService(
     private val api = GitHubReleaseApi(httpClient)
     private val downloader = ApkDownloader(httpClient)
     private val installer = ApkInstaller(providerAuthority)
+    private val stateStore = UpdateStateStore(appContext)
     private val downloadDirectory: File
         get() = File(appContext.cacheDir, "self-update").apply { mkdirs() }
+
+    private val mutableUpdateStatus = MutableStateFlow<SelfUpdateStatus>(SelfUpdateStatus.Idle)
+    val updateStatus: StateFlow<SelfUpdateStatus> = mutableUpdateStatus.asStateFlow()
 
     override suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck {
         val release = api.latestRelease(owner, repository)
@@ -123,4 +148,42 @@ class SelfUpdateService(
     }
 
     override fun install(apk: File): ApkInstallResult = installer.install(appContext, apk)
+
+    override fun cachedApk(versionCode: Long): File? = stateStore.cachedApkForVersion(versionCode)
+
+    /**
+     * Startup update check plus silent prefetch. Runs on the graph's IO scope; any failure is
+     * swallowed so a transient network problem never crashes or spams the user. A known update is
+     * surfaced through [updateStatus] so the profile badge lights even when the prefetch fails.
+     */
+    suspend fun checkAndPrefetch(installedVersionCode: Long) {
+        val check = try {
+            checkForUpdate(installedVersionCode)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            return
+        }
+        val available = when (check) {
+            is SelfUpdateCheck.Available -> check
+            else -> return
+        }
+
+        mutableUpdateStatus.value = SelfUpdateStatus.UpdateAvailable(available.versionCode)
+
+        stateStore.cachedApkForVersion(available.versionCode)?.let { cached ->
+            mutableUpdateStatus.value = SelfUpdateStatus.Downloaded(available.versionCode, cached)
+            return
+        }
+
+        val target = File(downloadDirectory, ReleaseSelection.sanitizeAssetFileName(available.apk.name))
+        try {
+            downloader.download(available.apk.downloadUrl, target)
+            stateStore.saveDownloadedApk(available.versionCode, target.absolutePath)
+            mutableUpdateStatus.value = SelfUpdateStatus.Downloaded(available.versionCode, target)
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
+            // Keep the badge lit; the user can still tap through and retry the download manually.
+            mutableUpdateStatus.value = SelfUpdateStatus.UpdateAvailable(available.versionCode)
+        }
+    }
 }

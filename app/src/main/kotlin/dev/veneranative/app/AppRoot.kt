@@ -46,6 +46,7 @@ import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.history.ReadingProgressTracker
 import dev.veneranative.data.local.localReaderKey
 import dev.veneranative.data.source.DefaultSourceRepository
+import dev.veneranative.data.update.SelfUpdateStatus
 import dev.veneranative.feature.backup.BackupRoute
 import dev.veneranative.feature.details.DetailsRoute
 import dev.veneranative.feature.explore.ExploreRoute
@@ -162,6 +163,9 @@ private fun AppNavHost(
     backupFactory: dev.veneranative.data.backup.GitHubBackupGatewayFactory?,
     selfUpdateService: dev.veneranative.data.update.SelfUpdateService,
 ) {
+    val updateStatus by selfUpdateService.updateStatus.collectAsStateWithLifecycle()
+    val updateAvailable =
+        updateStatus is SelfUpdateStatus.UpdateAvailable || updateStatus is SelfUpdateStatus.Downloaded
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
     val routeStateHolder = rememberSaveableStateHolder()
     val onBack: () -> Unit = {
@@ -262,6 +266,7 @@ private fun AppNavHost(
                         onOpenBackup = { onRouteChange(AppRoute.Backup) },
                         onOpenAbout = { onRouteChange(AppRoute.About) },
                         onOpenSources = { onRouteChange(AppRoute.Sources) },
+                        updateAvailable = updateAvailable,
                     )
 
                     AppRoute.About -> {

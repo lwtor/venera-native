@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -172,6 +173,20 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         getApplication(), httpClient, SelfUpdateConfiguration.REPOSITORY_OWNER, SelfUpdateConfiguration.REPOSITORY_NAME,
         SelfUpdateConfiguration.FILE_PROVIDER_AUTHORITY,
     )
+    init {
+        // Check for updates once at startup and prefetch the APK in the background. The profile
+        // badge observes `selfUpdateService.updateStatus`, so a discovered update shows up without
+        // the user opening the About screen.
+        scope.launch {
+            val installedVersionCode = runCatching {
+                val app = getApplication<android.app.Application>()
+                @Suppress("DEPRECATION")
+                val info = app.packageManager.getPackageInfo(app.packageName, 0)
+                PackageInfoCompat.getLongVersionCode(info)
+            }.getOrNull() ?: return@launch
+            selfUpdateService.checkAndPrefetch(installedVersionCode)
+        }
+    }
     val catalog = DefaultComicCatalog(
         sourceRepository,
         EngineSourceCore(runtime, onCallFailure = { source, member, error ->

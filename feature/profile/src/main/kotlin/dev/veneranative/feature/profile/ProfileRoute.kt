@@ -31,11 +31,17 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
-fun ProfileRoute(factory: GitHubBackupGatewayFactory?, onOpenBackup: () -> Unit, onOpenAbout: () -> Unit, onOpenSources: () -> Unit) {
+fun ProfileRoute(
+    factory: GitHubBackupGatewayFactory?,
+    onOpenBackup: () -> Unit,
+    onOpenAbout: () -> Unit,
+    onOpenSources: () -> Unit,
+    updateAvailable: Boolean = false,
+) {
     val model: ProfileViewModel = viewModel(key = "profile-${factory != null}") { ProfileViewModel(factory?.create()) }
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(model) { model.onAction(ProfileAction.Refresh) }
-    ProfileScreen(state, factory != null, model::onAction, onOpenBackup, onOpenAbout, onOpenSources)
+    ProfileScreen(state, factory != null, model::onAction, onOpenBackup, onOpenAbout, onOpenSources, updateAvailable)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -47,6 +53,7 @@ internal fun ProfileScreen(
     onOpenBackup: () -> Unit,
     onOpenAbout: () -> Unit,
     onOpenSources: () -> Unit,
+    updateAvailable: Boolean,
 ) {
     val colors = MaterialTheme.colorScheme
     Scaffold(
@@ -147,7 +154,15 @@ internal fun ProfileScreen(
                             headlineContent = { Text("关于 Venera Native") },
                             supportingContent = { Text("版本信息") },
                             leadingContent = { Icon(Icons.Default.Info, null, tint = colors.primary) },
-                            trailingContent = { Text("›", style = MaterialTheme.typography.headlineSmall) },
+                            trailingContent = {
+                                if (updateAvailable) {
+                                    BadgedBox(badge = { Badge() }) {
+                                        Text("›", style = MaterialTheme.typography.headlineSmall)
+                                    }
+                                } else {
+                                    Text("›", style = MaterialTheme.typography.headlineSmall)
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth().testTag("profile_about").clickable(onClick = onOpenAbout),
                             colors = ListItemDefaults.colors(containerColor = colors.surfaceContainerLow),
                         )
