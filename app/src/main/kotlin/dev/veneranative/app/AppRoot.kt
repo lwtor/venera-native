@@ -75,6 +75,7 @@ internal fun AppRoot(
     val searchHistoryRepository by graph.searchHistory.collectAsStateWithLifecycle()
     val screenPreferences by graph.screenPreferences.collectAsStateWithLifecycle()
     val backupFactory by graph.backupFactory.collectAsStateWithLifecycle()
+    val selfUpdateService = graph.selfUpdateService
     val appScope = graph.scope
     val progressTracker = graph.progressTracker
     val catalog = graph.catalog
@@ -131,6 +132,7 @@ internal fun AppRoot(
             screenPreferences = screenPreferences,
             progressTracker = progressTracker,
             backupFactory = backupFactory,
+            selfUpdateService = selfUpdateService,
         )
     }
 }
@@ -158,6 +160,7 @@ private fun AppNavHost(
     screenPreferences: dev.veneranative.data.settings.ScreenPreferenceRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
     backupFactory: dev.veneranative.data.backup.GitHubBackupGatewayFactory?,
+    selfUpdateService: dev.veneranative.data.update.SelfUpdateService,
 ) {
     val backRoute = backDestination(route, detailsOrigin, readerOrigin)
     val routeStateHolder = rememberSaveableStateHolder()
@@ -268,7 +271,7 @@ private fun AppNavHost(
                             InstalledAppInfo(installed.versionName ?: "未知",
                                 androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(installed))
                         }
-                        AboutRoute(info, onBack)
+                        AboutRoute(info, selfUpdateService, onBack)
                     }
 
                     AppRoute.Library -> {

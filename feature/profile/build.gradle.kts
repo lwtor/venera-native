@@ -4,6 +4,7 @@ dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:image"))
     implementation(project(":data:backup"))
+    implementation(project(":data:update"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.foundation)

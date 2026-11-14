@@ -1,0 +1,107 @@
+package dev.veneranative.data.update
+
+import java.io.File
+import java.nio.file.Files
+import kotlinx.coroutines.test.runTest
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import okhttp3.OkHttpClient
+import okio.Buffer
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+
+class ApkDownloaderTest {
+
+    @get:Rule
+    val tmp = TemporaryFolder()
+
+    private val downloader = ApkDownloader(OkHttpClient(), progressIntervalBytes = 1024)
+
+    @Test
+    fun `downloads an apk with progress and leaves no part file`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val bytes = apkBytes(4096)
+            server.enqueue(MockResponse.Builder().body(Buffer().write(bytes)).build())
+            val target = File(tmp.newFolder(), "update.apk")
+
+            val progress = mutableListOf<ApkDownloadProgress>()
+            val result = downloader.download(server.url("/release.apk").toString(), target, progress::add)
+
+            assertEquals(target, result)
+            assertTrue(target.isFile)
+            assertEquals(bytes.size.toLong(), target.length())
+            assertFalse(File(target.parentFile, target.name + ".part").exists())
+            assertEquals(bytes.size.toLong(), progress.last().bytesDownloaded)
+            assertEquals(bytes.size.toLong(), progress.last().totalBytes)
+            // A small body arrives in one buffered read, so every report already carries the
+            // full byte count; the guarantees that matter are monotonicity and completeness.
+            assertTrue(progress.zipWithNext().all { (earlier, later) -> later.bytesDownloaded >= earlier.bytesDownloaded })
+            assertEquals(1f, progress.last().fraction!!, 0.0001f)
+        }
+    }
+
+    @Test
+    fun `rejects a body that is not an apk`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse.Builder().body("<html>404 page</html>").build())
+            val target = File(tmp.newFolder(), "update.apk")
+
+            val failure = runCatching {
+                downloader.download(server.url("/release.apk").toString(), target)
+            }.exceptionOrNull()
+
+            assertTrue(failure is ApkDownloadException)
+            assertTrue(failure!!.message!!.contains("not an Android package"))
+            assertFalse(target.exists())
+            assertFalse(File(target.parentFile, target.name + ".part").exists())
+        }
+    }
+
+    @Test
+    fun `maps an http error to a download exception and writes nothing`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            server.enqueue(MockResponse.Builder().code(404).body("gone").build())
+            val target = File(tmp.newFolder(), "update.apk")
+
+            val failure = runCatching {
+                downloader.download(server.url("/release.apk").toString(), target)
+            }.exceptionOrNull()
+
+            assertTrue(failure is ApkDownloadException)
+            assertTrue(failure!!.message!!.contains("404"))
+            assertFalse(target.exists())
+            assertFalse(File(target.parentFile, target.name + ".part").exists())
+        }
+    }
+
+    @Test
+    fun `replaces a stale file from an earlier download attempt`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val bytes = apkBytes(2048)
+            server.enqueue(MockResponse.Builder().body(Buffer().write(bytes)).build())
+            val folder = tmp.newFolder()
+            val target = File(folder, "update.apk").apply { writeBytes(ByteArray(16)) }
+
+            downloader.download(server.url("/release.apk").toString(), target)
+
+            assertEquals(bytes.size.toLong(), target.length())
+            assertEquals(1, Files.list(folder.toPath()).use { it.count() })
+        }
+    }
+
+    private fun apkBytes(size: Int): ByteArray = ByteArray(size).also { bytes ->
+        // APK files are ZIP archives starting with a local file header.
+        bytes[0] = 0x50
+        bytes[1] = 0x4B
+        bytes[2] = 0x03
+        bytes[3] = 0x04
+    }
+}

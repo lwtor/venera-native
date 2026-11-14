@@ -74,6 +74,8 @@ dependencies {
     implementation(project(":data:search"))
     implementation(project(":data:settings"))
     implementation(project(":data:source"))
+    // The assembly layer pairs the self-update service with the shared HTTP client (ADR-0017).
+    implementation(project(":data:update"))
     implementation(project(":feature:details"))
     implementation(project(":feature:backup"))
     implementation(project(":feature:profile"))

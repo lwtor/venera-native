@@ -36,6 +36,7 @@ include(
     ":data:search",
     ":data:settings",
     ":data:source",
+    ":data:update",
     ":feature:details",
     ":feature:backup",
     ":feature:profile",

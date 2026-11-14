@@ -16,6 +16,10 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | [ADR-0011](0011-chapter-reference-identity.md) | 远端与本地章节统一身份 | Accepted |
 | [ADR-0012](0012-bounded-source-timers.md) | 受限且可取消的来源计时器 | Accepted |
 | [ADR-0013](0013-github-private-backup.md) | GitHub 私有仓库选择性备份与本地加密快照 | Accepted（实现中） |
+| [ADR-0014](0014-shared-comic-cards.md) | 共享漫画卡片与横向列表 | Accepted |
+| [ADR-0015](0015-retained-comic-data.md) | 保留漫画资料与资源 | Accepted |
+| [ADR-0016](0016-installed-source-settings-and-login.md) | 已安装来源的私有设置与登录 | Accepted |
+| [ADR-0017](0017-github-release-self-update.md) | GitHub Release 应用内自升级 | Accepted |
 
 ## 编写规则
 
@@ -24,7 +28,3 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 - 必须包含上下文、决策、理由、后果和替代方案。
 - 旧 ADR 不删除；被替代时互相链接。
 - ADR 记录“为什么”，实现文档记录“怎么做”。
-
-- [ADR-0014：共享漫画卡片与横向列表](0014-shared-comic-cards.md)
-
-- [ADR-0015：保留漫画资料与资源](0015-retained-comic-data.md)

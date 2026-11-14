@@ -31,6 +31,6 @@ The artifact is `app/build/outputs/apk/release/app-release.apk`. Verify it with 
 2. Build `:app:assembleDebug` and `:app:assembleRelease`; run release-stage tests and lint required by `AGENTS.md`.
 3. Check `git diff --check`, review the staged diff, and confirm no credentials, user data, or build artifacts are staged.
 4. Commit with a Conventional Commit message and push the branch and matching annotated version tag.
-5. Create a GitHub Release for the tag, attach the signed APK named `venera-native-<version>.apk`, and include concise release notes.
+5. Create a GitHub Release for the tag, attach the signed APK named `venera-native-v<version>-<versionCode>.apk` (e.g. `venera-native-v1.6.0-1006000.apk`), and include concise release notes. The in-app updater parses the `versionCode` from this exact asset name to decide whether an update is available (ADR-0017), so do not rename the artifact after upload; keep the tag matching `v<version>` as the fallback signal.
 
 The project license and resolved runtime dependency inventory are included in the APK at `assets/licenses/` and linked from the repository README.

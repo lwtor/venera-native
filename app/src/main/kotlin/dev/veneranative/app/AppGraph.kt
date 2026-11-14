@@ -64,6 +64,7 @@ import dev.veneranative.data.search.DefaultSearchHistoryRepository
 import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.data.settings.DefaultScreenPreferenceRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
+import dev.veneranative.data.update.SelfUpdateService
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
@@ -163,6 +164,9 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         onSourceChanged = { network.clearSource(it); scope.launch { refreshComicSourceNames() } },
     )
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
+    val selfUpdateService = SelfUpdateService(
+        getApplication(), httpClient, SelfUpdateConfiguration.REPOSITORY_OWNER, SelfUpdateConfiguration.REPOSITORY_NAME,
+    )
     val catalog = DefaultComicCatalog(
         sourceRepository,
         EngineSourceCore(runtime, onCallFailure = { source, member, error ->
