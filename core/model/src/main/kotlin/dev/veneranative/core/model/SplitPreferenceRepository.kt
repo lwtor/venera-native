@@ -1,10 +1,11 @@
 package dev.veneranative.core.model
 
 /**
- * Per-chapter persistence seam for the reader's "auto split double pages" feature.
+ * Persistence seam for the reader's "auto split double pages" feature.
  *
- * The reader depends on this contract (declared in `:core:model`) so it never talks to the data
- * layer directly. A concrete implementation stores preferences keyed by [ChapterRef].
+ * Chapter-level settings ([isSplitEnabled], [isPageExcluded]) are keyed by [ChapterRef]; the gutter
+ * overlap and half order are shared by the whole comic and keyed by [ComicRef]. The reader depends
+ * on this contract (declared in `:core:model`) so it never talks to the data layer directly.
  */
 interface SplitPreferenceRepository {
 
@@ -17,6 +18,21 @@ interface SplitPreferenceRepository {
     suspend fun isPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int): Boolean
 
     suspend fun setPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int, excluded: Boolean)
+
+    /**
+     * How far each half reaches past the centre line, as a fraction of the page width.
+     *
+     * Defaults to [PageSplit.DEFAULT_OVERLAP_FRACTION] so a repository that only stores chapter
+     * settings keeps working, and so implementations without persistence stay valid fakes.
+     */
+    suspend fun overlapFraction(comicRef: ComicRef): Float = PageSplit.DEFAULT_OVERLAP_FRACTION
+
+    suspend fun setOverlapFraction(comicRef: ComicRef, fraction: Float) = Unit
+
+    /** Whether the right half is shown before the left half when reading this comic. */
+    suspend fun isRightToLeft(comicRef: ComicRef): Boolean = false
+
+    suspend fun setRightToLeft(comicRef: ComicRef, rightToLeft: Boolean) = Unit
 }
 
 /**
@@ -40,4 +56,15 @@ fun ChapterRef.stableId(): String = when (this) {
         }
     }
     is ChapterRef.Local -> "local:${comicId.value}/${chapterId.value}"
+}
+
+/**
+ * Stable, collision-free identity for a comic, used to key per-comic split preferences.
+ *
+ * Every chapter of the same comic resolves to the same value, while two comics — local or remote —
+ * never share one.
+ */
+fun ComicRef.stableId(): String = when (this) {
+    is ComicRef.Remote -> "remote:${key.sourceId.value}/${key.remoteId.value}"
+    is ComicRef.Local -> "local:${id.value}"
 }

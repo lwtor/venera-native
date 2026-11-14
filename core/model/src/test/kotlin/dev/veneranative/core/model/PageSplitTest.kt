@@ -59,4 +59,68 @@ class PageSplitTest {
         assertEquals(0, halves[0].leftPx)
         assertEquals(width, halves[1].leftPx + halves[1].widthPx)
     }
+
+    @Test
+    fun `default arguments keep the historical 55 and 45 percent split`() {
+        val halves = PageSplit.halves(widthPx = 2000, heightPx = 1400)
+
+        assertEquals(0, halves[0].leftPx)
+        assertEquals(1100, halves[0].widthPx)
+        assertEquals(900, halves[1].leftPx)
+        assertEquals(1100, halves[1].widthPx)
+        assertEquals(PageSplit.LEFT_END_FRACTION, 0.55f)
+        assertEquals(PageSplit.RIGHT_START_FRACTION, 0.45f)
+    }
+
+    @Test
+    fun `zero overlap makes the halves meet without sharing pixels`() {
+        val halves = PageSplit.halves(widthPx = 2000, heightPx = 1400, overlapFraction = 0f)
+
+        val left = halves[0]
+        val right = halves[1]
+        assertEquals(1000, left.widthPx)
+        assertEquals(1000, right.leftPx)
+        assertEquals(left.leftPx + left.widthPx, right.leftPx)
+    }
+
+    @Test
+    fun `ten percent per-side overlap shares twenty percent of the width`() {
+        val width = 2000
+        val halves = PageSplit.halves(widthPx = width, heightPx = 1400, overlapFraction = 0.1f)
+
+        val left = halves[0]
+        val right = halves[1]
+        assertEquals(1200, left.widthPx) // 60%
+        assertEquals(800, right.leftPx) // 40%
+
+        val sharedPx = left.leftPx + left.widthPx - right.leftPx
+        assertEquals((width * 0.2f).toInt(), sharedPx)
+    }
+
+    @Test
+    fun `right to left only reorders the halves`() {
+        val normal = PageSplit.halves(widthPx = 2000, heightPx = 1400)
+        val reversed = PageSplit.halves(widthPx = 2000, heightPx = 1400, rightToLeft = true)
+
+        assertEquals(2, reversed.size)
+        assertFalse(reversed[0].isLeft)
+        assertTrue(reversed[1].isLeft)
+        assertEquals(normal[1], reversed[0])
+        assertEquals(normal[0], reversed[1])
+        // `isLeft` still describes the real side of the source image.
+        assertEquals(900, reversed[0].leftPx)
+        assertEquals(0, reversed[1].leftPx)
+    }
+
+    @Test
+    fun `overlap is clamped to the maximum`() {
+        val halves = PageSplit.halves(widthPx = 2000, heightPx = 1400, overlapFraction = 0.9f)
+        val clamped = PageSplit.halves(
+            widthPx = 2000,
+            heightPx = 1400,
+            overlapFraction = PageSplit.MAX_OVERLAP_FRACTION,
+        )
+
+        assertEquals(clamped, halves)
+    }
 }

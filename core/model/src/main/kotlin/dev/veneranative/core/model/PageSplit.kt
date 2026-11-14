@@ -26,28 +26,50 @@ object PageSplit {
     /** A page is a double page when it is strictly wider than it is tall. */
     const val SPLIT_ASPECT_RATIO_THRESHOLD = 1.0f
 
-    /** Right edge of the left half as a fraction of the full width (55%). */
-    const val LEFT_END_FRACTION = 0.55f
+    /**
+     * Default gutter overlap per side, as a fraction of the full width.
+     *
+     * Each half reaches this far past the centre line, so the two halves share `2 * 5%` of the
+     * image. This keeps the original 55%/45% split as the default behaviour.
+     */
+    const val DEFAULT_OVERLAP_FRACTION = 0.05f
 
-    /** Left edge of the right half as a fraction of the full width (45%). */
-    const val RIGHT_START_FRACTION = 0.45f
+    /** Upper bound for a user-chosen overlap, keeping each half at least 25% of the width. */
+    const val MAX_OVERLAP_FRACTION = 0.25f
+
+    /** Right edge of the left half at the default overlap (55%). Derived for compatibility. */
+    const val LEFT_END_FRACTION = 0.5f + DEFAULT_OVERLAP_FRACTION
+
+    /** Left edge of the right half at the default overlap (45%). Derived for compatibility. */
+    const val RIGHT_START_FRACTION = 0.5f - DEFAULT_OVERLAP_FRACTION
 
     fun isDoublePage(widthPx: Int, heightPx: Int): Boolean =
         heightPx > 0 && widthPx.toFloat() / heightPx.toFloat() > SPLIT_ASPECT_RATIO_THRESHOLD
 
     /**
-     * The left and right halves of a double page, or an empty list for a normal (portrait) page.
+     * The two halves of a double page, or an empty list for a normal (portrait) page.
      *
-     * The two halves share a 10% overlap: the left half spans `[0, 55%]` and the right half spans
-     * `[45%, 100%]`, so the gutter is present in both.
+     * [overlapFraction] is how far each half reaches past the centre line as a fraction of the full
+     * width: `0.05` yields the historical `[0, 55%]` / `[45%, 100%]` split. Wider overlaps keep more
+     * of the gutter in both halves for issues whose fold eats into the artwork.
+     *
+     * [rightToLeft] only changes the order of the returned list (right half first); [PageHalf.isLeft]
+     * always describes the real side of the source image.
      */
-    fun halves(widthPx: Int, heightPx: Int): List<PageHalf> {
+    fun halves(
+        widthPx: Int,
+        heightPx: Int,
+        overlapFraction: Float = DEFAULT_OVERLAP_FRACTION,
+        rightToLeft: Boolean = false,
+    ): List<PageHalf> {
         if (!isDoublePage(widthPx, heightPx)) return emptyList()
-        val leftEnd = (widthPx * LEFT_END_FRACTION).toInt().coerceAtLeast(1)
-        val rightStart = (widthPx * RIGHT_START_FRACTION).toInt().coerceIn(0, widthPx - 1)
-        return listOf(
-            PageHalf(leftPx = 0, widthPx = leftEnd, isLeft = true),
-            PageHalf(leftPx = rightStart, widthPx = widthPx - rightStart, isLeft = false),
-        )
+        val overlap = overlapFraction.coerceIn(0f, MAX_OVERLAP_FRACTION)
+        val leftEndFraction = (0.5f + overlap).coerceAtMost(1f)
+        val rightStartFraction = (0.5f - overlap).coerceAtLeast(0f)
+        val leftEnd = (widthPx * leftEndFraction).toInt().coerceIn(1, widthPx)
+        val rightStart = (widthPx * rightStartFraction).toInt().coerceIn(0, widthPx - 1)
+        val left = PageHalf(leftPx = 0, widthPx = leftEnd, isLeft = true)
+        val right = PageHalf(leftPx = rightStart, widthPx = widthPx - rightStart, isLeft = false)
+        return if (rightToLeft) listOf(right, left) else listOf(left, right)
     }
 }
