@@ -10,6 +10,7 @@ import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.SplitPreferenceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -20,6 +21,8 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 
@@ -402,5 +405,69 @@ class ReaderViewModelTest {
     private class FailingPageProvider : PageProvider {
         override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
             throw IllegalStateException("provider unavailable")
+    }
+
+    private class AlwaysSplitPreference : SplitPreferenceRepository {
+        override suspend fun isSplitEnabled(chapterRef: ChapterRef) = true
+        override suspend fun setSplitEnabled(chapterRef: ChapterRef, enabled: Boolean) = Unit
+        override suspend fun isPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int) = false
+        override suspend fun setPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int, excluded: Boolean) = Unit
+    }
+
+    @Test
+    fun `split enabled splits wide pages and records progress by source index`() = runTest(dispatcher) {
+        val recorded = mutableListOf<Int>()
+        val progress = object : dev.veneranative.core.model.ReaderProgress {
+            override suspend fun resumePage() = 0
+            override fun record(content: ChapterContent, pageIndex: Int) { recorded += pageIndex }
+        }
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split",
+                listOf(
+                    ComicPage(0, "wide", 2000, 1400),
+                    ComicPage(1, "portrait", 1000, 1400),
+                ),
+            )
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider,
+            progress = progress, splitPreference = AlwaysSplitPreference(),
+        )
+        advanceUntilIdle()
+
+        val pages = viewModel.state.value.pages
+        assertEquals(3, pages.size)
+        assertNotNull(pages[0].crop)
+        assertNotNull(pages[1].crop)
+        assertNull(pages[2].crop)
+        assertEquals(listOf(0, 0, 1), pages.map { it.sourceIndex })
+        assertEquals(listOf(0, 1, 2), pages.map { it.index })
+        // Progress records the source index, not the doubled display index.
+        assertEquals(listOf(0), recorded)
+    }
+
+    @Test
+    fun `excluded wide page stays unsplit`() = runTest(dispatcher) {
+        val preference = object : SplitPreferenceRepository {
+            override suspend fun isSplitEnabled(chapterRef: ChapterRef) = true
+            override suspend fun setSplitEnabled(chapterRef: ChapterRef, enabled: Boolean) = Unit
+            override suspend fun isPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int) = sourcePageIndex == 0
+            override suspend fun setPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int, excluded: Boolean) = Unit
+        }
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split", listOf(ComicPage(0, "wide", 2000, 1400), ComicPage(1, "wide-2", 2000, 1400)),
+            )
+        }
+        val viewModel = ReaderViewModel(ChapterRef.Remote(chapterKey), provider, splitPreference = preference)
+        advanceUntilIdle()
+
+        val pages = viewModel.state.value.pages
+        // Page 0 is excluded so stays one page; page 1 splits into two.
+        assertEquals(3, pages.size)
+        assertNull(pages[0].crop)
+        assertNotNull(pages[1].crop)
+        assertNotNull(pages[2].crop)
     }
 }
