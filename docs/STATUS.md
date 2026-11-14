@@ -4,6 +4,13 @@
 
 ## 状态快照
 
+**S4-10A26 DONE：修正邻近页解析回归里过期的断言。** S3-00K1 把相邻页预取半径从 1 改为 3，但
+`ReaderViewModelTest` 的“只解析邻近页”用例仍按半径 1 断言解析顺序；由于普通节点只要求测试可编译
+（`AGENTS.md` 第 7 节），该断言自 S3-00K1 起从未被执行。断言改为真实行为：起始页 0 解析 0..3，
+失败的第 1 页在放弃前共尝试三次。验证：JDK 17 `:feature:reader:testDebugUnitTest`（34 项，0 失败）、
+`:app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。在 `origin/main`（0e1c1d7）的
+独立 worktree 中复现了同一失败，确认这是既有过期断言而非本次改动引入。版本升至 1.4.3 / versionCode 1004003。
+
 **S4-10A25 DONE：扩大阅读器工具栏长按热区。** 热区从屏幕中央 32% × 20% 扩大到 60% × 40%（横向 20%–80%，纵向 30%–70%）；仅调整可触发范围，仍需长按 1 秒且未被滑动手势取消。版本升至 1.4.2 / versionCode 1004002。验证：JDK 17 `:feature:reader:compileDebugUnitTestKotlin :app:assembleDebug`（`--no-daemon --max-workers=2`）— BUILD SUCCESSFUL；`git diff --check` — PASS。未做真机手势验收。
 
 **S4-10A24 DONE：修正阅读记录删除按钮的显示时机。** 按用户澄清，删除按钮现在默认隐藏，左滑列表项后才揭示；右滑可收起，漫画卡片点击续读不变。版本升至 1.4.1 / versionCode 1004001。验证：JDK 17 `:app:assembleDebug`（`--no-daemon --max-workers=2`）— BUILD SUCCESSFUL；`git diff --check` — PASS。未做真机手势验收。

@@ -346,7 +346,9 @@ class ReaderViewModelTest {
         }
         val vm = ReaderViewModel(chapterKey, provider)
         advanceUntilIdle()
-        assertEquals(listOf(0, 1, 1, 1), resolved)
+        // The neighbourhood is three pages on each side (S3-00K1), so pages 0..3 resolve from page 0.
+        // Page 1 fails, so it is attempted three times in total before it is given up on.
+        assertEquals(listOf(0, 1, 2, 3, 1, 1), resolved)
         assertEquals(20, vm.state.value.pageCount)
         assertEquals(dev.veneranative.core.model.PageSizeState.Failed, vm.state.value.pages[1].sizeState)
         fail = false
