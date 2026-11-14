@@ -360,17 +360,17 @@ fun ReaderScreen(
                         val width = size.width.toFloat()
                         val height = size.height.toFloat()
                         if (state.status == ReaderStatus.Ready) {
+                            val inToolbarTarget = ReaderControlsTapTarget.contains(tap.x, tap.y, width, height)
                             when {
                                 controlsTimer.visible.value && wasTap -> controlsTimer.hide()
+                                !controlsTimer.visible.value && heldForOneSecond && inToolbarTarget ->
+                                    controlsTimer.toggle()
                                 !controlsTimer.visible.value && heldForOneSecond && state.splitEnabled &&
                                     state.pages.isNotEmpty() -> {
                                     splitMenuSourceIndex =
                                         state.pages[state.currentPageIndex.coerceIn(0, state.pages.lastIndex)].sourceIndex
                                     controlsTimer.hide()
                                 }
-                                !controlsTimer.visible.value && heldForOneSecond &&
-                                    ReaderControlsTapTarget.contains(tap.x, tap.y, width, height) ->
-                                    controlsTimer.toggle()
                             }
                         }
                     })
