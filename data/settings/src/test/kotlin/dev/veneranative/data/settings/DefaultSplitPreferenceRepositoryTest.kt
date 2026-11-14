@@ -3,8 +3,10 @@ package dev.veneranative.data.settings
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.ComicRef
 import dev.veneranative.core.model.LocalChapterId
 import dev.veneranative.core.model.LocalComicId
+import dev.veneranative.core.model.PageSplit
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
@@ -105,5 +107,63 @@ class DefaultSplitPreferenceRepositoryTest {
         assertTrue(repo.isSplitEnabled(remote))
         assertTrue(repo.isPageExcluded(remote, 0))
         assertEquals(2, store.map.size)
+    }
+
+    @Test
+    fun `per-comic split settings default when never written`() = runTest {
+        val store = InMemoryPreferences()
+        val repo = DefaultSplitPreferenceRepository(store)
+
+        assertEquals(PageSplit.DEFAULT_OVERLAP_FRACTION, repo.overlapFraction(remote.comicRef), 0f)
+        assertFalse(repo.isRightToLeft(remote.comicRef))
+        assertTrue(store.map.isEmpty())
+    }
+
+    @Test
+    fun `overlap fraction round trips`() = runTest {
+        val store = InMemoryPreferences()
+        val repo = DefaultSplitPreferenceRepository(store)
+
+        repo.setOverlapFraction(remote.comicRef, 0.15f)
+        assertEquals(0.15f, repo.overlapFraction(remote.comicRef), 1e-6f)
+
+        repo.setOverlapFraction(remote.comicRef, 0f)
+        assertEquals(0f, repo.overlapFraction(remote.comicRef), 0f)
+    }
+
+    @Test
+    fun `unreadable overlap value falls back to the default`() = runTest {
+        val store = InMemoryPreferences()
+        store.put("split:comic:${remote.comicRef.stableId()}:overlap", "not-a-number")
+        val repo = DefaultSplitPreferenceRepository(store)
+
+        assertEquals(PageSplit.DEFAULT_OVERLAP_FRACTION, repo.overlapFraction(remote.comicRef), 0f)
+    }
+
+    @Test
+    fun `split order round trips and stays scoped to one comic`() = runTest {
+        val store = InMemoryPreferences()
+        val repo = DefaultSplitPreferenceRepository(store)
+        val otherComic = ComicRef.Remote(ComicKey(SourceId("source-a"), RemoteComicId("comic-2")))
+
+        repo.setRightToLeft(remote.comicRef, true)
+        assertTrue(repo.isRightToLeft(remote.comicRef))
+        assertFalse(repo.isRightToLeft(otherComic))
+
+        repo.setRightToLeft(remote.comicRef, false)
+        assertFalse(repo.isRightToLeft(remote.comicRef))
+    }
+
+    @Test
+    fun `overlap stays scoped to one comic and is shared by all its chapters`() = runTest {
+        val store = InMemoryPreferences()
+        val repo = DefaultSplitPreferenceRepository(store)
+        val siblingChapter = remote.copy(key = remote.key.copy(remoteId = RemoteChapterId("chapter-2")))
+        val otherComic = ComicRef.Remote(ComicKey(SourceId("source-a"), RemoteComicId("comic-2")))
+
+        repo.setOverlapFraction(remote.comicRef, 0.1f)
+
+        assertEquals(0.1f, repo.overlapFraction(siblingChapter.comicRef), 1e-6f)
+        assertEquals(PageSplit.DEFAULT_OVERLAP_FRACTION, repo.overlapFraction(otherComic), 0f)
     }
 }
