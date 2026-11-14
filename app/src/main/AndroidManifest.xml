@@ -3,6 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Required to install the downloaded APK. This is a normal permission (no runtime prompt):
+         it only lets the system installer present the "install unknown app" confirmation; the user
+         still approves each install individually. Without it, MIUI/HyperOS reject ACTION_VIEW with
+         a bare "no permission" instead of showing the confirmation dialog. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- The download worker runs in the foreground: without a foreground-service permission the
          system stops it, and from API 34 a foreground service must also declare the type it runs
          under (ADR-0005 §2.2). -->
