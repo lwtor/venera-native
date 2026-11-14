@@ -125,6 +125,32 @@ class ApkDownloaderTest {
         }
     }
 
+    @Test
+    fun `keeps the part file when the download fails mid-transfer`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val bytes = apkBytes(4096)
+            val folder = tmp.newFolder()
+            val target = File(folder, "update.apk")
+            val part = File(folder, "update.apk.part")
+            // A prior attempt left the first half behind.
+            part.writeBytes(bytes.copyOfRange(0, 2048))
+
+            // This attempt fails before completing (an HTTP error). The `.part` from the previous
+            // run must survive so the next attempt can resume instead of restarting. The bug this
+            // guards against is a `finally { part.delete() }` that wiped the resume point on every
+            // failure, forcing a restart from zero.
+            server.enqueue(MockResponse.Builder().code(500).body("boom").build())
+            val failure = runCatching {
+                downloader.download(server.url("/release.apk").toString(), target)
+            }.exceptionOrNull()
+            assertTrue(failure is ApkDownloadException)
+            assertTrue("the .part must survive a failed attempt", part.isFile)
+            assertEquals(2048L, part.length())
+            assertFalse(target.exists())
+        }
+    }
+
     private fun apkBytes(size: Int): ByteArray = ByteArray(size).also { bytes ->
         // APK files are ZIP archives starting with a local file header.
         bytes[0] = 0x50

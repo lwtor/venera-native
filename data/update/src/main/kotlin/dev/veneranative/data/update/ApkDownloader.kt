@@ -56,13 +56,19 @@ class ApkDownloader(
         val part = File(parent, target.name + ".part")
         val startBytes = if (part.isFile) part.length() else 0L
 
+        // On success `moveIntoPlace` renames the `.part` into `target`, so nothing is left behind.
+        // On a transfer failure the `.part` is deliberately kept: the next attempt resumes from its
+        // length instead of starting over. The one exception is a body that is not an APK at all —
+        // that is garbage (e.g. an HTML error page served as 200), and resuming it would only
+        // append valid bytes to junk, so it is discarded below.
+        downloadInto(url, part, startBytes, onProgress)
         try {
-            downloadInto(url, part, startBytes, onProgress)
             verifyApkHeader(part)
-            moveIntoPlace(part, target)
-        } finally {
-            if (part.exists()) part.delete()
+        } catch (error: ApkDownloadException) {
+            part.delete()
+            throw error
         }
+        moveIntoPlace(part, target)
         return target
     }
 
