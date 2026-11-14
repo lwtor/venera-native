@@ -947,7 +947,7 @@ private fun ContinuousPages(
         userScrollEnabled = true,
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        items(items, key = { "${it.page.index}:${it.tileIndex}" }) { item ->
+        items(items, key = { stableTileKey(it) }) { item ->
             PageTile(
                 item = item,
                 decoder = decoder,
@@ -1336,7 +1336,7 @@ private fun PagedPage(
         userScrollEnabled = !zoomState.isZoomed,
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        item(key = page.index) {
+        item(key = page.imageRef) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth(),
@@ -1532,6 +1532,18 @@ private data class TileItem(
     val tileIndex: Int,
     val tile: PageTile,
 )
+
+/**
+ * Stable identity for one flattened tile row in the continuous list.
+ *
+ * It must never include [ComicPage.index]: prepending a previous chapter shifts every display
+ * index, so an index-based key invalidates the whole list and makes LazyColumn drop its scroll
+ * anchor — the reader then jumps to the top of the freshly inserted chapter and a split page looks
+ * like it "lost" its split. The image reference plus the crop origin identifies the source page
+ * across chapters, and the tile index separates the tiles of one wide strip.
+ */
+private fun stableTileKey(item: TileItem): String =
+    "${item.page.imageRef}|${item.page.crop?.leftPx ?: -1}|${item.tileIndex}"
 
 private fun placeholderTile(page: ComicPage, viewport: PageViewport, continuous: Boolean): PageTile {
     val scale = if (continuous) {

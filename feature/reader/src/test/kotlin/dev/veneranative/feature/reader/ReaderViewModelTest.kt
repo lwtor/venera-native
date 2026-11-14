@@ -21,8 +21,10 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -469,5 +471,76 @@ class ReaderViewModelTest {
         assertNull(pages[0].crop)
         assertNotNull(pages[1].crop)
         assertNotNull(pages[2].crop)
+    }
+
+    /** Splits the current test chapter only, so a prepended chapter keeps splitting off. */
+    private fun currentChapterOnlySplit() = object : SplitPreferenceRepository {
+        override suspend fun isSplitEnabled(chapterRef: ChapterRef) = chapterRef == ChapterRef.Remote(chapterKey)
+        override suspend fun setSplitEnabled(chapterRef: ChapterRef, enabled: Boolean) = Unit
+        override suspend fun isPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int) = false
+        override suspend fun setPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int, excluded: Boolean) = Unit
+    }
+
+    @Test
+    fun `preloading the previous chapter keeps the current chapter split`() = runTest(dispatcher) {
+        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = when (chapter) {
+                ChapterRef.Remote(chapterKey) -> ChapterContent(
+                    "Chapter 1",
+                    listOf(ComicPage(0, "current-wide", 2000, 1400), ComicPage(1, "current-wide-2", 2000, 1400)),
+                    previousChapter = previous,
+                )
+                else -> ChapterContent("Chapter 0", listOf(ComicPage(0, "previous-portrait", 1000, 1400)))
+            }
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = currentChapterOnlySplit(),
+        )
+        advanceUntilIdle()
+        assertEquals(4, viewModel.state.value.pages.size)
+
+        viewModel.onAction(ReaderAction.PageShown(0))
+        viewModel.onAction(ReaderAction.AutoLoadPreviousChapter)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        // Scrolling to the top prepends the un-split previous chapter, but the four halves of the
+        // current chapter must keep their crop so the split survives the prepend.
+        assertEquals(
+            listOf("previous-portrait", "current-wide", "current-wide", "current-wide-2", "current-wide-2"),
+            state.pages.map { it.imageRef },
+        )
+        assertEquals(listOf(null, 0, 900, 0, 900), state.pages.map { it.crop?.leftPx })
+        assertEquals(4, state.currentChapterPageCount)
+        assertTrue(state.splitEnabled)
+    }
+
+    @Test
+    fun `crossing chapters replays that chapter's split setting`() = runTest(dispatcher) {
+        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = when (chapter) {
+                ChapterRef.Remote(chapterKey) -> ChapterContent(
+                    "Chapter 1",
+                    listOf(ComicPage(0, "current-wide", 2000, 1400)),
+                    previousChapter = previous,
+                )
+                else -> ChapterContent("Chapter 0", listOf(ComicPage(0, "previous-portrait", 1000, 1400)))
+            }
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = currentChapterOnlySplit(),
+        )
+        advanceUntilIdle()
+        assertTrue(viewModel.state.value.splitEnabled)
+
+        viewModel.onAction(ReaderAction.LoadPreviousChapter)
+        advanceUntilIdle()
+        // The previous chapter has splitting off, so the toggle has to follow the visible chapter.
+        assertFalse(viewModel.state.value.splitEnabled)
+
+        viewModel.onAction(ReaderAction.PageShown(1))
+        assertTrue(viewModel.state.value.splitEnabled)
     }
 }

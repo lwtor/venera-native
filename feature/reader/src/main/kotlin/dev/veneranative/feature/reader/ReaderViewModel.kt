@@ -56,6 +56,9 @@ class ReaderViewModel(
         val progress: ReaderProgress?,
         /** Number of display pages this chapter occupies; differs from `content.pages.size` when split. */
         val displayPageCount: Int,
+        /** Split preference of this chapter, replayed into the UI state when it becomes visible. */
+        val splitEnabled: Boolean = false,
+        val excludedPages: Set<Int> = emptySet(),
     ) {
         val endPageIndex: Int get() = startPageIndex + displayPageCount - 1
     }
@@ -132,7 +135,9 @@ class ReaderViewModel(
                 val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
                 val displayPages = splitPages(sizedSource, splitEnabled, excluded)
                 val displayIndex = displayPages.indexOfFirst { it.sourceIndex == resumedIndex }.coerceAtLeast(0)
-                chapters += ChapterSegment(chapter, content, 0, chapterProgress, displayPages.size)
+                chapters += ChapterSegment(
+                    chapter, content, 0, chapterProgress, displayPages.size, splitEnabled, excluded,
+                )
                 loadedChapters += chapter
                 _state.update { current ->
                     current.copy(
@@ -193,6 +198,9 @@ class ReaderViewModel(
             )
         }
         segment?.let { loaded ->
+            // Crossing into another chapter must replay that chapter's split settings, otherwise the
+            // toolbar keeps showing the previous chapter's toggle while the pages are un-split.
+            _state.update { it.copy(splitEnabled = loaded.splitEnabled, excludedPages = loaded.excludedPages) }
             loaded.progress?.record(loaded.content, pages[target].sourceIndex)
         }
         prefetchAround(target)
@@ -236,7 +244,9 @@ class ReaderViewModel(
                 val excluded = if (splitEnabled) excludedSourcePages(nextRef, content.pages.size) else emptySet()
                 val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
                 val displayPages = splitPages(sizedSource, splitEnabled, excluded)
-                chapters += ChapterSegment(nextRef, content, startIndex, segmentProgress, displayPages.size)
+                chapters += ChapterSegment(
+                    nextRef, content, startIndex, segmentProgress, displayPages.size, splitEnabled, excluded,
+                )
                 loadedChapters += nextRef
                 val appended = displayPages.mapIndexed { offset, page -> page.copy(index = startIndex + offset) }
                 _state.update { current ->
@@ -257,6 +267,8 @@ class ReaderViewModel(
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
                         endOfChaptersReached = false,
+                        splitEnabled = if (navigateAfterLoad) splitEnabled else current.splitEnabled,
+                        excludedPages = if (navigateAfterLoad) excluded else current.excludedPages,
                     )
                 }
                 if (navigateAfterLoad) segmentProgress?.record(content, 0)
@@ -296,7 +308,10 @@ class ReaderViewModel(
                 val preservedSegmentStart = currentState.currentChapterStartIndex + count
                 chapters.replaceAll { segment -> segment.copy(startPageIndex = segment.startPageIndex + count) }
                 val segmentProgress = progressFactory(previousRef)
-                chapters.add(0, ChapterSegment(previousRef, content, 0, segmentProgress, count))
+                chapters.add(
+                    0,
+                    ChapterSegment(previousRef, content, 0, segmentProgress, count, splitEnabled, excluded),
+                )
                 loadedChapters += previousRef
                 _state.update { current ->
                     current.copy(
@@ -313,6 +328,8 @@ class ReaderViewModel(
                         nextChapter = if (preserveVisiblePage) current.nextChapter else content.nextChapter,
                         isLoadingPreviousChapter = false,
                         previousChapterLoadFailed = false,
+                        splitEnabled = if (preserveVisiblePage) current.splitEnabled else splitEnabled,
+                        excludedPages = if (preserveVisiblePage) current.excludedPages else excluded,
                     )
                 }
                 segmentProgress?.record(content, content.pages.lastIndex)
