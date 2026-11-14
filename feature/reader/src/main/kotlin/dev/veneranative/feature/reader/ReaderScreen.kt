@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -107,6 +109,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import android.app.Activity
 import android.content.Context
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -441,6 +444,8 @@ fun ReaderScreen(
                 onDirectionChange = { toolbarAction(ReaderAction.ChangeDirection(it)) },
                 onStrategyChange = { controlsTimer.onInteraction(); strategy = it },
                 onSplitChange = { toolbarAction(ReaderAction.ToggleSplit) },
+                onSplitOverlapChange = { toolbarAction(ReaderAction.SetSplitOverlap(it)) },
+                onSplitOrderChange = { toolbarAction(ReaderAction.SetSplitOrder(it)) },
             )
         }
         AnimatedVisibility(
@@ -505,6 +510,8 @@ private fun ReaderToolOverlay(
     onDirectionChange: (ReadingDirection) -> Unit,
     onStrategyChange: (DecodeStrategy) -> Unit,
     onSplitChange: () -> Unit,
+    onSplitOverlapChange: (Float) -> Unit,
+    onSplitOrderChange: (Boolean) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Surface(
@@ -515,7 +522,12 @@ private fun ReaderToolOverlay(
             tonalElevation = 4.dp,
             shadowElevation = 8.dp,
         ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
                 if (state.isLoadingNextChapter || state.isLoadingPreviousChapter) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -560,9 +572,13 @@ private fun ReaderToolOverlay(
                     direction = state.direction,
                     strategy = strategy,
                     splitEnabled = state.splitEnabled,
+                    splitOverlap = state.splitOverlapFraction,
+                    splitRightToLeft = state.splitRightToLeft,
                     onDirectionChange = onDirectionChange,
                     onStrategyChange = onStrategyChange,
                     onSplitChange = onSplitChange,
+                    onSplitOverlapChange = onSplitOverlapChange,
+                    onSplitOrderChange = onSplitOrderChange,
                 )
             }
         }
@@ -1446,14 +1462,32 @@ internal fun FittedPageImage(
     )
 }
 
+/** Gutter overlap choices offered by the reader toolbar, as (per-side fraction, label). */
+private val SPLIT_OVERLAP_OPTIONS = listOf(
+    0f to "0%",
+    0.05f to "5%",
+    0.10f to "10%",
+    0.15f to "15%",
+)
+
+/** Half order choices offered by the reader toolbar, as (right half first, label). */
+private val SPLIT_ORDER_OPTIONS = listOf(
+    false to "先左后右",
+    true to "先右后左",
+)
+
 @Composable
 private fun ReaderControls(
     direction: ReadingDirection,
     strategy: DecodeStrategy?,
     splitEnabled: Boolean,
+    splitOverlap: Float,
+    splitRightToLeft: Boolean,
     onDirectionChange: (ReadingDirection) -> Unit,
     onStrategyChange: (DecodeStrategy) -> Unit,
     onSplitChange: () -> Unit,
+    onSplitOverlapChange: (Float) -> Unit,
+    onSplitOrderChange: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("翻页方式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1496,6 +1530,38 @@ private fun ReaderControls(
                 )
             },
         )
+        // The tuning chips only matter while splitting is on; hiding them keeps the toolbar short.
+        if (splitEnabled) {
+            val nearestOverlap = SPLIT_OVERLAP_OPTIONS.minByOrNull { (fraction, _) ->
+                abs(fraction - splitOverlap)
+            }?.first
+            Text("中缝重叠", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SPLIT_OVERLAP_OPTIONS.forEach { (fraction, label) ->
+                    FilterChip(
+                        selected = fraction == nearestOverlap,
+                        onClick = { onSplitOverlapChange(fraction) },
+                        label = {
+                            Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+            Text("拆分顺序", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SPLIT_ORDER_OPTIONS.forEach { (rightToLeft, label) ->
+                    FilterChip(
+                        selected = rightToLeft == splitRightToLeft,
+                        onClick = { onSplitOrderChange(rightToLeft) },
+                        label = {
+                            Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
     }
 }
 
