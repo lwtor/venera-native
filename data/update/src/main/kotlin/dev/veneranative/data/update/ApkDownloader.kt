@@ -35,26 +35,31 @@ data class ApkDownloadProgress(val bytesDownloaded: Long, val totalBytes: Long?)
 class ApkDownloader(
     baseClient: OkHttpClient,
     private val progressIntervalBytes: Long = DEFAULT_PROGRESS_INTERVAL_BYTES,
+    private val onDiagnostic: (String) -> Unit = {},
 ) {
     private val viaProxyClient = baseClient.newBuilder()
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
     private val directClient = baseClient.newBuilder()
         .proxy(Proxy.NO_PROXY)
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
     /** Downloads [url] into [target], resuming a partial `.part` if one already exists. */
     suspend fun download(url: String, target: File, onProgress: (ApkDownloadProgress) -> Unit = {}): File {
+        val startedAt = System.currentTimeMillis()
         val parent = target.parentFile ?: throw ApkDownloadException("target has no parent directory")
         if (!parent.isDirectory && !parent.mkdirs()) {
             throw ApkDownloadException("cannot create ${parent.name}")
         }
         val part = File(parent, target.name + ".part")
         val startBytes = if (part.isFile) part.length() else 0L
+        onDiagnostic("download start url=$url resume=$startBytes")
 
         // On success `moveIntoPlace` renames the `.part` into `target`, so nothing is left behind.
         // On a transfer failure the `.part` is deliberately kept: the next attempt resumes from its
@@ -69,6 +74,7 @@ class ApkDownloader(
             throw error
         }
         moveIntoPlace(part, target)
+        onDiagnostic("download done elapsed=${System.currentTimeMillis() - startedAt}ms bytes=${target.length()}")
         return target
     }
 
@@ -86,11 +92,14 @@ class ApkDownloader(
         val attempts = listOf(viaProxyClient, directClient)
         var lastError: ApkDownloadException? = null
         for ((index, client) in attempts.withIndex()) {
+            val channel = if (index == 0) "proxy" else "direct"
             try {
+                onDiagnostic("attempt channel=$channel")
                 streamFrom(client, request, part, startBytes, onProgress)
                 return
             } catch (error: ApkDownloadException) {
                 lastError = error
+                onDiagnostic("attempt failed channel=$channel error=${error.javaClass.simpleName}: ${error.message}")
                 // Only a connect failure justifies switching channels, and only while no bytes
                 // have been written. HTTP errors and mid-stream failures must not be replayed.
                 val canFallback = error is ApkConnectException && index < attempts.lastIndex && part.length() <= startBytes
@@ -107,6 +116,7 @@ class ApkDownloader(
         startBytes: Long,
         onProgress: (ApkDownloadProgress) -> Unit,
     ) {
+        val connectedAt = System.currentTimeMillis()
         val response = try {
             awaitResponse(client, request)
         } catch (error: IOException) {
@@ -117,6 +127,8 @@ class ApkDownloader(
         }
         response.use {
             val code = it.code
+            val connectMs = System.currentTimeMillis() - connectedAt
+            onDiagnostic("connected status=$code connectMs=$connectMs")
             if (code != 200 && code != 206) throw ApkDownloadException("download failed with HTTP $code")
 
             val body = it.body ?: throw ApkDownloadException("download returned an empty body")
@@ -130,13 +142,19 @@ class ApkDownloader(
                 val source = body.source()
                 val buffer = ByteArray(IO_BUFFER_BYTES)
                 var lastReported = copied
+                var lastReportedAt = System.currentTimeMillis()
                 while (true) {
                     val read = source.read(buffer)
                     if (read == -1) break
                     file.write(buffer, 0, read)
                     copied += read
                     if (copied - lastReported >= progressIntervalBytes) {
+                        val now = System.currentTimeMillis()
+                        val intervalMs = (now - lastReportedAt).coerceAtLeast(1)
+                        val rate = (copied - lastReported) * 1000 / intervalMs
+                        onDiagnostic("progress bytes=$copied total=$totalBytes rate=${rate}B/s")
                         lastReported = copied
+                        lastReportedAt = now
                         onProgress(ApkDownloadProgress(copied, totalBytes))
                     }
                 }
@@ -179,6 +197,7 @@ class ApkDownloader(
 
     companion object {
         private const val IO_BUFFER_BYTES = 64 * 1024
+        private const val CONNECT_TIMEOUT_SECONDS = 30L
         private const val READ_TIMEOUT_SECONDS = 120L
         private const val DEFAULT_PROGRESS_INTERVAL_BYTES = 256L * 1024
         // APK files are ZIP archives and always start with a local file header.

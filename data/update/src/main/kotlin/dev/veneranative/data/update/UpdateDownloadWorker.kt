@@ -28,7 +28,9 @@ class UpdateDownloadWorker(
         }
 
         val notifier = UpdateNotifier(applicationContext)
-        val downloader = ApkDownloader(UpdateEnvironment.httpClient())
+        val downloader = ApkDownloader(UpdateEnvironment.httpClient(), onDiagnostic = { message ->
+            android.util.Log.d("VeneraSelfUpdate", message)
+        })
         val directory = File(applicationContext.cacheDir, "self-update").apply { mkdirs() }
         val target = File(directory, ReleaseSelection.sanitizeAssetFileName(targetName))
 
