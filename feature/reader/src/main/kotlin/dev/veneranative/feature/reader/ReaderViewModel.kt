@@ -62,6 +62,13 @@ class ReaderViewModel(
         /** Per-comic split tuning, replayed alongside [splitEnabled] when this chapter is shown. */
         val splitOverlapFraction: Float = PageSplit.DEFAULT_OVERLAP_FRACTION,
         val splitRightToLeft: Boolean = false,
+        /**
+         * Source pages carrying real dimensions, kept so split settings can be re-applied without
+         * reloading the chapter. Falls back to [content]'s pages when nothing was resolved.
+         */
+        val sourcePages: List<ComicPage> = content.pages,
+        /** Whether [sourcePages] holds provider-resolved dimensions rather than placeholders. */
+        val sizesResolved: Boolean = false,
     ) {
         val endPageIndex: Int get() = startPageIndex + displayPageCount - 1
     }
@@ -71,6 +78,7 @@ class ReaderViewModel(
     private var loadJob: kotlinx.coroutines.Job? = null
     private var nextChapterLoadJob: kotlinx.coroutines.Job? = null
     private var previousChapterLoadJob: kotlinx.coroutines.Job? = null
+    private var splitResolveJob: kotlinx.coroutines.Job? = null
 
     private val _state = MutableStateFlow(ReaderUiState())
     val state: StateFlow<ReaderUiState> = _state.asStateFlow()
@@ -145,7 +153,7 @@ class ReaderViewModel(
                 val displayIndex = displayPages.indexOfFirst { it.sourceIndex == resumedIndex }.coerceAtLeast(0)
                 chapters += ChapterSegment(
                     chapter, content, 0, chapterProgress, displayPages.size, splitEnabled, excluded,
-                    overlapFraction, rightToLeft,
+                    overlapFraction, rightToLeft, sizedSource, splitEnabled,
                 )
                 loadedChapters += chapter
                 _state.update { current ->
@@ -267,7 +275,7 @@ class ReaderViewModel(
                 val displayPages = splitPages(sizedSource, splitEnabled, excluded, overlapFraction, rightToLeft)
                 chapters += ChapterSegment(
                     nextRef, content, startIndex, segmentProgress, displayPages.size, splitEnabled, excluded,
-                    overlapFraction, rightToLeft,
+                    overlapFraction, rightToLeft, sizedSource, splitEnabled,
                 )
                 loadedChapters += nextRef
                 val appended = displayPages.mapIndexed { offset, page -> page.copy(index = startIndex + offset) }
@@ -339,7 +347,7 @@ class ReaderViewModel(
                     0,
                     ChapterSegment(
                         previousRef, content, 0, segmentProgress, count, splitEnabled, excluded,
-                        overlapFraction, rightToLeft,
+                        overlapFraction, rightToLeft, sizedSource, splitEnabled,
                     ),
                 )
                 loadedChapters += previousRef
@@ -518,42 +526,143 @@ class ReaderViewModel(
         }
     }
 
+    private fun segmentIndexOfPage(pageIndex: Int): Int =
+        chapters.indexOfLast { pageIndex in it.startPageIndex..it.endPageIndex }
+
+    private fun currentAnchorSourceIndex(): Int =
+        _state.value.pages.getOrNull(_state.value.currentPageIndex)?.sourceIndex ?: 0
+
+    /**
+     * Rebuilds every loaded chapter's display pages from the cached source pages, using each
+     * segment's own split settings, then re-anchors the viewport on [anchorSourceIndex].
+     *
+     * Split settings only change geometry, and the source dimensions are already known, so this must
+     * stay a pure in-memory recomputation: routing it through [load] would drop the reader back to
+     * [ReaderStatus.Loading] and re-resolve the whole chapter, which can hang on a slow source.
+     */
+    private fun rebuildSplitPages(segmentIndex: Int, anchorSourceIndex: Int) {
+        val pages = mutableListOf<ComicPage>()
+        val starts = IntArray(chapters.size)
+        val displays = ArrayList<List<ComicPage>>(chapters.size)
+        chapters.forEachIndexed { index, segment ->
+            val display = splitPages(
+                segment.sourcePages,
+                segment.splitEnabled,
+                segment.excludedPages,
+                segment.splitOverlapFraction,
+                segment.splitRightToLeft,
+            )
+            starts[index] = pages.size
+            displays += display
+            display.forEach { page -> pages += page.copy(index = pages.size) }
+        }
+        for (index in chapters.indices) {
+            chapters[index] = chapters[index].copy(
+                startPageIndex = starts[index],
+                displayPageCount = displays[index].size,
+            )
+        }
+        val target = segmentIndex.coerceIn(0, chapters.lastIndex)
+        val offset = displays[target].indexOfFirst { it.sourceIndex == anchorSourceIndex }.coerceAtLeast(0)
+        val pageIndex = starts[target] + offset
+        pageJobs.values.forEach { it.cancel() }
+        pageJobs.clear()
+        prefetched.clear()
+        _state.update { current ->
+            current.copy(
+                pages = pages,
+                currentPageIndex = pageIndex,
+                currentChapterStartIndex = starts[target],
+                currentChapterPageCount = displays[target].size,
+                nextChapterStartIndex = chapters.getOrNull(target + 1)
+                    ?.takeIf { it.startPageIndex == starts[target] + displays[target].size }
+                    ?.startPageIndex,
+                endOfChaptersReached = false,
+            )
+        }
+        prefetchAround(pageIndex)
+    }
+
     private fun toggleSplit() {
-        val current = _state.value
-        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
-        val enabled = !current.splitEnabled
-        viewModelScope.launch {
-            splitPreference?.setSplitEnabled(chapter, enabled)
-            load(overrideStartSourceIndex = currentSourceIndex)
+        val segmentIndex = segmentIndexOfPage(_state.value.currentPageIndex)
+        if (segmentIndex < 0) return
+        val segment = chapters[segmentIndex]
+        val enabled = !segment.splitEnabled
+        val anchor = currentAnchorSourceIndex()
+        chapters[segmentIndex] = segment.copy(splitEnabled = enabled)
+        _state.update { it.copy(splitEnabled = enabled) }
+        if (!enabled) {
+            rebuildSplitPages(segmentIndex, anchor)
+            viewModelScope.launch { splitPreference?.setSplitEnabled(segment.chapter, false) }
+            return
+        }
+        // Turning the split on needs real page dimensions. Resolve them once in the background while
+        // the reader keeps showing the un-split pages, then swap the display list in place. Never enter
+        // the full-screen loading state for this.
+        splitResolveJob?.cancel()
+        splitResolveJob = viewModelScope.launch {
+            try {
+                val index = chapters.indexOfFirst { it.chapter == segment.chapter }
+                if (index < 0) return@launch
+                val current = chapters[index]
+                val sized = if (current.sizesResolved) {
+                    current.sourcePages
+                } else {
+                    resolveSourceSizes(current.content.pages)
+                }
+                chapters[index] = chapters[index].copy(sourcePages = sized, sizesResolved = true)
+                splitPreference?.setSplitEnabled(segment.chapter, true)
+                rebuildSplitPages(index, currentAnchorSourceIndex())
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (_: Exception) {
+                // Leave the pages un-split; the toolbar toggle still reflects the saved preference.
+            }
         }
     }
 
     private fun togglePageSplit(sourcePageIndex: Int) {
-        val current = _state.value
-        val nowExcluded = sourcePageIndex !in current.excludedPages
-        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
-        viewModelScope.launch {
-            splitPreference?.setPageExcluded(chapter, sourcePageIndex, nowExcluded)
-            load(overrideStartSourceIndex = currentSourceIndex)
+        val segmentIndex = segmentIndexOfPage(_state.value.currentPageIndex)
+        if (segmentIndex < 0) return
+        val segment = chapters[segmentIndex]
+        // Excluding a page needs real dimensions the same way enabling the split does.
+        if (segment.splitEnabled && !segment.sizesResolved) return
+        val anchor = currentAnchorSourceIndex()
+        val nowExcluded = sourcePageIndex !in segment.excludedPages
+        val excluded = if (nowExcluded) {
+            segment.excludedPages + sourcePageIndex
+        } else {
+            segment.excludedPages - sourcePageIndex
         }
+        chapters[segmentIndex] = segment.copy(excludedPages = excluded)
+        _state.update { it.copy(excludedPages = excluded) }
+        rebuildSplitPages(segmentIndex, anchor)
+        viewModelScope.launch { splitPreference?.setPageExcluded(segment.chapter, sourcePageIndex, nowExcluded) }
     }
 
     private fun setSplitOverlap(fraction: Float) {
-        val current = _state.value
-        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
-        viewModelScope.launch {
-            splitPreference?.setOverlapFraction(chapter.comicRef, fraction)
-            load(overrideStartSourceIndex = currentSourceIndex)
+        val segmentIndex = segmentIndexOfPage(_state.value.currentPageIndex)
+        if (segmentIndex < 0) return
+        val anchor = currentAnchorSourceIndex()
+        // The setting is per comic, so every loaded segment of this comic must pick it up.
+        chapters.replaceAll { segment ->
+            if (segment.chapter.comicRef == chapter.comicRef) segment.copy(splitOverlapFraction = fraction) else segment
         }
+        _state.update { it.copy(splitOverlapFraction = fraction) }
+        rebuildSplitPages(segmentIndex, anchor)
+        viewModelScope.launch { splitPreference?.setOverlapFraction(chapter.comicRef, fraction) }
     }
 
     private fun setSplitOrder(rightToLeft: Boolean) {
-        val current = _state.value
-        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
-        viewModelScope.launch {
-            splitPreference?.setRightToLeft(chapter.comicRef, rightToLeft)
-            load(overrideStartSourceIndex = currentSourceIndex)
+        val segmentIndex = segmentIndexOfPage(_state.value.currentPageIndex)
+        if (segmentIndex < 0) return
+        val anchor = currentAnchorSourceIndex()
+        chapters.replaceAll { segment ->
+            if (segment.chapter.comicRef == chapter.comicRef) segment.copy(splitRightToLeft = rightToLeft) else segment
         }
+        _state.update { it.copy(splitRightToLeft = rightToLeft) }
+        rebuildSplitPages(segmentIndex, anchor)
+        viewModelScope.launch { splitPreference?.setRightToLeft(chapter.comicRef, rightToLeft) }
     }
 
     private companion object {
