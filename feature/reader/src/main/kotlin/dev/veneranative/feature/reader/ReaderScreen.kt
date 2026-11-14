@@ -1549,11 +1549,11 @@ private fun ReaderControls(
                 value = overlapDraft.floatValue,
                 onValueChange = { overlapDraft.floatValue = it },
                 onValueChangeFinished = { onSplitOverlapChange(overlapDraft.floatValue) },
-                valueRange = 0f..0.2f,
-                // 1% per notch: 20 intervals across 0..20% leaves 19 intermediate steps.
-                steps = 19,
-                modifier = Modifier.fillMaxWidth().height(32.dp),
-            )
+            valueRange = 0f..0.2f,
+            // 1% per notch: 20 intervals across 0..20% leaves 19 intermediate steps.
+            steps = 19,
+            modifier = Modifier.fillMaxWidth(),
+        )
             Text("拆分顺序", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SPLIT_ORDER_OPTIONS.forEach { (rightToLeft, label) ->
