@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -306,6 +307,7 @@ fun ReaderScreen(
     val view = LocalView.current
     val window = remember(view) { view.context.findActivity()?.window }
     var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
+    var splitMenuSourceIndex by remember { mutableStateOf<Int?>(null) }
     val decoder: PageImageDecoder? = decoderFactory?.let { factory ->
         remember(factory, strategy) { factory(strategy) }
     }
@@ -360,6 +362,12 @@ fun ReaderScreen(
                         if (state.status == ReaderStatus.Ready) {
                             when {
                                 controlsTimer.visible.value && wasTap -> controlsTimer.hide()
+                                !controlsTimer.visible.value && heldForOneSecond && state.splitEnabled &&
+                                    state.pages.isNotEmpty() -> {
+                                    splitMenuSourceIndex =
+                                        state.pages[state.currentPageIndex.coerceIn(0, state.pages.lastIndex)].sourceIndex
+                                    controlsTimer.hide()
+                                }
                                 !controlsTimer.visible.value && heldForOneSecond &&
                                     ReaderControlsTapTarget.contains(tap.x, tap.y, width, height) ->
                                     controlsTimer.toggle()
@@ -432,6 +440,7 @@ fun ReaderScreen(
                 strategy = if (decoderFactory == null) null else strategy,
                 onDirectionChange = { toolbarAction(ReaderAction.ChangeDirection(it)) },
                 onStrategyChange = { controlsTimer.onInteraction(); strategy = it },
+                onSplitChange = { toolbarAction(ReaderAction.ToggleSplit) },
             )
         }
         AnimatedVisibility(
@@ -462,6 +471,23 @@ fun ReaderScreen(
                 }
             }
         }
+        splitMenuSourceIndex?.let { sourceIndex ->
+            val excluded = sourceIndex in state.excludedPages
+            AlertDialog(
+                onDismissRequest = { splitMenuSourceIndex = null },
+                title = { Text("第 ${sourceIndex + 1} 页") },
+                text = { Text(if (excluded) "此页已设为不拆分。" else "此页为跨页，当前会自动拆分。") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onAction(ReaderAction.TogglePageSplit(sourceIndex))
+                        splitMenuSourceIndex = null
+                    }) { Text(if (excluded) "恢复拆分" else "本页不拆分") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { splitMenuSourceIndex = null }) { Text("取消") }
+                },
+            )
+        }
     }
 }
 
@@ -478,6 +504,7 @@ private fun ReaderToolOverlay(
     strategy: DecodeStrategy?,
     onDirectionChange: (ReadingDirection) -> Unit,
     onStrategyChange: (DecodeStrategy) -> Unit,
+    onSplitChange: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Surface(
@@ -532,8 +559,10 @@ private fun ReaderToolOverlay(
                 ReaderControls(
                     direction = state.direction,
                     strategy = strategy,
+                    splitEnabled = state.splitEnabled,
                     onDirectionChange = onDirectionChange,
                     onStrategyChange = onStrategyChange,
+                    onSplitChange = onSplitChange,
                 )
             }
         }
@@ -1145,20 +1174,7 @@ private suspend fun predecodeNearbyPages(
                     try {
                         val tile = decoder.plan(page, viewport, zoom = 1f, continuous = continuous).firstOrNull()
                             ?: return@launch
-                        decoder.predecode(
-                            PageDecodeRequest(
-                                path = page.imageRef,
-                                sourceId = page.sourceId,
-                                targetWidthPx = tile.displayWidthPx,
-                                targetHeightPx = tile.displayHeightPx,
-                                pageIndex = page.index,
-                                region = tile.region,
-                                fitWidthOnly = tile.fitWidthOnly,
-                                headers = page.imageHeaders,
-                                reverseHorizontalBands = page.reverseHorizontalBands,
-                                sourceImageHeightPx = page.heightPx,
-                            ),
-                        )
+                        decoder.predecode(decodeRequestFor(page, tile))
                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -1176,19 +1192,33 @@ private suspend fun predecodePage(
     continuous: Boolean,
 ) {
     val tile = decoder.plan(page, viewport, zoom = 1f, continuous = continuous).firstOrNull() ?: return
-    decoder.predecode(
-        PageDecodeRequest(
-            path = page.imageRef,
-            sourceId = page.sourceId,
-            targetWidthPx = tile.displayWidthPx,
-            targetHeightPx = tile.displayHeightPx,
-            pageIndex = page.index,
-            region = tile.region,
-            fitWidthOnly = tile.fitWidthOnly,
-            headers = page.imageHeaders,
-            reverseHorizontalBands = page.reverseHorizontalBands,
-            sourceImageHeightPx = page.heightPx,
-        ),
+    decoder.predecode(decodeRequestFor(page, tile))
+}
+
+/**
+ * Builds a decode request for one planned tile, offsetting the region when [page] is a crop of a
+ * larger source image (a split double-page half). The plan is computed against the half width, so
+ * only the source offset and the source image height need correcting here.
+ */
+private fun decodeRequestFor(page: ComicPage, tile: PageTile): PageDecodeRequest {
+    val crop = page.crop
+    val region = if (crop == null) tile.region else PageRegion(
+        leftPx = tile.region.leftPx + crop.leftPx,
+        topPx = tile.region.topPx + crop.topPx,
+        widthPx = tile.region.widthPx,
+        heightPx = tile.region.heightPx,
+    )
+    return PageDecodeRequest(
+        path = page.imageRef,
+        sourceId = page.sourceId,
+        targetWidthPx = tile.displayWidthPx,
+        targetHeightPx = tile.displayHeightPx,
+        pageIndex = page.index,
+        region = region,
+        fitWidthOnly = tile.fitWidthOnly,
+        headers = page.imageHeaders,
+        reverseHorizontalBands = page.reverseHorizontalBands,
+        sourceImageHeightPx = crop?.sourceHeightPx ?: page.heightPx,
     )
 }
 
@@ -1371,20 +1401,7 @@ private fun PageTile(
     val imageState by produceState<PageImageState?>(initialValue = null, item.page, tile, decoder, retryGeneration) {
         value = null
         value = try {
-            val decoded = decoder.decode(
-                PageDecodeRequest(
-                    path = item.page.imageRef,
-                    sourceId = item.page.sourceId,
-                    targetWidthPx = tile.displayWidthPx,
-                    targetHeightPx = tile.displayHeightPx,
-                    pageIndex = item.page.index,
-                    region = tile.region,
-                    fitWidthOnly = tile.fitWidthOnly,
-                    headers = item.page.imageHeaders,
-                    reverseHorizontalBands = item.page.reverseHorizontalBands,
-                    sourceImageHeightPx = item.page.heightPx,
-                ),
-            )
+            val decoded = decoder.decode(decodeRequestFor(item.page, tile))
             PageImageState.Decoded(decoded)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -1433,8 +1450,10 @@ internal fun FittedPageImage(
 private fun ReaderControls(
     direction: ReadingDirection,
     strategy: DecodeStrategy?,
+    splitEnabled: Boolean,
     onDirectionChange: (ReadingDirection) -> Unit,
     onStrategyChange: (DecodeStrategy) -> Unit,
+    onSplitChange: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("翻页方式", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1465,6 +1484,18 @@ private fun ReaderControls(
                 }
             }
         }
+        Text("跨页拆分", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        FilterChip(
+            selected = splitEnabled,
+            onClick = onSplitChange,
+            label = {
+                Text(
+                    if (splitEnabled) "自动拆分已开启" else "自动拆分已关闭",
+                    maxLines = 1,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            },
+        )
     }
 }
 
