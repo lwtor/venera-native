@@ -65,9 +65,7 @@ class SelfUpdateService(
 ) : SelfUpdateGateway {
     private val appContext = context.applicationContext
     private val api = GitHubReleaseApi(httpClient)
-    private val downloader = ApkDownloader(httpClient, onDiagnostic = { message ->
-        android.util.Log.d("VeneraSelfUpdate", message)
-    })
+    private val downloader = ApkDownloader(httpClient)
     private val installer = ApkInstaller(providerAuthority)
     private val downloadDirectory: File
         get() = File(appContext.cacheDir, "self-update").apply { mkdirs() }

@@ -16,6 +16,9 @@ local.properties
 *.class
 *.hprof
 
+# Local release artifacts (APKs and QR codes staged for GitHub Releases)
+release/
+
 # Signing and secrets
 *.jks
 *.keystore
