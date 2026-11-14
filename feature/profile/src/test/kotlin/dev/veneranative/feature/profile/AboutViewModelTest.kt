@@ -39,11 +39,26 @@ class AboutViewModelTest {
     }
 
     @Test fun checkReportsUpToDate() = runTest(dispatcher) {
-        val model = AboutViewModel(FakeGateway(check = SelfUpdateCheck.UpToDate), 1_005_000, dispatcher)
+        val model = AboutViewModel(FakeGateway(check = SelfUpdateCheck.UpToDate(RELEASE, APK)), 1_005_000, dispatcher)
         model.onAction(AboutAction.CheckForUpdate)
         runCurrent()
         assertEquals(AboutUpdatePhase.IDLE, model.state.value.phase)
         assertTrue(model.state.value.upToDate)
+        // Already up to date but the APK is known, so a forced re-download stays possible.
+        assertTrue(model.state.value.forceDownloadAvailable)
+        assertEquals(APK, model.state.value.apk)
+    }
+
+    @Test fun forceDownloadRunsTheUpdateFlowEvenWhenUpToDate() = runTest(dispatcher) {
+        val gateway = FakeGateway(check = SelfUpdateCheck.UpToDate(RELEASE, APK))
+        val model = AboutViewModel(gateway, 1_006_000, dispatcher)
+        model.onAction(AboutAction.CheckForUpdate)
+        runCurrent()
+        model.onAction(AboutAction.ForceDownload)
+        runCurrent()
+        assertEquals(AboutUpdatePhase.INSTALLED, model.state.value.phase)
+        assertEquals(1, gateway.foregroundDownloads)
+        assertEquals(1, gateway.installs)
     }
 
     @Test fun checkMapsMissingReleaseAndNetworkErrorsToDistinctProblems() = runTest(dispatcher) {
@@ -128,7 +143,7 @@ class AboutViewModelTest {
         assertNull(model.state.value.release)
         assertFalse(model.state.value.upToDate)
 
-        gateway.check = SelfUpdateCheck.UpToDate
+        gateway.check = SelfUpdateCheck.UpToDate(RELEASE, APK)
         model.onAction(AboutAction.CheckForUpdate)
         runCurrent()
         assertTrue(model.state.value.upToDate)

@@ -38,6 +38,8 @@ data class AboutUiState(
     val apk: GitHubReleaseAsset? = null,
     val newVersionCode: Long = 0L,
     val upToDate: Boolean = false,
+    /** True when already up to date but the APK is known, so a forced re-download is possible. */
+    val forceDownloadAvailable: Boolean = false,
     /** The foreground download's progress as a fraction in `0f..1f`; null while unresolved. */
     val downloadProgress: Float? = null,
     val problem: AboutUpdateProblem? = null,
@@ -49,6 +51,7 @@ data class AboutUiState(
 sealed interface AboutAction {
     data object CheckForUpdate : AboutAction
     data object StartUpdate : AboutAction
+    data object ForceDownload : AboutAction
     data object CancelUpdate : AboutAction
     data object DismissInstalled : AboutAction
 }
@@ -66,6 +69,7 @@ class AboutViewModel(
         when (action) {
             AboutAction.CheckForUpdate -> checkForUpdate()
             AboutAction.StartUpdate -> startUpdate()
+            AboutAction.ForceDownload -> startUpdate()
             AboutAction.CancelUpdate -> cancel()
             AboutAction.DismissInstalled -> mutableState.value = AboutUiState()
         }
@@ -75,7 +79,14 @@ class AboutViewModel(
         if (job?.isActive == true) return
         job = viewModelScope.launch {
             mutableState.update {
-                it.copy(phase = AboutUpdatePhase.CHECKING, problem = null, upToDate = false, release = null, apk = null)
+                it.copy(
+                    phase = AboutUpdatePhase.CHECKING,
+                    problem = null,
+                    upToDate = false,
+                    forceDownloadAvailable = false,
+                    release = null,
+                    apk = null,
+                )
             }
             try {
                 val check = withContext(workerDispatcher) { gateway.checkForUpdate(installedVersionCode) }
@@ -89,7 +100,15 @@ class AboutViewModel(
                             downloadProgress = null,
                         )
                     }
-                    SelfUpdateCheck.UpToDate -> mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, upToDate = true) }
+                    is SelfUpdateCheck.UpToDate -> mutableState.update {
+                        it.copy(
+                            phase = AboutUpdatePhase.IDLE,
+                            upToDate = true,
+                            release = check.release,
+                            apk = check.apk,
+                            forceDownloadAvailable = true,
+                        )
+                    }
                     SelfUpdateCheck.NoInstallableApk ->
                         mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, problem = AboutUpdateProblem.NO_INSTALLABLE_APK) }
                 }

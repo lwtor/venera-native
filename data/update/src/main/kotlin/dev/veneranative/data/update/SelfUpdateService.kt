@@ -11,7 +11,12 @@ import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 
 sealed interface SelfUpdateCheck {
-    data object UpToDate : SelfUpdateCheck
+    /** The installed version is already the latest, but the release it found is still exposed so a
+     *  caller can force a re-download of the same APK (debug/testing aid). */
+    data class UpToDate(
+        val release: GitHubRelease,
+        val apk: GitHubReleaseAsset,
+    ) : SelfUpdateCheck
 
     /** A release exists but carries no APK this updater can install (missing or unrecognised). */
     data object NoInstallableApk : SelfUpdateCheck
@@ -75,7 +80,7 @@ class SelfUpdateService(
         return if (ReleaseSelection.isUpdate(versionCode, installedVersionCode)) {
             SelfUpdateCheck.Available(release, apk, versionCode)
         } else {
-            SelfUpdateCheck.UpToDate
+            SelfUpdateCheck.UpToDate(release, apk)
         }
     }
 

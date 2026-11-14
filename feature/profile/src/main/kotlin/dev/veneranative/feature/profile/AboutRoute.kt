@@ -81,6 +81,21 @@ internal fun AboutScreen(
                     colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                 )
             }
+            if (state.forceDownloadAvailable) {
+                Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+                    ListItem(
+                        headlineContent = { Text("强制重新下载") },
+                        supportingContent = { Text("无视版本号，重新下载最新 Release 的 APK（测试用）") },
+                        leadingContent = { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.tertiary) },
+                        modifier = Modifier.fillMaxWidth().testTag("about_force_download").clickable(
+                            enabled = state.phase == AboutUpdatePhase.IDLE,
+                            onClick = { onAction(AboutAction.ForceDownload) },
+                        ),
+                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    )
+                }
+            }
             Text("受 Venera 启发的非官方原生实现", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
