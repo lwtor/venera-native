@@ -3,6 +3,10 @@
 build/
 **/build/
 
+# Kotlin incremental compilation caches (e.g. build-logic/.kotlin)
+.kotlin/
+**/.kotlin/
+
 # Android Studio / IntelliJ
 .idea/
 *.iml
