@@ -44,6 +44,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -1462,14 +1463,6 @@ internal fun FittedPageImage(
     )
 }
 
-/** Gutter overlap choices offered by the reader toolbar, as (per-side fraction, label). */
-private val SPLIT_OVERLAP_OPTIONS = listOf(
-    0f to "0%",
-    0.05f to "5%",
-    0.10f to "10%",
-    0.15f to "15%",
-)
-
 /** Half order choices offered by the reader toolbar, as (right half first, label). */
 private val SPLIT_ORDER_OPTIONS = listOf(
     false to "先左后右",
@@ -1532,22 +1525,35 @@ private fun ReaderControls(
         )
         // The tuning chips only matter while splitting is on; hiding them keeps the toolbar short.
         if (splitEnabled) {
-            val nearestOverlap = SPLIT_OVERLAP_OPTIONS.minByOrNull { (fraction, _) ->
-                abs(fraction - splitOverlap)
-            }?.first
-            Text("中缝重叠", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                SPLIT_OVERLAP_OPTIONS.forEach { (fraction, label) ->
-                    FilterChip(
-                        selected = fraction == nearestOverlap,
-                        onClick = { onSplitOverlapChange(fraction) },
-                        label = {
-                            Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
+            // The slider is a local draft while dragging and only commits on release: pushing every
+            // pixel of movement into the ViewModel would rebuild the page list and restart bitmap
+            // decodes dozens of times per drag.
+            val overlapDraft = remember { mutableFloatStateOf(splitOverlap) }
+            LaunchedEffect(splitOverlap) {
+                if (abs(overlapDraft.floatValue - splitOverlap) > 0.0005f) overlapDraft.floatValue = splitOverlap
             }
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "中缝重叠",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    "${(overlapDraft.floatValue * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Slider(
+                value = overlapDraft.floatValue,
+                onValueChange = { overlapDraft.floatValue = it },
+                onValueChangeFinished = { onSplitOverlapChange(overlapDraft.floatValue) },
+                valueRange = 0f..0.2f,
+                // 1% per notch: 20 intervals across 0..20% leaves 19 intermediate steps.
+                steps = 19,
+                modifier = Modifier.fillMaxWidth().height(32.dp),
+            )
             Text("拆分顺序", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SPLIT_ORDER_OPTIONS.forEach { (rightToLeft, label) ->
