@@ -4,6 +4,7 @@ android { namespace = "dev.veneranative.data.settings" }
 
 dependencies {
     implementation(project(":core:database"))
+    implementation(project(":core:model"))
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
