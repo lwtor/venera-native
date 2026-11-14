@@ -35,6 +35,7 @@ data class ReaderUiState(
     val nextChapterLoadFailed: Boolean = false,
     val isLoadingPreviousChapter: Boolean = false,
     val previousChapterLoadFailed: Boolean = false,
+    val endOfChaptersReached: Boolean = false,
     val direction: ReadingDirection = ReadingDirection.Vertical,
     val status: ReaderStatus = ReaderStatus.Loading,
 ) {

@@ -149,6 +149,46 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun `automatic previous chapter loading preserves the visible page`() = runTest(dispatcher) {
+        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
+                if (chapter == ChapterRef.Remote(chapterKey)) {
+                    ChapterContent(
+                        "Chapter 1",
+                        listOf(ComicPage(0, "current-0", 100, 100), ComicPage(1, "current-1", 100, 100)),
+                        previousChapter = previous,
+                    )
+                } else {
+                    ChapterContent("Chapter 0", listOf(ComicPage(0, "previous-0", 100, 100)))
+                }
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+        viewModel.onAction(ReaderAction.PageShown(0))
+
+        viewModel.onAction(ReaderAction.AutoLoadPreviousChapter)
+        advanceUntilIdle()
+
+        assertEquals(listOf("previous-0", "current-0", "current-1"), viewModel.state.value.pages.map { it.imageRef })
+        assertEquals(1, viewModel.state.value.currentPageIndex)
+        assertEquals(1, viewModel.state.value.currentChapterStartIndex)
+        assertEquals("Chapter 1", viewModel.state.value.chapterTitle)
+    }
+
+    @Test
+    fun `reaching the end without a following chapter exposes an end page state`() = runTest(dispatcher) {
+        val viewModel = ReaderViewModel(chapterKey, FakePageProvider(pageCount = 2))
+        advanceUntilIdle()
+
+        viewModel.onAction(ReaderAction.LoadNextChapter)
+
+        assertEquals(true, viewModel.state.value.endOfChaptersReached)
+        viewModel.onAction(ReaderAction.PageShown(0))
+        assertEquals(false, viewModel.state.value.endOfChaptersReached)
+    }
+
+    @Test
     fun `failed next chapter remains on the same canvas and retry appends it`() = runTest(dispatcher) {
         val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
         var nextAttempts = 0
@@ -346,6 +386,7 @@ class ReaderViewModelTest {
         }
         val vm = ReaderViewModel(chapterKey, provider)
         advanceUntilIdle()
+
         // The neighbourhood is three pages on each side (S3-00K1), so pages 0..3 resolve from page 0.
         // Page 1 fails, so it is attempted three times in total before it is given up on.
         assertEquals(listOf(0, 1, 2, 3, 1, 1), resolved)

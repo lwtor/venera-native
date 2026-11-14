@@ -83,6 +83,7 @@ class ReaderViewModel(
             is ReaderAction.PageShown -> showPage(action.index)
             is ReaderAction.SeekPage -> seekPage(action.chapterPageIndex)
             ReaderAction.LoadPreviousChapter -> loadPreviousChapter()
+            ReaderAction.AutoLoadPreviousChapter -> loadPreviousChapter(preserveVisiblePage = true)
             ReaderAction.RetryPreviousChapter -> loadPreviousChapter()
             ReaderAction.NavigateNextChapter -> navigateNextChapter()
             is ReaderAction.ChangeDirection -> _state.update { it.copy(direction = action.direction) }
@@ -127,6 +128,7 @@ class ReaderViewModel(
                         nextChapterLoadFailed = false,
                         isLoadingPreviousChapter = false,
                         previousChapterLoadFailed = false,
+                        endOfChaptersReached = false,
                         status = ReaderStatus.Ready,
                     )
                 }
@@ -147,7 +149,12 @@ class ReaderViewModel(
         val pages = _state.value.pages
         if (pages.isEmpty()) return
         val target = index.coerceIn(0, pages.lastIndex)
-        if (target == _state.value.currentPageIndex) return
+        if (target == _state.value.currentPageIndex) {
+            if (_state.value.endOfChaptersReached) {
+                _state.update { it.copy(endOfChaptersReached = false) }
+            }
+            return
+        }
         val segment = chapters.lastOrNull { target in it.startPageIndex..it.endPageIndex }
         _state.update { current ->
             current.copy(
@@ -160,6 +167,7 @@ class ReaderViewModel(
                 nextChapterStartIndex = segment?.let { currentSegment ->
                     chapters.firstOrNull { it.startPageIndex == currentSegment.endPageIndex + 1 }?.startPageIndex
                 },
+                endOfChaptersReached = if (target < pages.lastIndex) false else current.endOfChaptersReached,
             )
         }
         segment?.let { loaded ->
@@ -181,11 +189,18 @@ class ReaderViewModel(
             showPage(loadedStart)
             return
         }
-        loadNextChapter(navigateAfterLoad = true)
+        if (current.nextChapter == null) {
+            _state.update { it.copy(endOfChaptersReached = true) }
+        } else {
+            loadNextChapter(navigateAfterLoad = true)
+        }
     }
 
     private fun loadNextChapter(navigateAfterLoad: Boolean = false) {
-        val next = _state.value.nextChapter ?: return
+        val next = _state.value.nextChapter ?: run {
+            _state.update { it.copy(endOfChaptersReached = true) }
+            return
+        }
         val nextRef = next.toChapterRef()
         if (nextRef in loadedChapters || nextChapterLoadJob?.isActive == true) return
         _state.update { it.copy(isLoadingNextChapter = true, nextChapterLoadFailed = false) }
@@ -215,6 +230,7 @@ class ReaderViewModel(
                         nextChapter = if (navigateAfterLoad) content.nextChapter else visibleSegment?.content?.nextChapter,
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
+                        endOfChaptersReached = false,
                     )
                 }
                 if (navigateAfterLoad) segmentProgress?.record(content, 0)
@@ -229,10 +245,11 @@ class ReaderViewModel(
         }
     }
 
-    private fun loadPreviousChapter() {
+    private fun loadPreviousChapter(preserveVisiblePage: Boolean = false) {
         val previous = _state.value.previousChapter ?: return
         val previousRef = previous.toChapterRef()
         if (previousRef in loadedChapters) {
+            if (preserveVisiblePage) return
             val start = chapters.firstOrNull { it.chapter == previousRef }?.startPageIndex ?: return
             showPage(start + (chapters.first { it.chapter == previousRef }.content.pages.lastIndex))
             return
@@ -244,7 +261,9 @@ class ReaderViewModel(
                 val content = loadChapterBounded(previousRef)
                 if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
                 val count = content.pages.size
-                val shiftedPages = _state.value.pages.map { it.copy(index = it.index + count) }
+                val currentState = _state.value
+                val shiftedPages = currentState.pages.map { it.copy(index = it.index + count) }
+                val preservedSegmentStart = currentState.currentChapterStartIndex + count
                 chapters.replaceAll { segment -> segment.copy(startPageIndex = segment.startPageIndex + count) }
                 val segmentProgress = progressFactory(previousRef)
                 chapters.add(0, ChapterSegment(previousRef, content, 0, segmentProgress))
@@ -252,13 +271,16 @@ class ReaderViewModel(
                 _state.update { current ->
                     current.copy(
                         pages = content.pages.mapIndexed { index, page -> page.copy(index = index) } + shiftedPages,
-                        currentPageIndex = count - 1,
-                        currentChapterStartIndex = 0,
-                        currentChapterPageCount = count,
-                        chapterTitle = content.title,
-                        previousChapter = content.previousChapter,
-                        nextChapterStartIndex = count,
-                        nextChapter = content.nextChapter,
+                        currentPageIndex = if (preserveVisiblePage) current.currentPageIndex + count else count - 1,
+                        currentChapterStartIndex = if (preserveVisiblePage) preservedSegmentStart else 0,
+                        currentChapterPageCount = if (preserveVisiblePage) current.currentChapterPageCount else count,
+                        chapterTitle = if (preserveVisiblePage) current.chapterTitle else content.title,
+                        previousChapter = if (preserveVisiblePage) current.previousChapter else content.previousChapter,
+                        nextChapterStartIndex = if (preserveVisiblePage) {
+                            chapters.firstOrNull { it.startPageIndex == preservedSegmentStart + current.currentChapterPageCount }
+                                ?.startPageIndex
+                        } else count,
+                        nextChapter = if (preserveVisiblePage) current.nextChapter else content.nextChapter,
                         isLoadingPreviousChapter = false,
                         previousChapterLoadFailed = false,
                     )
@@ -267,7 +289,7 @@ class ReaderViewModel(
                 pageJobs.values.forEach { it.cancel() }
                 pageJobs.clear()
                 prefetched.clear()
-                prefetchAround(count - 1)
+                prefetchAround(if (preserveVisiblePage) count else count - 1)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
