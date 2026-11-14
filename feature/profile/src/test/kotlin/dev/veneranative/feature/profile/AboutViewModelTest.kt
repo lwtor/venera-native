@@ -1,7 +1,6 @@
 package dev.veneranative.feature.profile
 
 import dev.veneranative.data.update.ApkInstallResult
-import dev.veneranative.data.update.ApkDownloadProgress
 import dev.veneranative.data.update.GitHubRelease
 import dev.veneranative.data.update.GitHubReleaseAsset
 import dev.veneranative.data.update.GitHubReleaseException
@@ -10,6 +9,8 @@ import dev.veneranative.data.update.SelfUpdateGateway
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Assert.*
@@ -72,7 +73,7 @@ class AboutViewModelTest {
     @Test fun updateDownloadsLaunchesInstallerAndReportsCompletion() = runTest(dispatcher) {
         val gateway = FakeGateway(
             check = SelfUpdateCheck.Available(RELEASE, APK, 1_006_000),
-            progressBytes = listOf(1024, 2048, 3072),
+            progressFractions = listOf(0.25f, 0.5f, 1f),
         )
         val model = AboutViewModel(gateway, 1_005_000, dispatcher)
         model.onAction(AboutAction.CheckForUpdate)
@@ -81,14 +82,16 @@ class AboutViewModelTest {
         runCurrent()
         val state = model.state.value
         assertEquals(AboutUpdatePhase.INSTALLED, state.phase)
-        assertEquals(3072L, state.downloadProgress?.bytesDownloaded)
-        assertEquals(listOf(1024L, 2048L, 3072L), gateway.reportedProgress)
         assertEquals(1, gateway.installs)
+        assertEquals(1, gateway.foregroundDownloads)
     }
 
     @Test fun downloadFailureMapsToDownloadProblemAndInstallFailureToInstallProblem() = runTest(dispatcher) {
         val downloadFailure = AboutViewModel(
-            FakeGateway(check = SelfUpdateCheck.Available(RELEASE, APK, 1_006_000), downloadError = java.io.IOException("reset")),
+            FakeGateway(
+                check = SelfUpdateCheck.Available(RELEASE, APK, 1_006_000),
+                downloadError = java.io.IOException("reset"),
+            ),
             1_005_000, dispatcher,
         )
         downloadFailure.onAction(AboutAction.CheckForUpdate)
@@ -151,12 +154,12 @@ class AboutViewModelTest {
         var check: Any,
         var installResult: ApkInstallResult = ApkInstallResult.Launched,
         var downloadError: Exception? = null,
-        var progressBytes: List<Long> = emptyList(),
+        var progressFractions: List<Float> = emptyList(),
     ) : SelfUpdateGateway {
         var checks = 0
-        var downloads = 0
         var installs = 0
-        val reportedProgress = mutableListOf<Long>()
+        var foregroundDownloads = 0
+        var cancels = 0
 
         override suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck {
             checks++
@@ -167,13 +170,19 @@ class AboutViewModelTest {
             }
         }
 
-        override suspend fun download(apk: GitHubReleaseAsset, onProgress: (ApkDownloadProgress) -> Unit): File {
-            downloads++
+        override suspend fun downloadInForeground(apk: GitHubReleaseAsset): File {
+            foregroundDownloads++
             downloadError?.let { throw it }
-            progressBytes.forEach { bytes ->
-                onProgress(ApkDownloadProgress(bytes, 3072))
-                reportedProgress.add(bytes)
-            }
+            return File("update.apk")
+        }
+
+        override fun observeDownloadProgress(): Flow<Float?> = flowOf(1f)
+
+        override fun cancelDownload() {
+            cancels++
+        }
+
+        override suspend fun download(apk: GitHubReleaseAsset, onProgress: (dev.veneranative.data.update.ApkDownloadProgress) -> Unit): File {
             return File("update.apk")
         }
 

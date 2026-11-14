@@ -1,7 +1,13 @@
 package dev.veneranative.data.update
 
 import android.content.Context
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import java.io.File
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import okhttp3.OkHttpClient
 
 sealed interface SelfUpdateCheck {
@@ -23,6 +29,15 @@ sealed interface SelfUpdateCheck {
  */
 interface SelfUpdateGateway {
     suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck
+
+    /** Downloads the APK in the foreground via a WorkManager worker and awaits its completion. */
+    suspend fun downloadInForeground(apk: GitHubReleaseAsset): File
+
+    /** Emits the foreground download's progress as a fraction in `0f..1f`; null while unresolved. */
+    fun observeDownloadProgress(): Flow<Float?>
+
+    /** Cancels the in-flight foreground download, if any. */
+    fun cancelDownload()
 
     /** Downloads the APK; [onProgress] is invoked on the caller's dispatcher as bytes arrive. */
     suspend fun download(apk: GitHubReleaseAsset, onProgress: (ApkDownloadProgress) -> Unit): File
@@ -60,6 +75,41 @@ class SelfUpdateService(
         } else {
             SelfUpdateCheck.UpToDate
         }
+    }
+
+    override suspend fun downloadInForeground(apk: GitHubReleaseAsset): File {
+        val targetName = ReleaseSelection.sanitizeAssetFileName(apk.name)
+        UpdateWorkScheduler.start(appContext, apk.downloadUrl, targetName)
+
+        // Wait until the worker either succeeds (reading the output path) or stops in a terminal
+        // failure state, then surface it to the caller as an exception so the About screen can map
+        // it to a download problem instead of silently installing a missing file.
+        val manager = WorkManager.getInstance(appContext)
+        val workInfo = manager.getWorkInfosForUniqueWorkFlow(UpdateWorkScheduler.WORK_NAME)
+            .first { infos -> infos.isNotEmpty() && infos.all { it.state.isFinished } }
+        val finished = workInfo.last()
+        if (finished.state == WorkInfo.State.SUCCEEDED) {
+            val path = finished.outputData.getString(UpdateDownloadWorker.OUTPUT_FILE_PATH)
+            if (!path.isNullOrBlank()) return File(path)
+        }
+        val reason = finished.outputData.getString(UpdateDownloadWorker.OUTPUT_ERROR)
+            ?: "update download did not complete (${finished.state})"
+        throw ApkDownloadException(reason)
+    }
+
+    override fun observeDownloadProgress(): Flow<Float?> =
+        WorkManager.getInstance(appContext)
+            .getWorkInfosForUniqueWorkFlow(UpdateWorkScheduler.WORK_NAME)
+            .map { infos ->
+                infos.lastOrNull()
+                    ?.progress
+                    ?.getFloat(UpdateDownloadWorker.PROGRESS_KEY, -1f)
+                    ?.takeIf { it >= 0f }
+            }
+            .distinctUntilChanged()
+
+    override fun cancelDownload() {
+        UpdateWorkScheduler.cancel(appContext)
     }
 
     override suspend fun download(apk: GitHubReleaseAsset, onProgress: (ApkDownloadProgress) -> Unit): File {

@@ -65,6 +65,7 @@ import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.data.settings.DefaultScreenPreferenceRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.data.update.SelfUpdateService
+import dev.veneranative.data.update.UpdateEnvironment
 import dev.veneranative.data.local.LocalComicRepository
 import dev.veneranative.data.source.DefaultSourceRepository
 import dev.veneranative.data.source.AndroidSourceScriptFetcher
@@ -118,6 +119,9 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val localOfflineReaderLog =
         if (debugNetworkTraceEnabled) LocalOfflineReaderLog(getApplication<android.app.Application>().filesDir) else null
     init {
+        // The self-update download runs in a WorkManager worker that may outlive any screen; it
+        // reaches the shared client through this process-wide hook rather than a captured graph.
+        UpdateEnvironment.configure(httpClient)
         if (debugNetworkTraceEnabled) {
             val selectedProxy = runCatching {
                 host.networkProxySelector.select(URI("https://komiic.com")).firstOrNull()

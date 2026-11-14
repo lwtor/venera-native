@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.data.update.SelfUpdateGateway
-import java.util.Locale
 
 data class InstalledAppInfo(val versionName: String, val versionCode: Long)
 
@@ -115,14 +114,11 @@ private fun UpdateDialogs(state: AboutUiState, onAction: (AboutAction) -> Unit) 
             title = { Text("正在下载新版本") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val progress = state.downloadProgress
-                    val fraction = progress?.fraction
+                    val fraction = state.downloadProgress
                     if (fraction != null) LinearProgressIndicator(progress = { fraction })
                     else LinearProgressIndicator()
-                    progress?.let { current ->
-                        val downloaded = formatBytes(current.bytesDownloaded)
-                        val total = current.totalBytes?.let(::formatBytes) ?: "未知"
-                        Text("已下载 $downloaded / $total", style = MaterialTheme.typography.bodySmall)
+                    fraction?.let {
+                        Text("已下载 ${(it.coerceIn(0f, 1f) * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             },
@@ -155,9 +151,7 @@ private fun updateSupportingText(state: AboutUiState): String = when (state.phas
     AboutUpdatePhase.CONFIRM ->
         state.newVersionName?.let { "发现新版本 v$it" } ?: "发现新版本"
     AboutUpdatePhase.DOWNLOADING -> state.downloadProgress?.let { progress ->
-        val downloaded = formatBytes(progress.bytesDownloaded)
-        val total = progress.totalBytes?.let(::formatBytes) ?: "未知"
-        "正在下载 $downloaded / $total"
+        "正在下载 ${(progress.coerceIn(0f, 1f) * 100).toInt()}%"
     } ?: "正在下载…"
     AboutUpdatePhase.INSTALLING -> "正在安装…"
     AboutUpdatePhase.INSTALLED -> "已更新到新版本"
@@ -174,13 +168,4 @@ private fun problemText(problem: AboutUpdateProblem): String = when (problem) {
     AboutUpdateProblem.NO_INSTALLABLE_APK -> "新版本未提供可自动安装的 APK"
     AboutUpdateProblem.DOWNLOAD -> "安装包下载失败，请重试"
     AboutUpdateProblem.INSTALL -> "安装未完成，请重试"
-}
-
-private fun formatBytes(bytes: Long): String {
-    val megabytes = bytes / 1024.0 / 1024.0
-    return if (megabytes >= 1.0) {
-        String.format(Locale.US, "%.1f MB", megabytes)
-    } else {
-        "${bytes / 1024} KB"
-    }
 }

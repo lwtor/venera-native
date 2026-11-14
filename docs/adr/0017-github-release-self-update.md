@@ -2,7 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-11-14
-- 修订：2026-11-14（安装方式由 `PackageInstaller` 会话改为 FileProvider + `ACTION_VIEW`，见「修订」一节）
+- 修订：2026-11-14（安装方式由 `PackageInstaller` 会话改为 FileProvider + `ACTION_VIEW`，见「修订」一节；下载改为 WorkManager 前台服务，见「修订二」）
 
 ## 背景
 
@@ -25,6 +25,16 @@
 - 代价：拿不到安装成功/失败回调（只能确认安装器是否被成功拉起）；每次更新仍需用户点一次系统「安装」按钮。
 
 这正符合用户期望的"微信式每次确认"，且避免了永久授权带来的系统级更严审查。
+
+## 修订二（2026-11-14）
+
+真机反馈三连：下载极慢（走系统代理的共享客户端对 `release-assets.githubusercontent.com` 不稳定）、无断点续传（每次失败从头下）、无前台服务（退后台/锁屏后线程被系统回收）。
+
+- **下载慢**：改「代理优先 + 直连回退」。先走系统代理（用户 VPN 加速浏览器的同一通道），连接失败且未产生任何字节时才回退直连（`Proxy.NO_PROXY`）；HTTP 错误与中途断流不重放，避免把已下的字节作废。
+- **断点续传**：`.part` 临时文件 + `Range: bytes=N-`。下次尝试从已写字节处续传（GitHub CDN 返回 206），ZIP 头校验后原子改名。
+- **前台服务**：下载从 `AboutViewModel.viewModelScope` 迁移到 `data:update` 的 `UpdateDownloadWorker`（`CoroutineWorker` + `setForeground` + `dataSync` 前台类型，通知带进度条），退后台/锁屏后仍存活。复用 `data:download` 的成熟模式；进程内共享 httpClient 经 `UpdateEnvironment` 单例注入（`:data:update` 不能依赖 `:app`）。
+
+代价：Worker 通过 `setProgressAsync` 上报进度 fraction（非挂起回调里不能调 `setForeground`），前台通知进度条停在初始值，精确百分比在 About 页展示；下载完成路径经 `Result.success` 的 outputData 传回，ViewModel 观察 `WorkInfo` 等待 SUCCEEDED 后调用安装。
 
 ## 理由
 

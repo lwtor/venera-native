@@ -3,7 +3,6 @@ package dev.veneranative.feature.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.veneranative.data.update.ApkInstallResult
-import dev.veneranative.data.update.ApkDownloadProgress
 import dev.veneranative.data.update.GitHubRelease
 import dev.veneranative.data.update.GitHubReleaseAsset
 import dev.veneranative.data.update.GitHubReleaseException
@@ -39,7 +38,8 @@ data class AboutUiState(
     val apk: GitHubReleaseAsset? = null,
     val newVersionCode: Long = 0L,
     val upToDate: Boolean = false,
-    val downloadProgress: ApkDownloadProgress? = null,
+    /** The foreground download's progress as a fraction in `0f..1f`; null while unresolved. */
+    val downloadProgress: Float? = null,
     val problem: AboutUpdateProblem? = null,
 ) {
     val newVersionName: String?
@@ -105,17 +105,21 @@ class AboutViewModel(
         val apk = state.value.apk ?: return
         job = viewModelScope.launch {
             mutableState.update { it.copy(phase = AboutUpdatePhase.DOWNLOADING, downloadProgress = null, problem = null) }
-            val file: File = try {
-                withContext(workerDispatcher) {
-                    gateway.download(apk) { progress ->
-                        mutableState.update { current -> current.copy(downloadProgress = progress) }
-                    }
+            // The worker reports progress as a fraction; mirror it into the UI while it runs.
+            val progressJob = launch {
+                gateway.observeDownloadProgress().collect { fraction ->
+                    mutableState.update { current -> current.copy(downloadProgress = fraction) }
                 }
+            }
+            val file: File = try {
+                gateway.downloadInForeground(apk)
             } catch (failure: Exception) {
                 if (failure is CancellationException) throw failure
+                progressJob.cancel()
                 mutableState.update { it.copy(phase = AboutUpdatePhase.IDLE, problem = AboutUpdateProblem.DOWNLOAD) }
                 return@launch
             }
+            progressJob.cancel()
             mutableState.update { it.copy(phase = AboutUpdatePhase.INSTALLING) }
             try {
                 when (gateway.install(file)) {
@@ -131,6 +135,7 @@ class AboutViewModel(
     }
 
     private fun cancel() {
+        gateway.cancelDownload()
         job?.cancel()
         job = null
         mutableState.value = AboutUiState()
