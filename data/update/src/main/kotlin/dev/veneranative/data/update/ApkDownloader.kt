@@ -1,17 +1,19 @@
 package dev.veneranative.data.update
 
-import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import java.io.RandomAccessFile
+import java.net.Proxy
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-class ApkDownloadException(message: String) : IOException(message)
+open class ApkDownloadException(message: String, cause: Throwable? = null) : IOException(message, cause)
+
+/** A failure establishing the connection; retrying through the other network channel may help. */
+private class ApkConnectException(message: String, cause: Throwable) : ApkDownloadException(message, cause)
 
 data class ApkDownloadProgress(val bytesDownloaded: Long, val totalBytes: Long?) {
     val fraction: Float?
@@ -19,88 +21,131 @@ data class ApkDownloadProgress(val bytesDownloaded: Long, val totalBytes: Long?)
 }
 
 /**
- * Streams a release APK to a local file with byte-level progress. The bytes go to a `.part`
- * sibling first and are moved into place only after the declared length and the ZIP magic are
- * verified, mirroring the atomic pattern of the comic download pipeline without its
- * download-root restriction.
+ * Streams a release APK to a local file with byte-level progress and resumable downloads.
+ *
+ * The bytes land in a `.part` sibling; if a download is interrupted, the next attempt requests the
+ * missing range (`Range: bytes=<resumed>-`) so it continues from where it left off instead of
+ * starting over. GitHub's release CDN answers range requests with `206 Partial Content`.
+ *
+ * The download first tries the device's system proxy (which is how the user's VPN accelerates the
+ * browser), then falls back to a direct connection when the proxy fails before any progress is
+ * made — the two paths are tried per attempt so an unstable proxy does not leave the download
+ * permanently stuck.
  */
 class ApkDownloader(
     baseClient: OkHttpClient,
     private val progressIntervalBytes: Long = DEFAULT_PROGRESS_INTERVAL_BYTES,
 ) {
-    private val httpClient = baseClient.newBuilder()
-        // A public release asset needs no proxy; routing the download through the device's
-        // system proxy (VPN / ad-blocker / network accelerator) is the common reason a
-        // "check update" succeeds while the APK download fails, because those proxies often
-        // choke on GitHub's release CDN. Go direct instead.
-        .proxy(java.net.Proxy.NO_PROXY)
-        // One APK download may legitimately take minutes; the call has no overall deadline and
-        // each individual read gets a generous per-read timeout instead.
+    private val viaProxyClient = baseClient.newBuilder()
         .callTimeout(0, TimeUnit.MILLISECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
-    /** Downloads [url] into [target]; returns [target] once the file is verified and in place. */
+    private val directClient = baseClient.newBuilder()
+        .proxy(Proxy.NO_PROXY)
+        .callTimeout(0, TimeUnit.MILLISECONDS)
+        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .build()
+
+    /** Downloads [url] into [target], resuming a partial `.part` if one already exists. */
     suspend fun download(url: String, target: File, onProgress: (ApkDownloadProgress) -> Unit = {}): File {
         val parent = target.parentFile ?: throw ApkDownloadException("target has no parent directory")
         if (!parent.isDirectory && !parent.mkdirs()) {
             throw ApkDownloadException("cannot create ${parent.name}")
         }
         val part = File(parent, target.name + ".part")
+        val startBytes = if (part.isFile) part.length() else 0L
+
         try {
-            val response = try {
-                awaitResponse(httpClient, Request.Builder().url(url).get().build())
-            } catch (error: IOException) {
-                if (error is java.net.SocketTimeoutException) {
-                    throw ApkDownloadException("the download timed out while connecting: ${error.message}")
-                }
-                throw ApkDownloadException("could not reach the download server: ${error.message}")
-            }
-            response.use {
-                if (!it.isSuccessful) throw ApkDownloadException("download failed with HTTP ${it.code}")
-                val body = it.body ?: throw ApkDownloadException("download returned an empty body")
-                val expectedBytes = body.contentLength()
-                val knownTotal = expectedBytes.takeIf { value -> value > 0 }
-                var copied = 0L
-                var reportedBytes = 0L
-                try {
-                    FileOutputStream(part).use { raw ->
-                        BufferedOutputStream(raw, IO_BUFFER_BYTES).use { sink ->
-                            val source = body.source()
-                            val buffer = ByteArray(IO_BUFFER_BYTES)
-                            while (true) {
-                                val read = source.read(buffer)
-                                if (read == -1) break
-                                sink.write(buffer, 0, read)
-                                copied += read
-                                if (copied - reportedBytes >= progressIntervalBytes) {
-                                    reportedBytes = copied
-                                    onProgress(ApkDownloadProgress(copied, knownTotal))
-                                }
-                            }
-                            sink.flush()
-                        }
-                        raw.fd.let { fd ->
-                            // Best-effort durability: a cache APK does not need power-loss
-                            // guarantees, and some file systems (FUSE sandboxes, exotic mounts)
-                            // reject fsync outright.
-                            runCatching { fd.sync() }
-                        }
-                    }
-                } catch (error: IOException) {
-                    throw ApkDownloadException("the download stream failed: ${error.message}")
-                }
-                onProgress(ApkDownloadProgress(copied, knownTotal))
-                if (expectedBytes > 0 && copied != expectedBytes) {
-                    throw ApkDownloadException("truncated download: received $copied of $expectedBytes bytes")
-                }
-                verifyApkHeader(part)
-                moveIntoPlace(part, target)
-            }
+            downloadInto(url, part, startBytes, onProgress)
+            verifyApkHeader(part)
+            moveIntoPlace(part, target)
         } finally {
             if (part.exists()) part.delete()
         }
         return target
+    }
+
+    /** Tries the proxy channel first, then the direct channel when the proxy makes no progress. */
+    private suspend fun downloadInto(
+        url: String,
+        part: File,
+        startBytes: Long,
+        onProgress: (ApkDownloadProgress) -> Unit,
+    ) {
+        val request = Request.Builder().url(url).get().apply {
+            if (startBytes > 0) header("Range", "bytes=$startBytes-")
+        }.build()
+
+        val attempts = listOf(viaProxyClient, directClient)
+        var lastError: ApkDownloadException? = null
+        for ((index, client) in attempts.withIndex()) {
+            try {
+                streamFrom(client, request, part, startBytes, onProgress)
+                return
+            } catch (error: ApkDownloadException) {
+                lastError = error
+                // Only a connect failure justifies switching channels, and only while no bytes
+                // have been written. HTTP errors and mid-stream failures must not be replayed.
+                val canFallback = error is ApkConnectException && index < attempts.lastIndex && part.length() <= startBytes
+                if (!canFallback) throw error
+            }
+        }
+        throw lastError ?: ApkDownloadException("download failed")
+    }
+
+    private suspend fun streamFrom(
+        client: OkHttpClient,
+        request: Request,
+        part: File,
+        startBytes: Long,
+        onProgress: (ApkDownloadProgress) -> Unit,
+    ) {
+        val response = try {
+            awaitResponse(client, request)
+        } catch (error: IOException) {
+            if (error is SocketTimeoutException) {
+                throw ApkConnectException("the download timed out while connecting: ${error.message}", error)
+            }
+            throw ApkConnectException("could not reach the download server: ${error.message}", error)
+        }
+        response.use {
+            val code = it.code
+            if (code != 200 && code != 206) throw ApkDownloadException("download failed with HTTP $code")
+
+            val body = it.body ?: throw ApkDownloadException("download returned an empty body")
+            val totalBytes = parseTotalBytes(it.header("Content-Range"), body.contentLength())
+            // The server may ignore our range and send the whole file (200): restart from zero.
+            val offset = if (code == 206) startBytes else 0L
+            var copied = offset
+
+            RandomAccessFile(part, "rw").use { file ->
+                file.seek(offset)
+                val source = body.source()
+                val buffer = ByteArray(IO_BUFFER_BYTES)
+                var lastReported = copied
+                while (true) {
+                    val read = source.read(buffer)
+                    if (read == -1) break
+                    file.write(buffer, 0, read)
+                    copied += read
+                    if (copied - lastReported >= progressIntervalBytes) {
+                        lastReported = copied
+                        onProgress(ApkDownloadProgress(copied, totalBytes))
+                    }
+                }
+            }
+            onProgress(ApkDownloadProgress(copied, totalBytes))
+            if (totalBytes != null && totalBytes > 0 && copied != totalBytes) {
+                throw ApkDownloadException("truncated download: received $copied of $totalBytes bytes")
+            }
+        }
+    }
+
+    private fun parseTotalBytes(contentRange: String?, contentLength: Long): Long? {
+        // "bytes 0-499/500" -> 500, falling back to Content-Length when absent.
+        return contentRange?.substringAfterLast('/')?.toLongOrNull()?.takeIf { it > 0 }
+            ?: contentLength.takeIf { it > 0 }
     }
 
     private fun verifyApkHeader(file: File) {
@@ -113,9 +158,16 @@ class ApkDownloader(
 
     private fun moveIntoPlace(part: File, target: File) {
         try {
-            Files.move(part.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            java.nio.file.Files.move(
+                part.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
         } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
-            Files.move(part.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            java.nio.file.Files.move(
+                part.toPath(), target.toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
         }
     }
 

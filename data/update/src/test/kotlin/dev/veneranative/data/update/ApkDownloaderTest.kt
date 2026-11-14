@@ -97,6 +97,34 @@ class ApkDownloaderTest {
         }
     }
 
+    @Test
+    fun `resumes a partial download via a range request`() = runTest {
+        MockWebServer().use { server ->
+            server.start()
+            val bytes = apkBytes(4096)
+            // The client asks for bytes 2048- with a range request.
+            server.enqueue(
+                MockResponse.Builder()
+                    .code(206)
+                    .addHeader("Content-Range", "bytes 2048-4095/4096")
+                    .body(Buffer().write(bytes.copyOfRange(2048, 4096)))
+                    .build(),
+            )
+            val folder = tmp.newFolder()
+            val target = File(folder, "update.apk")
+            // A prior attempt left the first half behind.
+            File(folder, "update.apk.part").writeBytes(bytes.copyOfRange(0, 2048))
+
+            val result = downloader.download(server.url("/release.apk").toString(), target)
+
+            assertEquals(target, result)
+            assertEquals(4096L, target.length())
+            assertTrue(target.readBytes().contentEquals(bytes))
+            val request = server.takeRequest()
+            assertTrue(request.headers["Range"]!!.startsWith("bytes=2048-"))
+        }
+    }
+
     private fun apkBytes(size: Int): ByteArray = ByteArray(size).also { bytes ->
         // APK files are ZIP archives starting with a local file header.
         bytes[0] = 0x50
