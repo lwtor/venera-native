@@ -125,7 +125,8 @@ class AboutViewModel(
         val newVersionCode = state.value.newVersionCode
         job = viewModelScope.launch {
             // Reuse a prefetched APK when one is already on disk, skipping the foreground download.
-            val cached = gateway.cachedApk(newVersionCode)
+            // The lookup touches the file system (APK header check), so run it off the main thread.
+            val cached = withContext(workerDispatcher) { gateway.cachedApk(newVersionCode) }
             val file: File = if (cached != null) {
                 cached
             } else {
