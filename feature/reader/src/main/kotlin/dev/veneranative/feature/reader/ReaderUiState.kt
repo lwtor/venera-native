@@ -38,6 +38,8 @@ data class ReaderUiState(
     val endOfChaptersReached: Boolean = false,
     val direction: ReadingDirection = ReadingDirection.Vertical,
     val status: ReaderStatus = ReaderStatus.Loading,
+    val splitEnabled: Boolean = false,
+    val excludedPages: Set<Int> = emptySet(),
 ) {
     val pageCount: Int get() = pages.size
 

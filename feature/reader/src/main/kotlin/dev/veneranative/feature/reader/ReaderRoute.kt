@@ -10,6 +10,7 @@ import dev.veneranative.core.image.tiling.DecodeStrategy
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.ReaderProgress
+import dev.veneranative.core.model.SplitPreferenceRepository
 
 
 /**
@@ -33,6 +34,7 @@ fun ReaderRoute(
     progressFactory: ((ChapterRef) -> ReaderProgress?)? = null,
     onExit: () -> Unit = {},
     onOpenComicDetails: (() -> Unit)? = null,
+    splitPreference: SplitPreferenceRepository? = null,
 ) {
     val owner = androidx.compose.runtime.remember(chapter) {
         object : androidx.lifecycle.ViewModelStoreOwner {
@@ -46,7 +48,8 @@ fun ReaderRoute(
     val viewModel: ReaderViewModel = viewModel(viewModelStoreOwner = owner) {
         ReaderViewModel(chapter, provider, startPageIndex = startPageIndex, progress = progress,
 prefetchRadius = if (chapter is ChapterRef.Local) 0 else 3,
-            progressFactory = progressFactory ?: { target -> progress.takeIf { target == chapter } })
+            progressFactory = progressFactory ?: { target -> progress.takeIf { target == chapter } },
+            splitPreference = splitPreference)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     ReaderScreen(

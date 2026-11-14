@@ -13,4 +13,6 @@ sealed interface ReaderAction {
     data class ChangeDirection(val direction: ReadingDirection) : ReaderAction
     data object LoadNextChapter : ReaderAction
     data object RetryNextChapter : ReaderAction
+    data object ToggleSplit : ReaderAction
+    data class TogglePageSplit(val sourcePageIndex: Int) : ReaderAction
 }

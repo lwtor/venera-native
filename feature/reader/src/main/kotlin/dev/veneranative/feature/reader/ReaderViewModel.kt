@@ -6,16 +6,24 @@ import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
+import dev.veneranative.core.model.PageCrop
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.PageSizeState
+import dev.veneranative.core.model.PageSplit
 import dev.veneranative.core.model.ReaderProgress
+import dev.veneranative.core.model.SplitPreferenceRepository
 import dev.veneranative.core.model.Chapter
 import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.delay
 
@@ -37,6 +45,8 @@ class ReaderViewModel(
     private val progressFactory: (ChapterRef) -> ReaderProgress? = { ref -> progress.takeIf { ref == chapter } },
     private val chapterLoadTimeoutMillis: Long = 120_000L,
     private val pageLoadTimeoutMillis: Long = 30_000L,
+    /** Per-chapter split preferences; null disables splitting and keeps the reader behaviour unchanged. */
+    private val splitPreference: SplitPreferenceRepository? = null,
 ) : ViewModel() {
 
     private data class ChapterSegment(
@@ -44,8 +54,10 @@ class ReaderViewModel(
         val content: ChapterContent,
         val startPageIndex: Int,
         val progress: ReaderProgress?,
+        /** Number of display pages this chapter occupies; differs from `content.pages.size` when split. */
+        val displayPageCount: Int,
     ) {
-        val endPageIndex: Int get() = startPageIndex + content.pages.lastIndex
+        val endPageIndex: Int get() = startPageIndex + displayPageCount - 1
     }
 
     private val chapters = mutableListOf<ChapterSegment>()
@@ -92,10 +104,12 @@ class ReaderViewModel(
                 _state.update { it.copy(nextChapterLoadFailed = false) }
                 loadNextChapter()
             }
+            ReaderAction.ToggleSplit -> toggleSplit()
+            is ReaderAction.TogglePageSplit -> togglePageSplit(action.sourcePageIndex)
         }
     }
 
-    private fun load() {
+    private fun load(overrideStartSourceIndex: Int? = null) {
         _state.update { it.copy(status = ReaderStatus.Loading) }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -105,22 +119,28 @@ class ReaderViewModel(
                 nextChapterLoadJob?.cancel()
                 previousChapterLoadJob?.cancel()
                 val chapterProgress = progressFactory(chapter)
-                val resumePage = withTimeoutOrNull(10_000L) { chapterProgress?.resumePage() } ?: startPageIndex
+                val resumePage = overrideStartSourceIndex
+                    ?: withTimeoutOrNull(10_000L) { chapterProgress?.resumePage() } ?: startPageIndex
                 val content = loadChapterBounded(chapter)
                 if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
                 pageJobs.values.forEach { it.cancel() }
                 pageJobs.clear()
                 prefetched.clear()
                 val resumedIndex = resumePage.coerceIn(0, content.pages.lastIndex.coerceAtLeast(0))
-                chapters += ChapterSegment(chapter, content, 0, chapterProgress)
+                val splitEnabled = splitPreference?.isSplitEnabled(chapter) == true
+                val excluded = if (splitEnabled) excludedSourcePages(chapter, content.pages.size) else emptySet()
+                val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
+                val displayPages = splitPages(sizedSource, splitEnabled, excluded)
+                val displayIndex = displayPages.indexOfFirst { it.sourceIndex == resumedIndex }.coerceAtLeast(0)
+                chapters += ChapterSegment(chapter, content, 0, chapterProgress, displayPages.size)
                 loadedChapters += chapter
                 _state.update { current ->
                     current.copy(
                         chapterTitle = content.title,
-                        pages = content.pages.mapIndexed { index, page -> page.copy(index = index) },
-                        currentPageIndex = resumedIndex,
+                        pages = displayPages,
+                        currentPageIndex = displayIndex,
                         currentChapterStartIndex = 0,
-                        currentChapterPageCount = content.pages.size,
+                        currentChapterPageCount = displayPages.size,
                         previousChapter = content.previousChapter,
                         nextChapterStartIndex = null,
                         nextChapter = content.nextChapter,
@@ -129,11 +149,13 @@ class ReaderViewModel(
                         isLoadingPreviousChapter = false,
                         previousChapterLoadFailed = false,
                         endOfChaptersReached = false,
+                        splitEnabled = splitEnabled,
+                        excludedPages = excluded,
                         status = ReaderStatus.Ready,
                     )
                 }
                 chapterProgress?.record(content, resumedIndex)
-                prefetchAround(resumedIndex)
+                prefetchAround(displayIndex)
                 content.nextChapter?.let { next ->
                     viewModelScope.launch { provider.prefetchChapter(next.toChapterRef()) }
                 }
@@ -161,7 +183,7 @@ class ReaderViewModel(
                 currentPageIndex = target,
                 chapterTitle = segment?.content?.title ?: current.chapterTitle,
                 currentChapterStartIndex = segment?.startPageIndex ?: current.currentChapterStartIndex,
-                currentChapterPageCount = segment?.content?.pages?.size ?: current.currentChapterPageCount,
+                currentChapterPageCount = segment?.displayPageCount ?: current.currentChapterPageCount,
                 previousChapter = segment?.content?.previousChapter,
                 nextChapter = segment?.content?.nextChapter,
                 nextChapterStartIndex = segment?.let { currentSegment ->
@@ -171,7 +193,7 @@ class ReaderViewModel(
             )
         }
         segment?.let { loaded ->
-            loaded.progress?.record(loaded.content, target - loaded.startPageIndex)
+            loaded.progress?.record(loaded.content, pages[target].sourceIndex)
         }
         prefetchAround(target)
     }
@@ -210,9 +232,13 @@ class ReaderViewModel(
                 if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
                 val startIndex = _state.value.pages.size
                 val segmentProgress = progressFactory(nextRef)
-                chapters += ChapterSegment(nextRef, content, startIndex, segmentProgress)
+                val splitEnabled = splitPreference?.isSplitEnabled(nextRef) == true
+                val excluded = if (splitEnabled) excludedSourcePages(nextRef, content.pages.size) else emptySet()
+                val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
+                val displayPages = splitPages(sizedSource, splitEnabled, excluded)
+                chapters += ChapterSegment(nextRef, content, startIndex, segmentProgress, displayPages.size)
                 loadedChapters += nextRef
-                val appended = content.pages.mapIndexed { offset, page -> page.copy(index = startIndex + offset) }
+                val appended = displayPages.mapIndexed { offset, page -> page.copy(index = startIndex + offset) }
                 _state.update { current ->
                     val visibleSegment = chapters.lastOrNull {
                         current.currentPageIndex in it.startPageIndex..it.endPageIndex
@@ -221,7 +247,7 @@ class ReaderViewModel(
                         pages = current.pages + appended,
                         currentPageIndex = if (navigateAfterLoad) startIndex else current.currentPageIndex,
                         currentChapterStartIndex = if (navigateAfterLoad) startIndex else current.currentChapterStartIndex,
-                        currentChapterPageCount = if (navigateAfterLoad) content.pages.size else current.currentChapterPageCount,
+                        currentChapterPageCount = if (navigateAfterLoad) displayPages.size else current.currentChapterPageCount,
                         nextChapterStartIndex = if (navigateAfterLoad) null else visibleSegment?.let { segment ->
                             chapters.firstOrNull { it.startPageIndex == segment.endPageIndex + 1 }?.startPageIndex
                         },
@@ -250,8 +276,8 @@ class ReaderViewModel(
         val previousRef = previous.toChapterRef()
         if (previousRef in loadedChapters) {
             if (preserveVisiblePage) return
-            val start = chapters.firstOrNull { it.chapter == previousRef }?.startPageIndex ?: return
-            showPage(start + (chapters.first { it.chapter == previousRef }.content.pages.lastIndex))
+            val segment = chapters.firstOrNull { it.chapter == previousRef } ?: return
+            showPage(segment.startPageIndex + (segment.displayPageCount - 1))
             return
         }
         if (previousChapterLoadJob?.isActive == true) return
@@ -260,17 +286,21 @@ class ReaderViewModel(
             try {
                 val content = loadChapterBounded(previousRef)
                 if (content.pages.isEmpty()) throw IllegalStateException("Chapter has no pages")
-                val count = content.pages.size
+                val splitEnabled = splitPreference?.isSplitEnabled(previousRef) == true
+                val excluded = if (splitEnabled) excludedSourcePages(previousRef, content.pages.size) else emptySet()
+                val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
+                val displayPages = splitPages(sizedSource, splitEnabled, excluded)
+                val count = displayPages.size
                 val currentState = _state.value
                 val shiftedPages = currentState.pages.map { it.copy(index = it.index + count) }
                 val preservedSegmentStart = currentState.currentChapterStartIndex + count
                 chapters.replaceAll { segment -> segment.copy(startPageIndex = segment.startPageIndex + count) }
                 val segmentProgress = progressFactory(previousRef)
-                chapters.add(0, ChapterSegment(previousRef, content, 0, segmentProgress))
+                chapters.add(0, ChapterSegment(previousRef, content, 0, segmentProgress, count))
                 loadedChapters += previousRef
                 _state.update { current ->
                     current.copy(
-                        pages = content.pages.mapIndexed { index, page -> page.copy(index = index) } + shiftedPages,
+                        pages = displayPages.mapIndexed { index, page -> page.copy(index = index) } + shiftedPages,
                         currentPageIndex = if (preserveVisiblePage) current.currentPageIndex + count else count - 1,
                         currentChapterStartIndex = if (preserveVisiblePage) preservedSegmentStart else 0,
                         currentChapterPageCount = if (preserveVisiblePage) current.currentChapterPageCount else count,
@@ -285,7 +315,7 @@ class ReaderViewModel(
                         previousChapterLoadFailed = false,
                     )
                 }
-                segmentProgress?.record(content, count - 1)
+                segmentProgress?.record(content, content.pages.lastIndex)
                 pageJobs.values.forEach { it.cancel() }
                 pageJobs.clear()
                 prefetched.clear()
@@ -314,7 +344,11 @@ class ReaderViewModel(
         pageJobs[index] = viewModelScope.launch {
             val localChapter = chapters.lastOrNull { index in it.startPageIndex..it.endPageIndex }?.chapter is ChapterRef.Local
             try {
-                if (page.sizeState == PageSizeState.Ready && localChapter) {
+                if (page.crop != null) {
+                    // A split half already has its final size; only warm the source image. Never
+                    // re-resolve it, or the returned full size would overwrite the half width.
+                    withTimeoutOrNull(pageLoadTimeoutMillis) { provider.prefetch(page) }
+                } else if (page.sizeState == PageSizeState.Ready && localChapter) {
                     // A bounded SAF cache may have evicted this page while it was off screen.
                     updatePage(index, page.copy(sizeState = dev.veneranative.core.model.PageSizeState.Pending))
                     updatePage(index, resolvePageBounded(page))
@@ -328,7 +362,7 @@ class ReaderViewModel(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {
-                if (page.sizeState != PageSizeState.Ready || localChapter) {
+                if (page.crop == null && (page.sizeState != PageSizeState.Ready || localChapter)) {
                     updatePage(index, page.copy(sizeState = PageSizeState.Failed))
                 }
             }
@@ -358,8 +392,94 @@ class ReaderViewModel(
         error("Unreachable retry state")
     }
 
+    /**
+     * Maps source pages to display pages, splitting double pages into left/right halves when
+     * enabled and not manually excluded. Display indices are always the contiguous `0..N-1` of the
+     * result; `sourceIndex` stays the original source position for progress and exclusions.
+     */
+    private fun splitPages(source: List<ComicPage>, enabled: Boolean, excluded: Set<Int>): List<ComicPage> {
+        val normalized = source.mapIndexed { index, page -> page.copy(index = index, sourceIndex = index) }
+        if (!enabled) return normalized
+        val result = mutableListOf<ComicPage>()
+        for (page in normalized) {
+            if (page.sourceIndex in excluded || !PageSplit.isDoublePage(page.widthPx, page.heightPx)) {
+                result += page.copy(index = result.size)
+            } else {
+                for (half in PageSplit.halves(page.widthPx, page.heightPx)) {
+                    result += page.copy(
+                        index = result.size,
+                        widthPx = half.widthPx,
+                        crop = PageCrop(
+                            sourceWidthPx = page.widthPx,
+                            sourceHeightPx = page.heightPx,
+                            leftPx = half.leftPx,
+                            topPx = 0,
+                            widthPx = half.widthPx,
+                            heightPx = page.heightPx,
+                        ),
+                    )
+                }
+            }
+        }
+        return result
+    }
+
+    /** Reads which source pages are manually excluded from splitting for [chapterRef]. */
+    private suspend fun excludedSourcePages(chapterRef: ChapterRef, pageCount: Int): Set<Int> {
+        val preference = splitPreference ?: return emptySet()
+        return buildSet {
+            for (index in 0 until pageCount) {
+                if (preference.isPageExcluded(chapterRef, index)) add(index)
+            }
+        }
+    }
+
+    /**
+     * Resolves the real dimensions of every source page so the aspect-ratio split decision can be
+     * made. Concurrent but bounded; a page that fails keeps its placeholder and stays un-split.
+     */
+    private suspend fun resolveSourceSizes(pages: List<ComicPage>): List<ComicPage> {
+        val semaphore = Semaphore(MAX_SPLIT_RESOLVE_CONCURRENCY)
+        return coroutineScope {
+            pages.map { page ->
+                async {
+                    semaphore.withPermit {
+                        try {
+                            withTimeoutOrNull(pageLoadTimeoutMillis) { provider.resolve(page) } ?: page
+                        } catch (cancellation: CancellationException) {
+                            throw cancellation
+                        } catch (_: Exception) {
+                            page
+                        }
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
+    private fun toggleSplit() {
+        val current = _state.value
+        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
+        val enabled = !current.splitEnabled
+        viewModelScope.launch {
+            splitPreference?.setSplitEnabled(chapter, enabled)
+            load(overrideStartSourceIndex = currentSourceIndex)
+        }
+    }
+
+    private fun togglePageSplit(sourcePageIndex: Int) {
+        val current = _state.value
+        val nowExcluded = sourcePageIndex !in current.excludedPages
+        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
+        viewModelScope.launch {
+            splitPreference?.setPageExcluded(chapter, sourcePageIndex, nowExcluded)
+            load(overrideStartSourceIndex = currentSourceIndex)
+        }
+    }
+
     private companion object {
         const val DEFAULT_PREFETCH_RADIUS = 3
+        const val MAX_SPLIT_RESOLVE_CONCURRENCY = 8
     }
 }
 
