@@ -543,4 +543,55 @@ class ReaderViewModelTest {
         viewModel.onAction(ReaderAction.PageShown(1))
         assertTrue(viewModel.state.value.splitEnabled)
     }
+
+    /** Split preference whose per-comic overlap and order are fixed by the test. */
+    private fun perComicSplit(
+        overlap: Float = dev.veneranative.core.model.PageSplit.DEFAULT_OVERLAP_FRACTION,
+        rightToLeft: Boolean = false,
+    ) = object : SplitPreferenceRepository {
+        override suspend fun isSplitEnabled(chapterRef: ChapterRef) = true
+        override suspend fun setSplitEnabled(chapterRef: ChapterRef, enabled: Boolean) = Unit
+        override suspend fun isPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int) = false
+        override suspend fun setPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int, excluded: Boolean) = Unit
+        override suspend fun overlapFraction(comicRef: dev.veneranative.core.model.ComicRef) = overlap
+        override suspend fun setOverlapFraction(comicRef: dev.veneranative.core.model.ComicRef, fraction: Float) = Unit
+        override suspend fun isRightToLeft(comicRef: dev.veneranative.core.model.ComicRef) = rightToLeft
+        override suspend fun setRightToLeft(comicRef: dev.veneranative.core.model.ComicRef, rightToLeft: Boolean) = Unit
+    }
+
+    @Test
+    fun `right to left comic shows the right half first`() = runTest(dispatcher) {
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split", listOf(ComicPage(0, "wide", 2000, 1400)),
+            )
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = perComicSplit(rightToLeft = true),
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        // The right half starts at 45% of the width, so it is the page shown first.
+        assertEquals(listOf(900, 0), state.pages.map { it.crop?.leftPx })
+        assertTrue(state.splitRightToLeft)
+    }
+
+    @Test
+    fun `saved overlap widens the shared gutter`() = runTest(dispatcher) {
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split", listOf(ComicPage(0, "wide", 2000, 1400)),
+            )
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = perComicSplit(overlap = 0.1f),
+        )
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertEquals(1200, state.pages[0].crop?.widthPx) // left half reaches 60%
+        assertEquals(800, state.pages[1].crop?.leftPx) // right half starts at 40%
+        assertEquals(0.1f, state.splitOverlapFraction, 1e-6f)
+    }
 }

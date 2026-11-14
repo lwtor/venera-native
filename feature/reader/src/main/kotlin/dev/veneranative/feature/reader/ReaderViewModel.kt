@@ -59,6 +59,9 @@ class ReaderViewModel(
         /** Split preference of this chapter, replayed into the UI state when it becomes visible. */
         val splitEnabled: Boolean = false,
         val excludedPages: Set<Int> = emptySet(),
+        /** Per-comic split tuning, replayed alongside [splitEnabled] when this chapter is shown. */
+        val splitOverlapFraction: Float = PageSplit.DEFAULT_OVERLAP_FRACTION,
+        val splitRightToLeft: Boolean = false,
     ) {
         val endPageIndex: Int get() = startPageIndex + displayPageCount - 1
     }
@@ -109,6 +112,8 @@ class ReaderViewModel(
             }
             ReaderAction.ToggleSplit -> toggleSplit()
             is ReaderAction.TogglePageSplit -> togglePageSplit(action.sourcePageIndex)
+            is ReaderAction.SetSplitOverlap -> setSplitOverlap(action.fraction)
+            is ReaderAction.SetSplitOrder -> setSplitOrder(action.rightToLeft)
         }
     }
 
@@ -133,10 +138,14 @@ class ReaderViewModel(
                 val splitEnabled = splitPreference?.isSplitEnabled(chapter) == true
                 val excluded = if (splitEnabled) excludedSourcePages(chapter, content.pages.size) else emptySet()
                 val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
-                val displayPages = splitPages(sizedSource, splitEnabled, excluded)
+                val overlapFraction = splitPreference?.overlapFraction(chapter.comicRef)
+                    ?: PageSplit.DEFAULT_OVERLAP_FRACTION
+                val rightToLeft = splitPreference?.isRightToLeft(chapter.comicRef) == true
+                val displayPages = splitPages(sizedSource, splitEnabled, excluded, overlapFraction, rightToLeft)
                 val displayIndex = displayPages.indexOfFirst { it.sourceIndex == resumedIndex }.coerceAtLeast(0)
                 chapters += ChapterSegment(
                     chapter, content, 0, chapterProgress, displayPages.size, splitEnabled, excluded,
+                    overlapFraction, rightToLeft,
                 )
                 loadedChapters += chapter
                 _state.update { current ->
@@ -156,6 +165,8 @@ class ReaderViewModel(
                         endOfChaptersReached = false,
                         splitEnabled = splitEnabled,
                         excludedPages = excluded,
+                        splitOverlapFraction = overlapFraction,
+                        splitRightToLeft = rightToLeft,
                         status = ReaderStatus.Ready,
                     )
                 }
@@ -200,7 +211,14 @@ class ReaderViewModel(
         segment?.let { loaded ->
             // Crossing into another chapter must replay that chapter's split settings, otherwise the
             // toolbar keeps showing the previous chapter's toggle while the pages are un-split.
-            _state.update { it.copy(splitEnabled = loaded.splitEnabled, excludedPages = loaded.excludedPages) }
+            _state.update {
+                it.copy(
+                    splitEnabled = loaded.splitEnabled,
+                    excludedPages = loaded.excludedPages,
+                    splitOverlapFraction = loaded.splitOverlapFraction,
+                    splitRightToLeft = loaded.splitRightToLeft,
+                )
+            }
             loaded.progress?.record(loaded.content, pages[target].sourceIndex)
         }
         prefetchAround(target)
@@ -243,9 +261,13 @@ class ReaderViewModel(
                 val splitEnabled = splitPreference?.isSplitEnabled(nextRef) == true
                 val excluded = if (splitEnabled) excludedSourcePages(nextRef, content.pages.size) else emptySet()
                 val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
-                val displayPages = splitPages(sizedSource, splitEnabled, excluded)
+                val overlapFraction = splitPreference?.overlapFraction(nextRef.comicRef)
+                    ?: PageSplit.DEFAULT_OVERLAP_FRACTION
+                val rightToLeft = splitPreference?.isRightToLeft(nextRef.comicRef) == true
+                val displayPages = splitPages(sizedSource, splitEnabled, excluded, overlapFraction, rightToLeft)
                 chapters += ChapterSegment(
                     nextRef, content, startIndex, segmentProgress, displayPages.size, splitEnabled, excluded,
+                    overlapFraction, rightToLeft,
                 )
                 loadedChapters += nextRef
                 val appended = displayPages.mapIndexed { offset, page -> page.copy(index = startIndex + offset) }
@@ -269,6 +291,8 @@ class ReaderViewModel(
                         endOfChaptersReached = false,
                         splitEnabled = if (navigateAfterLoad) splitEnabled else current.splitEnabled,
                         excludedPages = if (navigateAfterLoad) excluded else current.excludedPages,
+                        splitOverlapFraction = if (navigateAfterLoad) overlapFraction else current.splitOverlapFraction,
+                        splitRightToLeft = if (navigateAfterLoad) rightToLeft else current.splitRightToLeft,
                     )
                 }
                 if (navigateAfterLoad) segmentProgress?.record(content, 0)
@@ -301,7 +325,10 @@ class ReaderViewModel(
                 val splitEnabled = splitPreference?.isSplitEnabled(previousRef) == true
                 val excluded = if (splitEnabled) excludedSourcePages(previousRef, content.pages.size) else emptySet()
                 val sizedSource = if (splitEnabled) resolveSourceSizes(content.pages) else content.pages
-                val displayPages = splitPages(sizedSource, splitEnabled, excluded)
+                val overlapFraction = splitPreference?.overlapFraction(previousRef.comicRef)
+                    ?: PageSplit.DEFAULT_OVERLAP_FRACTION
+                val rightToLeft = splitPreference?.isRightToLeft(previousRef.comicRef) == true
+                val displayPages = splitPages(sizedSource, splitEnabled, excluded, overlapFraction, rightToLeft)
                 val count = displayPages.size
                 val currentState = _state.value
                 val shiftedPages = currentState.pages.map { it.copy(index = it.index + count) }
@@ -310,7 +337,10 @@ class ReaderViewModel(
                 val segmentProgress = progressFactory(previousRef)
                 chapters.add(
                     0,
-                    ChapterSegment(previousRef, content, 0, segmentProgress, count, splitEnabled, excluded),
+                    ChapterSegment(
+                        previousRef, content, 0, segmentProgress, count, splitEnabled, excluded,
+                        overlapFraction, rightToLeft,
+                    ),
                 )
                 loadedChapters += previousRef
                 _state.update { current ->
@@ -330,6 +360,12 @@ class ReaderViewModel(
                         previousChapterLoadFailed = false,
                         splitEnabled = if (preserveVisiblePage) current.splitEnabled else splitEnabled,
                         excludedPages = if (preserveVisiblePage) current.excludedPages else excluded,
+                        splitOverlapFraction = if (preserveVisiblePage) {
+                            current.splitOverlapFraction
+                        } else {
+                            overlapFraction
+                        },
+                        splitRightToLeft = if (preserveVisiblePage) current.splitRightToLeft else rightToLeft,
                     )
                 }
                 segmentProgress?.record(content, content.pages.lastIndex)
@@ -413,8 +449,16 @@ class ReaderViewModel(
      * Maps source pages to display pages, splitting double pages into left/right halves when
      * enabled and not manually excluded. Display indices are always the contiguous `0..N-1` of the
      * result; `sourceIndex` stays the original source position for progress and exclusions.
+     *
+     * [overlapFraction] and [rightToLeft] come from the comic's saved split settings.
      */
-    private fun splitPages(source: List<ComicPage>, enabled: Boolean, excluded: Set<Int>): List<ComicPage> {
+    private fun splitPages(
+        source: List<ComicPage>,
+        enabled: Boolean,
+        excluded: Set<Int>,
+        overlapFraction: Float,
+        rightToLeft: Boolean,
+    ): List<ComicPage> {
         val normalized = source.mapIndexed { index, page -> page.copy(index = index, sourceIndex = index) }
         if (!enabled) return normalized
         val result = mutableListOf<ComicPage>()
@@ -422,7 +466,7 @@ class ReaderViewModel(
             if (page.sourceIndex in excluded || !PageSplit.isDoublePage(page.widthPx, page.heightPx)) {
                 result += page.copy(index = result.size)
             } else {
-                for (half in PageSplit.halves(page.widthPx, page.heightPx)) {
+                for (half in PageSplit.halves(page.widthPx, page.heightPx, overlapFraction, rightToLeft)) {
                     result += page.copy(
                         index = result.size,
                         widthPx = half.widthPx,
@@ -490,6 +534,24 @@ class ReaderViewModel(
         val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
         viewModelScope.launch {
             splitPreference?.setPageExcluded(chapter, sourcePageIndex, nowExcluded)
+            load(overrideStartSourceIndex = currentSourceIndex)
+        }
+    }
+
+    private fun setSplitOverlap(fraction: Float) {
+        val current = _state.value
+        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
+        viewModelScope.launch {
+            splitPreference?.setOverlapFraction(chapter.comicRef, fraction)
+            load(overrideStartSourceIndex = currentSourceIndex)
+        }
+    }
+
+    private fun setSplitOrder(rightToLeft: Boolean) {
+        val current = _state.value
+        val currentSourceIndex = current.pages.getOrNull(current.currentPageIndex)?.sourceIndex ?: 0
+        viewModelScope.launch {
+            splitPreference?.setRightToLeft(chapter.comicRef, rightToLeft)
             load(overrideStartSourceIndex = currentSourceIndex)
         }
     }

@@ -15,4 +15,8 @@ sealed interface ReaderAction {
     data object RetryNextChapter : ReaderAction
     data object ToggleSplit : ReaderAction
     data class TogglePageSplit(val sourcePageIndex: Int) : ReaderAction
+    /** Changes how far each split half reaches past the centre line, as a fraction of the width. */
+    data class SetSplitOverlap(val fraction: Float) : ReaderAction
+    /** Chooses which half of a split page is shown first for the current comic. */
+    data class SetSplitOrder(val rightToLeft: Boolean) : ReaderAction
 }

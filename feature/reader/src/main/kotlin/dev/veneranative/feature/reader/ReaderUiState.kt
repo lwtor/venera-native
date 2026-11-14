@@ -2,6 +2,7 @@ package dev.veneranative.feature.reader
 
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.Chapter
+import dev.veneranative.core.model.PageSplit
 
 /** How pages are laid out and in which order they advance. */
 enum class ReadingDirection {
@@ -40,6 +41,10 @@ data class ReaderUiState(
     val status: ReaderStatus = ReaderStatus.Loading,
     val splitEnabled: Boolean = false,
     val excludedPages: Set<Int> = emptySet(),
+    /** Gutter overlap per side of a split page, shared by every chapter of the current comic. */
+    val splitOverlapFraction: Float = PageSplit.DEFAULT_OVERLAP_FRACTION,
+    /** Whether split pages show the right half before the left half for the current comic. */
+    val splitRightToLeft: Boolean = false,
 ) {
     val pageCount: Int get() = pages.size
 
