@@ -594,4 +594,78 @@ class ReaderViewModelTest {
         assertEquals(800, state.pages[1].crop?.leftPx) // right half starts at 40%
         assertEquals(0.1f, state.splitOverlapFraction, 1e-6f)
     }
+
+    @Test
+    fun `changing the gutter overlap resplits in place without reloading the chapter`() = runTest(dispatcher) {
+        var loads = 0
+        val savedOverlaps = mutableListOf<Float>()
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+                loads++
+                return ChapterContent("Split", listOf(ComicPage(0, "wide", 2000, 1400)))
+            }
+        }
+        val preference = object : SplitPreferenceRepository {
+            override suspend fun isSplitEnabled(chapterRef: ChapterRef) = true
+            override suspend fun setSplitEnabled(chapterRef: ChapterRef, enabled: Boolean) = Unit
+            override suspend fun isPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int) = false
+            override suspend fun setPageExcluded(chapterRef: ChapterRef, sourcePageIndex: Int, excluded: Boolean) = Unit
+            override suspend fun setOverlapFraction(
+                comicRef: dev.veneranative.core.model.ComicRef,
+                fraction: Float,
+            ) {
+                savedOverlaps += fraction
+            }
+        }
+        val viewModel = ReaderViewModel(ChapterRef.Remote(chapterKey), provider, splitPreference = preference)
+        advanceUntilIdle()
+        assertEquals(1, loads)
+        assertEquals(listOf(0, 900), viewModel.state.value.pages.map { it.crop?.leftPx })
+
+        viewModel.onAction(ReaderAction.SetSplitOverlap(0.1f))
+        runCurrent()
+
+        // Re-splitting is pure geometry over dimensions that are already known, so the reader must
+        // never fall back to the loading screen and must never reload the chapter.
+        assertEquals(ReaderStatus.Ready, viewModel.state.value.status)
+        val pages = viewModel.state.value.pages
+        assertEquals(1200, pages[0].crop?.widthPx)
+        assertEquals(800, pages[1].crop?.leftPx)
+
+        advanceUntilIdle()
+        assertEquals(1, loads)
+        assertEquals(listOf(0.1f), savedOverlaps)
+    }
+
+    @Test
+    fun `changing the half order keeps the visible page without reloading`() = runTest(dispatcher) {
+        var loads = 0
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
+                loads++
+                return ChapterContent(
+                    "Split",
+                    listOf(ComicPage(0, "wide", 2000, 1400), ComicPage(1, "wide-2", 2000, 1400)),
+                )
+            }
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = perComicSplit(),
+        )
+        advanceUntilIdle()
+        assertEquals(listOf(0, 900, 0, 900), viewModel.state.value.pages.map { it.crop?.leftPx })
+
+        viewModel.onAction(ReaderAction.PageShown(2))
+        viewModel.onAction(ReaderAction.SetSplitOrder(true))
+        runCurrent()
+
+        val state = viewModel.state.value
+        assertEquals(ReaderStatus.Ready, state.status)
+        assertEquals(listOf(900, 0, 900, 0), state.pages.map { it.crop?.leftPx })
+        // The anchor follows the source page, so the reader stays on the same content.
+        assertEquals(2, state.currentPageIndex)
+        assertEquals(1, state.pages[state.currentPageIndex].sourceIndex)
+        advanceUntilIdle()
+        assertEquals(1, loads)
+    }
 }
