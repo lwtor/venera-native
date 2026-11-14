@@ -75,6 +75,7 @@ internal fun AppRoot(
     val downloadRepository by graph.download.collectAsStateWithLifecycle()
     val searchHistoryRepository by graph.searchHistory.collectAsStateWithLifecycle()
     val screenPreferences by graph.screenPreferences.collectAsStateWithLifecycle()
+    val splitPreference by graph.splitPreference.collectAsStateWithLifecycle()
     val backupFactory by graph.backupFactory.collectAsStateWithLifecycle()
     val selfUpdateService = graph.selfUpdateService
     val appScope = graph.scope
@@ -131,6 +132,7 @@ internal fun AppRoot(
             downloadRepository = downloadRepository,
             searchHistoryRepository = searchHistoryRepository,
             screenPreferences = screenPreferences,
+            splitPreference = splitPreference,
             progressTracker = progressTracker,
             backupFactory = backupFactory,
             selfUpdateService = selfUpdateService,
@@ -159,6 +161,7 @@ private fun AppNavHost(
     downloadRepository: DownloadRepository?,
     searchHistoryRepository: dev.veneranative.data.search.SearchHistoryRepository?,
     screenPreferences: dev.veneranative.data.settings.ScreenPreferenceRepository?,
+    splitPreference: dev.veneranative.core.model.SplitPreferenceRepository?,
     progressTracker: AtomicReference<ReadingProgressTracker?>,
     backupFactory: dev.veneranative.data.backup.GitHubBackupGatewayFactory?,
     selfUpdateService: dev.veneranative.data.update.SelfUpdateService,
@@ -377,6 +380,7 @@ private fun AppNavHost(
                                 chapter = current.chapter, provider = provider,
                                 onBack = onBack,
                                 decoderFactory = decoderFactory, progress = session,
+                                splitPreference = splitPreference,
                                 onOpenComicDetails = if (current.chapter is ChapterRef.Remote) ({
                                     appScope.launch {
                                         runCatching { tracker.flush() }

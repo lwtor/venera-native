@@ -63,7 +63,9 @@ import dev.veneranative.data.local.LocalPageCache
 import dev.veneranative.data.local.LocalPageMaterializer
 import dev.veneranative.data.search.DefaultSearchHistoryRepository
 import dev.veneranative.data.search.SearchHistoryRepository
+import dev.veneranative.core.model.SplitPreferenceRepository
 import dev.veneranative.data.settings.DefaultScreenPreferenceRepository
+import dev.veneranative.data.settings.DefaultSplitPreferenceRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.data.update.SelfUpdateService
 import dev.veneranative.data.update.UpdateEnvironment
@@ -272,9 +274,11 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val _local = kotlinx.coroutines.flow.MutableStateFlow<LocalComicRepository?>(null)
     private val _searchHistory = kotlinx.coroutines.flow.MutableStateFlow<SearchHistoryRepository?>(null)
     private val _screenPreferences = kotlinx.coroutines.flow.MutableStateFlow<ScreenPreferenceRepository?>(null)
+    private val _splitPreference = kotlinx.coroutines.flow.MutableStateFlow<SplitPreferenceRepository?>(null)
     val local: kotlinx.coroutines.flow.StateFlow<LocalComicRepository?> = _local
     val searchHistory: kotlinx.coroutines.flow.StateFlow<SearchHistoryRepository?> = _searchHistory
     val screenPreferences: kotlinx.coroutines.flow.StateFlow<ScreenPreferenceRepository?> = _screenPreferences
+    val splitPreference: kotlinx.coroutines.flow.StateFlow<SplitPreferenceRepository?> = _splitPreference
     private val _backupFactory = kotlinx.coroutines.flow.MutableStateFlow<GitHubBackupGatewayFactory?>(null)
     val backupFactory: kotlinx.coroutines.flow.StateFlow<GitHubBackupGatewayFactory?> = _backupFactory
     val download: kotlinx.coroutines.flow.StateFlow<DownloadRepository?> = _download
@@ -286,7 +290,9 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             )
             val repository = DefaultHistoryRepository(db)
             _searchHistory.value = DefaultSearchHistoryRepository(db.searchHistoryDao())
-            _screenPreferences.value = DefaultScreenPreferenceRepository(db.screenPreferenceDao())
+            val screenPreferences = DefaultScreenPreferenceRepository(db.screenPreferenceDao())
+            _screenPreferences.value = screenPreferences
+            _splitPreference.value = DefaultSplitPreferenceRepository(screenPreferences)
             progressTracker.set(ReadingProgressTracker(repository, scope, clock = { System.currentTimeMillis() }))
             _history.value = repository
             // The shelf asks installed sources for chapter snapshots; the assembly layer is the only
