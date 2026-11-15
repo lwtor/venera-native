@@ -312,6 +312,10 @@ fun ReaderScreen(
     val window = remember(view) { view.context.findActivity()?.window }
     var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
     var splitMenuSourceIndex by remember { mutableStateOf<Int?>(null) }
+    // The tap gesture only restarts on a status change, so it must not close over [state]: doing so
+    // would freeze the first Ready state's pages, page index and split flag for the rest of the
+    // session. The key stays status-only, otherwise restarting would cancel in-flight gestures.
+    val latestState = rememberUpdatedState(state)
     val decoder: PageImageDecoder? = decoderFactory?.let { factory ->
         remember(factory, strategy) { factory(strategy) }
     }
@@ -363,16 +367,17 @@ fun ReaderScreen(
                         val wasTap = releaseResult == true
                         val width = size.width.toFloat()
                         val height = size.height.toFloat()
-                        if (state.status == ReaderStatus.Ready) {
+                        val current = latestState.value
+                        if (current.status == ReaderStatus.Ready) {
                             val inToolbarTarget = ReaderControlsTapTarget.contains(tap.x, tap.y, width, height)
                             when {
                                 controlsTimer.visible.value && wasTap -> controlsTimer.hide()
                                 !controlsTimer.visible.value && heldForOneSecond && inToolbarTarget ->
                                     controlsTimer.toggle()
-                                !controlsTimer.visible.value && heldForOneSecond && state.splitEnabled &&
-                                    state.pages.isNotEmpty() -> {
+                                !controlsTimer.visible.value && heldForOneSecond && current.splitEnabled &&
+                                    current.pages.isNotEmpty() -> {
                                     splitMenuSourceIndex =
-                                        state.pages[state.currentPageIndex.coerceIn(0, state.pages.lastIndex)].sourceIndex
+                                        current.pages[current.currentPageIndex.coerceIn(0, current.pages.lastIndex)].sourceIndex
                                     controlsTimer.hide()
                                 }
                             }

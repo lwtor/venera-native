@@ -625,8 +625,6 @@ class ReaderViewModel(
         val segmentIndex = segmentIndexOfPage(_state.value.currentPageIndex)
         if (segmentIndex < 0) return
         val segment = chapters[segmentIndex]
-        // Excluding a page needs real dimensions the same way enabling the split does.
-        if (segment.splitEnabled && !segment.sizesResolved) return
         val anchor = currentAnchorSourceIndex()
         val nowExcluded = sourcePageIndex !in segment.excludedPages
         val excluded = if (nowExcluded) {

@@ -450,6 +450,37 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun `excluding a page can be undone and splits it again`() = runTest(dispatcher) {
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split", listOf(ComicPage(0, "wide", 2000, 1400), ComicPage(1, "wide-2", 2000, 1400)),
+            )
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = perComicSplit(),
+        )
+        advanceUntilIdle()
+        assertEquals(ReaderStatus.Ready, viewModel.state.value.status)
+        assertEquals(4, viewModel.state.value.pages.size)
+
+        viewModel.onAction(ReaderAction.TogglePageSplit(0))
+        advanceUntilIdle()
+
+        // Excluding re-splits in place: the page collapses to one display page, still readable.
+        assertEquals(ReaderStatus.Ready, viewModel.state.value.status)
+        assertEquals(3, viewModel.state.value.pages.size)
+        assertNull(viewModel.state.value.pages[0].crop)
+
+        viewModel.onAction(ReaderAction.TogglePageSplit(0))
+        advanceUntilIdle()
+
+        // The exclusion must round-trip: restoring the page splits it again instead of being a no-op.
+        assertEquals(ReaderStatus.Ready, viewModel.state.value.status)
+        assertEquals(4, viewModel.state.value.pages.size)
+        assertNotNull(viewModel.state.value.pages[0].crop)
+    }
+
+    @Test
     fun `excluded wide page stays unsplit`() = runTest(dispatcher) {
         val preference = object : SplitPreferenceRepository {
             override suspend fun isSplitEnabled(chapterRef: ChapterRef) = true
