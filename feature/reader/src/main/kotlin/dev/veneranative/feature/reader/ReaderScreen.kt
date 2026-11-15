@@ -846,7 +846,12 @@ private fun ContinuousPages(
                 val visible = listState.layoutInfo.visibleItemsInfo
                 val hit = visible.firstOrNull { y >= it.offset && y < it.offset + it.size }
                     ?: visible.minByOrNull { kotlin.math.abs(y - (it.offset + it.size / 2f)) }
-                hit?.let { latestItems.getOrNull(it.index)?.page?.sourceIndex }
+                val page = hit?.let { latestItems.getOrNull(it.index)?.page }
+                // Two chapters can share the screen; a page belonging to the neighbour would be
+                // applied to the wrong chapter's exclusion set, so only the visible chapter counts.
+                val chapterRange = state.currentChapterStartIndex until
+                    (state.currentChapterStartIndex + state.currentChapterPageCount)
+                page?.takeIf { it.index in chapterRange }?.sourceIndex
             }
         }
     }
