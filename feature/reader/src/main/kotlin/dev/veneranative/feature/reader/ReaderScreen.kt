@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,6 +88,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -1474,6 +1477,7 @@ private val SPLIT_ORDER_OPTIONS = listOf(
     true to "先右后左",
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReaderControls(
     direction: ReadingDirection,
@@ -1534,6 +1538,7 @@ private fun ReaderControls(
             // pixel of movement into the ViewModel would rebuild the page list and restart bitmap
             // decodes dozens of times per drag.
             val overlapDraft = remember { mutableFloatStateOf(splitOverlap) }
+            val overlapInteraction = remember { MutableInteractionSource() }
             LaunchedEffect(splitOverlap) {
                 if (abs(overlapDraft.floatValue - splitOverlap) > 0.0005f) overlapDraft.floatValue = splitOverlap
             }
@@ -1554,11 +1559,48 @@ private fun ReaderControls(
                 value = overlapDraft.floatValue,
                 onValueChange = { overlapDraft.floatValue = it },
                 onValueChangeFinished = { onSplitOverlapChange(overlapDraft.floatValue) },
-            valueRange = 0f..0.2f,
-            // 1% per notch: 20 intervals across 0..20% leaves 19 intermediate steps.
-            steps = 19,
-            modifier = Modifier.fillMaxWidth(),
-        )
+                valueRange = 0f..0.2f,
+                // 1% per notch: 20 intervals across 0..20% leaves 19 intermediate steps.
+                steps = 19,
+                interactionSource = overlapInteraction,
+                // The Material3 default thumb in this BOM is a 4x44dp vertical bar; a small dot reads
+                // as a slider and leaves the track legible. The horizontal padding keeps the dot from
+                // being clipped at either end of the track.
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                thumb = {
+                    SliderDefaults.Thumb(
+                        interactionSource = overlapInteraction,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                        ),
+                        thumbSize = DpSize(14.dp, 14.dp),
+                    )
+                },
+                track = { sliderState ->
+                    val activeColor = MaterialTheme.colorScheme.primary
+                    val inactiveColor = MaterialTheme.colorScheme.surfaceVariant
+                    Canvas(modifier = Modifier.fillMaxWidth().height(4.dp)) {
+                        val centerY = size.height / 2f
+                        drawLine(
+                            color = inactiveColor,
+                            start = Offset(0f, centerY),
+                            end = Offset(size.width, centerY),
+                            strokeWidth = size.height,
+                            cap = StrokeCap.Round,
+                        )
+                        val activeEnd = size.width * sliderState.coercedValueAsFraction
+                        if (activeEnd > 0f) {
+                            drawLine(
+                                color = activeColor,
+                                start = Offset(0f, centerY),
+                                end = Offset(activeEnd, centerY),
+                                strokeWidth = size.height,
+                                cap = StrokeCap.Round,
+                            )
+                        }
+                    }
+                },
+            )
             Text("拆分顺序", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 SPLIT_ORDER_OPTIONS.forEach { (rightToLeft, label) ->
