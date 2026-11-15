@@ -119,7 +119,7 @@ class ReaderViewModel(
                 loadNextChapter()
             }
             ReaderAction.ToggleSplit -> toggleSplit()
-            is ReaderAction.TogglePageSplit -> togglePageSplit(action.sourcePageIndex)
+            is ReaderAction.SetPageSplit -> setPageSplit(action.sourcePageIndex, action.split)
             is ReaderAction.SetSplitOverlap -> setSplitOverlap(action.fraction)
             is ReaderAction.SetSplitOrder -> setSplitOrder(action.rightToLeft)
         }
@@ -577,6 +577,12 @@ class ReaderViewModel(
                 nextChapterStartIndex = chapters.getOrNull(target + 1)
                     ?.takeIf { it.startPageIndex == starts[target] + displays[target].size }
                     ?.startPageIndex,
+                // The toolbar and the long-press dialog both read these from the UI state, so they
+                // must be derived from the visible segment after every rebuild.
+                splitEnabled = chapters[target].splitEnabled,
+                excludedPages = chapters[target].excludedPages,
+                splitOverlapFraction = chapters[target].splitOverlapFraction,
+                splitRightToLeft = chapters[target].splitRightToLeft,
                 endOfChaptersReached = false,
             )
         }
@@ -621,21 +627,24 @@ class ReaderViewModel(
         }
     }
 
-    private fun togglePageSplit(sourcePageIndex: Int) {
+    /**
+     * Excludes or re-includes one source page. Takes the desired end state instead of flipping the
+     * current one, so the caller's view of the exclusion set cannot invert the result.
+     */
+    private fun setPageSplit(sourcePageIndex: Int, split: Boolean) {
         val segmentIndex = segmentIndexOfPage(_state.value.currentPageIndex)
         if (segmentIndex < 0) return
         val segment = chapters[segmentIndex]
+        if (segment.sourcePages.none { it.sourceIndex == sourcePageIndex }) return
         val anchor = currentAnchorSourceIndex()
-        val nowExcluded = sourcePageIndex !in segment.excludedPages
-        val excluded = if (nowExcluded) {
-            segment.excludedPages + sourcePageIndex
-        } else {
+        val excluded = if (split) {
             segment.excludedPages - sourcePageIndex
+        } else {
+            segment.excludedPages + sourcePageIndex
         }
         chapters[segmentIndex] = segment.copy(excludedPages = excluded)
-        _state.update { it.copy(excludedPages = excluded) }
         rebuildSplitPages(segmentIndex, anchor)
-        viewModelScope.launch { splitPreference?.setPageExcluded(segment.chapter, sourcePageIndex, nowExcluded) }
+        viewModelScope.launch { splitPreference?.setPageExcluded(segment.chapter, sourcePageIndex, !split) }
     }
 
     private fun setSplitOverlap(fraction: Float) {

@@ -463,7 +463,7 @@ class ReaderViewModelTest {
         assertEquals(ReaderStatus.Ready, viewModel.state.value.status)
         assertEquals(4, viewModel.state.value.pages.size)
 
-        viewModel.onAction(ReaderAction.TogglePageSplit(0))
+        viewModel.onAction(ReaderAction.SetPageSplit(0, split = false))
         advanceUntilIdle()
 
         // Excluding re-splits in place: the page collapses to one display page, still readable.
@@ -471,13 +471,67 @@ class ReaderViewModelTest {
         assertEquals(3, viewModel.state.value.pages.size)
         assertNull(viewModel.state.value.pages[0].crop)
 
-        viewModel.onAction(ReaderAction.TogglePageSplit(0))
+        viewModel.onAction(ReaderAction.SetPageSplit(0, split = true))
         advanceUntilIdle()
 
         // The exclusion must round-trip: restoring the page splits it again instead of being a no-op.
         assertEquals(ReaderStatus.Ready, viewModel.state.value.status)
         assertEquals(4, viewModel.state.value.pages.size)
         assertNotNull(viewModel.state.value.pages[0].crop)
+    }
+
+    @Test
+    fun `split intent is idempotent`() = runTest(dispatcher) {
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split", listOf(ComicPage(0, "wide", 2000, 1400), ComicPage(1, "wide-2", 2000, 1400)),
+            )
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = perComicSplit(),
+        )
+        advanceUntilIdle()
+        assertEquals(4, viewModel.state.value.pages.size)
+
+        viewModel.onAction(ReaderAction.SetPageSplit(0, split = false))
+        advanceUntilIdle()
+        assertEquals(3, viewModel.state.value.pages.size)
+        assertEquals(setOf(0), viewModel.state.value.excludedPages)
+
+        // Repeating the same intent must not re-split or exclude the page twice.
+        viewModel.onAction(ReaderAction.SetPageSplit(0, split = false))
+        advanceUntilIdle()
+        assertEquals(3, viewModel.state.value.pages.size)
+        assertEquals(setOf(0), viewModel.state.value.excludedPages)
+        assertNull(viewModel.state.value.pages[0].crop)
+
+        viewModel.onAction(ReaderAction.SetPageSplit(0, split = true))
+        advanceUntilIdle()
+        assertEquals(4, viewModel.state.value.pages.size)
+        assertEquals(emptySet<Int>(), viewModel.state.value.excludedPages)
+        assertNotNull(viewModel.state.value.pages[0].crop)
+    }
+
+    @Test
+    fun `split intent for a page outside the chapter is ignored`() = runTest(dispatcher) {
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef) = ChapterContent(
+                "Split", listOf(ComicPage(0, "wide", 2000, 1400), ComicPage(1, "wide-2", 2000, 1400)),
+            )
+        }
+        val viewModel = ReaderViewModel(
+            ChapterRef.Remote(chapterKey), provider, splitPreference = perComicSplit(),
+        )
+        advanceUntilIdle()
+        val before = viewModel.state.value.pages.map { it.sourceIndex to it.crop }
+        assertEquals(4, before.size)
+
+        viewModel.onAction(ReaderAction.SetPageSplit(99, split = false))
+        advanceUntilIdle()
+
+        // An unknown source index is not part of this chapter, so nothing may change.
+        assertEquals(before, viewModel.state.value.pages.map { it.sourceIndex to it.crop })
+        assertEquals(emptySet<Int>(), viewModel.state.value.excludedPages)
     }
 
     @Test

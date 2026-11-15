@@ -315,6 +315,7 @@ fun ReaderScreen(
     val window = remember(view) { view.context.findActivity()?.window }
     var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
     var splitMenuSourceIndex by remember { mutableStateOf<Int?>(null) }
+    val pageHitTester = remember { PageHitTester() }
     // The tap gesture only restarts on a status change, so it must not close over [state]: doing so
     // would freeze the first Ready state's pages, page index and split flag for the rest of the
     // session. The key stays status-only, otherwise restarting would cancel in-flight gestures.
@@ -379,8 +380,10 @@ fun ReaderScreen(
                                     controlsTimer.toggle()
                                 !controlsTimer.visible.value && heldForOneSecond && current.splitEnabled &&
                                     current.pages.isNotEmpty() -> {
-                                    splitMenuSourceIndex =
-                                        current.pages[current.currentPageIndex.coerceIn(0, current.pages.lastIndex)].sourceIndex
+                                    val fallback = current.pages
+                                        .getOrNull(current.currentPageIndex.coerceIn(0, current.pages.lastIndex))
+                                        ?.sourceIndex ?: 0
+                                    splitMenuSourceIndex = pageHitTester.resolve?.invoke(tap.y) ?: fallback
                                     controlsTimer.hide()
                                 }
                             }
@@ -413,6 +416,7 @@ fun ReaderScreen(
                     state = state,
                     onAction = onAction,
                     decoder = decoder,
+                    pageHitTester = pageHitTester,
                     doubleTapZoomHandler = doubleTapZoomHandler,
                     onChapterEndChange = { chapterEndReached = it },
                     onChapterStartReached = {
@@ -493,7 +497,7 @@ fun ReaderScreen(
                 text = { Text(if (excluded) "此页已设为不拆分。" else "此页为跨页，当前会自动拆分。") },
                 confirmButton = {
                     TextButton(onClick = {
-                        onAction(ReaderAction.TogglePageSplit(sourceIndex))
+                        onAction(ReaderAction.SetPageSplit(sourceIndex, split = excluded))
                         splitMenuSourceIndex = null
                     }) { Text(if (excluded) "恢复拆分" else "本页不拆分") }
                 },
@@ -725,11 +729,23 @@ private fun ReaderPageSeekBar(
     }
 }
 
+/**
+ * Resolves the source page sitting under a vertical canvas coordinate.
+ *
+ * The reader's "current page" is the first visible item of the scrolling canvas, and it collapses
+ * to the last page near the chapter end, so it cannot answer "which page did the user touch".
+ * [ContinuousPages] installs the real implementation; paged mode falls back to the visible page.
+ */
+private class PageHitTester {
+    var resolve: ((y: Float) -> Int?)? = null
+}
+
 @Composable
 private fun PageContent(
     state: ReaderUiState,
     onAction: (ReaderAction) -> Unit,
     decoder: PageImageDecoder?,
+    pageHitTester: PageHitTester,
     doubleTapZoomHandler: ReaderDoubleTapZoomHandler,
     onChapterEndChange: (Boolean) -> Unit,
     onChapterStartReached: () -> Unit,
@@ -754,6 +770,7 @@ private fun PageContent(
                 state = state,
                 viewport = viewport,
                 decoder = decoder,
+                pageHitTester = pageHitTester,
                 onChapterEndChange = onChapterEndChange,
                 onChapterStartReached = onChapterStartReached,
                 onAction = onAction,
@@ -766,6 +783,7 @@ private fun PageContent(
                 state = state,
                 viewport = viewport,
                 decoder = decoder,
+                pageHitTester = pageHitTester,
                 onChapterEndChange = onChapterEndChange,
                 onChapterStartReached = onChapterStartReached,
                 onAction = onAction,
@@ -781,6 +799,7 @@ private fun ContinuousPages(
     state: ReaderUiState,
     viewport: PageViewport,
     decoder: PageImageDecoder?,
+    pageHitTester: PageHitTester,
     onChapterEndChange: (Boolean) -> Unit,
     onChapterStartReached: () -> Unit,
     onAction: (ReaderAction) -> Unit,
@@ -817,6 +836,23 @@ private fun ContinuousPages(
     )
     val latestItems by rememberUpdatedState(items)
     val latestPages by rememberUpdatedState(state.pages)
+    // SideEffect keeps the resolver's closure fresh every composition without restarting gestures.
+    SideEffect {
+        pageHitTester.resolve = { y ->
+            if (zoomState.scale != 1f) {
+                // Zoomed, the canvas offset no longer matches the list's local coordinates.
+                null
+            } else {
+                val visible = listState.layoutInfo.visibleItemsInfo
+                val hit = visible.firstOrNull { y >= it.offset && y < it.offset + it.size }
+                    ?: visible.minByOrNull { kotlin.math.abs(y - (it.offset + it.size / 2f)) }
+                hit?.let { latestItems.getOrNull(it.index)?.page?.sourceIndex }
+            }
+        }
+    }
+    DisposableEffect(pageHitTester) {
+        onDispose { pageHitTester.resolve = null }
+    }
     LaunchedEffect(listState, items) {
         var userScrollStarted = false
         snapshotFlow {
@@ -992,6 +1028,7 @@ private fun SinglePagePager(
     state: ReaderUiState,
     viewport: PageViewport,
     decoder: PageImageDecoder?,
+    pageHitTester: PageHitTester,
     onChapterEndChange: (Boolean) -> Unit,
     onChapterStartReached: () -> Unit,
     onAction: (ReaderAction) -> Unit,
@@ -1002,6 +1039,13 @@ private fun SinglePagePager(
         pageCount = { state.pageCount },
     )
     val latestPages by rememberUpdatedState(state.pages)
+    // Paged mode shows exactly one page per screen, so the visible page is the touched page.
+    SideEffect {
+        pageHitTester.resolve = { state.pages.getOrNull(state.currentPageIndex)?.sourceIndex }
+    }
+    DisposableEffect(pageHitTester) {
+        onDispose { pageHitTester.resolve = null }
+    }
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.currentPage }
             .collect { page -> if (page in state.pages.indices) onAction(ReaderAction.PageShown(page)) }

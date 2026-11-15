@@ -14,7 +14,13 @@ sealed interface ReaderAction {
     data object LoadNextChapter : ReaderAction
     data object RetryNextChapter : ReaderAction
     data object ToggleSplit : ReaderAction
-    data class TogglePageSplit(val sourcePageIndex: Int) : ReaderAction
+    /**
+     * Explicitly splits or un-splits one source page; the caller decides, so a stale flip cannot invert it.
+     *
+     * [split] is the desired end state, not a delta: the dialog already knows what the page should
+     * become, and a toggle would re-apply the wrong state if the two exclusion sets ever diverge.
+     */
+    data class SetPageSplit(val sourcePageIndex: Int, val split: Boolean) : ReaderAction
     /** Changes how far each split half reaches past the centre line, as a fraction of the width. */
     data class SetSplitOverlap(val fraction: Float) : ReaderAction
     /** Chooses which half of a split page is shown first for the current comic. */
