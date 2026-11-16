@@ -1,5 +1,6 @@
 package dev.veneranative.data.comic
 
+import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterContent
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
@@ -106,8 +107,8 @@ class SourcePageProvider(
         return ChapterContent(
             title = chapterList.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
             pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
-            nextChapter = chapterList.getOrNull(chapterIndex + 1).takeIf { chapterIndex >= 0 },
-            previousChapter = chapterList.getOrNull(chapterIndex - 1).takeIf { chapterIndex > 0 },
+            nextChapter = chapterList.getOrNull(chapterIndex + 1)?.takeIf { chapterIndex >= 0 }?.toChapterRef(),
+            previousChapter = chapterList.getOrNull(chapterIndex - 1)?.takeIf { chapterIndex > 0 }?.toChapterRef(),
         )
     }
 
@@ -132,3 +133,5 @@ class SourcePageProvider(
     override suspend fun prefetch(page: ComicPage) { resolve(page) }
 
 }
+
+private fun Chapter.toChapterRef(): ChapterRef.Remote = ChapterRef.Remote(key, group)

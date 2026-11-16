@@ -49,6 +49,32 @@ class LocalFirstPageProviderTest {
         Unit
     }
 
+
+    @Test fun localChaptersExposeTheirNeighboursInReadingOrder() = kotlinx.coroutines.runBlocking {
+        val comicId = LocalComicId("imported")
+        val first = LocalChapterId("chapter-1")
+        val second = LocalChapterId("chapter-2")
+        val third = LocalChapterId("chapter-3")
+        val root = Files.createTempDirectory("local-chain").toFile()
+        val provider = LocalFirstPageProvider(
+            object : PageProvider {
+                override suspend fun loadChapter(chapter: ChapterRef) = error("local chapter must not reach source")
+            },
+            { FakeLocalRepository(comicId, second, chapterIds = listOf(first, second, third)) },
+            LocalPageMaterializer(LocalPageCache(root), LocalPageSource { ByteArrayInputStream(pngHeader()) }),
+        )
+
+        val middle = provider.loadChapter(localReaderKey(comicId, second))
+        val last = provider.loadChapter(localReaderKey(comicId, third))
+
+        assertEquals(ChapterRef.Local(comicId, first), middle.previousChapter)
+        assertEquals(ChapterRef.Local(comicId, third), middle.nextChapter)
+        assertNull(last.nextChapter)
+        assertEquals(ChapterRef.Local(comicId, second), last.previousChapter)
+        root.deleteRecursively()
+        Unit
+    }
+
     private fun pngHeader(): ByteArray = byteArrayOf(
         0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
         0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
@@ -99,9 +125,12 @@ class LocalFirstPageProviderTest {
         private val comic: LocalComicId,
         private val chapter: LocalChapterId,
         private val pageCount: Int = 1,
+        chapterIds: List<LocalChapterId> = listOf(chapter),
     ) : LocalComicRepository {
-        override fun observeComics(): Flow<List<LocalComic>> = flowOf(listOf(LocalComic(comic, "Local comic", LocalKind.Directory, "root", null, 1, 0)))
-        override fun observeChapters(comicId: LocalComicId): Flow<List<LocalChapter>> = flowOf(listOf(LocalChapter(chapter, comic, "Local chapter", 0)))
+        private val chapters = chapterIds.mapIndexed { index, id -> LocalChapter(id, comic, "Local chapter", index) }
+
+        override fun observeComics(): Flow<List<LocalComic>> = flowOf(listOf(LocalComic(comic, "Local comic", LocalKind.Directory, "root", null, chapters.size, 0)))
+        override fun observeChapters(comicId: LocalComicId): Flow<List<LocalChapter>> = flowOf(chapters)
         override suspend fun pages(comicId: LocalComicId, chapterId: LocalChapterId) =
             List(pageCount) { index -> LocalPage(comic, chapter, index, "page-uri-$index", "$index.jpg", 24, "root") }
         override suspend fun importTree(uri: String) = LocalImportResult.Empty

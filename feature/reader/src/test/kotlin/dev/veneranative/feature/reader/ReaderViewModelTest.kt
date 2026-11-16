@@ -1,7 +1,6 @@
 package dev.veneranative.feature.reader
 
 import dev.veneranative.core.model.ChapterContent
-import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.PageProvider
@@ -79,7 +78,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `exposes the next chapter supplied with chapter content`() = runTest(dispatcher) {
-        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        val next = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")))
         val prefetchedChapters = mutableListOf<ChapterRef>()
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef) =
@@ -90,12 +89,12 @@ class ReaderViewModelTest {
         advanceUntilIdle()
 
         assertEquals(next, viewModel.state.value.nextChapter)
-        assertEquals(listOf(ChapterRef.Remote(next.key)), prefetchedChapters)
+        assertEquals(listOf(next), prefetchedChapters)
     }
 
     @Test
     fun `next chapter pages append to the current reader canvas`() = runTest(dispatcher) {
-        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        val next = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")))
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
                 if (chapter == ChapterRef.Remote(chapterKey)) {
@@ -119,14 +118,14 @@ class ReaderViewModelTest {
 
     @Test
     fun `quick chapter navigation loads the previous chapter and keeps pages on one canvas`() = runTest(dispatcher) {
-        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val previous = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")))
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = when (chapter) {
                 ChapterRef.Remote(chapterKey) -> ChapterContent(
                     "Chapter 1", listOf(ComicPage(0, "current-0", 100, 100), ComicPage(1, "current-1", 100, 100)),
                     previousChapter = previous,
                 )
-                ChapterRef.Remote(previous.key) -> ChapterContent(
+                previous -> ChapterContent(
                     "Chapter 0", listOf(ComicPage(0, "previous-0", 100, 100), ComicPage(1, "previous-1", 100, 100),
                         ComicPage(2, "previous-2", 100, 100)),
                 )
@@ -155,7 +154,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `automatic previous chapter loading preserves the visible page`() = runTest(dispatcher) {
-        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val previous = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")))
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
                 if (chapter == ChapterRef.Remote(chapterKey)) {
@@ -195,7 +194,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `failed next chapter remains on the same canvas and retry appends it`() = runTest(dispatcher) {
-        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
+        val next = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")))
         var nextAttempts = 0
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
@@ -318,10 +317,10 @@ class ReaderViewModelTest {
     }
 
     @Test fun `hung next chapter fails visibly while current pages remain readable`() = runTest(dispatcher) {
-        val next = Chapter(chapterKey.copy(remoteId = RemoteChapterId("next")), "Next", 1)
+        val next = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("next")))
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
-                if ((chapter as ChapterRef.Remote).key == next.key) kotlinx.coroutines.awaitCancellation()
+                if (chapter == next) kotlinx.coroutines.awaitCancellation()
                 return ChapterContent("Fixture", listOf(ComicPage(0, "fixture://page", 100, 100)), nextChapter = next)
             }
         }
@@ -568,7 +567,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `preloading the previous chapter keeps the current chapter split`() = runTest(dispatcher) {
-        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val previous = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")))
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = when (chapter) {
                 ChapterRef.Remote(chapterKey) -> ChapterContent(
@@ -603,7 +602,7 @@ class ReaderViewModelTest {
 
     @Test
     fun `crossing chapters replays that chapter's split setting`() = runTest(dispatcher) {
-        val previous = Chapter(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")), "Chapter 0", 0)
+        val previous = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")))
         val provider = object : PageProvider {
             override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = when (chapter) {
                 ChapterRef.Remote(chapterKey) -> ChapterContent(

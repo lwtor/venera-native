@@ -2,15 +2,17 @@ package dev.veneranative.data.download
 
 import dev.veneranative.core.image.ImageSizeHeaderParser
 import dev.veneranative.core.model.ChapterContent
-import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterNeighbors
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.PageSizeState
 import java.io.File
 import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Reads an intact downloaded chapter directly from disk, falling back to its source when incomplete. */
 class OfflineFirstPageProvider(
@@ -18,6 +20,15 @@ class OfflineFirstPageProvider(
     private val layout: DownloadFileLayout,
     private val source: PageProvider,
     private val onDiagnostic: (String) -> Unit = {},
+    /**
+     * The source's own chapter order, asked online so a downloaded chapter still knows the
+     * neighbours that were never downloaded.
+     *
+     * Downloaded tasks are only the chapters the user asked for, so using them as the series order
+     * made a downloaded chapter look like the last one of the whole comic. Null (or a failed or
+     * timed-out lookup) keeps the downloaded order as the offline fallback.
+     */
+    private val chapterNeighbors: (suspend (ChapterRef.Remote) -> ChapterNeighbors?)? = null,
 ) : PageProvider {
 
     override suspend fun loadChapter(chapter: ChapterRef): ChapterContent {
@@ -69,15 +80,32 @@ class OfflineFirstPageProvider(
                     candidate.state == DownloadChapterState.Completed && repository.isCompleteOffline(candidate.chapter)
             }
             .sortedWith(compareBy<DownloadTask>({ it.chapterIndex ?: Int.MAX_VALUE }, { it.createdAtEpochMillis }))
-        val ordered = sameVersion.mapIndexed { index, candidate -> candidate.toReaderChapter(index) }
-        val position = ordered.indexOfFirst { it.key == key && it.group == offlineRef.group }
-        onDiagnostic("event=offline-ready chapter=${key.remoteId.value} pages=${pages.size} versionChapters=${ordered.size}")
+        val ordered = sameVersion.map { it.chapter as ChapterRef.Remote }
+        val position = ordered.indexOf(offlineRef)
+        val onlineNeighbors = onlineNeighbors(offlineRef)
+        // A successful lookup is authoritative: it can legitimately say "this is the last chapter".
+        // Only a missing or failed lookup falls back to the downloaded order, which is also guarded
+        // against an unmapped position so an unknown chapter never inherits a neighbour by accident.
+        val next = if (onlineNeighbors != null) {
+            onlineNeighbors.nextChapter
+        } else {
+            ordered.getOrNull(position + 1).takeIf { position >= 0 }
+        }
+        val previous = if (onlineNeighbors != null) {
+            onlineNeighbors.previousChapter
+        } else {
+            ordered.getOrNull(position - 1).takeIf { position > 0 }
+        }
+        onDiagnostic(
+            "event=offline-ready chapter=${key.remoteId.value} pages=${pages.size} " +
+                "versionChapters=${ordered.size} neighbors=${if (onlineNeighbors != null) "source" else "downloaded"}",
+        )
         return ChapterContent(
             title = task.title,
             pages = pages,
             comicTitle = task.comicTitle,
-            nextChapter = ordered.getOrNull(position + 1),
-            previousChapter = ordered.getOrNull(position - 1),
+            nextChapter = next,
+            previousChapter = previous,
         )
     }
 
@@ -107,9 +135,19 @@ class OfflineFirstPageProvider(
 
     suspend fun loadChapter(chapter: ChapterKey): ChapterContent = loadChapter(ChapterRef.Remote(chapter))
 
-    private fun DownloadTask.toReaderChapter(fallbackIndex: Int): Chapter {
-        val ref = chapter as ChapterRef.Remote
-        return Chapter(key = ref.key, title = title, index = chapterIndex ?: fallbackIndex, group = ref.group)
+    /**
+     * Asks for the source-declared neighbours without ever failing the chapter load: an offline
+     * device, an unsupported detail capability or a slow source just leaves the downloaded order.
+     */
+    private suspend fun onlineNeighbors(ref: ChapterRef.Remote): ChapterNeighbors? {
+        val lookup = chapterNeighbors ?: return null
+        return try {
+            withTimeoutOrNull(CHAPTER_NEIGHBORS_TIMEOUT_MILLIS) { lookup(ref) }
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (_: Exception) {
+            null
+        }
     }
 
     override suspend fun resolve(page: ComicPage): ComicPage {
@@ -129,3 +167,9 @@ class OfflineFirstPageProvider(
         if (page.sourceId == null) resolve(page) else source.prefetch(page)
     }
 }
+
+/**
+ * Short enough that opening a downloaded chapter offline is not held hostage by a source that never
+ * answers, long enough for one detail request on a normal connection.
+ */
+private const val CHAPTER_NEIGHBORS_TIMEOUT_MILLIS = 5_000L

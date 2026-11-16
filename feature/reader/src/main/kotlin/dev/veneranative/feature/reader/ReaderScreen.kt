@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -70,7 +71,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -86,7 +86,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -474,6 +473,9 @@ fun ReaderScreen(
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
             ReaderTopBar(state = state, onBack = onBack, onOpenComicDetails = onOpenComicDetails)
+        }
+        if (!showControls && state.status == ReaderStatus.Ready && state.endOfChaptersReached) {
+            EndOfChaptersNotice(modifier = Modifier.align(Alignment.BottomCenter))
         }
         if (!showControls && state.status == ReaderStatus.Ready && (state.nextChapterLoadFailed || state.previousChapterLoadFailed)) {
             Surface(
@@ -1021,9 +1023,6 @@ private fun ContinuousPages(
                 onRetry = { onAction(ReaderAction.RetryPage(item.page.index)) },
             )
         }
-        if (state.endOfChaptersReached) {
-            item(key = "reader-end-of-chapters") { EndOfChaptersPage() }
-        }
     }
 }
 
@@ -1067,11 +1066,6 @@ private fun SinglePagePager(
     LaunchedEffect(state.currentPageIndex) {
         if (state.currentPageIndex in 0 until pagerState.pageCount && pagerState.currentPage != state.currentPageIndex) {
             pagerState.animateScrollToPage(state.currentPageIndex)
-        }
-    }
-    LaunchedEffect(state.endOfChaptersReached, state.pageCount) {
-        if (state.endOfChaptersReached && state.pageCount > 0) {
-            pagerState.animateScrollToPage(state.pageCount)
         }
     }
     LaunchedEffect(pagerState.currentPage) { onChapterEndChange(false) }
@@ -1123,100 +1117,67 @@ private fun SinglePagePager(
         modifier = Modifier.fillMaxSize(),
         reverseLayout = state.direction == ReadingDirection.RightToLeft,
     ) { index ->
-        if (index == state.pageCount) {
-            EndOfChaptersPage()
-        } else {
-            PagedPage(
-                page = state.pages[index],
-                viewport = viewport,
-                decoder = decoder,
-                isLastChapterPage = index == state.pageCount - 1,
-                onChapterEndChange = { reached ->
-                    if (index == pagerState.currentPage) onChapterEndChange(reached)
-                },
-                onRetry = { onAction(ReaderAction.RetryPage(index)) },
-                isCurrentPage = index == pagerState.currentPage,
-                doubleTapZoomHandler = doubleTapZoomHandler,
-            )
-        }
+        PagedPage(
+            page = state.pages[index],
+            viewport = viewport,
+            decoder = decoder,
+            isLastChapterPage = index == state.pageCount - 1,
+            onChapterEndChange = { reached ->
+                if (index == pagerState.currentPage) onChapterEndChange(reached)
+            },
+            onRetry = { onAction(ReaderAction.RetryPage(index)) },
+            isCurrentPage = index == pagerState.currentPage,
+            doubleTapZoomHandler = doubleTapZoomHandler,
+        )
     }
 }
 
+/**
+ * The end of the series, shown as an overlay instead of an item at the end of the canvas.
+ *
+ * The old card was appended to the scrolling canvas, so it only appeared after the reader dragged
+ * past the last page, and scrolling back even slightly re-reported an earlier page, which cleared
+ * the flag and made the card vanish mid-gesture. An overlay follows the reading position instead:
+ * it appears while the last page is current and leaves when an earlier page becomes current again.
+ */
 @Composable
-private fun EndOfChaptersPage() {
+private fun EndOfChaptersNotice(modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier.fillMaxSize().background(
-            Brush.verticalGradient(
-                listOf(
-                    colors.surface,
-                    colors.surfaceVariant.copy(alpha = 0.38f),
-                    colors.surface,
-                ),
-            ),
-        ),
-        contentAlignment = Alignment.Center,
+    Surface(
+        modifier = modifier
+            .padding(horizontal = 20.dp, vertical = 22.dp)
+            .fillMaxWidth()
+            .testTag("reader-end-of-chapters"),
+        shape = RoundedCornerShape(20.dp),
+        color = colors.surface.copy(alpha = 0.96f),
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .background(
-                    color = colors.surfaceVariant.copy(alpha = 0.62f),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(30.dp),
-                )
-                .border(
-                    width = 1.dp,
-                    color = colors.outlineVariant.copy(alpha = 0.7f),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(30.dp),
-                )
-                .padding(horizontal = 24.dp, vertical = 30.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Row(
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Canvas(Modifier.size(68.dp)) {
-                val accent = colors.primary
-                drawCircle(colors.primaryContainer, radius = size.minDimension / 2f)
-                drawCircle(
-                    color = accent,
-                    radius = size.minDimension * 0.31f,
-                    style = Stroke(width = 2.dp.toPx()),
-                )
+            Canvas(Modifier.size(22.dp)) {
+                drawCircle(colors.primaryContainer)
                 val check = Path().apply {
-                    moveTo(size.width * 0.35f, size.height * 0.51f)
-                    lineTo(size.width * 0.46f, size.height * 0.62f)
-                    lineTo(size.width * 0.67f, size.height * 0.4f)
+                    moveTo(size.width * 0.28f, size.height * 0.52f)
+                    lineTo(size.width * 0.44f, size.height * 0.68f)
+                    lineTo(size.width * 0.74f, size.height * 0.34f)
                 }
                 drawPath(
                     path = check,
-                    color = accent,
-                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round),
+                    color = colors.primary,
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
                 )
             }
-            Spacer(Modifier.size(22.dp))
-            Text(
-                "本话阅读完成",
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.primary,
-            )
-            Spacer(Modifier.size(8.dp))
-            Text("已到最后一话", style = MaterialTheme.typography.headlineSmall)
-            Spacer(Modifier.size(10.dp))
-            Text(
-                "这部漫画暂时没有更多章节，后续更新后可以继续接着阅读。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.size(22.dp))
-            Surface(
-                color = colors.primaryContainer.copy(alpha = 0.78f),
-                contentColor = colors.onPrimaryContainer,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
-            ) {
+            Spacer(Modifier.size(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text("已到最后一话", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.size(3.dp))
                 Text(
-                    "向上滑动可返回漫画内容",
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-                    style = MaterialTheme.typography.labelMedium,
+                    "这部漫画暂时没有更多章节，更新后可以继续阅读。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
                 )
             }
         }

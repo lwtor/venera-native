@@ -12,7 +12,6 @@ import dev.veneranative.core.model.PageSizeState
 import dev.veneranative.core.model.PageSplit
 import dev.veneranative.core.model.ReaderProgress
 import dev.veneranative.core.model.SplitPreferenceRepository
-import dev.veneranative.core.model.Chapter
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -181,7 +180,7 @@ class ReaderViewModel(
                 chapterProgress?.record(content, resumedIndex)
                 prefetchAround(displayIndex)
                 content.nextChapter?.let { next ->
-                    viewModelScope.launch { provider.prefetchChapter(next.toChapterRef()) }
+                    viewModelScope.launch { provider.prefetchChapter(next) }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -253,11 +252,10 @@ class ReaderViewModel(
     }
 
     private fun loadNextChapter(navigateAfterLoad: Boolean = false) {
-        val next = _state.value.nextChapter ?: run {
+        val nextRef = _state.value.nextChapter ?: run {
             _state.update { it.copy(endOfChaptersReached = true) }
             return
         }
-        val nextRef = next.toChapterRef()
         if (nextRef in loadedChapters || nextChapterLoadJob?.isActive == true) return
         _state.update { it.copy(isLoadingNextChapter = true, nextChapterLoadFailed = false) }
         nextChapterLoadJob = viewModelScope.launch {
@@ -305,7 +303,7 @@ class ReaderViewModel(
                 }
                 if (navigateAfterLoad) segmentProgress?.record(content, 0)
                 content.nextChapter?.let { following ->
-                    viewModelScope.launch { provider.prefetchChapter(following.toChapterRef()) }
+                    viewModelScope.launch { provider.prefetchChapter(following) }
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -316,8 +314,7 @@ class ReaderViewModel(
     }
 
     private fun loadPreviousChapter(preserveVisiblePage: Boolean = false) {
-        val previous = _state.value.previousChapter ?: return
-        val previousRef = previous.toChapterRef()
+        val previousRef = _state.value.previousChapter ?: return
         if (previousRef in loadedChapters) {
             if (preserveVisiblePage) return
             val segment = chapters.firstOrNull { it.chapter == previousRef } ?: return
@@ -677,5 +674,3 @@ class ReaderViewModel(
         const val MAX_SPLIT_RESOLVE_CONCURRENCY = 8
     }
 }
-
-private fun Chapter.toChapterRef(): ChapterRef.Remote = ChapterRef.Remote(key, group)

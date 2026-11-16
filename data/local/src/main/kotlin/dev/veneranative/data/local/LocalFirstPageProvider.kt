@@ -31,8 +31,9 @@ class LocalFirstPageProvider(
             val comicId = localRef.comicId
             val chapterId = localRef.chapterId
             val repository = localRepository()
-            val localChapter = repository.observeChapters(comicId).first().firstOrNull { it.id == chapterId }
-                ?: throw IOException("Local chapter unavailable")
+            val chapters = repository.observeChapters(comicId).first()
+            val position = chapters.indexOfFirst { it.id == chapterId }
+            val localChapter = chapters.getOrNull(position) ?: throw IOException("Local chapter unavailable")
             val comic = repository.observeComics().first().firstOrNull { it.id == comicId }
                 ?: throw IOException("Local comic unavailable")
             pendingPages.clear()
@@ -43,7 +44,16 @@ class LocalFirstPageProvider(
                 ComicPage(page.index, key, 1080, 1440, sourceId = null, sizeState = PageSizeState.Pending)
             }
             if (pages.isEmpty()) throw IOException("Local chapter has no readable pages")
-            ChapterContent(localChapter.title, pages, comic.title, comic.coverPath)
+            // A locally imported comic is a chapter list on disk too: without these links the reader
+            // treated every finished chapter as the end of the series and could never advance.
+            ChapterContent(
+                title = localChapter.title,
+                pages = pages,
+                comicTitle = comic.title,
+                coverUrl = comic.coverPath,
+                previousChapter = chapters.getOrNull(position - 1)?.let { ChapterRef.Local(comicId, it.id) },
+                nextChapter = chapters.getOrNull(position + 1)?.let { ChapterRef.Local(comicId, it.id) },
+            )
         }
     }
 

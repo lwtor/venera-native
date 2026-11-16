@@ -1,5 +1,7 @@
 package dev.veneranative.data.download
 
+import dev.veneranative.core.database.DownloadPageEntity
+import dev.veneranative.core.database.DownloadTaskEntity
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -8,10 +10,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import dev.veneranative.core.model.ChapterContent
+import dev.veneranative.core.model.ChapterNeighbors
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.ChapterRef
+import dev.veneranative.core.model.RemoteChapterId
 
 class OfflineFirstPageProviderTest {
     @get:Rule val folder = TemporaryFolder()
@@ -100,10 +104,82 @@ class OfflineFirstPageProviderTest {
 
         val content = provider.loadChapter(current)
 
-        assertEquals("ch-2", content.nextChapter?.key?.remoteId?.value)
-        assertEquals("ch-0", content.previousChapter?.key?.remoteId?.value)
-        assertEquals("繁中", content.nextChapter?.group)
-        assertEquals("繁中", content.previousChapter?.group)
+        val resolvedNext = content.nextChapter as ChapterRef.Remote
+        val resolvedPrevious = content.previousChapter as ChapterRef.Remote
+        assertEquals("ch-2", resolvedNext.key.remoteId.value)
+        assertEquals("ch-0", resolvedPrevious.key.remoteId.value)
+        assertEquals("繁中", resolvedNext.group)
+        assertEquals("繁中", resolvedPrevious.group)
+    }
+
+
+    @Test fun `undownloaded neighbour still chains through the source chapter order`() = runTest {
+        val layout = DownloadFileLayout(folder.root)
+        val dao = FakeDownloadDao()
+        val comic = chapter.comicKey
+        fun ref(id: String) = ChapterRef.Remote(
+            ChapterKey(comic, RemoteChapterId(id)), "繁中",
+        )
+        val current = ref("ch-1")
+        val notDownloaded = ref("ch-2")
+        val file = layout.pageFile(
+            current.key.comicKey.sourceId.value, current.key.comicKey.remoteId.value, current.key.remoteId.value, 0, current.group,
+        )
+        val bytes = pngBytes(640, 960)
+        layout.writeAtomically(file, bytes)
+        dao.tasks.value = listOf(
+            taskEntity(current, state = DownloadChapterState.Completed, pageCount = 1)
+                .copy(chapterIndex = 1, title = "Chapter 1"),
+        )
+        dao.pages.value = listOf(
+            pageEntity(current.taskId(), 0, DownloadPageState.Succeeded, layout.relativeOf(file), bytes.size.toLong()),
+        )
+        val provider = OfflineFirstPageProvider(
+            { DefaultDownloadRepository(dao, layout) },
+            layout,
+            RecordingPageProvider(),
+            chapterNeighbors = { ChapterNeighbors(previousChapter = null, nextChapter = notDownloaded) },
+        )
+
+        val content = provider.loadChapter(current)
+
+        assertEquals(notDownloaded, content.nextChapter)
+        assertNull(content.previousChapter)
+    }
+
+    @Test fun `failed neighbour lookup falls back to the downloaded order`() = runTest {
+        val layout = DownloadFileLayout(folder.root)
+        val dao = FakeDownloadDao()
+        val comic = chapter.comicKey
+        fun ref(id: String) = ChapterRef.Remote(
+            ChapterKey(comic, RemoteChapterId(id)), "繁中",
+        )
+        val current = ref("ch-1")
+        val laterDownload = ref("ch-3")
+        val tasks = mutableListOf<DownloadTaskEntity>()
+        val pageRows = mutableListOf<DownloadPageEntity>()
+        listOf(current to 1, laterDownload to 3).forEach { (ref, index) ->
+            val file = layout.pageFile(
+                ref.key.comicKey.sourceId.value, ref.key.comicKey.remoteId.value, ref.key.remoteId.value, 0, ref.group,
+            )
+            val bytes = pngBytes(640, 960)
+            layout.writeAtomically(file, bytes)
+            tasks += taskEntity(ref, state = DownloadChapterState.Completed, pageCount = 1)
+                .copy(chapterIndex = index, title = "Chapter $index")
+            pageRows += pageEntity(ref.taskId(), 0, DownloadPageState.Succeeded, layout.relativeOf(file), bytes.size.toLong())
+        }
+        dao.tasks.value = tasks
+        dao.pages.value = pageRows
+        val provider = OfflineFirstPageProvider(
+            { DefaultDownloadRepository(dao, layout) },
+            layout,
+            RecordingPageProvider(),
+            chapterNeighbors = { throw java.io.IOException("offline") },
+        )
+
+        val content = provider.loadChapter(current)
+
+        assertEquals(laterDownload, content.nextChapter)
     }
 
     private class RecordingPageProvider : PageProvider {

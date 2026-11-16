@@ -1,7 +1,7 @@
 package dev.veneranative.feature.reader
 
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicPage
-import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.PageSplit
 
 /** How pages are laid out and in which order they advance. */
@@ -29,9 +29,9 @@ data class ReaderUiState(
     val currentPageIndex: Int = 0,
     val currentChapterStartIndex: Int = 0,
     val currentChapterPageCount: Int = 0,
-    val previousChapter: Chapter? = null,
+    val previousChapter: ChapterRef? = null,
     val nextChapterStartIndex: Int? = null,
-    val nextChapter: Chapter? = null,
+    val nextChapter: ChapterRef? = null,
     val isLoadingNextChapter: Boolean = false,
     val nextChapterLoadFailed: Boolean = false,
     val isLoadingPreviousChapter: Boolean = false,

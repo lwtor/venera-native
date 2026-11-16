@@ -4,6 +4,19 @@
 
 ## 状态快照
 
+**S4-10A28 DONE：修复已下载/本地章节读完后无法续读下一话以及完结提示错位。** 已下载章节的相邻章节
+此前只取自「已完成下载」的任务列表，下一话没有下载就会被当成全书完结；本地导入章节则完全没有相邻
+链接，每章读完都停在原地。现在 `ChapterContent` 的相邻章节改用 `ChapterRef`，下载 provider 通过来源
+章节列表取真实顺序（5 秒超时、按漫画缓存 5 分钟、查询失败回退下载顺序），下一话未下载时自动回退在线
+加载；本地 provider 按本地章节顺序补齐上一话/下一话。完结提示从画布尾部 item 改为底部浮层：不再需要
+一直滑到底才出现，也不会因为回滚一点触发 `PageShown` 而在手势中消失。新增 3 条、更新 3 条回归。
+版本升至 1.9.4 / versionCode 1009004。
+
+验证（2026-11-16）：JDK 17 `:data:download:testDebugUnitTest :data:local:testDebugUnitTest
+:data:comic:testDebugUnitTest :feature:reader:testDebugUnitTest` — BUILD SUCCESSFUL（0 失败，新测试已执行）；
+`:feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；`git diff --check` — PASS。
+未做真机验收：在线续读、断网回退两种路径以及完结浮层的实际观感待用户复验。
+
 **S4-10A27 DONE：阅读器自动前置上一话与末尾提示页（S3-00X3）。** 竖向滚到画布顶部时自动前置上一话
 且保持当前画面不跳动；横向首屏反向翻页时加载并进入上一话；最后一话末尾在同一画布呈现结束提示卡片，
 不做程序化滚动。新增两条 ViewModel 回归。版本升至 1.5.0 / versionCode 1005000。

@@ -6,15 +6,32 @@ data class ChapterContent(
     val pages: List<ComicPage>,
     val comicTitle: String? = null,
     val coverUrl: String? = null,
-    /** Next chapter in the source's declared order, when available. */
-    val nextChapter: Chapter? = null,
+    /**
+     * Next chapter in the source's declared order, when available.
+     *
+     * Typed as [ChapterRef] rather than [Chapter] so locally imported comics can chain chapters
+     * too: a local chapter has no [ChapterKey], and treating the missing link as the end of the
+     * series is exactly the bug that made downloaded chapters look finished after one chapter.
+     */
+    val nextChapter: ChapterRef? = null,
     /** Previous chapter in the source's declared order, when available. */
-    val previousChapter: Chapter? = null,
+    val previousChapter: ChapterRef? = null,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }
     }
 }
+
+/**
+ * A chapter's neighbours in the source's declared order.
+ *
+ * Null means "the source did not answer", not "there is no such chapter": a real series end is
+ * expressed by a neighbour field that is null while the lookup itself succeeded.
+ */
+data class ChapterNeighbors(
+    val previousChapter: ChapterRef?,
+    val nextChapter: ChapterRef?,
+)
 
 /**
  * Supplies pages for a chapter.

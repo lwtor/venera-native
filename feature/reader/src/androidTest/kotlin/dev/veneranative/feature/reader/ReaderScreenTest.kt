@@ -33,7 +33,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageSizeState
-import dev.veneranative.core.model.Chapter
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.RemoteChapterId
@@ -83,9 +83,8 @@ class ReaderScreenTest {
 
     @Test
     fun centerLongPressShowsFullscreenReaderControls() {
-        val next = Chapter(
+        val next = ChapterRef.Remote(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
-            "下一话", 1,
         )
         composeRule.setContent {
             ReaderScreen(
@@ -113,9 +112,8 @@ class ReaderScreenTest {
 
     @Test
     fun shortTapDoesNotShowControlsAndTapHidesThemImmediately() {
-        val next = Chapter(
+        val next = ChapterRef.Remote(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
-            "下一话", 1,
         )
         composeRule.setContent {
             ReaderScreen(
@@ -386,10 +384,8 @@ class ReaderScreenTest {
 
     @Test
     fun requestsNextChapterAppendWhenTheReaderReachesTheEnd() {
-        val nextChapter = Chapter(
+        val nextChapter = ChapterRef.Remote(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("chapter-2")),
-            title = "Chapter 2",
-            index = 1,
         )
         var openedNext = false
         composeRule.setContent {
@@ -411,10 +407,8 @@ class ReaderScreenTest {
 
     @Test
     fun verticalEndDetectionUpdatesWhenLastPageFinishesLoading() {
-        val nextChapter = Chapter(
+        val nextChapter = ChapterRef.Remote(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("chapter-2")),
-            title = "Chapter 2",
-            index = 1,
         )
         val state = mutableStateOf(
             ReaderUiState(
@@ -551,5 +545,25 @@ class ReaderScreenTest {
             }
         }
         assertTrue("a tall local page should respond to vertical scroll gestures", state.value.currentPageIndex > 0)
+    }
+
+    @Test
+    fun endOfChaptersNoticeStaysOnScreenInsteadOfLivingAtTheCanvasEnd() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    endOfChaptersReached = true,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {},
+                onBack = {},
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-end-of-chapters").assertIsDisplayed()
+        composeRule.onNodeWithText("已到最后一话").assertIsDisplayed()
     }
 }

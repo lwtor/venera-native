@@ -3,6 +3,7 @@ package dev.veneranative.data.comic
 import androidx.paging.PagingSource
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Chapter
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
@@ -158,8 +159,8 @@ class SourcePageProviderTest {
         }
         val content = SourcePageProvider(catalog, FixedSizer()).loadChapter(chapter)
 
-        assertEquals(next, content.nextChapter)
-        assertEquals(previous, content.previousChapter)
+        assertEquals(next.readerRef(), content.nextChapter)
+        assertEquals(previous.readerRef(), content.previousChapter)
     }
 
     @Test
@@ -190,10 +191,10 @@ class SourcePageProviderTest {
             group = "Version 1",
         ))
 
-        assertEquals(versionOne.last(), middle.nextChapter)
+        assertEquals(versionOne.last().readerRef(), middle.nextChapter)
         assertEquals(null, middle.previousChapter)
         assertEquals(null, last.nextChapter)
-        assertEquals(versionOne.first(), last.previousChapter)
+        assertEquals(versionOne.first().readerRef(), last.previousChapter)
     }
 
     @Test
@@ -295,7 +296,7 @@ class SourcePageProviderTest {
         val content = provider.loadChapter(chapter)
 
         assertEquals(2, detailAttempts)
-        assertEquals(next, content.nextChapter)
+        assertEquals(next.readerRef(), content.nextChapter)
     }
 
     @Test
@@ -354,3 +355,5 @@ class SourcePageProviderTest {
     }
 
 }
+
+private fun Chapter.readerRef(): ChapterRef.Remote = ChapterRef.Remote(key, group)

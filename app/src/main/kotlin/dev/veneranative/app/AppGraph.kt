@@ -31,11 +31,14 @@ import dev.veneranative.core.image.decode.RegionPageImageDecoder
 import dev.veneranative.core.image.decode.SampledPageImageDecoder
 import dev.veneranative.core.image.tiling.DecodeStrategy
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.ChapterNeighbors
+import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.RemoteChapterId
 import dev.veneranative.core.model.RemoteComicId
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.source.api.SourceOutcome
 import java.net.URI
 import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.decodeAppRoute
@@ -213,11 +216,14 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
     private val sourcePageProvider: PageProvider = SourcePageProvider(
         catalog, CoilPageImageSizer(imagePipeline), prefetchScope = scope,
     )
+    private val sourceChapterListCache =
+        java.util.concurrent.ConcurrentHashMap<ComicKey, Pair<Long, List<dev.veneranative.core.model.Chapter>>>()
     private val offlineProvider: PageProvider = OfflineFirstPageProvider(
         downloads = { _download.value ?: _download.filterNotNull().first() },
         layout = DownloadEnvironment.get(getApplication()).layout(),
         source = sourcePageProvider,
         onDiagnostic = { event -> localOfflineReaderLog?.append(event) },
+        chapterNeighbors = ::sourceChapterNeighbors,
     )
     private val localArchiveAccess = AndroidSafArchiveAccess(getApplication())
     private val localMaterializer = LocalPageMaterializer(
@@ -229,6 +235,32 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         localRepository = { _local.value ?: _local.filterNotNull().first() },
         materializer = localMaterializer,
     )
+
+    /**
+     * The source's own chapter order for a downloaded chapter, so opening chapter 5 can still reach
+     * the never-downloaded chapter 6 instead of declaring the series finished.
+     *
+     * Cached per comic: one detail response covers every chapter, and chaining chapters must not pay
+     * a network round trip at each boundary. A failure simply returns null, which lets the
+     * downloaded order stand in.
+     */
+    private suspend fun sourceChapterNeighbors(ref: ChapterRef.Remote): ChapterNeighbors? {
+        val chapterKey = ref.key
+        val comicKey = chapterKey.comicKey
+        val now = System.currentTimeMillis()
+        val chapters = sourceChapterListCache[comicKey]
+            ?.takeIf { (cachedAt, _) -> now - cachedAt < CHAPTER_LIST_CACHE_MILLIS }
+            ?.second
+            ?: ((catalog.detail(comicKey) as? SourceOutcome.Success)?.value?.chapters ?: return null)
+                .also { sourceChapterListCache[comicKey] = now to it }
+        val scoped = ref.group?.let { group -> chapters.filter { it.group == group } } ?: chapters
+        val position = scoped.indexOfFirst { it.key == chapterKey }
+        if (position < 0) return null
+        return ChapterNeighbors(
+            previousChapter = scoped.getOrNull(position - 1)?.let { ChapterRef.Remote(it.key, it.group) },
+            nextChapter = scoped.getOrNull(position + 1)?.let { ChapterRef.Remote(it.key, it.group) },
+        )
+    }
     val decoderFactory: (DecodeStrategy) -> PageImageDecoder = { strategy ->
         val decoder = when (strategy) {
             DecodeStrategy.Sampled -> SampledPageImageDecoder()
@@ -330,3 +362,6 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         }
     }
 }
+
+/** Chapter lists change slowly; five minutes keeps chapter chaining snappy without going stale. */
+private const val CHAPTER_LIST_CACHE_MILLIS = 5 * 60 * 1000L
