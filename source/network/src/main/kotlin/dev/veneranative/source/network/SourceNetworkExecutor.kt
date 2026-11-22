@@ -66,7 +66,7 @@ class SourceNetworkExecutor(
                 return SourceHttpResult.Failure(SourceNetworkError.Cancelled)
             }
             val result = try {
-                executeCall(call)
+                executeCall(call, request.responseAsBytes)
             } finally {
                 synchronized(activeCalls) {
                     activeCalls[sourceId]?.remove(call)
@@ -114,7 +114,7 @@ class SourceNetworkExecutor(
                 .build()
         }
 
-    private suspend fun executeCall(call: Call): SourceHttpResult =
+    private suspend fun executeCall(call: Call, responseAsBytes: Boolean): SourceHttpResult =
         suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(
@@ -156,7 +156,8 @@ class SourceNetworkExecutor(
                                             SourceHttpResponse(
                                                 statusCode = response.code,
                                                 headers = response.headers.toMultimap(),
-                                                body = bytes.toString(Charsets.UTF_8),
+                                                body = if (responseAsBytes) "" else bytes.toString(Charsets.UTF_8),
+                                                bodyBase64 = if (responseAsBytes) java.util.Base64.getEncoder().encodeToString(bytes) else null,
                                             ),
                                         )
                                     }

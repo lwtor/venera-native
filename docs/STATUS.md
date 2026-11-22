@@ -4,6 +4,15 @@
 
 ## 状态快照
 
+**U-03E DONE：恢复来源二进制响应契约。** `Network.fetchBytes` 现在返回状态码、响应头和原始字节
+`ArrayBuffer`，通过 Base64 跨 JSON 桥传输，沿用响应 4 MiB 上限。暴露已有 SHA-256 实现，用于飞翔
+脚本的图片识别。二进制请求体和图片响应回调仍是独立能力。本次按上游接口行为实现，未复制上游脚本。
+版本 1.9.10 / 1009010。JDK 17 引擎 `QuickJsRuntimeTest.*fetch*`、网络
+`SourceBinaryResponseTest` / `SourceNetworkBodyTest` 与 `:app:assembleDebug` 均通过。
+搜索和正文抽样证据见 U-03A 至 U-03D，飞翔的实时封面检测未单独复验，Android UI 未实测。
+U-03 用户任务完成，恢复既定计划下一项 S3-02A5。
+
+
 **U-03D DONE：采用来源图片 Hook 返回的真实 URL。** `comic.onImageLoad` 的返回值原只提取请求头，
 忽略 url，新版 Komiic 票据占位地址因此无法下载；飞翔的阅读地址改写同样被忽略。现类型化 pages 同时
 采用有界 HTTP(S) url，缺省/非法改写保留原引用；请求头及条带处理不变。新增先失败后通过的实际引擎

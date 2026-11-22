@@ -43,6 +43,35 @@ import org.junit.Test
 class QuickJsRuntimeTest {
 
     @Test
+    fun `binary fetch returns status headers and exact bytes without utf8 conversion`() = runBlocking {
+        val bytes = byteArrayOf(0, 0xff.toByte(), 0x80.toByte()) + "中文".toByteArray()
+        val host = RecordingHostApi { request ->
+            assertEquals("bytes", JSONObject(request.payloadJson).getString("responseType"))
+            SourceHostResult.Success(request.requestId, JSONObject().put("statusCode", 200)
+                .put("headers", JSONObject().put("content-type", JSONArray().put("image/test")))
+                .put("body", "").put("bodyBase64", Base64.getEncoder().encodeToString(bytes)).toString())
+        }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val id = runtime.installSource(fixtureSource("""
+                binary = async () => {
+                    const response = await Network.fetchBytes('GET', 'https://fixture.invalid/bytes', {});
+                    return {status: response.status, type: String(response.headers['content-type']),
+                        buffer: response.body instanceof ArrayBuffer, bytes: Array.from(new Uint8Array(response.body)),
+                        digest: Convert.hexEncode(Convert.sha256(response.body))};
+                };
+            """.trimIndent()))
+            val result = JSONObject(runtime.invokeSuccess(id, "binary", "[]"))
+            assertEquals(200, result.getInt("status"))
+            assertEquals("image/test", result.getString("type"))
+            assertTrue(result.getBoolean("buffer"))
+            assertEquals(bytes.map { it.toInt() and 255 }, result.getJSONArray("bytes").let { array ->
+                (0 until array.length()).map(array::getInt)
+            })
+            assertEquals(MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }, result.getString("digest"))
+        }
+    }
+
+    @Test
     fun `large detail responses cross the bridge and dispose only their own document`() = runBlocking {
         val host = RecordingHostApi { request ->
             val payload = JSONObject(request.payloadJson)

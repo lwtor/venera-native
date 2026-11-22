@@ -5,6 +5,7 @@ data class SourceHttpRequest(
     val method: Method,
     val headers: Map<String, String> = emptyMap(),
     val body: String? = null,
+    val responseAsBytes: Boolean = false,
 ) {
     enum class Method {
         GET,
@@ -16,6 +17,7 @@ data class SourceHttpResponse(
     val statusCode: Int,
     val headers: Map<String, List<String>>,
     val body: String,
+    val bodyBase64: String? = null,
 )
 
 sealed interface SourceHttpResult {

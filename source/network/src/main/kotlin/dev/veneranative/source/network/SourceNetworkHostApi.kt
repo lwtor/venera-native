@@ -126,7 +126,17 @@ class SourceNetworkHostApi(
                 value.jsonPrimitive.content
             }.orEmpty()
         val body = payload["body"]?.jsonPrimitive?.contentOrNull
-        return SourceHttpRequest(url = url, method = method, headers = headers, body = body)
+        val responseAsBytes = when (val type = payload["responseType"]) {
+            null -> false
+            is JsonPrimitive -> when {
+                !type.isString -> throw IllegalArgumentException("Invalid response type.")
+                type.content == "bytes" -> true
+                type.content == "text" -> false
+                else -> throw IllegalArgumentException("Unsupported response type.")
+            }
+            else -> throw IllegalArgumentException("Invalid response type.")
+        }
+        return SourceHttpRequest(url = url, method = method, headers = headers, body = body, responseAsBytes = responseAsBytes)
     }
 
     private fun encodeResponse(response: SourceHttpResponse): String =
@@ -141,6 +151,7 @@ class SourceNetworkHostApi(
                 ),
             )
             put("body", JsonPrimitive(response.body))
+            response.bodyBase64?.let { put("bodyBase64", JsonPrimitive(it)) }
         }.toString()
 
     private fun SourceHostRequest.failure(error: SourceNetworkError): SourceHostResult.Failure =

@@ -250,3 +250,8 @@ HTML 每次调用累计预算调整为 4 MiB，JSON 桥接请求上限为 9 Mi �
 U-03C补充：端到端约束须一致：网络响应 4 MiB，Host 响应封装 9 MiB（请求仍 1 MiB）；
 HTML 4 MiB/25k节点为调用内同时活跃的文档预算，dispose按文档回收并失效其句柄，其他文档仍有效。
 所有HTTP读流、JS调用超时及结束清理保持。增加预算不等同取消资源约束。
+
+
+U-03E补充：根据[上游 Network 契约](https://github.com/venera-app/venera/blob/master/assets/init.js)，
+`fetchBytes` 返回包含 status、headers、body 的对象。响应使用显式 bytes 模式，原始字节以 Base64
+跨 JSON 传输，脚本侧恢复 ArrayBuffer。继续限制原始响应 4 MiB 和桥接封装 9 MiB。

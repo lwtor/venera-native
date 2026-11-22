@@ -497,6 +497,7 @@ internal object QuickJsHostScript {
             encodeBase64: encodeBase64,
             decodeBase64: decodeBase64,
             md5: md5,
+            sha256: function (value) { return sha256(value).buffer; },
             decryptAesEcb: decryptAesEcb,
             hmac: function (key, value, hash) {
               if (String(hash).toLowerCase() !== "sha256") throw new TypeError("Unsupported HMAC algorithm.");
@@ -615,7 +616,7 @@ internal object QuickJsHostScript {
             return String(body);
           }
 
-          function decodeResponse(payload, invocationId) {
+          function decodeResponse(payload, invocationId, responseType) {
             if (payload && globalThis.__veneraListMetadata) {
               globalThis.__veneraListMetadata.capture(payload.body, invocationId);
             }
@@ -629,13 +630,20 @@ internal object QuickJsHostScript {
             return {
               status: status,
               headers: headers,
-              body: payload && payload.body !== undefined && payload.body !== null
-                ? String(payload.body)
-                : ""
+              body: responseType === "bytes"
+                ? decodeBinaryResponse(payload)
+                : (payload && payload.body !== undefined && payload.body !== null ? String(payload.body) : "")
             };
           }
 
-          function request(method, url, headers, body) {
+          function decodeBinaryResponse(payload) {
+            if (!payload || typeof payload.bodyBase64 !== "string") {
+              throw hostFailure("Missing binary response bytes.", "INVALID_RESPONSE", false);
+            }
+            return decodeBase64(payload.bodyBase64).buffer;
+          }
+
+          function request(method, url, headers, body, responseType) {
             if (typeof url !== "string" || url.length === 0) {
               return Promise.reject(
                 hostFailure("Request URL must not be empty.", "INVALID_REQUEST", false)
@@ -651,10 +659,11 @@ internal object QuickJsHostScript {
               url: url,
               method: method,
               headers: headerObject(headers),
-              body: bodyToText(body)
-            }).then(function(payload) { return decodeResponse(payload, invocationId); }).catch(function (failure) {
+              body: bodyToText(body),
+              responseType: responseType === "bytes" ? "bytes" : "text"
+            }).then(function(payload) { return decodeResponse(payload, invocationId, responseType); }).catch(function (failure) {
               if (invocationId === "source-install") {
-                return { status: 0, headers: {}, body: "" };
+                return { status: 0, headers: {}, body: responseType === "bytes" ? new ArrayBuffer(0) : "" };
               }
               throw failure;
             });
@@ -789,10 +798,7 @@ internal object QuickJsHostScript {
               return request("DELETE", String(url), headers, null);
             },
             fetchBytes: function (method, url, headers, data) {
-              return request(String(method).toUpperCase(), String(url), headers, data)
-                .then(function (raw) {
-                  return utf8Encode(raw.body).buffer;
-                });
+              return request(String(method).toUpperCase(), String(url), headers, data, "bytes");
             }
           });
 
