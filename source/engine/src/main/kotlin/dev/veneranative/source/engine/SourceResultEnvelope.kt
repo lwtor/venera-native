@@ -1,8 +1,9 @@
 package dev.veneranative.source.engine
 
-import org.json.JSONArray
 import org.json.JSONException
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 
 /**
  * The `{ value }` envelope [SourceInvocationScript] produces, decoded back into result JSON.
@@ -24,20 +25,18 @@ internal object SourceResultEnvelope {
     }
 
     fun decode(envelope: String): Decoded {
-        val result = JSONObject(envelope)
-        if (!result.has(VALUE_KEY)) {
-            throw JSONException("Missing result value.")
+        // org.json object iteration is implementation dependent (HashMap on the JVM).
+        // Chapter object order is source-defined reading order, so keep the JSON parser's order.
+        val result = try {
+            Json.parseToJsonElement(envelope) as? JsonObject
+                ?: throw JSONException("Result envelope must be a JSON object.")
+        } catch (failure: IllegalArgumentException) {
+            throw JSONException("Invalid result envelope.").apply { initCause(failure) }
         }
-        val valueJson = when (val value = result.get(VALUE_KEY)) {
-            JSONObject.NULL -> "null"
-            is String -> JSONObject.quote(value)
-            is Number, is Boolean, is JSONObject, is JSONArray -> value.toString()
-            else -> throw JSONException("Unsupported result value.")
-        }
-        val sourceData = result.opt(SOURCE_DATA_KEY)
-        val sourceDataJson = when (sourceData) {
-            null, JSONObject.NULL -> null
-            is JSONObject -> sourceData.toString()
+        val valueJson = result[VALUE_KEY]?.toString() ?: throw JSONException("Missing result value.")
+        val sourceDataJson = when (val sourceData = result[SOURCE_DATA_KEY]) {
+            null, JsonNull -> null
+            is JsonObject -> sourceData.toString()
             else -> throw JSONException("Source data must be a JSON object.")
         }
         return Decoded(valueJson, sourceDataJson)

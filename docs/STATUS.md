@@ -4,6 +4,18 @@
 
 ## 状态快照
 
+**U-03B DONE：来源结果解包保留章节插入顺序。** `SourceResultEnvelope` 原先使用 org.json 解析后再次
+序列化，JVM 实现按 HashMap 重排章节键，导致真实 Native JVM 验证中出现 918→919→225 等乱序；Android
+JSONObject 实现可能不同，不据此声称所有设备都已复现。现改用有序的 kotlinx JSON 值解包，嵌套分组及
+来源私有数据同样保序；错误仍映射 JSONException。新增先失败后通过的最小回归覆盖章节、分组、标量及非法
+封装。版本 1.9.7 / 1009007。JDK 17 `:source:engine:testDebugUnitTest --tests '*SourceResultEnvelopeTest'
+--tests '*QuickJsRuntimeTest' :source:core:testDebugUnitTest --tests '*EngineSourceCoreTest' :app:assembleDebug`
+— BUILD SUCCESSFUL；`git diff --check` — PASS。
+真实 EngineSourceCore 搜索→详情→指定章节→按 App 请求头下载抽图已通过图库1199试看版、漫画1234第1198话、
+瓜子第1190话；不等同设备UI验收或整章下载。腾讯首话可抽图，但详情仍失败：除 DOM 外，网络和 Host 桥接
+仍各有 1 MiB 上限，下一子项 **U-03C：端到端大目录传输及图片请求契约**。用户 `docs/sdk/` 保持未动。
+
+
 **U-03A DONE：修复来源大目录 HTML 和脚本内章节 JSON 的解析。** 用户要求按 Native 调用链复验候选源。
 腾讯当前详情约 2.49 MB、首章约 1.78 MB，超出原 1 MiB HTML 预算，来源 catch 后显示“加载失败”；
 `script[type=text/plain]` 的章节 JSON 还会被 Jsoup `text()` 忽略。HTML 上限现为有界 4 MiB，
