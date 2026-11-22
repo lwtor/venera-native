@@ -237,3 +237,11 @@ S2-07C12 将工具链升级到 AGP 9.3.1 / KGP 2.4.20 后，绑定升级到 `qui
 上游 1.0.15 暴露求值超时与 `interruptEvaluation()`，调用求值协程的取消也被设计为中断正在运行的 JavaScript（[上游 QuickJS-KT README](https://github.com/dokar3/quickjs-kt)）。项目 `QuickJsRuntime` 把 evaluate 放在会话 scope 下的独立 `Deferred`，因此 `withTimeout { deferred.await() }` 本身只取消等待者。S2-07C13 已在 timeout 和 `SourceScriptRuntime.cancel()` 路径显式取消该 evaluation，并最多等待 1 秒让 native evaluation 收尾后丢弃引擎。JVM 回归覆盖真实 `while (true)`：timeout 返回 `Timeout`、显式取消返回 `Cancelled`，两者后续均可重建来源并成功响应。
 
 本次升级已核验 Release APK 内四个 ABI 的 `libquickjs.so`（arm64-v8a、armeabi-v7a、x86、x86_64）；各 ELF `LOAD` segment 均为 `0x4000`（16 KB）alignment。
+
+
+## 12. 真实规模目录 HTML 预算（U-03A，2026-11-23）
+
+腾讯公开详情约 2.49 MB，首章页面约 1.78 MB；原 1 MiB 上限会让来源吞异常并显示加载失败。
+HTML 每次调用累计预算调整为 4 MiB，JSON 桥接请求上限为 9 Mi 字符以容纳转义膨胀，节点仍最多 25,000。
+超限继续明确拒绝，不取消调用超时或沙箱边界。script/style 的 `.text` 使用 Jsoup data 文本，保留 JSON
+内空白；普通元素文本保持旧规则。测试使用仓库自制 HTML/JSON，不保存站点正文。

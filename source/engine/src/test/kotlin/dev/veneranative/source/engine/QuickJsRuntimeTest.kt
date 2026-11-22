@@ -43,6 +43,24 @@ import org.junit.Test
 class QuickJsRuntimeTest {
 
     @Test
+    fun `detail parses a complete catalog from an inert script element`() = runBlocking {
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val sourceId = runtime.installSource(fixtureSource("""
+                comic = { loadInfo: async () => {
+                    const doc = new HtmlDocument('<script type="text/plain" id="catalog">[{"cid":1,"title":"Chapter  1"},{"cid":2,"title":"Chapter 2"}]</script>');
+                    try {
+                        const entries = JSON.parse(doc.getElementById('catalog').text);
+                        return new ComicDetails({title: 'Fixture', chapters: new Map(entries.map(c => [String(c.cid), c.title]))});
+                    } finally { doc.dispose(); }
+                }};
+            """.trimIndent()))
+            val result = JSONObject(runtime.invokeSuccess(sourceId, "comic.loadInfo", "[]"))
+            assertEquals(2, result.getJSONObject("chapters").length())
+            assertEquals("Chapter  1", result.getJSONObject("chapters").getString("1"))
+        }
+    }
+
+    @Test
     fun `a source instance is created, registered and callable`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(

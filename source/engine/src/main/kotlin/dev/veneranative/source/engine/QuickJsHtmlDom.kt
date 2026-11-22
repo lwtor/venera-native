@@ -35,7 +35,11 @@ internal class QuickJsHtmlDom(
                 "create" -> create(invocation, request)
                 "query", "queryAll" -> query(invocation, request, action == "queryAll")
                 "getElementById" -> getElementById(invocation, request)
-                "text" -> JSONObject().put("value", element(invocation, request).text())
+                "text" -> JSONObject().put("value", element(invocation, request).let {
+                    // Jsoup stores script/style contents as DataNodes, which text() omits.
+                    // Sources use text/plain script elements for chapter JSON; preserve its bytes.
+                    if (it.normalName() == "script" || it.normalName() == "style") it.data() else it.text()
+                })
                 "attributes" -> attributes(element(invocation, request))
                 "innerHtml" -> JSONObject().put("value", element(invocation, request).html())
                 "classNames" -> JSONObject().put("value", JSONArray().apply {
@@ -145,9 +149,9 @@ internal class QuickJsHtmlDom(
     }
 
     companion object {
-        const val DEFAULT_MAX_HTML_BYTES = 1_048_576
+        const val DEFAULT_MAX_HTML_BYTES = 4 * 1_048_576
         const val DEFAULT_MAX_NODES_PER_INVOCATION = 25_000
-        private const val MAX_REQUEST_CHARS = 1_100_000
+        private const val MAX_REQUEST_CHARS = 9 * 1_048_576
         private const val MAX_DOCUMENTS_PER_INVOCATION = 256
         private const val MAX_SELECTOR_CHARS = 2_048
         private const val MAX_INVOCATION_ID_CHARS = 128

@@ -4,6 +4,18 @@
 
 ## 状态快照
 
+**U-03A DONE：修复来源大目录 HTML 和脚本内章节 JSON 的解析。** 用户要求按 Native 调用链复验候选源。
+腾讯当前详情约 2.49 MB、首章约 1.78 MB，超出原 1 MiB HTML 预算，来源 catch 后显示“加载失败”；
+`script[type=text/plain]` 的章节 JSON 还会被 Jsoup `text()` 忽略。HTML 上限现为有界 4 MiB，
+桥接封装为 9 Mi 字符（容纳 JSON 转义），节点仍限制 25,000；script/style 读取 data，普通元素保持原文本规则。
+新增合成回归覆盖原始 JSON 空白、真实 QuickJS 目录解析、大文档和超限拒绝，不复制真实漫画或站点 HTML。
+版本 1.9.6 / 1009006。验证：JDK 17 `:source:engine:testDebugUnitTest --tests '*QuickJsHtmlDomTest'
+--tests '*QuickJsRuntimeTest.detail parses*' :app:assembleDebug` — BUILD SUCCESSFUL，4 项回归 0 失败；
+`git diff --check` — PASS。未安装真机；真实腾讯详情需修复构建后继续复验。
+**当前用户任务下一子项：U-03B，结果解包保留章节顺序及候选源 Native 搜索/阅读复验。**
+上轮“漫画屋缺 CBC”的判断已撤回：该脚本正常 edition 不走 Six 分支，不据此扩展加密能力。
+
+
 **S4-10A29 DONE：章节不再因为「拿不到章节顺序」而整体失败（拷贝漫画无法加载章节）。** `SourcePageProvider`
 原来把 `catalog.detail` 的失败升级成整章失败，但页数据此时已经取到了；拷贝漫画的 `loadInfo` 要重新拉
 comic2、收藏状态以及每个版本分组的全部章节，「详情/章节顺序」这一次调用正是被它自己的限流打掉的那一次，
