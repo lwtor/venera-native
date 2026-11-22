@@ -4,6 +4,18 @@
 
 ## 状态快照
 
+**U-03D DONE：采用来源图片 Hook 返回的真实 URL。** `comic.onImageLoad` 的返回值原只提取请求头，
+忽略 url，新版 Komiic 票据占位地址因此无法下载；飞翔的阅读地址改写同样被忽略。现类型化 pages 同时
+采用有界 HTTP(S) url，缺省/非法改写保留原引用；请求头及条带处理不变。新增先失败后通过的实际引擎
+回归覆盖票据地址改写、章节头、仅头返回及非HTTP地址不扩权。版本 1.9.9 / 1009009。
+验证：JDK17 `:source:core:testDebugUnitTest --tests '*EngineSourceCoreTest.image hooks*'
+--tests '*EngineSourceCoreTest.page loading applies*' :app:assembleDebug` — BUILD SUCCESSFUL；
+`git diff --check` — PASS。修后Komiic1198话13页，按实际App票据请求头抽图WEBP解码成功；漫画屋719回
+18页抽图通过，末目录章图床返回21字节非图片，不能标可读。飞翔首/末58/18页、51首/末209/17页同样抽图
+通过。均为JVM真实类型化调用+临时HTTP Host，未安装真机。
+**下一用户子项 U-03E：恢复 fetchBytes 官方响应对象及原始字节契约，完成候选源验证记录。**
+
+
 **U-03C DONE：打通腾讯大目录的完整传输链并修正文档释放。** 网络响应仍受 1 MiB 限制，Host 桥接
 也会在 DOM 前拒绝大响应；现网络上限 4 MiB，桥接响应上限 9 MiB，脚本请求上限仍 1 MiB。
 `HtmlDocument.dispose()` 现在只释放本份文档及其句柄/活跃字节和节点预算，保留同调用其他活动文档，

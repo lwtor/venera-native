@@ -184,6 +184,24 @@ class EngineSourceCoreTest {
         }
     }
 
+    @Test
+    fun `image hooks replace ticket references while preserving chapter headers`() = runBlocking {
+        withCore(source("""
+            comic = {
+                loadEp: async () => ({images: ['ticket:page-1', 'https://images.example/keep.jpg', 'https://images.example/safe.jpg']}),
+                onImageLoad: (url, comicId, epId) => url.startsWith('ticket:')
+                    ? {url: 'https://images.example/resolved.jpg', headers: {Referer: comicId + '/' + epId}}
+                    : url.endsWith('safe.jpg') ? {url: 'file:///private/invalid.jpg'} : {headers: {Accept: 'image/*'}}
+            };
+        """.trimIndent())) { core ->
+            val key = ChapterKey(ComicKey(sourceId, RemoteComicId("comic")), RemoteChapterId("chapter"))
+            val pages = (core.pages(key) as SourceOutcome.Success).value
+            assertEquals(listOf("https://images.example/resolved.jpg", "https://images.example/keep.jpg", "https://images.example/safe.jpg"), pages.map { it.imageRef })
+            assertEquals("comic/chapter", pages.first().headers["Referer"])
+            assertEquals("image/*", pages[1].headers["Accept"])
+        }
+    }
+
     private class RecordingRuntime : SourceScriptRuntime {
         val calls = mutableListOf<SourceCall.InvokeFunction>()
 

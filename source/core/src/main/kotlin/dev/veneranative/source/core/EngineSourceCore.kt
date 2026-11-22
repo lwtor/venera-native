@@ -338,6 +338,7 @@ class EngineSourceCore(
                 SourceOutcome.Success(pages.map { page ->
                     when (val config = invoke(sourceId, SourceProtocol.onImageLoad(page.imageRef, chapterKey))) {
                         is SourceOutcome.Success -> page.copy(
+                            imageRef = SourceProtocolParser.parseImageUrl(config.value) ?: page.imageRef,
                             headers = SourceProtocolParser.parseImageHeaders(config.value),
                             reverseHorizontalBands = SourceProtocolParser.parseReverseHorizontalBands(config.value),
                         )

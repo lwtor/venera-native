@@ -206,6 +206,15 @@ object SourceProtocolParser {
         return root["images"].stringList().mapIndexed { index, url -> SourcePage(index = index, imageRef = url) }
     }
 
+    /** Optional rewritten HTTP image URL; unrelated schemes never gain filesystem access. */
+    fun parseImageUrl(payload: String): String? {
+        val value = payload.objectOrNull()?.get("url") as? JsonPrimitive ?: return null
+        if (!value.isString) return null
+        val url = value.content.takeIf { it.isNotBlank() && it.length <= 16_384 } ?: return null
+        val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
+        return url.takeIf { uri.scheme?.lowercase() in setOf("http", "https") && !uri.host.isNullOrBlank() }
+    }
+
     /** Reads only the request headers from an optional `comic.onImageLoad` result. */
     fun parseImageHeaders(payload: String): Map<String, String> {
         val config = payload.objectOrNull() ?: return emptyMap()
