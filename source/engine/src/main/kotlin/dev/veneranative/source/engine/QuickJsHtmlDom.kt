@@ -50,7 +50,9 @@ internal class QuickJsHtmlDom(
                 "children" -> handles(invocation, element(invocation, request).children())
                 "parent", "previousSibling", "nextSibling" -> sibling(invocation, request, action)
                 "dispose" -> {
-                    invocations.remove(invocationId)
+                    val documentId = request.optString("documentId")
+                    if (documentId.isBlank()) invocations.remove(invocationId)
+                    else disposeDocument(invocation, documentId)
                     JSONObject()
                 }
                 else -> throw IllegalArgumentException("Unsupported HTML operation.")
@@ -79,7 +81,19 @@ internal class QuickJsHtmlDom(
         invocation.totalNodes += parsedNodes
         val documentId = "d${++invocation.nextId}"
         invocation.documents[documentId] = document
+        invocation.documentSizes[documentId] = htmlBytes to parsedNodes
         return JSONObject().put("documentId", documentId)
+    }
+
+    private fun disposeDocument(invocation: InvocationDom, documentId: String) {
+        val document = invocation.documents.remove(documentId) ?: return
+        invocation.elements.entries.removeAll { (_, element) ->
+            element === document || element.ownerDocument() === document
+        }
+        invocation.documentSizes.remove(documentId)?.let { (bytes, nodes) ->
+            invocation.totalHtmlBytes -= bytes
+            invocation.totalNodes -= nodes
+        }
     }
 
     private fun query(invocation: InvocationDom, request: JSONObject, all: Boolean): JSONObject {
@@ -144,6 +158,7 @@ internal class QuickJsHtmlDom(
         var nextId = 0
         var totalHtmlBytes = 0
         var totalNodes = 0
+        val documentSizes = LinkedHashMap<String, Pair<Int, Int>>()
         val documents = LinkedHashMap<String, Element>()
         val elements = LinkedHashMap<String, Element>()
     }

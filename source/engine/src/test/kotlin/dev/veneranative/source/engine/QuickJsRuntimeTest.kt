@@ -43,6 +43,40 @@ import org.junit.Test
 class QuickJsRuntimeTest {
 
     @Test
+    fun `large detail responses cross the bridge and dispose only their own document`() = runBlocking {
+        val host = RecordingHostApi { request ->
+            val payload = JSONObject(request.payloadJson)
+            val html = if (payload.getString("url").endsWith("/detail")) {
+                "<h1>Fixture</h1>" + " ".repeat(2_500_000)
+            } else {
+                "<script id='catalog' type='text/plain'>[{\"id\":1,\"title\":\"First\"}]</script>" + " ".repeat(1_800_000)
+            }
+            SourceHostResult.Success(request.requestId, JSONObject().put("statusCode", 200)
+                .put("headers", JSONObject()).put("body", html).toString())
+        }
+        withRuntime(QuickJsRuntime(hostApi = host)) { runtime ->
+            val id = runtime.installSource(fixtureSource("""
+                comic = { loadInfo: async () => {
+                    const detail = new HtmlDocument((await Network.get('https://fixture.invalid/detail', {})).body);
+                    const guard = new HtmlDocument('<p>Other active document</p>');
+                    const title = detail.querySelector('h1').text;
+                    detail.dispose(); detail.dispose();
+                    const chapter = new HtmlDocument((await Network.get('https://fixture.invalid/chapter', {})).body);
+                    try {
+                        const catalog = JSON.parse(chapter.getElementById('catalog').text);
+                        return new ComicDetails({title, description: guard.querySelector('p').text,
+                            chapters: new Map(catalog.map(c => [String(c.id), c.title]))});
+                    } finally { chapter.dispose(); guard.dispose(); }
+                }};
+            """.trimIndent()))
+            val result = JSONObject(runtime.invokeSuccess(id, "comic.loadInfo", "[]"))
+            assertEquals("Fixture", result.getString("title"))
+            assertEquals("Other active document", result.getString("description"))
+            assertEquals("First", result.getJSONObject("chapters").getString("1"))
+        }
+    }
+
+    @Test
     fun `detail parses a complete catalog from an inert script element`() = runBlocking {
         withRuntime(QuickJsRuntime()) { runtime ->
             val sourceId = runtime.installSource(fixtureSource("""

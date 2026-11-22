@@ -4,6 +4,20 @@
 
 ## 状态快照
 
+**U-03C DONE：打通腾讯大目录的完整传输链并修正文档释放。** 网络响应仍受 1 MiB 限制，Host 桥接
+也会在 DOM 前拒绝大响应；现网络上限 4 MiB，桥接响应上限 9 MiB，脚本请求上限仍 1 MiB。
+`HtmlDocument.dispose()` 现在只释放本份文档及其句柄/活跃字节和节点预算，保留同调用其他活动文档，
+调用结束仍统一清理。避免串行目录累计预算误拒和并行文档被互相释放。新增合成大响应回归及已知长度/
+chunked 超限拒绝，实际 QuickJS 覆盖 2.5MB详情→释放→1.8MB章节 JSON、其他文档仍可用及重复释放。
+版本 1.9.8 / 1009008。JDK 17 `:source:engine:testDebugUnitTest --tests '*QuickJsRuntimeTest.large detail*'
+--tests '*QuickJsHtmlDomTest' :source:network:testDebugUnitTest --tests '*SourceNetworkBodyTest'
+:app:assembleDebug` — BUILD SUCCESSFUL（15 项，0 失败）；`git diff --check` — PASS。
+修后实际 EngineSourceCore + QuickJS + 临时 HTTP Host 验证腾讯搜索、详情1198章、首话58页并按 App
+请求头下载首图解码成功；zero首卷206页抽图成功，末章节要求登录。网络执行器由本地MockWebServer回归
+独立验证；不是Android设备UI实测。三优先源封面不带hook也实际下载成功，本次不为假设扩大封面架构。
+**当前用户任务下一子项 U-03D：其余候选源二进制响应契约核对及复验。**
+
+
 **U-03B DONE：来源结果解包保留章节插入顺序。** `SourceResultEnvelope` 原先使用 org.json 解析后再次
 序列化，JVM 实现按 HashMap 重排章节键，导致真实 Native JVM 验证中出现 918→919→225 等乱序；Android
 JSONObject 实现可能不同，不据此声称所有设备都已复现。现改用有序的 kotlinx JSON 值解包，嵌套分组及

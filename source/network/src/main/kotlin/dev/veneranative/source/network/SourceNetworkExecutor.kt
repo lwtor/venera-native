@@ -229,7 +229,8 @@ class SourceNetworkExecutor(
     private companion object {
         const val IKM_SOURCE_ID = "ikmmh"
         const val DEFAULT_MAX_CONCURRENT_PER_SOURCE = 4
-        const val DEFAULT_MAX_RESPONSE_BYTES = 1_048_576L
+        // Public detail pages can contain multi-megabyte chapter catalogs; retain a hard byte limit.
+        const val DEFAULT_MAX_RESPONSE_BYTES = 4_194_304L
         const val DEFAULT_CALL_TIMEOUT_MILLIS = 15_000L
     }
 }

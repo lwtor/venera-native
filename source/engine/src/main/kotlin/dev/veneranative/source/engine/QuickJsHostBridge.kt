@@ -32,6 +32,7 @@ internal class QuickJsHostBridge(
     sourceSettingsJson: String = "{}",
     sourceDataJson: String = "{}",
     private val maxMessageBytes: Int = DEFAULT_MAX_MESSAGE_BYTES,
+    private val maxResponseMessageBytes: Int = DEFAULT_MAX_RESPONSE_MESSAGE_BYTES,
     private val maxLogChars: Int = DEFAULT_MAX_LOG_CHARS,
     private val logSink: (String, String) -> Unit = DEFAULT_LOG_SINK,
 ) {
@@ -123,7 +124,7 @@ internal class QuickJsHostBridge(
             }
 
         val encoded = encode(result)
-        return if (encoded.toByteArray(UTF_8).size <= maxMessageBytes) {
+        return if (encoded.toByteArray(UTF_8).size <= maxResponseMessageBytes) {
             encoded
         } else {
             encodeFailure(
@@ -187,6 +188,8 @@ internal class QuickJsHostBridge(
     companion object {
         const val READY_SENTINEL = "__VENERA_HOST_READY__"
         const val DEFAULT_MAX_MESSAGE_BYTES = 1_048_576
+        // A bounded 4 MiB HTTP body plus JSON escaping and response metadata.
+        const val DEFAULT_MAX_RESPONSE_MESSAGE_BYTES = 9 * 1_048_576
         const val DEFAULT_MAX_LOG_CHARS = 4_096
 
         /**

@@ -76,7 +76,7 @@ internal object SourceHtmlScript {
               var found = htmlCall("getElementById", { documentId: documentId, id: String(id) }).elementId;
               return createElement(documentId, found);
             };
-            this.dispose = function() { htmlCall("dispose", {}); };
+            this.dispose = function() { htmlCall("dispose", { documentId: documentId }); };
           };
           globalThis.__veneraDisposeHtmlInvocation = function(invocationId) {
             htmlCall("dispose", {}, String(invocationId));

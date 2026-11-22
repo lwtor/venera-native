@@ -124,6 +124,40 @@ class SourceNetworkBodyTest {
         }
     }
 
+    @Test fun defaultBudgetAcceptsLargePublicDetailHtml() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val html = "<html><body>" + "x".repeat(2_500_000) + "</body></html>"
+            server.enqueue(MockResponse.Builder().body(html).build())
+            val result = SourceNetworkExecutor().execute(
+                SourceId("large-detail-fixture"),
+                SourceHttpRequest(server.url("/detail").toString(), SourceHttpRequest.Method.GET),
+            )
+            assertEquals(html, (result as SourceHttpResult.Success).response.body)
+        }
+    }
+
+    @Test fun defaultBudgetRejectsOverflowForKnownAndStreamedLengths() = runBlocking {
+        MockWebServer().use { server ->
+            server.start()
+            val oversized = "x".repeat(4 * 1024 * 1024 + 1)
+            for (response in listOf(
+                MockResponse.Builder().body(oversized).build(),
+                MockResponse.Builder().chunkedBody(oversized, 8192).build(),
+            )) {
+                server.enqueue(response)
+                val result = SourceNetworkExecutor().execute(
+                    SourceId("oversized-detail-fixture"),
+                    SourceHttpRequest(server.url("/detail").toString(), SourceHttpRequest.Method.GET),
+                )
+                assertEquals(
+                    SourceNetworkError.ResponseTooLarge(4 * 1024 * 1024L),
+                    (result as SourceHttpResult.Failure).error,
+                )
+            }
+        }
+    }
+
     @Test fun shortEmptyAndExactBodiesComplete() = runBlocking {
         MockWebServer().use { server ->
             server.start()
