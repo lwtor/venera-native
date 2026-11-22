@@ -4,6 +4,21 @@
 
 ## 状态快照
 
+**S4-10A29 DONE：章节不再因为「拿不到章节顺序」而整体失败（拷贝漫画无法加载章节）。** `SourcePageProvider`
+原来把 `catalog.detail` 的失败升级成整章失败，但页数据此时已经取到了；拷贝漫画的 `loadInfo` 要重新拉
+comic2、收藏状态以及每个版本分组的全部章节，「详情/章节顺序」这一次调用正是被它自己的限流打掉的那一次，
+而单话的 `chapter2` 往往还能成功——于是「详情能看、章节永远打不开」。现在页优先：`detail` 失败只把
+`ChapterContent.neighborsResolved` 置 false，页面照常显示。阅读器据此区分「真的最后一话」与「顺序未知」：
+未知时不再弹「已到最后一话」，改为底部「无法确认下一话」浮层 + 重试（重试重新读取本章以再次询问来源）；
+下载 provider 在来源顺序查询失败且下载序列也没有下一话时同样标记为未知。失败页新增一行真实原因
+（`ReaderStatus.Failed` 的 `failureDetail`，截断 160 字符），限流("Invalid status code: 210")与空页
+这类差异不必再靠 adb 复现。新增/改写 3 条回归。版本升至 1.9.5 / versionCode 1009005。
+
+验证（2026-11-23）：`:data:comic:testDebugUnitTest :data:download:testDebugUnitTest
+:feature:reader:testDebugUnitTest :data:local:testDebugUnitTest` — BUILD SUCCESSFUL（0 失败，新增
+「detail 失败仍可读且标记未解析」「未解析顺序不判为最后一话」已执行）；`:feature:reader:compileDebugAndroidTestKotlin
+:app:assembleDebug` — BUILD SUCCESSFUL。未做真机验收：拷贝漫画实际限流路径待用户复验。
+
 **S4-10A28 DONE：修复已下载/本地章节读完后无法续读下一话以及完结提示错位。** 已下载章节的相邻章节
 此前只取自「已完成下载」的任务列表，下一话没有下载就会被当成全书完结；本地导入章节则完全没有相邻
 链接，每章读完都停在原地。现在 `ChapterContent` 的相邻章节改用 `ChapterRef`，下载 provider 通过来源

@@ -16,6 +16,18 @@ data class ChapterContent(
     val nextChapter: ChapterRef? = null,
     /** Previous chapter in the source's declared order, when available. */
     val previousChapter: ChapterRef? = null,
+    /**
+     * Whether the lookup behind [nextChapter] / [previousChapter] actually completed.
+     *
+     * A null neighbour is ambiguous on its own: it can mean "the series ends here" or "we failed
+     * to ask". Some sources answer the page request and the chapter-order request through
+     * completely different calls, and the order one is far more fragile — copy_manga rebuilds the
+     * whole chapter list by re-fetching the comic plus every chapter group, which is exactly the
+     * call its rate limiter rejects while single-chapter reads still succeed. Treating such a
+     * failure as the end of the series is how a readable chapter gets reported as "last chapter"
+     * (or, when the failure is escalated, as an unreadable chapter).
+     */
+    val neighborsResolved: Boolean = true,
 ) {
     init {
         require(title.isNotBlank()) { "title must not be blank" }

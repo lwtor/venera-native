@@ -85,6 +85,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
@@ -408,6 +409,19 @@ fun ReaderScreen(
                         text = "无法加载此章节。",
                         style = MaterialTheme.typography.bodyLarge,
                     )
+                    // Naming the layer that failed beats a generic line: "Invalid status code: 210"
+                    // means throttling, an empty payload means a different bug entirely.
+                    state.failureDetail?.let { detail ->
+                        Text(
+                            text = detail,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .padding(horizontal = 32.dp)
+                                .testTag("reader-failure-detail"),
+                        )
+                    }
                     Button(onClick = { onAction(ReaderAction.Retry) }) { Text("重试") }
                 }
 
@@ -476,6 +490,12 @@ fun ReaderScreen(
         }
         if (!showControls && state.status == ReaderStatus.Ready && state.endOfChaptersReached) {
             EndOfChaptersNotice(modifier = Modifier.align(Alignment.BottomCenter))
+        }
+        if (!showControls && state.status == ReaderStatus.Ready && state.nextChapterUnknown) {
+            UnknownNextChapterNotice(
+                onRetry = { onAction(ReaderAction.RetryNextChapter) },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         }
         if (!showControls && state.status == ReaderStatus.Ready && (state.nextChapterLoadFailed || state.previousChapterLoadFailed)) {
             Surface(
@@ -1180,6 +1200,44 @@ private fun EndOfChaptersNotice(modifier: Modifier = Modifier) {
                     color = colors.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+/**
+ * Shown when the chapter itself read fine but its neighbour lookup failed.
+ *
+ * Saying nothing here would be a lie either way: claiming "已到最后一话" invents an ending, and
+ * failing the whole chapter throws away pages that are already on screen. So the pages stay, and
+ * this overlay states what is actually known plus a retry that re-asks the source.
+ */
+@Composable
+private fun UnknownNextChapterNotice(onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier
+            .padding(horizontal = 20.dp, vertical = 22.dp)
+            .fillMaxWidth()
+            .testTag("reader-next-chapter-unknown"),
+        shape = RoundedCornerShape(20.dp),
+        color = colors.surface.copy(alpha = 0.96f),
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 18.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("无法确认下一话", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.size(3.dp))
+                Text(
+                    "这一话已可正常阅读，但来源没有返回章节顺序（常见于限流）。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            TextButton(onClick = onRetry) { Text("重试") }
         }
     }
 }

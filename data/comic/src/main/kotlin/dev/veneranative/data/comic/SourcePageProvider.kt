@@ -8,9 +8,7 @@ import dev.veneranative.core.model.ComicPage
 import dev.veneranative.core.model.PageImageSizer
 import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.model.SourcePage
-import dev.veneranative.core.model.SourceCapability
 import dev.veneranative.source.api.SourceOutcome
-import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -88,27 +86,31 @@ class SourcePageProvider(
                 reverseHorizontalBands = reference.reverseHorizontalBands,
             )
         }
+        // Pages are the payload; comic metadata is a bonus. Some sources answer the page request
+        // and the chapter-order request through different calls, and the order one is far more
+        // fragile — copy_manga rebuilds its chapter list by re-fetching the comic plus every
+        // chapter group, so its rate limiter rejects that call while single-chapter reads still
+        // succeed. Escalating such a failure would throw away a chapter that already loaded.
+        var neighborsResolved = true
         val detail = try {
             sourceValue { catalog.detail(key.comicKey) }
-        } catch (failure: SourceLoadException) {
-            // Some sources legitimately expose pages without comic details. A transient or
-            // broken detail call is different: fail visibly so the reader can retry instead of
-            // silently treating the missing nextChapter as the end of the series.
-            if ((failure.error as? SourceRuntimeError.UnsupportedCapability)?.capability == SourceCapability.DETAIL) {
-                null
-            } else {
-                throw failure
-            }
+        } catch (_: SourceLoadException) {
+            neighborsResolved = false
+            null
         }
         val chapterList = detail?.chapters?.let { chapters ->
             ref.group?.let { selectedGroup -> chapters.filter { it.group == selectedGroup } } ?: chapters
         }.orEmpty()
         val chapterIndex = chapterList.indexOfFirst { it.key == key }
+        // A detail call that answers but does not list this chapter (another version group, a
+        // truncated list) says nothing about the neighbours either.
+        if (detail != null && chapterIndex < 0) neighborsResolved = false
         return ChapterContent(
             title = chapterList.firstOrNull { it.key == key }?.title ?: chapterTitle(key),
             pages = pages, comicTitle = detail?.comic?.title, coverUrl = detail?.comic?.coverUrl,
             nextChapter = chapterList.getOrNull(chapterIndex + 1)?.takeIf { chapterIndex >= 0 }?.toChapterRef(),
             previousChapter = chapterList.getOrNull(chapterIndex - 1)?.takeIf { chapterIndex > 0 }?.toChapterRef(),
+            neighborsResolved = neighborsResolved,
         )
     }
 

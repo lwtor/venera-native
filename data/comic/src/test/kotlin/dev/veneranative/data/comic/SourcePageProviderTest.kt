@@ -25,6 +25,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -274,7 +276,7 @@ class SourcePageProviderTest {
     }
 
     @Test
-    fun `failed directory is surfaced and subsequent load retains next chapter metadata`() = runTest {
+    fun `failed directory keeps the pages readable and a later load recovers the neighbours`() = runTest {
         val next = Chapter(chapter.copy(remoteId = RemoteChapterId("chapter-2")), "Chapter 2", 1)
         var detailAttempts = 0
         val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
@@ -292,29 +294,37 @@ class SourcePageProviderTest {
         }
         val provider = SourcePageProvider(catalog, FixedSizer())
 
-        assertTrue(runCatching { provider.loadChapter(chapter) }.exceptionOrNull() is SourceLoadException)
-        val content = provider.loadChapter(chapter)
+        val first = provider.loadChapter(chapter)
+        assertEquals(1, first.pages.size)
+        assertFalse(first.neighborsResolved)
+        assertNull(first.nextChapter)
 
+        val content = provider.loadChapter(chapter)
         assertEquals(2, detailAttempts)
         assertEquals(next.readerRef(), content.nextChapter)
+        assertTrue(content.neighborsResolved)
     }
 
     @Test
-    fun `detail source failure is surfaced for reader retry instead of looking like series end`() = runTest {
-        val failure = SourceRuntimeError.Timeout(5_000)
+    fun `detail failure keeps readable pages and reports neighbours as unresolved`() = runTest {
         var detailAttempts = 0
         val catalog = object : ComicCatalog by FakeCatalog(pages = listOf(SourcePage(0, "https://img/0"))) {
             override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
                 detailAttempts++
-                return SourceOutcome.Failure(failure)
+                return SourceOutcome.Failure(SourceRuntimeError.Timeout(5_000))
             }
         }
         val provider = SourcePageProvider(catalog, FixedSizer())
 
-        val thrown = runCatching { provider.loadChapter(chapter) }.exceptionOrNull()
+        val content = provider.loadChapter(chapter)
 
+        // Pages are the payload: a metadata failure must not discard an already loaded chapter.
+        // This is the copy_manga shape — its chapter-order request refetches the whole comic plus
+        // every version group, so the rate limiter rejects it long before the page call fails.
         assertEquals(1, detailAttempts)
-        assertEquals(failure, (thrown as? SourceLoadException)?.error)
+        assertEquals("https://img/0", content.pages.single().imageRef)
+        assertNull(content.nextChapter)
+        assertFalse(content.neighborsResolved)
     }
 
     /** Only the sizes it was given; every other reference is "could not be resolved". */

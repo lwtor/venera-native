@@ -37,8 +37,26 @@ data class ReaderUiState(
     val isLoadingPreviousChapter: Boolean = false,
     val previousChapterLoadFailed: Boolean = false,
     val endOfChaptersReached: Boolean = false,
+    /**
+     * Whether the source actually resolved this chapter's neighbours.
+     *
+     * False means a null [nextChapter] is "unknown", not "finished": the chapter-order request
+     * failed while the pages themselves loaded (copy_manga fetches the whole comic plus every
+     * chapter group to answer it, which its rate limiter rejects far sooner than a page read).
+     */
+    val neighborsResolved: Boolean = true,
+    /** Last page reached with an unresolved neighbour lookup: offer a retry instead of "last chapter". */
+    val nextChapterUnknown: Boolean = false,
     val direction: ReadingDirection = ReadingDirection.Vertical,
     val status: ReaderStatus = ReaderStatus.Loading,
+    /**
+     * Short reason behind [ReaderStatus.Failed], straight from the failing layer.
+     *
+     * The generic line tells the reader nothing when the cause is a source-side rate limit or a
+     * script error, and reproducing it elsewhere needs the very log that is missing. Keeping the
+     * first 160 characters here makes the failure diagnosable on the device that hit it.
+     */
+    val failureDetail: String? = null,
     val splitEnabled: Boolean = false,
     val excludedPages: Set<Int> = emptySet(),
     /** Gutter overlap per side of a split page, shared by every chapter of the current comic. */

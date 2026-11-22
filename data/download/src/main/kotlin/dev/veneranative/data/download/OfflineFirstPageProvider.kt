@@ -106,6 +106,9 @@ class OfflineFirstPageProvider(
             comicTitle = task.comicTitle,
             nextChapter = next,
             previousChapter = previous,
+            // Without the source order, the downloaded list is all we know: no next chapter there
+            // means "nothing downloaded after this one", not "the series ended".
+            neighborsResolved = onlineNeighbors != null || next != null,
         )
     }
 

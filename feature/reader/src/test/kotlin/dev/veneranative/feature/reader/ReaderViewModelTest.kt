@@ -193,6 +193,27 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun `an unresolved chapter order is never reported as the last chapter`() = runTest(dispatcher) {
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent = ChapterContent(
+                title = "Chapter 1",
+                pages = List(2) { index -> ComicPage(index, "fake://page/$index", 1080, 1440) },
+                neighborsResolved = false,
+            )
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+
+        viewModel.onAction(ReaderAction.LoadNextChapter)
+
+        // A source can answer the page request while its chapter-order request is rate limited
+        // (copy_manga refetches the whole comic for that). Reporting "已到最后一话" here would
+        // invent an ending the source never sent.
+        assertFalse(viewModel.state.value.endOfChaptersReached)
+        assertTrue(viewModel.state.value.nextChapterUnknown)
+    }
+
+    @Test
     fun `failed next chapter remains on the same canvas and retry appends it`() = runTest(dispatcher) {
         val next = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")))
         var nextAttempts = 0

@@ -114,8 +114,15 @@ class ReaderViewModel(
             is ReaderAction.ChangeDirection -> _state.update { it.copy(direction = action.direction) }
             ReaderAction.LoadNextChapter -> loadNextChapter()
             ReaderAction.RetryNextChapter -> {
-                _state.update { it.copy(nextChapterLoadFailed = false) }
-                loadNextChapter()
+                if (_state.value.nextChapter == null && !_state.value.neighborsResolved) {
+                    // There is nothing to load and the order never arrived: the only way to ask the
+                    // source again is to re-read this chapter, which re-resolves its neighbours.
+                    _state.update { it.copy(nextChapterUnknown = false) }
+                    load()
+                } else {
+                    _state.update { it.copy(nextChapterLoadFailed = false) }
+                    loadNextChapter()
+                }
             }
             ReaderAction.ToggleSplit -> toggleSplit()
             is ReaderAction.SetPageSplit -> setPageSplit(action.sourcePageIndex, action.split)
@@ -125,7 +132,7 @@ class ReaderViewModel(
     }
 
     private fun load(overrideStartSourceIndex: Int? = null) {
-        _state.update { it.copy(status = ReaderStatus.Loading) }
+        _state.update { it.copy(status = ReaderStatus.Loading, failureDetail = null) }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             try {
@@ -165,6 +172,8 @@ class ReaderViewModel(
                         previousChapter = content.previousChapter,
                         nextChapterStartIndex = null,
                         nextChapter = content.nextChapter,
+                        neighborsResolved = content.neighborsResolved,
+                        nextChapterUnknown = false,
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
                         isLoadingPreviousChapter = false,
@@ -175,6 +184,7 @@ class ReaderViewModel(
                         splitOverlapFraction = overlapFraction,
                         splitRightToLeft = rightToLeft,
                         status = ReaderStatus.Ready,
+                        failureDetail = null,
                     )
                 }
                 chapterProgress?.record(content, resumedIndex)
@@ -184,8 +194,10 @@ class ReaderViewModel(
                 }
             } catch (cancellation: CancellationException) {
                 throw cancellation
-            } catch (_: Exception) {
-                _state.update { it.copy(status = ReaderStatus.Failed) }
+            } catch (failure: Exception) {
+                _state.update {
+                    it.copy(status = ReaderStatus.Failed, failureDetail = failure.readerDetail())
+                }
             }
         }
     }
@@ -209,10 +221,12 @@ class ReaderViewModel(
                 currentChapterPageCount = segment?.displayPageCount ?: current.currentChapterPageCount,
                 previousChapter = segment?.content?.previousChapter,
                 nextChapter = segment?.content?.nextChapter,
+                neighborsResolved = segment?.content?.neighborsResolved ?: current.neighborsResolved,
                 nextChapterStartIndex = segment?.let { currentSegment ->
                     chapters.firstOrNull { it.startPageIndex == currentSegment.endPageIndex + 1 }?.startPageIndex
                 },
                 endOfChaptersReached = if (target < pages.lastIndex) false else current.endOfChaptersReached,
+                nextChapterUnknown = if (target < pages.lastIndex) false else current.nextChapterUnknown,
             )
         }
         segment?.let { loaded ->
@@ -245,7 +259,11 @@ class ReaderViewModel(
             return
         }
         if (current.nextChapter == null) {
-            _state.update { it.copy(endOfChaptersReached = true) }
+            // An unresolved chapter order is "unknown", not "the series ended".
+            _state.update {
+                if (current.neighborsResolved) it.copy(endOfChaptersReached = true)
+                else it.copy(nextChapterUnknown = true)
+            }
         } else {
             loadNextChapter(navigateAfterLoad = true)
         }
@@ -253,7 +271,11 @@ class ReaderViewModel(
 
     private fun loadNextChapter(navigateAfterLoad: Boolean = false) {
         val nextRef = _state.value.nextChapter ?: run {
-            _state.update { it.copy(endOfChaptersReached = true) }
+            val current = _state.value
+            _state.update {
+                if (current.neighborsResolved) it.copy(endOfChaptersReached = true)
+                else it.copy(nextChapterUnknown = true)
+            }
             return
         }
         if (nextRef in loadedChapters || nextChapterLoadJob?.isActive == true) return
@@ -292,6 +314,7 @@ class ReaderViewModel(
                         chapterTitle = if (navigateAfterLoad) content.title else current.chapterTitle,
                         previousChapter = if (navigateAfterLoad) content.previousChapter else visibleSegment?.content?.previousChapter,
                         nextChapter = if (navigateAfterLoad) content.nextChapter else visibleSegment?.content?.nextChapter,
+                        neighborsResolved = if (navigateAfterLoad) content.neighborsResolved else current.neighborsResolved,
                         isLoadingNextChapter = false,
                         nextChapterLoadFailed = false,
                         endOfChaptersReached = false,
@@ -674,3 +697,17 @@ class ReaderViewModel(
         const val MAX_SPLIT_RESOLVE_CONCURRENCY = 8
     }
 }
+
+/**
+ * First line of a failure, short enough for the error screen.
+ *
+ * `SourceLoadException` carries the source's own message, which is often the only on-device
+ * evidence of what actually broke — a rate limit ("Invalid status code: 210") reads very
+ * differently from a missing payload, and neither is recoverable by reading code alone.
+ */
+private fun Throwable.readerDetail(): String? =
+    (message ?: javaClass.simpleName)
+        .replace('\n', ' ')
+        .trim()
+        .take(160)
+        .takeIf { it.isNotEmpty() }
