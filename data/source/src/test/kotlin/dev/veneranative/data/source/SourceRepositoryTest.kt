@@ -40,6 +40,23 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun `revision changes only after successful source mutations`() = runTest {
+        givenScript(version = "1.0.0", script = "class A {}")
+        assertEquals(0L, repository.revision.value)
+        repository.install(LOCATION)
+        assertEquals(1L, repository.revision.value)
+        repository.install(LOCATION) // same version still replaces the script
+        assertEquals(2L, repository.revision.value)
+        runtime.rejectedSourceIds += sourceId
+        repository.install(LOCATION)
+        assertEquals(2L, repository.revision.value)
+        repository.setEnabled(sourceId, false)
+        assertEquals(3L, repository.revision.value)
+        repository.uninstall(sourceId)
+        assertEquals(4L, repository.revision.value)
+    }
+
+    @Test
     fun `installing a script stores it, loads it and reports metadata`() = runTest {
         givenScript(version = "1.0.0", script = "class A {}")
 

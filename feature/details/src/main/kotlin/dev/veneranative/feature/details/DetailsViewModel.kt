@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +81,7 @@ class DetailsViewModel(
             _state.update { it.copy(order = order ?: it.order, selectedGroup = group) }
             load()
         }
+        viewModelScope.launch { catalog.sourceChanges().drop(1).collect { load(forceRefresh = true) } }
         observeShelf()
         observeReadChapters()
         observeDownloadedChapters()

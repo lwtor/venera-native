@@ -249,6 +249,23 @@ class ComicCatalogTest {
     }
 
     @Test
+    fun `same version source replacement invalidates capability and detail caches`() = runTest {
+        val source = source("source-a")
+        val repository = FakeSourceRepository(listOf(source))
+        val core = FakeSourceCore(declaredCapabilities = mapOf(source.sourceId to capabilities(SourceCapability.SEARCH)))
+        val detail = ComicDetail(comic = comic("c1"))
+        core.detailResponse = SourceOutcome.Success(detail)
+        val catalog = DefaultComicCatalog(repository, core)
+        catalog.searchableSources()
+        catalog.detail(detail.comic.key)
+        repository.changes.value++
+        catalog.searchableSources()
+        catalog.detail(detail.comic.key)
+        assertEquals(2, core.capabilityCalls)
+        assertEquals(2, core.detailCalls)
+    }
+
+    @Test
     fun `details are passed through unchanged`() = runTest {
         val detail = ComicDetail(comic = comic("c1"), description = "desc")
         val core = FakeSourceCore().apply { detailResponse = SourceOutcome.Success(detail) }
@@ -366,6 +383,8 @@ class ComicCatalogTest {
 
     private class FakeSourceRepository(sources: List<InstalledSource>) : SourceRepository {
         val sources: MutableList<InstalledSource> = sources.toMutableList()
+        val changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
+        override val revision: kotlinx.coroutines.flow.StateFlow<Long> = changes
 
         override suspend fun installed(): List<InstalledSource> = sources
 

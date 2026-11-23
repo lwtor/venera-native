@@ -24,6 +24,9 @@ import kotlinx.coroutines.withContext
  * runtime accepted it, so a failed install leaves the previous version exactly as it was.
  */
 interface SourceRepository {
+    /** Monotonically changes after a successful installation, replacement, enable, or removal. */
+    val revision: kotlinx.coroutines.flow.StateFlow<Long> get() = EMPTY_REVISION
+
     suspend fun installed(): List<InstalledSource>
 
     suspend fun install(location: String): InstallOutcome
@@ -48,6 +51,8 @@ interface SourceRepository {
 
     suspend fun logout(sourceId: SourceId): SourceLoginOutcome = SourceLoginOutcome.Unsupported
 }
+
+private val EMPTY_REVISION = kotlinx.coroutines.flow.MutableStateFlow(0L)
 
 sealed interface SourceLoginOutcome {
     data object Success : SourceLoginOutcome
@@ -96,6 +101,8 @@ class DefaultSourceRepository(
 ) : SourceRepository {
 
     private val mutex = Mutex()
+    private val mutableRevision = kotlinx.coroutines.flow.MutableStateFlow(0L)
+    override val revision: kotlinx.coroutines.flow.StateFlow<Long> = mutableRevision
     private val loaded = mutableSetOf<SourceId>()
 
     override suspend fun installed(): List<InstalledSource> = mutex.withLock {
@@ -230,6 +237,7 @@ class DefaultSourceRepository(
                 val stored = runCatching { store.write(entry) }.isSuccess
                 if (stored) {
                     loaded += metadata.sourceId
+                    mutableRevision.value++
                     InstallOutcome.Success(entry.installed)
                 } else {
                     withContext(NonCancellable) { restore(previous, metadata.sourceId) }
@@ -253,6 +261,7 @@ class DefaultSourceRepository(
             store.setEnabled(sourceId, enabled).also {
                 if (enabled) loaded += sourceId else loaded -= sourceId
                 if (!enabled) onSourceChanged(sourceId)
+                if (it) mutableRevision.value++
             }
         } catch (failure: Exception) {
             withContext(NonCancellable) { restore(stored, sourceId) }
@@ -268,6 +277,7 @@ class DefaultSourceRepository(
         privateSettings.clear(sourceId)
         loaded -= sourceId
         onSourceChanged(sourceId)
+        if (removed) mutableRevision.value++
         return removed
     }
 

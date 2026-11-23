@@ -42,6 +42,9 @@ class DefaultComicCatalog(
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val onDiscoveryTiming: (sourceCount: Int, installMillis: Long, capabilityMillis: Long) -> Unit = { _, _, _ -> },
 ) : ComicCatalog {
+    override fun sourceChanges(): kotlinx.coroutines.flow.Flow<Long> = sources.revision
+
+    private fun cacheVersion(version: String?): String = "${sources.revision.value}:$version"
 
     override suspend fun tagNavigation(comicKey: ComicKey, namespace: String, tag: String) = core.tagNavigation(comicKey, namespace, tag)
 
@@ -68,7 +71,7 @@ class DefaultComicCatalog(
     private val tags = ConcurrentHashMap<ComicKey, TagsEntry>()
 
     override suspend fun comicListInfo(comic: Comic): SourceOutcome<Comic> {
-        val version = sources.installed().firstOrNull { it.sourceId == comic.key.sourceId }?.version
+        val version = sources.installed().firstOrNull { it.sourceId == comic.key.sourceId }?.version.let(::cacheVersion)
         val entry = tags.getOrPut(comic.key) { TagsEntry() }
         return entry.mutex.withLock {
             entry.info?.takeIf { entry.sourceVersion == version && nowMillis() < entry.expiresAtMillis }
@@ -85,7 +88,7 @@ class DefaultComicCatalog(
     }
 
     override suspend fun comicTags(comicKey: ComicKey): SourceOutcome<List<String>> {
-        val version = sources.installed().firstOrNull { it.sourceId == comicKey.sourceId }?.version
+        val version = sources.installed().firstOrNull { it.sourceId == comicKey.sourceId }?.version.let(::cacheVersion)
         val entry = tags.getOrPut(comicKey) { TagsEntry() }
         return entry.mutex.withLock {
             entry.value?.takeIf { entry.sourceVersion == version && nowMillis() < entry.expiresAtMillis }
@@ -117,12 +120,12 @@ class DefaultComicCatalog(
         val sourceVersion = runCatching { sources.installed() }.getOrDefault(emptyList())
             .firstOrNull { it.sourceId == sourceId }?.version
             ?: return core.capabilities(sourceId)
-        return cachedCapabilities(sourceId, sourceVersion)
+        return cachedCapabilities(sourceId, cacheVersion(sourceVersion))
     }
 
     override suspend fun detail(comicKey: ComicKey): SourceOutcome<ComicDetail> {
         val installed = sources.installed()
-        val sourceVersion = installed.firstOrNull { it.sourceId == comicKey.sourceId }?.version
+        val sourceVersion = installed.firstOrNull { it.sourceId == comicKey.sourceId }?.version.let(::cacheVersion)
         val entry = details.getOrPut(comicKey) { DetailEntry() }
         return entry.mutex.withLock {
             entry.value?.takeIf {
@@ -174,7 +177,7 @@ class DefaultComicCatalog(
         if (items.firstOrNull()?.key?.sourceId?.value != "copy_manga") return items
         val sourceId = items.first().key.sourceId
         val version = try {
-            sources.installed().firstOrNull { it.sourceId == sourceId }?.version
+            sources.installed().firstOrNull { it.sourceId == sourceId }?.version.let(::cacheVersion)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -205,7 +208,7 @@ class DefaultComicCatalog(
             installed.map { source ->
                 async {
                     source.takeIf {
-                        it.enabled && cachedCapabilities(it.sourceId, it.version)
+                        it.enabled && cachedCapabilities(it.sourceId, cacheVersion(it.version))
                             .let { outcome -> outcome is SourceOutcome.Success && outcome.value.supports(capability) }
                     }
                 }

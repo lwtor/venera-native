@@ -60,8 +60,9 @@ fun SourcesScreen(
     onChooseScript: () -> Unit = {},
 ) {
     var pendingUninstall by rememberSaveable { mutableStateOf<String?>(null) }
-    var section by rememberSaveable { mutableStateOf(SourcesSection.Available) }
+    var section by rememberSaveable { mutableStateOf(SourcesSection.Installed) }
     var manualInstallExpanded by rememberSaveable { mutableStateOf(false) }
+    var catalogAddressExpanded by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -89,16 +90,16 @@ fun SourcesScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 FilterChip(
-                    selected = section == SourcesSection.Available,
-                    onClick = { section = SourcesSection.Available },
-                    label = { Text("可用来源  ${state.catalogEntries.size}") },
-                    modifier = Modifier.testTag(AVAILABLE_SECTION_TAG),
-                )
-                FilterChip(
                     selected = section == SourcesSection.Installed,
                     onClick = { section = SourcesSection.Installed },
                     label = { Text("已安装  ${state.sources.size}") },
                     modifier = Modifier.testTag(INSTALLED_SECTION_TAG),
+                )
+                FilterChip(
+                    selected = section == SourcesSection.Available,
+                    onClick = { section = SourcesSection.Available },
+                    label = { Text("发现来源  ${state.catalogEntries.size}") },
+                    modifier = Modifier.testTag(AVAILABLE_SECTION_TAG),
                 )
             }
 
@@ -108,7 +109,10 @@ fun SourcesScreen(
 
             when (section) {
                 SourcesSection.Available -> {
-                    CatalogHeader(state = state, onAction = onAction)
+                    TextButton(onClick = { catalogAddressExpanded = !catalogAddressExpanded }, modifier = Modifier.padding(horizontal = 8.dp)) {
+                        Text(if (catalogAddressExpanded) "收起目录设置" else "目录设置")
+                    }
+                    if (catalogAddressExpanded) CatalogHeader(state = state, onAction = onAction)
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -131,6 +135,7 @@ fun SourcesScreen(
                         state = state,
                         onAction = onAction,
                         onUninstall = { pendingUninstall = it.sourceId.value },
+                        onDiscover = { section = SourcesSection.Available },
                     )
                 }
             }
@@ -234,6 +239,7 @@ private fun InstalledContent(
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
     onUninstall: (InstalledSource) -> Unit,
+    onDiscover: () -> Unit,
 ) {
     when (state.status) {
         SourcesStatus.Loading -> Column(
@@ -253,7 +259,10 @@ private fun InstalledContent(
             TextButton(onClick = { onAction(SourcesAction.Retry) }) { Text("重试") }
         }
         SourcesStatus.Ready -> if (state.isEmpty) {
-            EmptyListMessage("还没有安装漫画源。你可以从“可用来源”安装，或从文件导入脚本。")
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                EmptyListMessage("还没有安装漫画源。打开“发现来源”选择安装，或点击右上角 + 导入文件。")
+                Button(onClick = onDiscover) { Text("发现漫画源") }
+            }
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -343,8 +352,8 @@ private fun SourceRow(
                 Switch(checked = source.enabled, onCheckedChange = onEnabledChange, enabled = !busy)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(source.origin, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (source.enabled) "已启用" else "已停用", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onConfigure, enabled = !busy) { Text("设置") }
                 TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
             }

@@ -53,7 +53,9 @@ class SourcesScreenTest {
         }
 
         composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
-        composeRule.onNodeWithText("还没有安装漫画源。你可以从“可用来源”安装，或从文件导入脚本。").assertIsDisplayed()
+        composeRule.onNodeWithText("还没有安装漫画源。打开“发现来源”选择安装，或点击右上角 + 导入文件。").assertIsDisplayed()
+        composeRule.onNodeWithText("发现漫画源").performClick()
+        composeRule.onNodeWithText("在线目录").assertIsDisplayed()
     }
 
     @Test
@@ -108,6 +110,7 @@ class SourcesScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(AVAILABLE_SECTION_TAG).performClick()
         composeRule.onNodeWithText("手动安装").performClick()
         composeRule.onNodeWithTag(MANUAL_INSTALL_TAG).assertIsNotEnabled()
     }
@@ -130,6 +133,7 @@ class SourcesScreenTest {
             }
         }
 
+        composeRule.onNodeWithTag(AVAILABLE_SECTION_TAG).performClick()
         composeRule.onNodeWithText("MangaDex").assertIsDisplayed()
         composeRule.onNodeWithTag(CATALOG_INSTALL_TAG).performClick()
 

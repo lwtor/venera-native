@@ -87,8 +87,22 @@ class SearchViewModel(
         }
         .cachedIn(viewModelScope)
 
+    private var sourceLoadGeneration = 0L
+
     init {
-        loadSources(restoreSavedSelection = screenPreferences != null)
+        viewModelScope.launch {
+            var first = true
+            catalog.sourceChanges().collect {
+                if (!first) {
+                    aggregateJob?.cancel()
+                    query.value = null
+                    _aggregateResults.value = emptyList()
+                    _state.update { it.copy(hasSubmitted = false, aggregateSourceResultsId = null) }
+                }
+                loadSources(restoreSavedSelection = first && screenPreferences != null)
+                first = false
+            }
+        }
         initialHistoryRepository?.let(::attachSearchHistory)
     }
 
@@ -163,10 +177,12 @@ class SearchViewModel(
     }
 
     private fun loadSources(restoreSavedSelection: Boolean = false) {
+        val generation = ++sourceLoadGeneration
         _state.update { it.copy(status = SearchStatus.Loading, message = null) }
         viewModelScope.launch {
             runCatching { catalog.searchableSources() }
                 .onSuccess { sources ->
+                    if (generation != sourceLoadGeneration) return@onSuccess
                     val current = _state.value.selectedSourceId
                     val restoredId = if (restoreSavedSelection && !userChangedSelection) {
                         screenPreferences?.get(PREF_SOURCE)?.let(::decodeSourceId)
@@ -181,6 +197,7 @@ class SearchViewModel(
                             status = SearchStatus.Ready,
                             sources = sources,
                             selectedSourceId = selected,
+                            filterSelection = if (selected != current) FilterSelection.Empty else it.filterSelection,
                             aggregateSearch = aggregate,
                             filters = emptyList(),
                             message = null,
@@ -192,6 +209,7 @@ class SearchViewModel(
                     }
                 }
                 .onFailure {
+                    if (generation != sourceLoadGeneration) return@onFailure
                     _state.update {
                         it.copy(
                             status = SearchStatus.Failed,
@@ -227,6 +245,7 @@ class SearchViewModel(
      * whose capabilities cannot be read simply offers no filters; that must not block searching.
      */
     private fun loadFilters(sourceId: SourceId) {
+        val generation = sourceLoadGeneration
         viewModelScope.launch {
             val filters = when (val outcome = catalog.capabilities(sourceId)) {
                 is SourceOutcome.Success ->
@@ -241,7 +260,7 @@ class SearchViewModel(
             // The selection may have moved on while this was in flight.
             val storedSelection = screenPreferences?.get(filterPreferenceKey(sourceId))?.let(::decodeFilterSelection)
             _state.update { current ->
-                if (current.selectedSourceId == sourceId) {
+                if (current.selectedSourceId == sourceId && generation == sourceLoadGeneration) {
                     val restored = if (current.filterSelection.values.isEmpty()) {
                         storedSelection?.let { validateSelection(filters, it) } ?: current.filterSelection
                     } else current.filterSelection

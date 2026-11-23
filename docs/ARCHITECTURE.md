@@ -47,6 +47,8 @@ S4-10C2：core:image 增 ComicResourceStore 与 PersistentComicCoverStorage，�
 
 S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/分版本目录，旧字段作为排序与旧备份兼容投影；ComicCoverStorage 只依赖 core:model 纯契约，由 AppGraph 注入 core:image 实现，未新增 data:collection → core:image 依赖。App 转发生命周期，仓库维护前台检查循环（立即/15分钟、12h过期、二并发、15分钟失败退避）。成功详情更新资料并异步保留封面，失败保留旧内容；封面取得时间作为图片请求版本触发重载。备份传公开资料/时间，不传文件路径或二进制，恢复后重新检查资源。具体存储与兼容规则见 ADR-0015。
 
+来源管理：`data:source` 在安装、覆盖、启停或移除成功后发布单调递增的变更版本；`data:comic` 通过既有契约转发，搜索、探索、详情及相关作品页面据此刷新，漫画与能力缓存按变更版本失效。App 订阅同一变更刷新来源名称；通知不携带凭据或脚本内容。
+
 ## 3. 当前模块
 
 | 模块 | 当前职责 | 可依赖 |

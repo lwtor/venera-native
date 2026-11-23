@@ -21,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -57,7 +58,10 @@ class AuthorWorksViewModel(
         ).flow
     }.cachedIn(viewModelScope)
 
-    init { retry() }
+    init {
+        retry()
+        viewModelScope.launch { catalog.sourceChanges().drop(1).collect { retry() } }
+    }
 
     fun retry() {
         loadJob?.cancel()

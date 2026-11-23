@@ -38,6 +38,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ExploreViewModelTest {
 
+    @Test fun `source changes refresh the available list while the screen is open`() = runTest(dispatcher) {
+        catalog.explorable = listOf(source("a"))
+        val model = ExploreViewModel(catalog)
+        advanceUntilIdle()
+        catalog.explorable = listOf(source("a"), source("b"))
+        catalog.changes.value++
+        advanceUntilIdle()
+        assertEquals(listOf("a", "b"), model.state.value.sources.map { it.sourceId.value })
+        catalog.explorable = listOf(source("b"))
+        catalog.changes.value++
+        advanceUntilIdle()
+        assertEquals(listOf("b"), model.state.value.sources.map { it.sourceId.value })
+        assertEquals(SourceId("b"), model.state.value.selectedSourceId)
+    }
+
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeComicCatalog()
 
@@ -159,6 +174,8 @@ class ExploreViewModelTest {
     )
 
     private class FakeComicCatalog : ComicCatalog {
+        val changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
+        override fun sourceChanges(): kotlinx.coroutines.flow.Flow<Long> = changes
         var explorable: List<InstalledSource> = emptyList()
         var capabilityResponses: Map<SourceId, SourceOutcome<SourceCapabilities>> = emptyMap()
         var failList: Boolean = false

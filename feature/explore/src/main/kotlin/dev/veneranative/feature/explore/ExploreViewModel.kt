@@ -55,8 +55,10 @@ class ExploreViewModel(
         }
         .cachedIn(viewModelScope)
 
+    private var sourceLoadGeneration = 0L
+
     init {
-        loadSources()
+        viewModelScope.launch { catalog.sourceChanges().collect { loadSources() } }
     }
 
     fun onAction(action: ExploreAction) {
@@ -70,10 +72,12 @@ class ExploreViewModel(
     }
 
     private fun loadSources() {
+        val generation = ++sourceLoadGeneration
         _state.update { it.copy(status = ExploreStatus.Loading, message = null) }
         viewModelScope.launch {
             runCatching { catalog.explorableSources() }
                 .onSuccess { sources ->
+                    if (generation != sourceLoadGeneration) return@onSuccess
                     val current = _state.value.selectedSourceId
                     val selected = current?.takeIf { id -> sources.any { it.sourceId == id } }
                         ?: sources.firstOrNull()?.sourceId
@@ -91,6 +95,7 @@ class ExploreViewModel(
                     selected?.let { sourceId -> loadPages(sourceId) }
                 }
                 .onFailure {
+                    if (generation != sourceLoadGeneration) return@onFailure
                     _state.update {
                         it.copy(
                             status = ExploreStatus.Failed,
@@ -120,12 +125,13 @@ class ExploreViewModel(
      * read ends up with no pages, which the screen reports as such instead of as a source failure.
      */
     private fun loadPages(sourceId: SourceId) {
+        val generation = sourceLoadGeneration
         viewModelScope.launch {
             val pages = when (val outcome = catalog.capabilities(sourceId)) {
                 is SourceOutcome.Success -> outcome.value.explorePages
                 is SourceOutcome.Failure -> emptyList()
             }
-            if (_state.value.selectedSourceId != sourceId) return@launch
+            if (_state.value.selectedSourceId != sourceId || generation != sourceLoadGeneration) return@launch
 
             val selected = pages.firstOrNull()
             _state.update {

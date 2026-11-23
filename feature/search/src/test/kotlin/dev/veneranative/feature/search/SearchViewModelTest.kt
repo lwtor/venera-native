@@ -56,6 +56,21 @@ class SearchViewModelTest {
         assertEquals("A", model.state.value.keyword)
     }
 
+    @Test fun `source changes refresh the available list while the screen is open`() = runTest(dispatcher) {
+        catalog.searchable = listOf(source("a"))
+        val model = SearchViewModel(catalog)
+        advanceUntilIdle()
+        catalog.searchable = listOf(source("a"), source("b"))
+        catalog.changes.value++
+        advanceUntilIdle()
+        assertEquals(listOf("a", "b"), model.state.value.sources.map { it.sourceId.value })
+        catalog.searchable = listOf(source("b"))
+        catalog.changes.value++
+        advanceUntilIdle()
+        assertEquals(listOf("b"), model.state.value.sources.map { it.sourceId.value })
+        assertEquals(SourceId("b"), model.state.value.selectedSourceId)
+    }
+
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeComicCatalog()
 
@@ -348,6 +363,8 @@ class SearchViewModelTest {
     )
 
     private class FakeComicCatalog : ComicCatalog {
+        val changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
+        override fun sourceChanges(): kotlinx.coroutines.flow.Flow<Long> = changes
         var searchable: List<InstalledSource> = emptyList()
         var capabilityResponses: Map<SourceId, SourceOutcome<SourceCapabilities>> = emptyMap()
         var failList: Boolean = false

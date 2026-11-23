@@ -173,6 +173,9 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
         privateSettings = sourcePrivateSettings,
         onSourceChanged = { network.clearSource(it); scope.launch { refreshComicSourceNames() } },
     )
+    private val sourceNameUpdates = scope.launch {
+        sourceRepository.revision.collect { refreshComicSourceNames() }
+    }
     val sourceCatalogRepository = HttpSourceCatalogRepository(httpClient)
     val selfUpdateService = SelfUpdateService(
         getApplication(), httpClient, SelfUpdateConfiguration.REPOSITORY_OWNER, SelfUpdateConfiguration.REPOSITORY_NAME,
