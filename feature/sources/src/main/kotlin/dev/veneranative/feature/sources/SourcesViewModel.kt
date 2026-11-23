@@ -395,6 +395,7 @@ class SourcesViewModel(
                 comicSearchCompletedSources = 0,
                 comicSearchTotalSources = 0,
                 comicSearchFailedSources = 0,
+                comicSearchFailuresByStage = emptyMap(),
             )
         }
     }
@@ -479,6 +480,7 @@ class SourcesViewModel(
                 comicSearchCompletedSources = 0,
                 comicSearchTotalSources = entries.size,
                 comicSearchFailedSources = 0,
+                comicSearchFailuresByStage = emptyMap(),
                 message = null,
             )
         }
@@ -509,6 +511,7 @@ class SourcesViewModel(
                     comicSearchCompletedSources = report.sourcesChecked,
                     comicSearchTotalSources = report.sourcesChecked,
                     comicSearchFailedSources = report.sourcesFailed,
+                    comicSearchFailuresByStage = report.failuresByStage,
                 )
             }
         }

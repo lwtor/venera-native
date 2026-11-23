@@ -386,11 +386,11 @@ class QuickJsRuntime(
                     ),
                 )
             }
-            if (declaredKey != source.sourceId.value) {
+            if (declaredKey != source.declaredSourceId.value) {
                 throw RuntimeFailure(
                     SourceRuntimeError.InvalidPackage(
                         "Source script declares key '$declaredKey' but the package is " +
-                            "identified as '${source.sourceId.value}'.",
+                            "identified as '${source.declaredSourceId.value}'.",
                     ),
                 )
             }

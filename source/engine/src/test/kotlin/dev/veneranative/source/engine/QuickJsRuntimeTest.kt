@@ -43,6 +43,32 @@ import org.junit.Test
 class QuickJsRuntimeTest {
 
     @Test
+    fun `isolated runtime alias can execute a script under its declared source identity`() = runBlocking {
+        val declaredId = SourceId("fixture")
+        val runtimeId = SourceId("catalog-probe-fixture")
+        val script = fixtureSource("""
+            echo = async (value) => value;
+        """.trimIndent())
+        withRuntime(QuickJsRuntime()) { runtime ->
+            val installed = runtime.install(
+                SourcePackage(
+                    sourceId = runtimeId,
+                    version = "1",
+                    script = script,
+                    sha256 = sha256(script),
+                    declaredSourceId = declaredId,
+                ),
+            )
+            assertEquals(SourceInstallResult.Installed(runtimeId, "1"), installed)
+            assertEquals("\"ok\"", runtime.invokeSuccess(runtimeId, "echo", "[\"ok\"]"))
+            runtime.unload(runtimeId)
+            assertEquals(SourceRuntimeError.SourceNotLoaded(runtimeId), (runtime.invoke(
+                SourceCall.InvokeFunction("after-unload", runtimeId, "echo", "[]"),
+            ) as SourceResult.Failure).error)
+        }
+    }
+
+    @Test
     fun `binary fetch returns status headers and exact bytes without utf8 conversion`() = runBlocking {
         val bytes = byteArrayOf(0, 0xff.toByte(), 0x80.toByte()) + "中文".toByteArray()
         val host = RecordingHostApi { request ->

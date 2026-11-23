@@ -21,6 +21,7 @@ class AppRouteEncodingTest {
     private val routes = listOf(
         AppRoute.Home,
         AppRoute.Sources,
+        AppRoute.SourceComicSearch,
         AppRoute.Library,
         AppRoute.ReadingHistory,
         AppRoute.Downloads,

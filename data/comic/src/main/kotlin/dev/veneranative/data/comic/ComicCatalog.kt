@@ -106,7 +106,18 @@ data class CatalogComicSearchReport(
     val matches: List<CatalogComicMatch> = emptyList(),
     val sourcesChecked: Int = 0,
     val sourcesFailed: Int = 0,
+    val failuresByStage: Map<CatalogProbeFailureStage, Int> = emptyMap(),
 )
+
+enum class CatalogProbeFailureStage {
+    RuntimeUnavailable,
+    PrepareSource,
+    InstallSource,
+    Search,
+    LoadDetails,
+    NoChapters,
+    Timeout,
+}
 
 /**
  * The paging key.

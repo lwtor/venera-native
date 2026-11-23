@@ -26,6 +26,7 @@ class BackDestinationTest {
         assertNull(backDestination(AppRoute.Home, origin))
         for (route in listOf(
             AppRoute.Sources,
+            AppRoute.SourceComicSearch,
             AppRoute.Library,
             AppRoute.Downloads,
             AppRoute.Explore("source"),
@@ -33,6 +34,7 @@ class BackDestinationTest {
         )) {
             assertEquals(when (route) {
                 AppRoute.Sources -> AppRoute.Profile
+                AppRoute.SourceComicSearch -> AppRoute.Sources
                 AppRoute.Downloads -> AppRoute.Library
                 else -> AppRoute.Home
             }, backDestination(route, origin))

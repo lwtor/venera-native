@@ -7,7 +7,9 @@ import dev.veneranative.core.model.SourceId
  * Engine-independent contract for installing and invoking comic-source scripts.
  *
  * Callers submit typed operations. JavaScript source code is only accepted as part of a
- * [SourcePackage], never as an invocation payload.
+ * [SourcePackage], never as an invocation payload. [SourcePackage.sourceId] is the host runtime
+ * identity; [SourcePackage.declaredSourceId] can retain the script's identity when an isolated
+ * probe needs its own Cookie and Host API namespace.
  */
 interface SourceScriptRuntime {
     fun isSupported(): Boolean
@@ -33,6 +35,8 @@ data class SourcePackage(
     val settingsJson: String = "{}",
     /** Encrypted host-owned source data restored into `ComicSource.loadData` / `saveData`. */
     val sourceDataJson: String = "{}",
+    /** Script-declared identity when [sourceId] is a host-owned isolated runtime alias. */
+    val declaredSourceId: SourceId = sourceId,
 )
 
 sealed interface SourceInstallResult {

@@ -22,6 +22,7 @@ import dev.veneranative.core.model.SourceId
 fun AppRoute.encode(): String = when (this) {
     AppRoute.Home -> "home"
     AppRoute.Sources -> "sources"
+    AppRoute.SourceComicSearch -> "source-comic-search"
     AppRoute.Library -> "library"
     AppRoute.ReadingHistory -> "reading-history"
     AppRoute.Downloads -> "downloads"
@@ -51,6 +52,7 @@ fun decodeAppRoute(encoded: String): AppRoute? {
     return when (parts.firstOrNull()) {
         "home" -> AppRoute.Home
         "sources" -> AppRoute.Sources
+        "source-comic-search" -> AppRoute.SourceComicSearch
         "library" -> AppRoute.Library
         "reading-history" -> AppRoute.ReadingHistory
         "downloads" -> AppRoute.Downloads

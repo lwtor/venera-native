@@ -71,6 +71,8 @@ class ComicCatalogTest {
         assertEquals(SourceId("source-a"), report.matches.single().comic.key.sourceId)
         assertEquals(runtime.installed.single(), core.requests.single().sourceId)
         assertTrue(runtime.installed.single() != SourceId("source-a"))
+        assertEquals(SourceId("source-a"), runtime.packages.single().declaredSourceId)
+        assertEquals(runtime.installed.single(), runtime.packages.single().sourceId)
         assertEquals(runtime.installed, runtime.unloaded)
         assertEquals(runtime.installed, repo.clearedProbeIds)
         assertEquals(listOf(1 to 1), progress)
@@ -450,10 +452,12 @@ class ComicCatalogTest {
 
     private class RecordingProbeRuntime : SourceScriptRuntime {
         val installed = mutableListOf<SourceId>()
+        val packages = mutableListOf<SourcePackage>()
         val unloaded = mutableListOf<SourceId>()
         override fun isSupported() = true
         override suspend fun install(source: SourcePackage): SourceInstallResult {
             installed += source.sourceId
+            packages += source
             return SourceInstallResult.Installed(source.sourceId, source.version)
         }
         override suspend fun invoke(call: SourceCall): SourceResult = error("not used")

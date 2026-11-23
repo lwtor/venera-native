@@ -72,10 +72,18 @@ class DefaultComicCatalog(
     ): CatalogComicSearchReport {
         val keyword = query.trim()
         if (keyword.isBlank() || entries.isEmpty()) return CatalogComicSearchReport()
-        val runtime = probeRuntime ?: return CatalogComicSearchReport(sourcesChecked = entries.size, sourcesFailed = entries.size)
+        val runtime = probeRuntime ?: return CatalogComicSearchReport(
+            sourcesChecked = entries.size,
+            sourcesFailed = entries.size,
+            failuresByStage = mapOf(CatalogProbeFailureStage.RuntimeUnavailable to entries.size),
+        )
         if (!runtime.isSupported()) {
             onProgress(entries.size, entries.size)
-            return CatalogComicSearchReport(sourcesChecked = entries.size, sourcesFailed = entries.size)
+            return CatalogComicSearchReport(
+                sourcesChecked = entries.size,
+                sourcesFailed = entries.size,
+                failuresByStage = mapOf(CatalogProbeFailureStage.RuntimeUnavailable to entries.size),
+            )
         }
         val semaphore = Semaphore(3)
         val completed = AtomicInteger()
@@ -89,11 +97,15 @@ class DefaultComicCatalog(
         return CatalogComicSearchReport(
             matches = outcomes.mapNotNull { it.match },
             sourcesChecked = entries.size,
-            sourcesFailed = outcomes.count { it.failed },
+            sourcesFailed = outcomes.count { it.failureStage != null },
+            failuresByStage = outcomes.mapNotNull { it.failureStage }.groupingBy { it }.eachCount(),
         )
     }
 
-    private data class CatalogProbeOutcome(val match: CatalogComicMatch? = null, val failed: Boolean = false)
+    private data class CatalogProbeOutcome(
+        val match: CatalogComicMatch? = null,
+        val failureStage: CatalogProbeFailureStage? = null,
+    )
 
     private suspend fun probeCatalogEntry(
         entry: SourceCatalogEntry,
@@ -102,14 +114,14 @@ class DefaultComicCatalog(
     ): CatalogProbeOutcome = try {
         withTimeoutOrNull(CATALOG_PROBE_TIMEOUT_MILLIS) {
             val sourcePackage = sources.packageForProbe(entry.scriptUrl)
-                ?: return@withTimeoutOrNull CatalogProbeOutcome(failed = true)
+                ?: return@withTimeoutOrNull CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.PrepareSource)
             val probeId = SourceId("catalog-probe-${UUID.randomUUID()}")
             try {
-                if (runtime.install(sourcePackage.copy(sourceId = probeId)) !is SourceInstallResult.Installed) {
-                    return@withTimeoutOrNull CatalogProbeOutcome(failed = true)
+                if (runtime.install(sourcePackage.copy(sourceId = probeId, declaredSourceId = sourcePackage.sourceId)) !is SourceInstallResult.Installed) {
+                    return@withTimeoutOrNull CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.InstallSource)
                 }
                 when (val result = core.search(SearchRequest(sourceId = probeId, keyword = keyword))) {
-                    is SourceOutcome.Failure -> CatalogProbeOutcome(failed = true)
+                    is SourceOutcome.Failure -> CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.Search)
                     is SourceOutcome.Success -> {
                         // The source owns search ranking and matching. Titles can be localized or
                         // use punctuation/aliases that do not contain the user's exact query.
@@ -117,9 +129,9 @@ class DefaultComicCatalog(
                             ?: return@withTimeoutOrNull CatalogProbeOutcome()
                         val probeComicKey = candidate.key.copy(sourceId = probeId)
                         when (val detail = core.detail(probeComicKey)) {
-                            is SourceOutcome.Failure -> CatalogProbeOutcome(failed = true)
+                            is SourceOutcome.Failure -> CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.LoadDetails)
                             is SourceOutcome.Success -> if (detail.value.chapters.isEmpty()) {
-                                CatalogProbeOutcome(failed = true)
+                                CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.NoChapters)
                             } else CatalogProbeOutcome(
                                 match = CatalogComicMatch(entry, candidate.copy(key = candidate.key.copy(sourceId = sourcePackage.sourceId))),
                             )
@@ -135,11 +147,11 @@ class DefaultComicCatalog(
                     }
                 }
             }
-        } ?: CatalogProbeOutcome(failed = true)
+        } ?: CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.Timeout)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
-        CatalogProbeOutcome(failed = true)
+        CatalogProbeOutcome(failureStage = CatalogProbeFailureStage.Search)
     }
 
     private data class DetailEntry(

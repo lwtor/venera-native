@@ -23,6 +23,9 @@ sealed interface AppRoute {
     /** Installed source management. */
     data object Sources : AppRoute
 
+    /** Search source catalogs for a specific comic without embedding the form in source lists. */
+    data object SourceComicSearch : AppRoute
+
     /** The shelf: favourite folders, downloads and imported comics. */
     data object Library : AppRoute
 

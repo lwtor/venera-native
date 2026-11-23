@@ -11,6 +11,7 @@ fun backDestination(
     AppRoute.Home -> null
     AppRoute.Library, AppRoute.Profile, AppRoute.ReadingHistory -> AppRoute.Home
     AppRoute.Sources -> AppRoute.Profile
+    AppRoute.SourceComicSearch -> AppRoute.Sources
     AppRoute.Backup, AppRoute.About -> AppRoute.Profile
     AppRoute.Downloads -> AppRoute.Library
     is AppRoute.Explore, is AppRoute.Search -> AppRoute.Home

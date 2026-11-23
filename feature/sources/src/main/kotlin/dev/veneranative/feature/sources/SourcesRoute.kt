@@ -27,21 +27,33 @@ fun SourcesRoute(
     screenPreferences: ScreenPreferenceRepository? = null,
     comicCatalog: ComicCatalog? = null,
     onOpenComic: (ComicKey) -> Unit = {},
+    onSearchByComic: () -> Unit = {},
+    searchOnly: Boolean = false,
 ) {
     val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository, screenPreferences, comicCatalog) }
     LaunchedEffect(screenPreferences) { screenPreferences?.let(viewModel::attachScreenPreferences) }
     val state by viewModel.state.collectAsStateWithLifecycle()
-    SourcesScreen(
-        state = state,
-        onAction = viewModel::onAction,
-        onBack = onBack,
-        onOpenComic = onOpenComic,
-        onChooseScript = {
-            onRequestScript { location ->
-                viewModel.onAction(SourcesAction.InstallLocationChanged(location))
-                viewModel.onAction(SourcesAction.Install)
-            }
-        },
-        modifier = modifier,
-    )
+    if (searchOnly) {
+        ComicSourceSearchScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            onBack = onBack,
+            onOpenComic = onOpenComic,
+            modifier = modifier,
+        )
+    } else {
+        SourcesScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            onBack = onBack,
+            onSearchByComic = onSearchByComic,
+            onChooseScript = {
+                onRequestScript { location ->
+                    viewModel.onAction(SourcesAction.InstallLocationChanged(location))
+                    viewModel.onAction(SourcesAction.Install)
+                }
+            },
+            modifier = modifier,
+        )
+    }
 }

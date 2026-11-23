@@ -47,7 +47,7 @@ S4-10C2：core:image 增 ComicResourceStore 与 PersistentComicCoverStorage，�
 
 S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/分版本目录，旧字段作为排序与旧备份兼容投影；ComicCoverStorage 只依赖 core:model 纯契约，由 AppGraph 注入 core:image 实现，未新增 data:collection → core:image 依赖。App 转发生命周期，仓库维护前台检查循环（立即/15分钟、12h过期、二并发、15分钟失败退避）。成功详情更新资料并异步保留封面，失败保留旧内容；封面取得时间作为图片请求版本触发重载。备份传公开资料/时间，不传文件路径或二进制，恢复后重新检查资源。具体存储与兼容规则见 ADR-0015。
 
-来源管理：`data:source` 在安装、覆盖、启停、移除及排序成功后发布单调递增的变更版本；覆盖保留来源启停状态，来源索引记录目录地址和用户顺序（旧记录按索引现有次序兼容），`feature:sources` 仅对同目录同一来源检测版本更新。目录历史在对话框中添加或切换，页面只展示当前目录。已安装来源设置在列表项内展开。在线登录检测由 ViewModel 按 sourceId 去重，展开后台触发；密码登录凭据作为独立的来源私有记录，通过 Android Keystore AES-GCM 加密，不传入脚本设置或 saveData，卸载时清除。`data:comic` 保持仓库顺序，搜索聚合页据此排列来源结果。
+来源管理：`data:source` 在安装、覆盖、启停、移除及排序成功后发布单调递增的变更版本；覆盖保留来源启停状态，来源索引记录目录地址和用户顺序（旧记录按索引现有次序兼容），`feature:sources` 仅对同目录同一来源检测版本更新。目录历史在对话框中添加或切换，页面只展示当前目录。已安装来源设置在列表项内展开。按漫画试搜位于独立全屏路由；试搜包保留脚本声明 key，同时使用随机临时运行时 ID 隔离会话、Cookie 和私有状态，失败按脚本准备、安装、搜索、详情/章节及超时分阶段报告。在线登录检测由 ViewModel 按 sourceId 去重，展开后台触发；密码登录凭据作为独立的来源私有记录，通过 Android Keystore AES-GCM 加密，不传入脚本设置或 saveData，卸载时清除。`data:comic` 保持仓库顺序，搜索聚合页据此排列来源结果。
 
 ## 3. 当前模块
 

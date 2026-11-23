@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -48,7 +49,6 @@ import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
-import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.source.SourceCatalogEntry
 
 private enum class SourcesSection { Available, Installed }
@@ -62,7 +62,7 @@ fun SourcesScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onChooseScript: () -> Unit = {},
-    onOpenComic: (ComicKey) -> Unit = {},
+    onSearchByComic: () -> Unit = {},
 ) {
     var pendingUninstall by rememberSaveable { mutableStateOf<String?>(null) }
     var section by rememberSaveable { mutableStateOf(SourcesSection.Installed) }
@@ -84,6 +84,9 @@ fun SourcesScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onSearchByComic) {
+                        Icon(Icons.Filled.Search, contentDescription = "按漫画查找来源")
+                    }
                     IconButton(onClick = onChooseScript, enabled = !state.installing) {
                         Icon(Icons.Filled.Add, contentDescription = "从文件安装漫画源")
                     }
@@ -130,36 +133,19 @@ fun SourcesScreen(
                         onSwitch = { showSwitchCatalogDialog = true },
                         onRefresh = { onAction(SourcesAction.RefreshCatalog) },
                     )
-                    CatalogComicSearchPanel(
-                        state = state,
-                        onQueryChanged = { onAction(SourcesAction.ComicQueryChanged(it)) },
-                        onSearch = { onAction(SourcesAction.SearchCatalogForComic) },
-                            onCancel = { onAction(SourcesAction.CancelCatalogComicSearch) },
-                    )
-                    if (state.comicSearchPerformed) {
-                        ComicSearchResults(
-                            state = state,
-                            onClear = { onAction(SourcesAction.ComicQueryChanged("")) },
-                            onInstall = { onAction(SourcesAction.InstallComicMatch(it)) },
-                            onEnable = { onAction(SourcesAction.SetEnabled(it, true)) },
-                            onOpenComic = onOpenComic,
-                            modifier = Modifier.weight(1f),
-                        )
-                    } else {
-                        Column(Modifier.weight(1f)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text("在线目录", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { manualInstallExpanded = !manualInstallExpanded }) {
-                                    Text(if (manualInstallExpanded) "收起手动安装" else "手动安装")
-                                }
+                    Column(Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("在线目录", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { manualInstallExpanded = !manualInstallExpanded }) {
+                                Text(if (manualInstallExpanded) "收起手动安装" else "手动安装")
                             }
-                            if (manualInstallExpanded) ManualInstallRow(state = state, onAction = onAction)
-                            Box(Modifier.weight(1f)) {
-                                CatalogContent(state = state, onAction = onAction, onInstalledSection = { section = SourcesSection.Installed })
-                            }
+                        }
+                        if (manualInstallExpanded) ManualInstallRow(state = state, onAction = onAction)
+                        Box(Modifier.weight(1f)) {
+                            CatalogContent(state = state, onAction = onAction, onInstalledSection = { section = SourcesSection.Installed })
                         }
                     }
                 }
@@ -343,133 +329,6 @@ private fun CatalogContent(
                         onInstall = { onAction(SourcesAction.InstallCatalogEntry(entry)) },
                         onViewInstalled = onInstalledSection,
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CatalogComicSearchPanel(
-    state: SourcesUiState,
-    onQueryChanged: (String) -> Unit,
-    onSearch: () -> Unit,
-    onCancel: () -> Unit,
-) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text("找一本漫画", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "只试搜当前目录的来源。你可以先确认来源搜到了目标漫画，再决定是否添加。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            OutlinedTextField(
-                value = state.comicQuery,
-                onValueChange = onQueryChanged,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("漫画名称") },
-                singleLine = true,
-                enabled = !state.comicSearchLoading,
-            )
-            Button(
-                onClick = onSearch,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = state.comicQuery.isNotBlank() && state.catalogStatus == CatalogStatus.Ready && !state.comicSearchLoading,
-            ) {
-                Text("搜索当前目录")
-            }
-            if (state.comicSearchLoading) {
-                TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) { Text("取消搜索") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ComicSearchResults(
-    state: SourcesUiState,
-    onClear: () -> Unit,
-    onInstall: (dev.veneranative.data.comic.CatalogComicMatch) -> Unit,
-    onEnable: (SourceId) -> Unit,
-    onOpenComic: (ComicKey) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("搜索结果", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            TextButton(onClick = onClear) { Text("返回目录") }
-        }
-        if (state.comicSearchLoading) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                Text(
-                    "已检查 ${state.comicSearchCompletedSources}/${state.comicSearchTotalSources} 个来源",
-                    modifier = Modifier.padding(start = 10.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        } else if (state.comicSearchMatches.isEmpty()) {
-            val message = when {
-                state.comicSearchTotalSources == 0 -> "当前目录没有可搜索的来源。"
-                state.comicSearchFailedSources == state.comicSearchTotalSources ->
-                    "${state.comicSearchTotalSources} 个来源都未能完成试搜。请检查网络或目录脚本后重试。"
-                state.comicSearchFailedSources > 0 ->
-                    "没有找到可用来源；${state.comicSearchFailedSources} 个来源试搜失败，其余来源没有返回可阅读的结果。"
-                else -> "检查了 ${state.comicSearchTotalSources} 个来源，没有发现可阅读的搜索结果。"
-            }
-            EmptyListMessage(message)
-        } else {
-            Text(
-                if (state.comicSearchFailedSources == 0) "找到 ${state.comicSearchMatches.size} 个来源的结果"
-                else "找到 ${state.comicSearchMatches.size} 个来源的结果，另有 ${state.comicSearchFailedSources} 个来源试搜失败",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(state.comicSearchMatches, key = { "${it.source.scriptUrl}:${it.comic.key.remoteId.value}" }) { match ->
-                    val installed = state.sources.firstOrNull { it.sourceId == match.comic.key.sourceId }
-                    Card(Modifier.fillMaxWidth()) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Text(match.comic.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                                Text(match.source.name, style = MaterialTheme.typography.bodyMedium)
-                                Text("版本 ${match.source.version ?: "未知"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            if (installed != null && installed.catalogLocation == match.source.catalogLocation && installed.version != match.source.version) {
-                                TextButton(onClick = { onInstall(match) }, enabled = !state.installing) { Text("更新") }
-                            } else if (installed?.enabled == true && installed.catalogLocation == match.source.catalogLocation) {
-                                TextButton(onClick = { onOpenComic(match.comic.key) }) { Text("打开") }
-                            } else if (installed != null && installed.catalogLocation != match.source.catalogLocation) {
-                                TextButton(onClick = { onInstall(match) }, enabled = !state.installing) { Text("切换") }
-                            } else if (installed?.enabled == false) {
-                                TextButton(onClick = { onEnable(installed.sourceId) }, enabled = installed.sourceId !in state.busySourceIds) { Text("启用") }
-                            } else if (installed != null) {
-                                Text("已安装", style = MaterialTheme.typography.labelSmall)
-                            } else {
-                                Button(onClick = { onInstall(match) }, enabled = !state.installing) {
-                                    Text(if (state.installing) "添加中" else "添加")
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }

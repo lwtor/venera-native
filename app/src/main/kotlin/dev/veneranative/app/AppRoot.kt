@@ -328,12 +328,23 @@ private fun AppNavHost(
                         catalogRepository = sourceCatalogRepository,
                         comicCatalog = catalog,
                         onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
+                        onSearchByComic = { onRouteChange(AppRoute.SourceComicSearch) },
                         screenPreferences = screenPreferences,
                         onBack = onBack,
                         onRequestScript = { consume ->
                             scriptSelection = consume
                             scriptPicker.launch(arrayOf("application/javascript", "text/javascript", "text/plain"))
                         },
+                    )
+
+                    AppRoute.SourceComicSearch -> SourcesRoute(
+                        repository = sourceRepository,
+                        catalogRepository = sourceCatalogRepository,
+                        comicCatalog = catalog,
+                        onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
+                        screenPreferences = screenPreferences,
+                        onBack = onBack,
+                        searchOnly = true,
                     )
 
                     is AppRoute.Explore -> ExploreRoute(

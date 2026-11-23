@@ -6,6 +6,7 @@ import dev.veneranative.core.model.InstalledSourceConfiguration
 import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 import dev.veneranative.data.comic.CatalogComicMatch
+import dev.veneranative.data.comic.CatalogProbeFailureStage
 
 /** Everything the sources screen needs to render, including its own empty state. */
 data class SourcesUiState(
@@ -29,6 +30,7 @@ data class SourcesUiState(
     val comicSearchCompletedSources: Int = 0,
     val comicSearchTotalSources: Int = 0,
     val comicSearchFailedSources: Int = 0,
+    val comicSearchFailuresByStage: Map<CatalogProbeFailureStage, Int> = emptyMap(),
     val configuration: InstalledSourceConfiguration? = null,
     val configurationLoading: Boolean = false,
     val accountActionInProgress: Boolean = false,
