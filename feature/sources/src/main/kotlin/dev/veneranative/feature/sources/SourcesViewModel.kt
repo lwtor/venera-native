@@ -8,11 +8,16 @@ import dev.veneranative.data.source.SourceInstallError
 import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
+import dev.veneranative.data.settings.ScreenPreferenceRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Owns the source list: loading, installing, enabling and removing.
@@ -24,14 +29,22 @@ import kotlinx.coroutines.launch
 class SourcesViewModel(
     private val repository: SourceRepository,
     private val catalogRepository: SourceCatalogRepository? = null,
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SourcesUiState())
     val state: StateFlow<SourcesUiState> = _state.asStateFlow()
+    private var screenPreferences = screenPreferences
+    private var catalogEdited = false
+    private var lastAppliedLocation: String? = null
+    private var catalogJob: Job? = null
+    private val preferenceWriteMutex = Mutex()
 
     init {
         refresh()
-        if (catalogRepository != null) refreshCatalog()
+        if (catalogRepository != null) {
+            if (screenPreferences != null) restoreCatalog() else refreshCatalog()
+        }
     }
 
     fun onAction(action: SourcesAction) {
@@ -49,7 +62,11 @@ class SourcesViewModel(
 
             SourcesAction.DismissMessage -> _state.update { it.copy(message = null) }
 
-            is SourcesAction.CatalogLocationChanged -> _state.update { it.copy(catalogLocation = action.value) }
+            is SourcesAction.CatalogLocationChanged -> {
+                catalogEdited = true
+                catalogJob?.cancel()
+                _state.update { it.copy(catalogLocation = action.value, catalogStatus = CatalogStatus.Idle, catalogEntries = emptyList()) }
+            }
 
             SourcesAction.RefreshCatalog -> refreshCatalog()
 
@@ -66,6 +83,45 @@ class SourcesViewModel(
             is SourcesAction.Login -> login(action.sourceId, action.account, action.password)
 
             is SourcesAction.Logout -> logout(action.sourceId)
+        }
+    }
+
+    fun attachScreenPreferences(preferences: ScreenPreferenceRepository) {
+        if (screenPreferences === preferences) return
+        screenPreferences = preferences
+        if (!catalogEdited) restoreCatalog()
+        else lastAppliedLocation?.let(::persistCatalog)
+    }
+
+    private fun restoreCatalog() {
+        viewModelScope.launch {
+            val saved = try {
+                screenPreferences?.get(CATALOG_LOCATION_KEY)?.trim()?.takeIf(String::isNotEmpty)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(message = "无法读取已保存的目录地址，已使用默认地址。") }
+                null
+            }
+            if (catalogEdited) return@launch
+            catalogJob?.cancel()
+            _state.update { it.copy(catalogLocation = saved ?: it.catalogLocation, catalogStatus = CatalogStatus.Idle) }
+            refreshCatalog()
+        }
+    }
+
+    private fun persistCatalog(location: String) {
+        viewModelScope.launch {
+            preferenceWriteMutex.withLock {
+                if (lastAppliedLocation != location) return@withLock
+                try {
+                    screenPreferences?.put(CATALOG_LOCATION_KEY, location)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    _state.update { it.copy(message = "目录已加载，但地址保存失败，重启后可能无法恢复。") }
+                }
+            }
         }
     }
 
@@ -146,16 +202,24 @@ class SourcesViewModel(
         val location = _state.value.catalogLocation.trim()
         if (location.isEmpty() || _state.value.catalogStatus == CatalogStatus.Loading) return
         _state.update { it.copy(catalogStatus = CatalogStatus.Loading) }
-        viewModelScope.launch {
+        catalogJob = viewModelScope.launch {
             when (val result = source.load(location)) {
-                is SourceCatalogResult.Success -> _state.update {
-                    it.copy(catalogEntries = result.entries, catalogStatus = CatalogStatus.Ready)
+                is SourceCatalogResult.Success -> {
+                    _state.update { it.copy(catalogEntries = result.entries, catalogStatus = CatalogStatus.Ready) }
+                    if (catalogEdited) {
+                        lastAppliedLocation = location
+                        persistCatalog(location)
+                    }
                 }
                 is SourceCatalogResult.Failure -> _state.update {
                     it.copy(catalogStatus = CatalogStatus.Failed)
                 }
             }
         }
+    }
+
+    private companion object {
+        const val CATALOG_LOCATION_KEY = "sources.catalog.location"
     }
 
     private fun refresh() {

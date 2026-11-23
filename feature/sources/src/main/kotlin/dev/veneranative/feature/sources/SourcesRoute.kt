@@ -1,12 +1,14 @@
 package dev.veneranative.feature.sources
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogRepository
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 
 /**
  * Entry point of the sources screen: owns the ViewModel, collects state, forwards actions.
@@ -20,8 +22,10 @@ fun SourcesRoute(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onRequestScript: (((String) -> Unit) -> Unit) = {},
+    screenPreferences: ScreenPreferenceRepository? = null,
 ) {
-    val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository) }
+    val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository, screenPreferences) }
+    LaunchedEffect(screenPreferences) { screenPreferences?.let(viewModel::attachScreenPreferences) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     SourcesScreen(
         state = state,

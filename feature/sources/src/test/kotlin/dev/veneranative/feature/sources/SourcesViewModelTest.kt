@@ -9,6 +9,7 @@ import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
 import dev.veneranative.data.source.SourceLoginOutcome
+import dev.veneranative.data.settings.ScreenPreferenceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -211,6 +212,80 @@ class SourcesViewModelTest {
         assertEquals("MangaDex 已安装。", viewModel.state.value.message)
     }
 
+    @Test
+    fun `successfully applied catalog is restored and loaded after recreation`() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val first = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        val customUrl = "https://example.com/sources/index.json"
+        first.onAction(SourcesAction.CatalogLocationChanged(customUrl))
+        first.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+
+        val restored = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        assertEquals(customUrl, restored.state.value.catalogLocation)
+        assertEquals(customUrl, catalog.locations.last())
+    }
+
+    @Test
+    fun `failed catalog change does not replace last successful address`() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val first = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        val customUrl = "https://example.com/good/index.json"
+        first.onAction(SourcesAction.CatalogLocationChanged(customUrl))
+        first.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+        catalog.result = SourceCatalogResult.Failure(dev.veneranative.data.source.SourceCatalogFailure.Network)
+        first.onAction(SourcesAction.CatalogLocationChanged("https://example.com/bad/index.json"))
+        first.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+
+        val restored = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        assertEquals(customUrl, restored.state.value.catalogLocation)
+    }
+
+    @Test
+    fun `late preferences do not overwrite an address the user is editing`() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        preferences.put("sources.catalog.location", "https://example.com/saved.json")
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val model = SourcesViewModel(repository, catalog)
+        advanceUntilIdle()
+        model.onAction(SourcesAction.CatalogLocationChanged("https://example.com/editing.json"))
+        model.attachScreenPreferences(preferences)
+        advanceUntilIdle()
+        assertEquals("https://example.com/editing.json", model.state.value.catalogLocation)
+    }
+
+    @Test
+    fun `catalog applied before preferences are ready is saved when they attach`() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val model = SourcesViewModel(repository, catalog)
+        advanceUntilIdle()
+        val customUrl = "https://example.com/new.json"
+        model.onAction(SourcesAction.CatalogLocationChanged(customUrl))
+        model.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+        model.attachScreenPreferences(preferences)
+        advanceUntilIdle()
+        val restored = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        assertEquals(customUrl, restored.state.value.catalogLocation)
+    }
+
+    private class FakePreferences : ScreenPreferenceRepository {
+        private val values = mutableMapOf<String, String>()
+        override suspend fun get(key: String): String? = values[key]
+        override suspend fun put(key: String, value: String) { values[key] = value }
+        override suspend fun remove(key: String) { values.remove(key) }
+    }
+
     private fun source(id: String, name: String = "Source $id", enabled: Boolean = true) = InstalledSource(
         sourceId = SourceId(id),
         name = name,
@@ -256,7 +331,7 @@ class SourcesViewModelTest {
     }
 
     private class FakeSourceCatalogRepository(
-        private val result: SourceCatalogResult,
+        var result: SourceCatalogResult,
     ) : SourceCatalogRepository {
         val locations = mutableListOf<String>()
         override suspend fun load(location: String): SourceCatalogResult {

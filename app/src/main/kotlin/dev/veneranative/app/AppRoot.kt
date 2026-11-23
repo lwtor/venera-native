@@ -326,6 +326,7 @@ private fun AppNavHost(
                     AppRoute.Sources -> SourcesRoute(
                         repository = sourceRepository,
                         catalogRepository = sourceCatalogRepository,
+                        screenPreferences = screenPreferences,
                         onBack = onBack,
                         onRequestScript = { consume ->
                             scriptSelection = consume

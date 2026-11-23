@@ -2,6 +2,12 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-07 漫画源目录地址恢复
+
+- 目录地址原只保存在页面状态，重建后恢复默认值。现使用 `data:settings` 保存成功加载的目录地址，重新打开或重启时自动恢复并加载。
+- 失败的目录地址不会覆盖上一次成功的地址；设置存储稍后就绪时不覆盖用户正在输入的内容，并保存此前已成功应用的地址。目录与已安装漫画源彼此独立。
+- 目录地址恢复有 ViewModel 回归；未在设备上单独执行重启验收，等待用户验证。
+
 ## 当前任务：U-06 GitHub 设备授权错误
 
 - GitHub 设备授权明确请求 `offline_access`，确保支持可刷新的用户令牌；授权轮询遇到短暂连接错误或服务端暂时性错误时有限重试，不立即丢弃授权流程。非网络类错误不再直接提示网络断开。
@@ -26,11 +32,16 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.0.1（versionCode 2000001），本次修复 GitHub 设备授权的已知兼容缺口；来源管理改动仍待用户验证。
+- 应用版本：2.0.2（versionCode 2000002），本次修复漫画源目录地址重启后丢失；来源管理改动仍待用户验证。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。
 - 再漫画多个作品详情失败的原因尚未确认；之前的 Debug 诊断与结果可在 Git 历史查阅。是否继续排查由用户指定。
+
+## U-07 验证
+
+- JDK 17：`.\gradlew.bat --no-daemon --no-configuration-cache --max-workers=2 :feature:sources:testDebugUnitTest --tests '*SourcesViewModelTest' :app:assembleDebug :app:assembleRelease` — BUILD SUCCESSFUL；16 项 SourcesViewModel 测试通过，Release Lint Vital 与 APK 签名校验通过；包含目录恢复与失败回退专项回归。
+- 未安装设备 APK，未执行设备重启验收；签名沿用 2.0.1 的正式证书。
 
 ## U-06 验证
 
