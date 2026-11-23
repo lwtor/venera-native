@@ -94,7 +94,12 @@ fun SourcesScreen(
                 FilterChip(
                     selected = section == SourcesSection.Installed,
                     onClick = { section = SourcesSection.Installed },
-                    label = { Text("已安装  ${state.sources.size}") },
+                    label = {
+                        Text(
+                            if (state.catalogUpdateCount > 0) "已安装  ${state.sources.size} · 更新 ${state.catalogUpdateCount}"
+                            else "已安装  ${state.sources.size}",
+                        )
+                    },
                     modifier = Modifier.testTag(INSTALLED_SECTION_TAG),
                 )
                 FilterChip(
@@ -247,7 +252,7 @@ private fun CatalogContent(
                 items(state.catalogEntries, key = { it.scriptUrl }) { entry ->
                     CatalogSourceRow(
                         entry = entry,
-                        installed = entry.key?.let { key -> state.sources.any { it.sourceId.value == key } } == true,
+                        installedSource = state.installedSourceFor(entry),
                         installing = state.installing,
                         onInstall = { onAction(SourcesAction.InstallCatalogEntry(entry)) },
                         onViewInstalled = onInstalledSection,
@@ -294,9 +299,13 @@ private fun InstalledContent(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(state.sources, key = { it.sourceId.value }) { source ->
+                    val update = state.catalogUpdateFor(source)
                     SourceRow(
                         source = source,
+                        update = update,
+                        installing = state.installing,
                         busy = source.sourceId in state.busySourceIds,
+                        onUpdate = { update?.let { onAction(SourcesAction.InstallCatalogEntry(it)) } },
                         onEnabledChange = { enabled -> onAction(SourcesAction.SetEnabled(source.sourceId, enabled)) },
                         onUninstall = { onUninstall(source) },
                         onConfigure = { onAction(SourcesAction.OpenConfiguration(source.sourceId)) },
@@ -330,7 +339,7 @@ private fun ManualInstallRow(state: SourcesUiState, onAction: (SourcesAction) ->
 @Composable
 private fun CatalogSourceRow(
     entry: SourceCatalogEntry,
-    installed: Boolean,
+    installedSource: InstalledSource?,
     installing: Boolean,
     onInstall: () -> Unit,
     onViewInstalled: () -> Unit,
@@ -347,8 +356,24 @@ private fun CatalogSourceRow(
                     Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
-            if (installed) {
-                TextButton(onClick = onViewInstalled) { Text("已安装") }
+            if (installedSource != null) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "已安装 ${installedSource.version}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = onViewInstalled) { Text("查看") }
+                    if (entry.version != null && entry.version != installedSource.version) {
+                        TextButton(onClick = onInstall, enabled = !installing) {
+                            Text(if (installing) "更新中…" else "更新至 ${entry.version}")
+                        }
+                    } else {
+                        TextButton(onClick = onInstall, enabled = !installing) {
+                            Text(if (installing) "安装中…" else "重新安装")
+                        }
+                    }
+                }
             } else {
                 TextButton(onClick = onInstall, modifier = Modifier.testTag(CATALOG_INSTALL_TAG), enabled = !installing) {
                     Text(if (installing) "安装中…" else "安装")
@@ -361,7 +386,10 @@ private fun CatalogSourceRow(
 @Composable
 private fun SourceRow(
     source: InstalledSource,
+    update: SourceCatalogEntry?,
+    installing: Boolean,
     busy: Boolean,
+    onUpdate: () -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     onUninstall: () -> Unit,
     onConfigure: () -> Unit,
@@ -378,6 +406,12 @@ private fun SourceRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(if (source.enabled) "已启用" else "已停用", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (update != null) {
+                    TextButton(
+                        onClick = onUpdate,
+                        enabled = !busy && !installing,
+                    ) { Text(if (installing) "更新中…" else "更新 ${update.version}") }
+                }
                 TextButton(onClick = onConfigure, enabled = !busy) { Text("设置") }
                 TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
             }

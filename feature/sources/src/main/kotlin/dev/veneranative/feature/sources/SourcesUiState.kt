@@ -29,6 +29,20 @@ data class SourcesUiState(
     val isEmpty: Boolean get() = status == SourcesStatus.Ready && sources.isEmpty()
 
     val canInstall: Boolean get() = installLocation.isNotBlank() && !installing
+
+    fun installedSourceFor(entry: SourceCatalogEntry): InstalledSource? = sources.firstOrNull { source ->
+        entry.key?.let { it == source.sourceId.value } == true || entry.scriptUrl == source.origin
+    }
+
+    fun catalogUpdateFor(source: InstalledSource): SourceCatalogEntry? {
+        if (catalogStatus != CatalogStatus.Ready) return null
+        return catalogEntries.firstOrNull { entry ->
+            (entry.key == source.sourceId.value || entry.scriptUrl == source.origin) &&
+                entry.version != null && entry.version != source.version
+        }
+    }
+
+    val catalogUpdateCount: Int get() = sources.count { catalogUpdateFor(it) != null }
 }
 
 enum class CatalogStatus { Idle, Loading, Ready, Failed }

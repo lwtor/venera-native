@@ -7,6 +7,11 @@
 - 漫画源目录设置保存最多 10 个成功加载过的地址，按最近使用排序；点击历史项会立即加载并切换目录。
 - 旧版的最后成功目录会作为历史迁移来源；失败的加载不会进入历史。真机页面交互尚待用户验证。
 
+## 当前任务：U-09 已安装漫画源更新（DONE）
+
+- 来源目录与已安装来源按来源 ID（无 ID 时按安装地址）匹配；版本不同会在发现页和已安装列表显示更新提示，可直接覆盖更新。同版本或未声明目录版本时仍可手动重新安装。
+- 更新通过现有原子替换流程，失败保留旧版本；成功更新保留启用/停用状态、来源私有设置和会话数据。更新发布来源变更版本，使搜索、探索、详情等既有缓存刷新。
+
 ## 当前任务：U-07 漫画源目录地址恢复
 
 - 目录地址原只保存在页面状态，重建后恢复默认值。现使用 `data:settings` 保存成功加载的目录地址，重新打开或重启时自动恢复并加载。
@@ -31,13 +36,13 @@
 
 - 漫画源管理默认显示已安装列表，提供发现来源、手动安装和文件导入入口；已安装条目突出启用状态和设置操作。
 - 来源安装、覆盖安装、启停和移除成功后发出变更版本，搜索、探索、相关作品与详情页面刷新；同版本脚本覆盖也会使能力、详情和标签缓存失效。
-- 来源更新、账号有效性检测、按漫画寻找来源和详情来源替换是用户指定的后续批次，须先等待用户验证本批次。
+- 账号有效性检测、按漫画寻找来源和详情来源替换仍是后续用户指定批次。
 - 页面交互与实时来源行为尚未在用户设备验证。
 
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.1.0（versionCode 2001000），增加漫画源目录历史与快速切换；来源管理改动仍待用户验证。
+- 应用版本：2.2.0（versionCode 2002000），增加已安装漫画源版本提示与直接更新；来源管理改动仍待用户验证。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。
@@ -53,6 +58,13 @@
 - JDK 17：`.\gradlew.bat --no-daemon --no-configuration-cache --max-workers=2 :feature:sources:testDebugUnitTest --tests '*SourcesViewModelTest' :app:assembleDebug :app:assembleRelease` — BUILD SUCCESSFUL；18 项测试通过，Release Lint Vital 与 Release APK 签名检查通过。
 - `apksigner verify --print-certs` 与 `signing/release-cert.sha256` 指纹一致；`aapt dump badging` 确认 `dev.veneranative`、2.1.0 / 2001000。
 - APK 已附于 GitHub Release；未安装到真机，等待用户验证历史切换体验。
+
+## U-09 验证
+
+- JDK 17：`:data:source:testDebugUnitTest --tests '*SourceRepositoryTest' :feature:sources:testDebugUnitTest --tests '*SourcesViewModelTest' :app:assembleDebug` — BUILD SUCCESSFUL；14 项来源仓库测试与 19 项来源管理测试通过。
+- JDK 17：`:app:assembleDebug :app:assembleRelease` — BUILD SUCCESSFUL，Release Lint Vital 和 APK 签名校验通过。
+- `apksigner verify --print-certs` 指纹与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.2.0 / 2002000。
+- APK 已附于 GitHub Release；未安装到真机，等待用户验收更新提示和更新操作。
 
 ## U-06 验证
 

@@ -90,7 +90,8 @@ class SourcesViewModel(
 
             SourcesAction.RefreshCatalog -> refreshCatalog()
 
-            is SourcesAction.InstallCatalogEntry -> install(action.entry.scriptUrl)
+            is SourcesAction.InstallCatalogEntry ->
+                install(action.entry.scriptUrl, _state.value.installedSourceFor(action.entry)?.sourceId)
 
             is SourcesAction.OpenConfiguration -> openConfiguration(action.sourceId)
 
@@ -297,9 +298,12 @@ class SourcesViewModel(
         install(location)
     }
 
-    private fun install(location: String) {
+    private fun install(location: String, expectedSourceId: SourceId? = null) {
         if (location.isEmpty() || _state.value.installing) return
 
+        val replacingInstalledSource = _state.value.sources.any {
+            it.sourceId == expectedSourceId || (expectedSourceId == null && it.origin == location)
+        }
         _state.update { it.copy(installing = true, message = null) }
         viewModelScope.launch {
             val outcome = repository.install(location)
@@ -311,7 +315,11 @@ class SourcesViewModel(
                         sources = sources,
                         status = SourcesStatus.Ready,
                         installLocation = if (current.installLocation.trim() == location) "" else current.installLocation,
-                        message = "${outcome.installed.name} 已安装。",
+                        message = if (replacingInstalledSource) {
+                            "${outcome.installed.name} 已更新至版本 ${outcome.installed.version}。"
+                        } else {
+                            "${outcome.installed.name} 已安装。"
+                        },
                     )
 
                     is InstallOutcome.Failure -> current.copy(

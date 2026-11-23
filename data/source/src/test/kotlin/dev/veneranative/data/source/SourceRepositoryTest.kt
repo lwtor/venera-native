@@ -28,6 +28,7 @@ class SourceRepositoryTest {
     private val runtime = FakeSourceScriptRuntime()
     private val metadataReader = FakeMetadataReader()
     private val fetcher = FakeScriptFetcher()
+    private val privateSettings by lazy { InMemorySourcePrivateSettingsStore() }
     // Lazy: the temporary folder rule only creates the directory after the test instance exists.
     private val store by lazy { SourcePackageStore(File(temporaryFolder.root, "sources")) }
     private val repository: SourceRepository by lazy {
@@ -36,6 +37,7 @@ class SourceRepositoryTest {
             runtime = runtime,
             metadataReader = metadataReader,
             fetcher = fetcher,
+            privateSettings = privateSettings,
         )
     }
 
@@ -85,6 +87,25 @@ class SourceRepositoryTest {
         assertEquals("class A2 {}", store.read(sourceId)?.script)
         assertEquals(listOf("1.0.0", "2.0.0"), runtime.installedPackages.map { it.version })
         assertEquals(1, repository.installed().size)
+    }
+
+    @Test
+    fun `updating a disabled source preserves its disabled state`() = runTest {
+        givenScript(version = "1.0.0", script = "class A {}")
+        repository.install(LOCATION)
+        repository.setEnabled(sourceId, enabled = false)
+        privateSettings.writeSourceData(sourceId, "{\"sessionToken\":\"kept\"}")
+        givenScript(version = "2.0.0", script = "class A2 {}")
+
+        val outcome = repository.install(LOCATION)
+
+        val updated = (outcome as InstallOutcome.Success).installed
+        assertEquals("2.0.0", updated.version)
+        assertFalse(updated.enabled)
+        assertFalse(repository.installed().single().enabled)
+        assertEquals("class A2 {}", store.read(sourceId)?.script)
+        assertEquals(sourceId, runtime.unloadedSourceIds.last())
+        assertEquals("{\"sessionToken\":\"kept\"}", runtime.installedPackages.last().sourceDataJson)
     }
 
     @Test

@@ -215,6 +215,7 @@ class DefaultSourceRepository(
             // duplicate the check.
             sha256 = script.sha256Hex(),
             settingsJson = privateSettings.read(metadata.sourceId).toJsonObject(),
+            sourceDataJson = privateSettings.readSourceData(metadata.sourceId),
         )
 
         return when (val installed = runtime.install(packageToInstall)) {
@@ -223,12 +224,14 @@ class DefaultSourceRepository(
                 InstallOutcome.Failure(SourceInstallError.Rejected, installed.error.message)
 
             is SourceInstallResult.Installed -> {
+                val enabled = previous?.installed?.enabled ?: true
+                if (!enabled) runtime.unload(metadata.sourceId)
                 val entry = StoredSource(
                     installed = InstalledSource(
                         sourceId = metadata.sourceId,
                         name = metadata.name,
                         version = installed.version,
-                        enabled = true,
+                        enabled = enabled,
                         origin = location,
                     ),
                     script = script,
@@ -236,7 +239,7 @@ class DefaultSourceRepository(
                 )
                 val stored = runCatching { store.write(entry) }.isSuccess
                 if (stored) {
-                    loaded += metadata.sourceId
+                    if (enabled) loaded += metadata.sourceId else loaded -= metadata.sourceId
                     mutableRevision.value++
                     InstallOutcome.Success(entry.installed)
                 } else {

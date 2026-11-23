@@ -213,6 +213,27 @@ class SourcesViewModelTest {
     }
 
     @Test
+    fun `catalog version differences are shown and can update an installed source`() = runTest(dispatcher) {
+        val installed = source("manga_dex", name = "MangaDex", version = "1.0.0")
+        repository.sources = listOf(installed)
+        val update = SourceCatalogEntry("MangaDex", "manga_dex", "2.0.0", null, "https://cdn.example/manga_dex.js")
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(update)))
+        val viewModel = SourcesViewModel(repository, catalog)
+        repository.outcome = InstallOutcome.Success(installed.copy(version = "2.0.0"))
+        advanceUntilIdle()
+
+        assertEquals(update, viewModel.state.value.catalogUpdateFor(installed))
+        assertEquals(1, viewModel.state.value.catalogUpdateCount)
+
+        viewModel.onAction(SourcesAction.InstallCatalogEntry(update))
+        advanceUntilIdle()
+
+        assertEquals(listOf(update.scriptUrl), repository.installLocations)
+        assertEquals("2.0.0", viewModel.state.value.sources.single().version)
+        assertEquals("MangaDex 已更新至版本 2.0.0。", viewModel.state.value.message)
+    }
+
+    @Test
     fun `successfully applied catalog is restored and loaded after recreation`() = runTest(dispatcher) {
         val preferences = FakePreferences()
         val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
@@ -334,10 +355,15 @@ class SourcesViewModelTest {
         override suspend fun remove(key: String) { values.remove(key) }
     }
 
-    private fun source(id: String, name: String = "Source $id", enabled: Boolean = true) = InstalledSource(
+    private fun source(
+        id: String,
+        name: String = "Source $id",
+        enabled: Boolean = true,
+        version: String = "1.0.0",
+    ) = InstalledSource(
         sourceId = SourceId(id),
         name = name,
-        version = "1.0.0",
+        version = version,
         enabled = enabled,
         origin = "/tmp/$id.js",
     )
@@ -358,6 +384,9 @@ class SourcesViewModelTest {
 
         override suspend fun install(location: String): InstallOutcome {
             installLocations += location
+            (outcome as? InstallOutcome.Success)?.let { installed ->
+                sources = sources.filterNot { it.sourceId == installed.installed.sourceId } + installed.installed
+            }
             return outcome
         }
 
