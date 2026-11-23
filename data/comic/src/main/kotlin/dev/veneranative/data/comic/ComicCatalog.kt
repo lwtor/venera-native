@@ -57,7 +57,7 @@ interface ComicCatalog {
     suspend fun searchCatalog(
         query: String,
         entries: List<SourceCatalogEntry>,
-        onProgress: (completed: Int, total: Int) -> Unit = { _, _ -> },
+        onSourceResult: (CatalogComicSearchRow) -> Unit = {},
     ): CatalogComicSearchReport = CatalogComicSearchReport()
 
     /** Installed and enabled sources that declare at least one explore page. */
@@ -102,11 +102,16 @@ interface ComicCatalog {
 
 data class CatalogComicMatch(val source: SourceCatalogEntry, val comic: Comic)
 
+data class CatalogComicSearchRow(
+    val source: SourceCatalogEntry,
+    val comics: List<Comic> = emptyList(),
+    val isLoading: Boolean = true,
+    val failureStage: CatalogProbeFailureStage? = null,
+    val isCancelled: Boolean = false,
+)
+
 data class CatalogComicSearchReport(
-    val matches: List<CatalogComicMatch> = emptyList(),
-    val sourcesChecked: Int = 0,
-    val sourcesFailed: Int = 0,
-    val failuresByStage: Map<CatalogProbeFailureStage, Int> = emptyMap(),
+    val rows: List<CatalogComicSearchRow> = emptyList(),
 )
 
 enum class CatalogProbeFailureStage {
@@ -114,8 +119,6 @@ enum class CatalogProbeFailureStage {
     PrepareSource,
     InstallSource,
     Search,
-    LoadDetails,
-    NoChapters,
     Timeout,
 }
 

@@ -47,7 +47,7 @@ S4-10C2：core:image 增 ComicResourceStore 与 PersistentComicCoverStorage，�
 
 S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/分版本目录，旧字段作为排序与旧备份兼容投影；ComicCoverStorage 只依赖 core:model 纯契约，由 AppGraph 注入 core:image 实现，未新增 data:collection → core:image 依赖。App 转发生命周期，仓库维护前台检查循环（立即/15分钟、12h过期、二并发、15分钟失败退避）。成功详情更新资料并异步保留封面，失败保留旧内容；封面取得时间作为图片请求版本触发重载。备份传公开资料/时间，不传文件路径或二进制，恢复后重新检查资源。具体存储与兼容规则见 ADR-0015。
 
-来源管理：`data:source` 在安装、覆盖、启停、移除及排序成功后发布单调递增的变更版本；覆盖保留来源启停状态，来源索引记录目录地址和用户顺序（旧记录按索引现有次序兼容），`feature:sources` 仅对同目录同一来源检测版本更新。目录历史在对话框中添加或切换，页面只展示当前目录。已安装来源设置在列表项内展开。按漫画试搜位于独立全屏路由；试搜包保留脚本声明 key，同时使用随机临时运行时 ID 隔离会话、Cookie 和私有状态，失败按脚本准备、安装、搜索、详情/章节及超时分阶段报告。在线登录检测由 ViewModel 按 sourceId 去重，展开后台触发；密码登录凭据作为独立的来源私有记录，通过 Android Keystore AES-GCM 加密，不传入脚本设置或 saveData，卸载时清除。`data:comic` 保持仓库顺序，搜索聚合页据此排列来源结果。
+来源管理：`data:source` 在安装、覆盖、启停、移除及排序成功后发布单调递增的变更版本；覆盖保留来源启停状态，来源索引记录目录地址和用户顺序（旧记录按索引现有次序兼容），`feature:sources` 仅对同目录同一来源检测版本更新。目录历史在对话框中添加或切换，页面只展示当前目录。已安装来源设置在列表项内展开。按漫画试搜位于独立全屏路由；试搜包保留脚本声明 key，同时使用随机临时运行时 ID 隔离会话、Cookie 和私有状态；逐来源复用聚合搜索请求和结果展示，完成一源即呈现，并提供来源添加/更新/切换操作。脚本准备、安装、搜索和超时失败按阶段报告。在线登录检测由 ViewModel 按 sourceId 去重，展开后台触发；密码登录凭据作为独立的来源私有记录，通过 Android Keystore AES-GCM 加密，不传入脚本设置或 saveData，卸载时清除。`data:comic` 保持仓库顺序，搜索聚合页据此排列来源结果。
 
 ## 3. 当前模块
 
@@ -80,7 +80,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic`、`:core:image` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |
-| `:feature:sources` | 来源管理：目录与已安装来源管理；可在不安装来源的情况下逐个试搜漫画目录，显示能返回该漫画详情和章节的来源并仅安装选中的来源 | Design System、`:core:model`、`:data:source`、`:data:comic`、`:data:settings` |
+| `:feature:sources` | 来源管理：目录与已安装来源管理；可在不安装来源的情况下搜索漫画目录，逐来源展示聚合搜索样式的首屏结果，并只安装选中的来源 | Design System、`:core:model`、`:core:image`（来源搜索封面）、`:data:source`、`:data:comic`、`:data:settings` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |
 | `:source:engine` | QuickJS 主运行时、受控 Host binding，以及待移除的 AndroidX JavaScriptEngine 兼容实现 | `:source:api`、受控 Host API |

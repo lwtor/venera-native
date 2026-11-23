@@ -30,6 +30,10 @@ import dev.veneranative.source.api.SourceCore
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.async
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -40,42 +44,71 @@ import org.junit.Test
  * load asks for, what an end of list looks like, and that a failure arrives as a domain error rather
  * than as a string.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class ComicCatalogTest {
-    @Test fun `catalog search keeps localized ranked hits after source bootstrap and always unloads`() = runTest {
+    @Test fun `catalog search emits each source row without waiting for slower sources`() = runTest {
+        val repo = FakeSourceRepository(emptyList()).apply {
+            probePackage = SourcePackage(SourceId("source-a"), "1", "fixture", "a".repeat(64))
+            probeDelays = mapOf("https://fast.test/source.js" to 10L, "https://slow.test/source.js" to 1_000L)
+        }
+        val core = FakeSourceCore().apply {
+            items = listOf(Comic(ComicKey(SourceId("temporary"), RemoteComicId("1")), "Result"))
+        }
+        val catalog = DefaultComicCatalog(repo, core, RecordingProbeRuntime())
+        val entries = listOf(
+            SourceCatalogEntry("Fast", "source-a", "1", null, "https://fast.test/source.js"),
+            SourceCatalogEntry("Slow", "source-b", "1", null, "https://slow.test/source.js"),
+        )
+        val emitted = mutableListOf<CatalogComicSearchRow>()
+        val search = async { catalog.searchCatalog("query", entries, onSourceResult = emitted::add) }
+
+        runCurrent()
+        advanceTimeBy(10)
+        runCurrent()
+        assertEquals(listOf("Fast"), emitted.map { it.source.name })
+        assertTrue(search.isActive)
+
+        advanceTimeBy(990)
+        runCurrent()
+        val report = search.await()
+        assertEquals(listOf("Fast", "Slow"), emitted.map { it.source.name })
+        assertEquals(2, report.rows.size)
+    }
+
+    @Test fun `catalog search streams ordered source results after bootstrap and always unloads`() = runTest {
         val repo = FakeSourceRepository(emptyList()).apply {
             probePackage = SourcePackage(SourceId("source-a"), "1.2", "fixture", "a".repeat(64))
             probeDelayMillis = 20_000L
         }
         val core = FakeSourceCore().apply {
-            items = listOf(Comic(ComicKey(SourceId("temporary"), RemoteComicId("42")), "ナルト"))
-            detailResponse = SourceOutcome.Success(ComicDetail(
-                comic = items.first(),
-                chapters = listOf(Chapter(
-                    ChapterKey(ComicKey(SourceId("temporary"), RemoteComicId("42")), dev.veneranative.core.model.RemoteChapterId("ch1")),
-                    "Chapter 1", 0,
-                )),
-            ))
+            items = listOf(
+                Comic(ComicKey(SourceId("temporary"), RemoteComicId("42")), "ナルト"),
+                Comic(ComicKey(SourceId("temporary"), RemoteComicId("43")), "ナルト 外伝"),
+            )
         }
         val runtime = RecordingProbeRuntime()
         val entry = SourceCatalogEntry("Source A", "source-a", "1.2", null, "https://example.test/source.js")
         val catalog = DefaultComicCatalog(repo, core, runtime)
-        val progress = mutableListOf<Pair<Int, Int>>()
+        val streamedRows = mutableListOf<CatalogComicSearchRow>()
 
-        val report = catalog.searchCatalog("Naruto", listOf(entry)) { completed, total ->
-            progress += completed to total
-        }
+        val report = catalog.searchCatalog(
+            "Naruto",
+            listOf(entry),
+            onSourceResult = streamedRows::add,
+        )
 
-        assertEquals(1, report.matches.size)
-        assertEquals(0, report.sourcesFailed)
-        assertEquals("ナルト", report.matches.single().comic.title)
-        assertEquals(SourceId("source-a"), report.matches.single().comic.key.sourceId)
+        assertEquals(2, report.rows.single().comics.size)
+        assertEquals(2, streamedRows.single().comics.size)
+        assertTrue(streamedRows.single().isLoading.not())
+        assertEquals(0, core.detailCalls)
+        assertEquals("ナルト", report.rows.single().comics.first().title)
+        assertEquals(SourceId("source-a"), report.rows.single().comics.first().key.sourceId)
         assertEquals(runtime.installed.single(), core.requests.single().sourceId)
         assertTrue(runtime.installed.single() != SourceId("source-a"))
         assertEquals(SourceId("source-a"), runtime.packages.single().declaredSourceId)
         assertEquals(runtime.installed.single(), runtime.packages.single().sourceId)
         assertEquals(runtime.installed, runtime.unloaded)
         assertEquals(runtime.installed, repo.clearedProbeIds)
-        assertEquals(listOf(1 to 1), progress)
         assertTrue(repo.sources.isEmpty())
     }
 
@@ -429,6 +462,7 @@ class ComicCatalogTest {
         val sources: MutableList<InstalledSource> = sources.toMutableList()
         var probePackage: SourcePackage? = null
         var probeDelayMillis: Long = 0
+        var probeDelays: Map<String, Long> = emptyMap()
         val clearedProbeIds = mutableListOf<SourceId>()
         val changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
         override val revision: kotlinx.coroutines.flow.StateFlow<Long> = changes
@@ -439,7 +473,8 @@ class ComicCatalogTest {
             error("not used in these tests")
 
         override suspend fun packageForProbe(location: String): SourcePackage? {
-            if (probeDelayMillis > 0) kotlinx.coroutines.delay(probeDelayMillis)
+            val delay = probeDelays[location] ?: probeDelayMillis
+            if (delay > 0) kotlinx.coroutines.delay(delay)
             return probePackage
         }
 

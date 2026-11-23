@@ -11,6 +11,8 @@ import dev.veneranative.data.source.SourceCatalogResult
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.data.comic.CatalogComicMatch
+import dev.veneranative.data.comic.CatalogComicSearchRow
+import dev.veneranative.data.comic.CatalogProbeFailureStage
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -111,17 +113,19 @@ class SourcesViewModel(
                 _state.update {
                     it.copy(
                         comicQuery = action.query,
-                        comicSearchMatches = emptyList(),
+                        comicSearchRows = emptyList(),
                         comicSearchLoading = false,
                         comicSearchPerformed = false,
-                        comicSearchCompletedSources = 0,
-                        comicSearchTotalSources = 0,
-                        comicSearchFailedSources = 0,
                     )
                 }
             }
 
             SourcesAction.SearchCatalogForComic -> searchCatalogForComic()
+
+            SourcesAction.EditCatalogComicSearch -> {
+                comicSearchJob?.cancel()
+                _state.update { it.copy(comicSearchPerformed = false, comicSearchLoading = false) }
+            }
 
             SourcesAction.CancelCatalogComicSearch -> cancelComicSearch()
 
@@ -390,12 +394,9 @@ class SourcesViewModel(
         _state.update {
             it.copy(
                 comicSearchLoading = false,
-                comicSearchMatches = emptyList(),
-                comicSearchPerformed = false,
-                comicSearchCompletedSources = 0,
-                comicSearchTotalSources = 0,
-                comicSearchFailedSources = 0,
-                comicSearchFailuresByStage = emptyMap(),
+                comicSearchRows = it.comicSearchRows.map { row ->
+                    if (row.isLoading) row.copy(isLoading = false, isCancelled = true) else row
+                },
             )
         }
     }
@@ -475,47 +476,46 @@ class SourcesViewModel(
         _state.update {
             it.copy(
                 comicSearchLoading = true,
-                comicSearchMatches = emptyList(),
+                comicSearchRows = entries.map { CatalogComicSearchRow(it) },
                 comicSearchPerformed = true,
-                comicSearchCompletedSources = 0,
-                comicSearchTotalSources = entries.size,
-                comicSearchFailedSources = 0,
-                comicSearchFailuresByStage = emptyMap(),
                 message = null,
             )
         }
         comicSearchJob = viewModelScope.launch {
             val report = try {
-                comicCatalog.searchCatalog(query, entries) { completed, total ->
-                    _state.update { current ->
-                        if (current.comicQuery.trim() != query) current
-                        else current.copy(
-                            comicSearchCompletedSources = maxOf(current.comicSearchCompletedSources, completed),
-                            comicSearchTotalSources = total,
-                        )
-                    }
-                }
+                comicCatalog.searchCatalog(
+                    query = query,
+                    entries = entries,
+                    onSourceResult = { result ->
+                        _state.update { current ->
+                            if (current.comicQuery.trim() != query) current
+                            else current.copy(comicSearchRows = current.comicSearchRows.replaceSearchRow(result))
+                        }
+                    },
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 dev.veneranative.data.comic.CatalogComicSearchReport(
-                    sourcesChecked = entries.size,
-                    sourcesFailed = entries.size,
+                    rows = entries.map {
+                        CatalogComicSearchRow(it, isLoading = false, failureStage = CatalogProbeFailureStage.Search)
+                    },
                 )
             }
             _state.update { current ->
                 if (current.comicQuery.trim() != query) current
                 else current.copy(
                     comicSearchLoading = false,
-                    comicSearchMatches = report.matches,
-                    comicSearchCompletedSources = report.sourcesChecked,
-                    comicSearchTotalSources = report.sourcesChecked,
-                    comicSearchFailedSources = report.sourcesFailed,
-                    comicSearchFailuresByStage = report.failuresByStage,
+                    comicSearchRows = report.rows,
                 )
             }
         }
     }
+
+    private fun List<CatalogComicSearchRow>.replaceSearchRow(result: CatalogComicSearchRow): List<CatalogComicSearchRow> =
+        map { row ->
+            if (row.source.scriptUrl == result.source.scriptUrl && row.source.catalogLocation == result.source.catalogLocation) result else row
+        }
 
     private fun installComicMatch(match: CatalogComicMatch) {
         val entry = match.source

@@ -2,6 +2,16 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-17 目录搜索复用聚合搜索结果并逐源呈现（DONE）
+
+- 按用户反馈，目录搜索结果与搜索页聚合结果一致：按来源分组显示封面横向列表，复用相同 PagingSource、空筛选请求和首屏结果顺序；来源目录搜索全部条目，搜索页仍只覆盖已安装来源。每个有结果的来源行增加添加/更新/切换操作。
+- 数据层为每个来源完成后立即回调整组搜索结果；页面先显示来源加载状态，再逐行替换为成功、空结果或错误，不等待所有来源结束。
+- 移除了试搜阶段的额外详情/章节筛选，避免与搜索页采用不同结果判断规则。新增回归覆盖整组结果映射与较快来源先于慢来源呈现。
+- JDK 17：`:data:comic:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL。
+- JDK 17：`:data:comic:testDebugUnitTest --tests '...ComicCatalogTest.catalog search emits each source row without waiting for slower sources' --tests '...ComicCatalogTest.catalog search streams ordered source results after bootstrap and always unloads'` — BUILD SUCCESSFUL。
+- JDK 17：`:app:assembleRelease` 与 `--no-configuration-cache :app:assembleRelease` — BUILD SUCCESSFUL，Release Lint Vital 与签名身份检查通过。`apksigner` 证书 SHA-256 与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.6.3 / 2006003。
+- `git diff --check` — PASS。正式 APK：[GitHub Release](https://github.com/lwtor/venera-native/releases/tag/v2.6.3)。用户设备交互待验收。
+
 ## 当前任务：U-16 修复漫画源目录试搜并拆分搜索页面（DONE）
 
 - 已确认 U-15 “64 源均无结果”的根因：试搜以随机临时 `SourceId` 安装脚本，但 QuickJS 校验要求它等于脚本声明的 key；因此来源全部在安装阶段失败。`SourcePackage` 现单独保留脚本声明 ID，在保持临时运行时隔离的同时通过校验。
@@ -104,7 +114,7 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.6.2（versionCode 2006002），对应 U-16；2.6.1 是上一个正式发布版本。
+- 应用版本：2.6.3（versionCode 2006003），对应 U-17；2.6.2 是上一个正式发布版本。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。

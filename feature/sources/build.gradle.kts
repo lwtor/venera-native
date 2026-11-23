@@ -9,6 +9,7 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
+    implementation(project(":core:image"))
     implementation(project(":data:source"))
     implementation(project(":data:comic"))
     implementation(project(":data:settings"))
@@ -21,6 +22,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit4)

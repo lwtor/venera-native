@@ -1,6 +1,8 @@
 package dev.veneranative.feature.sources
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,16 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -25,16 +28,18 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.veneranative.core.designsystem.component.ComicCoverCard
+import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.model.ComicKey
-import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.CatalogComicMatch
+import dev.veneranative.data.comic.CatalogComicSearchRow
 import dev.veneranative.data.comic.CatalogProbeFailureStage
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ComicSourceSearchScreen(
     state: SourcesUiState,
@@ -43,14 +48,35 @@ fun ComicSourceSearchScreen(
     onOpenComic: (ComicKey) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (state.comicSearchPerformed) {
+        CatalogSearchResultsScreen(
+            state = state,
+            onAction = onAction,
+            onOpenComic = onOpenComic,
+            onBackToForm = { onAction(SourcesAction.EditCatalogComicSearch) },
+            modifier = modifier,
+        )
+    } else {
+        CatalogSearchFormScreen(state, onAction, onBack, modifier)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatalogSearchFormScreen(
+    state: SourcesUiState,
+    onAction: (SourcesAction) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier,
+) {
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("按漫画查找来源") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回漫画源")
+                    androidx.compose.material3.IconButton(onClick = onBack) {
+                        androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回漫画源")
                     }
                 },
             )
@@ -58,8 +84,8 @@ fun ComicSourceSearchScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Text(
-                "只检查当前目录。找到后再添加需要的来源。",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                "搜索当前目录中的所有来源。结果会逐个显示，你可以只添加需要的来源。",
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -74,120 +100,137 @@ fun ComicSourceSearchScreen(
                     modifier = Modifier.weight(1f),
                     label = { Text("漫画名称") },
                     singleLine = true,
-                    enabled = !state.comicSearchLoading,
                 )
                 Button(
                     onClick = { onAction(SourcesAction.SearchCatalogForComic) },
-                    enabled = state.comicQuery.isNotBlank() && state.catalogStatus == CatalogStatus.Ready && !state.comicSearchLoading,
+                    enabled = state.comicQuery.isNotBlank() && state.catalogStatus == CatalogStatus.Ready,
                 ) { Text("搜索") }
             }
-
-            if (state.comicSearchLoading) {
+            if (state.catalogStatus == CatalogStatus.Loading) {
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    Text(
-                        "正在检查 ${state.comicSearchCompletedSources}/${state.comicSearchTotalSources} 个来源",
-                        Modifier.weight(1f).padding(start = 10.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextButton(onClick = { onAction(SourcesAction.CancelCatalogComicSearch) }) { Text("取消") }
+                    Text("正在读取漫画源目录…", style = MaterialTheme.typography.bodyMedium)
                 }
-            } else if (state.comicSearchPerformed) {
-                SearchSummary(state)
+            } else if (state.catalogStatus == CatalogStatus.Failed) {
+                Text("漫画源目录读取失败，请返回目录页刷新后重试。", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error)
             }
+        }
+    }
+}
 
-            if (state.comicSearchMatches.isNotEmpty()) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    items(state.comicSearchMatches, key = { "${it.source.scriptUrl}:${it.comic.key.remoteId.value}" }) { match ->
-                        MatchCard(
-                            match = match,
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatalogSearchResultsScreen(
+    state: SourcesUiState,
+    onAction: (SourcesAction) -> Unit,
+    onOpenComic: (ComicKey) -> Unit,
+    onBackToForm: () -> Unit,
+    modifier: Modifier,
+) {
+    BackHandler(onBack = onBackToForm)
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            TopAppBar(
+                title = { Text(state.comicQuery, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                navigationIcon = {
+                    androidx.compose.material3.IconButton(onClick = onBackToForm) {
+                        androidx.compose.material3.Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回搜索")
+                    }
+                },
+                actions = {
+                    if (state.comicSearchLoading) {
+                        TextButton(onClick = { onAction(SourcesAction.CancelCatalogComicSearch) }) { Text("取消") }
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            if (state.comicSearchRows.isEmpty() && !state.comicSearchLoading) {
+                Text("当前目录没有可搜索的来源。", Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+                    items(state.comicSearchRows, key = { "${it.source.catalogLocation}:${it.source.scriptUrl}" }) { row ->
+                        CatalogSourceResults(
+                            row = row,
                             state = state,
-                            onInstall = { onAction(SourcesAction.InstallComicMatch(match)) },
-                            onEnable = { onAction(SourcesAction.SetEnabled(it, true)) },
+                            onInstall = { comic -> onAction(SourcesAction.InstallComicMatch(CatalogComicMatch(row.source, comic))) },
                             onOpenComic = onOpenComic,
                         )
+                        HorizontalDivider()
                     }
                 }
-            } else if (state.comicSearchPerformed && !state.comicSearchLoading) {
-                val message = if (state.comicSearchTotalSources == 0) {
-                    "当前目录没有可搜索的来源。"
-                } else if (state.comicSearchFailedSources > 0) {
-                    "没有找到可阅读的结果。${state.comicSearchFailedSources}/${state.comicSearchTotalSources} 个来源试搜失败；失败阶段见上方统计。"
-                } else {
-                    "检查了 ${state.comicSearchTotalSources} 个来源，没有发现可阅读的搜索结果。"
-                }
-                Text(message, Modifier.padding(horizontal = 16.dp, vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
 @Composable
-private fun SearchSummary(state: SourcesUiState) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-            if (state.comicSearchFailedSources == 0) "找到 ${state.comicSearchMatches.size} 个来源"
-            else "找到 ${state.comicSearchMatches.size} 个来源；${state.comicSearchFailedSources} 个来源试搜失败",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        if (state.comicSearchFailuresByStage.isNotEmpty()) {
-            val labels = mapOf(
-                CatalogProbeFailureStage.RuntimeUnavailable to "运行时不可用",
-                CatalogProbeFailureStage.PrepareSource to "获取或读取来源脚本失败",
-                CatalogProbeFailureStage.InstallSource to "来源脚本安装失败",
-                CatalogProbeFailureStage.Search to "搜索请求失败",
-                CatalogProbeFailureStage.LoadDetails to "漫画详情加载失败",
-                CatalogProbeFailureStage.NoChapters to "结果没有可读章节",
-                CatalogProbeFailureStage.Timeout to "探测超时",
-            )
-            Text(
-                state.comicSearchFailuresByStage.entries.joinToString(" · ") { (stage, count) -> "${labels[stage]} $count" },
-                modifier = Modifier.padding(top = 4.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MatchCard(
-    match: CatalogComicMatch,
+private fun CatalogSourceResults(
+    row: CatalogComicSearchRow,
     state: SourcesUiState,
-    onInstall: () -> Unit,
-    onEnable: (SourceId) -> Unit,
+    onInstall: (dev.veneranative.core.model.Comic) -> Unit,
     onOpenComic: (ComicKey) -> Unit,
 ) {
-    val installed = state.sources.firstOrNull { it.sourceId == match.comic.key.sourceId }
-    Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(match.comic.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                Text(match.source.name, style = MaterialTheme.typography.bodyMedium)
-                Text("版本 ${match.source.version ?: "未知"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            when {
-                installed != null && installed.catalogLocation == match.source.catalogLocation && installed.version != match.source.version ->
-                    TextButton(onClick = onInstall, enabled = !state.installing) { Text("更新") }
-                installed?.enabled == true && installed.catalogLocation == match.source.catalogLocation ->
-                    TextButton(onClick = { onOpenComic(match.comic.key) }) { Text("打开") }
-                installed != null && installed.catalogLocation != match.source.catalogLocation ->
-                    TextButton(onClick = onInstall, enabled = !state.installing) { Text("切换") }
-                installed?.enabled == false ->
-                    TextButton(onClick = { onEnable(installed.sourceId) }, enabled = installed.sourceId !in state.busySourceIds) { Text("启用") }
-                installed != null -> Text("已安装", style = MaterialTheme.typography.labelSmall)
-                else -> Button(onClick = onInstall, enabled = !state.installing) { Text(if (state.installing) "添加中" else "添加") }
+    val installed = state.installedSourceFor(row.source)
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(row.source.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            CatalogAddButton(row, installed, state.installing) { row.comics.firstOrNull()?.let(onInstall) }
+        }
+        when {
+            row.isLoading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+            row.failureStage != null -> Text(
+                "试搜失败：${row.failureStage?.displayName()}",
+                Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            row.isCancelled -> Text("已取消", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+            row.comics.isEmpty() -> Text("没有结果", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
+            else -> LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(row.comics, key = { it.key.remoteId.value }) { comic ->
+                    ComicCoverCard(
+                        title = comic.title,
+                        request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "comic-cover") },
+                        chapterLabel = "章节未知",
+                        sourceLabel = row.source.name,
+                        onClick = { onOpenComic(comic.key) },
+                        modifier = Modifier.width(128.dp),
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun CatalogAddButton(
+    row: CatalogComicSearchRow,
+    installed: dev.veneranative.core.model.InstalledSource?,
+    installing: Boolean,
+    onAdd: () -> Unit,
+) {
+    val sameCatalog = installed != null && installed.catalogLocation == row.source.catalogLocation
+    when {
+        installed != null && sameCatalog && installed.version == row.source.version ->
+            Text("已添加", Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        row.comics.isEmpty() -> Unit
+        installed != null && sameCatalog -> TextButton(onClick = onAdd, enabled = !installing) { Text(if (installing) "更新中" else "更新") }
+        installed != null -> TextButton(onClick = onAdd, enabled = !installing) { Text(if (installing) "切换中" else "切换") }
+        else -> Button(onClick = onAdd, enabled = !installing) { Text(if (installing) "添加中" else "添加") }
+    }
+}
+
+private fun CatalogProbeFailureStage.displayName(): String = when (this) {
+    CatalogProbeFailureStage.RuntimeUnavailable -> "脚本运行时不可用"
+    CatalogProbeFailureStage.PrepareSource -> "获取或读取来源脚本"
+    CatalogProbeFailureStage.InstallSource -> "安装来源脚本"
+    CatalogProbeFailureStage.Search -> "搜索请求"
+    CatalogProbeFailureStage.Timeout -> "探测超时"
 }
