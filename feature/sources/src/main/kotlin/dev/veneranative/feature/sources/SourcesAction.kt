@@ -30,5 +30,6 @@ sealed interface SourcesAction {
     data class SaveSettings(val sourceId: SourceId, val values: Map<String, String>) : SourcesAction
     data class InvokeSettingCallback(val sourceId: SourceId, val key: String) : SourcesAction
     data class Login(val sourceId: SourceId, val account: String, val password: String) : SourcesAction
+    data class CheckLogin(val sourceId: SourceId) : SourcesAction
     data class Logout(val sourceId: SourceId) : SourcesAction
 }

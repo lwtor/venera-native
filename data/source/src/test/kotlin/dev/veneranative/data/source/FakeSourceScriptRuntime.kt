@@ -1,12 +1,12 @@
 package dev.veneranative.data.source
 
 import dev.veneranative.core.model.SourceId
-import dev.veneranative.source.api.SourceCall
 import dev.veneranative.source.api.SourceInstallResult
 import dev.veneranative.source.api.SourcePackage
 import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.SourceRuntimeError
 import dev.veneranative.source.api.SourceScriptRuntime
+import dev.veneranative.source.api.SourceCall
 
 /**
  * Runtime double for install management tests.
@@ -22,6 +22,8 @@ class FakeSourceScriptRuntime(
     val unloadedSourceIds = mutableListOf<SourceId>()
     var closed = false
         private set
+    var nextInvokeResult: SourceResult = SourceResult.Failure("test", SourceRuntimeError.InvalidCall("not configured"))
+    val calls = mutableListOf<SourceCall>()
 
     override fun isSupported(): Boolean = true
 
@@ -33,8 +35,13 @@ class FakeSourceScriptRuntime(
             SourceInstallResult.Installed(sourceId = source.sourceId, version = source.version)
         }
 
-    override suspend fun invoke(call: SourceCall): SourceResult =
-        SourceResult.Failure(call.callId, SourceRuntimeError.InvalidCall("not used in these tests"))
+    override suspend fun invoke(call: SourceCall): SourceResult {
+        calls += call
+        return when (val result = nextInvokeResult) {
+            is SourceResult.Success -> result.copy(callId = call.callId)
+            is SourceResult.Failure -> result.copy(callId = call.callId)
+        }
+    }
 
     override suspend fun cancel(callId: String) = Unit
 

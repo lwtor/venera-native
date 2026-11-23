@@ -32,6 +32,7 @@ class SourceNetworkHostApi(
         when (request.method) {
             TIMER_SLEEP_METHOD -> return sleep(request)
             TIMER_CANCEL_METHOD -> return cancelTimer(request)
+            COOKIE_GET_METHOD -> return getCookies(request)
         }
         if (!isMethodAllowed(request.method)) {
             return request.failure(
@@ -61,6 +62,22 @@ class SourceNetworkHostApi(
                 )
             is SourceHttpResult.Failure -> request.failure(result.error)
         }
+    }
+
+    private fun getCookies(request: SourceHostRequest): SourceHostResult {
+        val url = runCatching {
+            json.parseToJsonElement(request.payloadJson).jsonObject.requiredString("url")
+        }.getOrNull() ?: return request.invalidRequest()
+        if (!url.startsWith("https://", ignoreCase = true)) return request.invalidRequest()
+        val cookies = executor.cookiesForRequest(request.sourceId, url)
+        val encoded = JsonArray(cookies.map { cookie ->
+            buildJsonObject {
+                put("name", JsonPrimitive(cookie.name))
+                put("value", JsonPrimitive(cookie.value))
+                put("domain", JsonPrimitive(cookie.domain))
+            }
+        }).toString()
+        return SourceHostResult.Success(request.requestId, encoded)
     }
 
     private suspend fun sleep(request: SourceHostRequest): SourceHostResult {
@@ -200,11 +217,12 @@ class SourceNetworkHostApi(
 
     companion object {
         const val HTTP_REQUEST_METHOD = "http.request"
+        const val COOKIE_GET_METHOD = "http.getCookies"
         const val TIMER_SLEEP_METHOD = "timer.sleep"
         const val TIMER_CANCEL_METHOD = "timer.cancel"
         private const val MAX_REQUEST_PAYLOAD_CHARS = 262_144
         const val MAX_TIMER_DELAY_MILLIS = 120_000L
         private const val MAX_ACTIVE_TIMERS_PER_INVOCATION = 8
-        private val ALLOWED_METHODS = setOf(HTTP_REQUEST_METHOD, TIMER_SLEEP_METHOD, TIMER_CANCEL_METHOD)
+        private val ALLOWED_METHODS = setOf(HTTP_REQUEST_METHOD, COOKIE_GET_METHOD, TIMER_SLEEP_METHOD, TIMER_CANCEL_METHOD)
     }
 }

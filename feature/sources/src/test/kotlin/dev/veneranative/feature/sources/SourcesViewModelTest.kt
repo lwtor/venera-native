@@ -10,6 +10,7 @@ import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
 import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 import dev.veneranative.data.source.SourceLoginOutcome
+import dev.veneranative.data.source.SourceLoginCheckOutcome
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -191,6 +192,20 @@ class SourcesViewModelTest {
         advanceUntilIdle()
 
         assertEquals("登录失败，请检查账号密码或网络。", viewModel.state.value.message)
+        assertTrue(!viewModel.state.value.accountActionInProgress)
+    }
+
+    @Test
+    fun `login validity check reports a source confirmed expired session`() = runTest(dispatcher) {
+        repository.loginCheckOutcome = SourceLoginCheckOutcome.Invalid
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(SourcesAction.CheckLogin(SourceId("a")))
+        advanceUntilIdle()
+
+        assertEquals(SourceLoginCheckOutcome.Invalid, viewModel.state.value.loginCheckOutcome)
+        assertEquals("账号登录已失效，可直接重新登录。", viewModel.state.value.message)
         assertTrue(!viewModel.state.value.accountActionInProgress)
     }
 
@@ -409,6 +424,7 @@ class SourcesViewModelTest {
         var outcome: InstallOutcome = InstallOutcome.Failure(SourceInstallError.LocationUnreadable)
         var listFailure: Throwable? = null
         var loginOutcome: SourceLoginOutcome = SourceLoginOutcome.Unsupported
+        var loginCheckOutcome: SourceLoginCheckOutcome = SourceLoginCheckOutcome.Unsupported
         val installLocations = mutableListOf<String>()
         val catalogInstallLocations = mutableListOf<Pair<String, String>>()
         val enabledChanges = mutableListOf<Pair<SourceId, Boolean>>()
@@ -453,6 +469,7 @@ class SourcesViewModelTest {
         }
 
         override suspend fun login(sourceId: SourceId, account: String, password: String) = loginOutcome
+        override suspend fun checkLogin(sourceId: SourceId) = loginCheckOutcome
     }
 
     private class FakeSourceCatalogRepository(

@@ -159,6 +159,22 @@ internal object SourceBaseScript {
 
             __veneraIsLogged() { return !!this.isLogged; }
 
+            async __veneraValidateLogin() {
+              var account = this.account || {};
+              if (typeof account.validate === "function") return await account.validate.call(account);
+              var cookieLogin = account.loginWithCookies;
+              if (!cookieLogin || typeof cookieLogin.validate !== "function" || !Array.isArray(cookieLogin.fields)) return null;
+              var url = cookieLogin.url || this.url || (account.loginWithWebview && account.loginWithWebview.url);
+              if (typeof url !== "string" || !/^https:\/\//i.test(url)) return null;
+              var cookies = await Network.getCookies(url);
+              var values = cookieLogin.fields.map(function (name) {
+                var cookie = cookies.find(function (item) { return item && item.name === name; });
+                return cookie ? String(cookie.value) : "";
+              });
+              if (values.some(function (value) { return value.length === 0; })) return false;
+              return await cookieLogin.validate.call(account, values);
+            }
+
             translate(key) {
               var app = globalThis.APP;
               var locale = app && typeof app.locale === "string" ? app.locale : "";

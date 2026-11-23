@@ -41,6 +41,38 @@ class QuickJsMetadataReaderTest {
     }
 
     @Test
+    fun `detects an optional online account validation function`() = runBlocking {
+        val result = reader.read(
+            """
+            class Checked extends ComicSource {
+              constructor() {
+                super(); this.name = "Checked"; this.key = "checked"; this.version = "1";
+                this.account = { validate: async () => true };
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertTrue((result as SourceMetadataResult.Success).metadata.supportsLoginValidation)
+    }
+
+    @Test
+    fun `detects upstream cookie login validation`() = runBlocking {
+        val result = reader.read(
+            """
+            class CookieChecked extends ComicSource {
+              constructor() {
+                super(); this.name = "CookieChecked"; this.key = "cookie_checked"; this.version = "1";
+                this.account = { loginWithCookies: { fields: ["session"], validate: async values => !!values[0] } };
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertTrue((result as SourceMetadataResult.Success).metadata.supportsLoginValidation)
+    }
+
+    @Test
     fun `minAppVersion is optional`() = runBlocking {
         val result =
             reader.read(

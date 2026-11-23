@@ -53,6 +53,8 @@ interface SourceRepository {
     suspend fun login(sourceId: SourceId, account: String, password: String): SourceLoginOutcome = SourceLoginOutcome.Unsupported
 
     suspend fun logout(sourceId: SourceId): SourceLoginOutcome = SourceLoginOutcome.Unsupported
+
+    suspend fun checkLogin(sourceId: SourceId): SourceLoginCheckOutcome = SourceLoginCheckOutcome.Unsupported
 }
 
 private val EMPTY_REVISION = kotlinx.coroutines.flow.MutableStateFlow(0L)
@@ -61,6 +63,13 @@ sealed interface SourceLoginOutcome {
     data object Success : SourceLoginOutcome
     data object Unsupported : SourceLoginOutcome
     data object Failed : SourceLoginOutcome
+}
+
+sealed interface SourceLoginCheckOutcome {
+    data object Valid : SourceLoginCheckOutcome
+    data object Invalid : SourceLoginCheckOutcome
+    data object Unsupported : SourceLoginCheckOutcome
+    data object Failed : SourceLoginCheckOutcome
 }
 
 sealed interface InstallOutcome {
@@ -192,6 +201,22 @@ class DefaultSourceRepository(
         }
     }
 
+    override suspend fun checkLogin(sourceId: SourceId): SourceLoginCheckOutcome = mutex.withLock {
+        val stored = store.read(sourceId) ?: return@withLock SourceLoginCheckOutcome.Unsupported
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata
+            ?: return@withLock SourceLoginCheckOutcome.Unsupported
+        if (!metadata.supportsLoginValidation) return@withLock SourceLoginCheckOutcome.Unsupported
+        when (val result = invokeInternal(sourceId, "__veneraValidateLogin")) {
+            is SourceResult.Failure -> SourceLoginCheckOutcome.Failed
+            is SourceResult.Success -> when (result.json) {
+                "true" -> SourceLoginCheckOutcome.Valid
+                "false" -> SourceLoginCheckOutcome.Invalid
+                "null" -> SourceLoginCheckOutcome.Unsupported
+                else -> SourceLoginCheckOutcome.Failed
+            }
+        }
+    }
+
 
     private suspend fun installLocked(location: String, catalogLocation: String?): InstallOutcome {
         val script = when (val fetched = fetcher.fetch(location)) {
@@ -312,6 +337,7 @@ class DefaultSourceRepository(
             },
             supportsPasswordLogin = metadata.supportsPasswordLogin,
             supportsLogout = metadata.supportsLogout,
+            supportsLoginValidation = metadata.supportsLoginValidation,
             registerWebsite = metadata.registerWebsite,
             loggedIn = loggedIn,
         )

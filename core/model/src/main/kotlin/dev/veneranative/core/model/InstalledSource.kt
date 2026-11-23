@@ -14,6 +14,7 @@ data class SourceMetadata(
     val settings: List<SourceSettingDefinition> = emptyList(),
     val supportsPasswordLogin: Boolean = false,
     val supportsLogout: Boolean = false,
+    val supportsLoginValidation: Boolean = false,
     val registerWebsite: String? = null,
 ) {
     init {
@@ -44,6 +45,7 @@ data class InstalledSourceConfiguration(
     val settingValues: Map<String, String>,
     val supportsPasswordLogin: Boolean,
     val supportsLogout: Boolean,
+    val supportsLoginValidation: Boolean,
     val registerWebsite: String?,
     val loggedIn: Boolean,
 )

@@ -223,6 +223,8 @@ ComicSource
 
 UI 根据能力决定显示哪些入口，避免在 Feature 内判断脚本字段。
 
+账号当前保存状态不代表服务端仍接受会话。来源可选声明 `account.validate(): Promise<boolean>`，或遵循上游的 `account.loginWithCookies.fields` 与 `account.loginWithCookies.validate(values)` 协议在线验证会话；返回 `true` 表示有效，`false` 表示失效，请求异常或其他返回类型显示为无法确认。不支持在线校验的来源会明确显示。已存在本地会话时，管理页仍允许直接提交账号密码重新登录，不要求先退出。
+
 ### 6.2 Runtime 接口
 
 ```kotlin

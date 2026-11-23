@@ -24,6 +24,7 @@ data class SourcesUiState(
     val configuration: InstalledSourceConfiguration? = null,
     val configurationLoading: Boolean = false,
     val accountActionInProgress: Boolean = false,
+    val loginCheckOutcome: dev.veneranative.data.source.SourceLoginCheckOutcome? = null,
     val settingsSaving: Boolean = false,
 ) {
     val isEmpty: Boolean get() = status == SourcesStatus.Ready && sources.isEmpty()

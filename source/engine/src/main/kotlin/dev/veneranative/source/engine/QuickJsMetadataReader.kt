@@ -147,6 +147,7 @@ class QuickJsMetadataReader(
                     },
                     supportsPasswordLogin = declared.optBoolean("passwordLogin", false),
                     supportsLogout = declared.optBoolean("logout", false),
+                    supportsLoginValidation = declared.optBoolean("loginValidation", false),
                     registerWebsite = declared.stringOrNull("registerWebsite"),
                 ),
             )
@@ -202,6 +203,12 @@ class QuickJsMetadataReader(
               })(),
               passwordLogin: !!(${SourceClassConvention.INSTANCE}.account && typeof ${SourceClassConvention.INSTANCE}.account.login === "function"),
               logout: !!(${SourceClassConvention.INSTANCE}.account && typeof ${SourceClassConvention.INSTANCE}.account.logout === "function"),
+              loginValidation: !!(${SourceClassConvention.INSTANCE}.account && (
+                typeof ${SourceClassConvention.INSTANCE}.account.validate === "function" ||
+                (${SourceClassConvention.INSTANCE}.account.loginWithCookies &&
+                 typeof ${SourceClassConvention.INSTANCE}.account.loginWithCookies.validate === "function" &&
+                 Array.isArray(${SourceClassConvention.INSTANCE}.account.loginWithCookies.fields))
+              )),
               registerWebsite: typeof ${SourceClassConvention.INSTANCE}.account?.registerWebsite === "string" ? ${SourceClassConvention.INSTANCE}.account.registerWebsite : null
             });
             """.trimIndent()

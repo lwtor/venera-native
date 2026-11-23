@@ -13,10 +13,12 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.Cookie
 import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.RequestBody
 import okhttp3.Response
 import okio.BufferedSink
@@ -80,6 +82,11 @@ class SourceNetworkExecutor(
             }
             result
         }
+    }
+
+    fun cookiesForRequest(sourceId: SourceId, url: String): List<Cookie> {
+        val parsed = url.toHttpUrlOrNull() ?: return emptyList()
+        return cookieJars.forSource(sourceId).loadForRequest(parsed)
     }
 
     fun clearSource(sourceId: SourceId) {

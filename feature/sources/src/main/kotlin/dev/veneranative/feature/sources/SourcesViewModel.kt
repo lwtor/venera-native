@@ -107,6 +107,8 @@ class SourcesViewModel(
 
             is SourcesAction.Login -> login(action.sourceId, action.account, action.password)
 
+            is SourcesAction.CheckLogin -> checkLogin(action.sourceId)
+
             is SourcesAction.Logout -> logout(action.sourceId)
         }
     }
@@ -192,6 +194,7 @@ class SourcesViewModel(
                 it.copy(
                     configurationLoading = false,
                     configuration = configuration,
+                    loginCheckOutcome = null,
                     message = if (configuration == null) "无法读取该漫画源的设置。" else it.message,
                 )
             }
@@ -216,7 +219,7 @@ class SourcesViewModel(
 
     private fun invokeSettingCallback(sourceId: SourceId, key: String) {
         if (_state.value.accountActionInProgress) return
-        _state.update { it.copy(accountActionInProgress = true, message = null) }
+        _state.update { it.copy(accountActionInProgress = true, loginCheckOutcome = null, message = null) }
         viewModelScope.launch {
             val succeeded = runCatching { repository.invokeSettingCallback(sourceId, key) }.getOrDefault(false)
             _state.update { it.copy(accountActionInProgress = false, message = if (succeeded) "操作已完成。" else "来源设置操作失败。") }
@@ -225,7 +228,7 @@ class SourcesViewModel(
 
     private fun login(sourceId: SourceId, account: String, password: String) {
         if (_state.value.accountActionInProgress) return
-        _state.update { it.copy(accountActionInProgress = true, message = null) }
+        _state.update { it.copy(accountActionInProgress = true, loginCheckOutcome = null, message = null) }
         viewModelScope.launch {
             val result = runCatching { repository.login(sourceId, account, password) }
                 .getOrDefault(dev.veneranative.data.source.SourceLoginOutcome.Failed)
@@ -236,6 +239,22 @@ class SourcesViewModel(
                 dev.veneranative.data.source.SourceLoginOutcome.Failed -> "登录失败，请检查账号密码或网络。"
             }
             _state.update { it.copy(accountActionInProgress = false, configuration = configuration ?: it.configuration, message = message) }
+        }
+    }
+
+    private fun checkLogin(sourceId: SourceId) {
+        if (_state.value.accountActionInProgress) return
+        _state.update { it.copy(accountActionInProgress = true, loginCheckOutcome = null, message = null) }
+        viewModelScope.launch {
+            val result = runCatching { repository.checkLogin(sourceId) }
+                .getOrDefault(dev.veneranative.data.source.SourceLoginCheckOutcome.Failed)
+            val message = when (result) {
+                dev.veneranative.data.source.SourceLoginCheckOutcome.Valid -> "账号有效，可以正常使用。"
+                dev.veneranative.data.source.SourceLoginCheckOutcome.Invalid -> "账号登录已失效，可直接重新登录。"
+                dev.veneranative.data.source.SourceLoginCheckOutcome.Unsupported -> "此来源未提供登录状态检测。"
+                dev.veneranative.data.source.SourceLoginCheckOutcome.Failed -> "暂时无法确认登录状态，请检查网络后重试。"
+            }
+            _state.update { it.copy(accountActionInProgress = false, loginCheckOutcome = result, message = message) }
         }
     }
 

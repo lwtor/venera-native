@@ -4,6 +4,7 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourceMetadata
 import dev.veneranative.source.api.SourceMetadataReader
 import dev.veneranative.source.api.SourceMetadataResult
+import dev.veneranative.source.api.SourceResult
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -39,6 +40,21 @@ class SourceRepositoryTest {
             fetcher = fetcher,
             privateSettings = privateSettings,
         )
+    }
+
+    @Test
+    fun `login check returns the source confirmed validity`() = runTest {
+        givenScript(version = "1.0.0", script = "class A {}")
+        repository.install(LOCATION)
+        metadataReader.result = SourceMetadataResult.Success(
+            SourceMetadata(sourceId, "Source A", "1.0.0", supportsLoginValidation = true),
+        )
+        runtime.nextInvokeResult = SourceResult.Success("test", "false")
+
+        assertEquals(SourceLoginCheckOutcome.Invalid, repository.checkLogin(sourceId))
+        assertTrue(runtime.calls.any { call ->
+            call is dev.veneranative.source.api.SourceCall.InvokeFunction && call.functionName == "__veneraValidateLogin"
+        })
     }
 
     @Test

@@ -799,6 +799,9 @@ internal object QuickJsHostScript {
             },
             fetchBytes: function (method, url, headers, data) {
               return request(String(method).toUpperCase(), String(url), headers, data, "bytes");
+            },
+            getCookies: function (url) {
+              return callHost("http.getCookies", { url: String(url) });
             }
           });
 

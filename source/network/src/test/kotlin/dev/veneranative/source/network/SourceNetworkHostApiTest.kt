@@ -13,8 +13,34 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import okhttp3.Cookie
+import okhttp3.HttpUrl.Companion.toHttpUrl
 
 class SourceNetworkHostApiTest {
+
+    @Test
+    fun `cookie lookup only returns matching cookies from the requesting source`() = runTest {
+        val registry = PerSourceCookieJarRegistry()
+        val first = SourceId("source-a")
+        val second = SourceId("source-b")
+        val url = "https://example.com/".toHttpUrl()
+        registry.forSource(first).saveFromResponse(
+            url,
+            listOf(Cookie.Builder().name("session").value("one").domain("example.com").build()),
+        )
+        registry.forSource(second).saveFromResponse(
+            url,
+            listOf(Cookie.Builder().name("session").value("two").domain("example.com").build()),
+        )
+        val api = SourceNetworkHostApi(SourceNetworkExecutor(cookieJars = registry))
+
+        val result = api.invoke(
+            SourceHostRequest(first, "call-1", "request-1", SourceNetworkHostApi.COOKIE_GET_METHOD, """{"url":"$url"}"""),
+        ) as SourceHostResult.Success
+
+        assertTrue(api.isMethodAllowed(SourceNetworkHostApi.COOKIE_GET_METHOD))
+        assertEquals("""[{"name":"session","value":"one","domain":"example.com"}]""", result.resultJson)
+    }
 
     @Test
     fun `timer sleep is allow listed and waits for the requested bounded duration`() = runTest {
