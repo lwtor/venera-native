@@ -27,7 +27,7 @@ The artifact is `app/build/outputs/apk/release/app-release.apk`. Verify it with 
 
 ## Release checklist
 
-1. Update app version and this repository's status/implementation documents in the same task commit.
+1. Update app version and this repository's status and relevant documentation in the same task commit.
 2. Build `:app:assembleDebug` and `:app:assembleRelease`; run release-stage tests and lint required by `AGENTS.md`.
 3. Check `git diff --check`, review the staged diff, and confirm no credentials, user data, or build artifacts are staged.
 4. Commit with a Conventional Commit message and push the branch and matching annotated version tag.

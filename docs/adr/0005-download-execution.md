@@ -1,7 +1,7 @@
 # ADR-0005：跨 Android 版本的下载执行策略
 
 - 状态：Accepted（2026-09-23）
-- 依据：设计 `docs/design/S2-incremental-design.md` §1.4（关键决策 2）、§2 的 S2-03 验收点；实现见 `:data:download` 的 `worker/` 包与 `:app` 的 `VeneraApplication`
+- 依据：下载执行设计及其验收记录（可从 Git 历史查阅）；实现见 `:data:download` 的 `worker/` 包与 `:app` 的 `VeneraApplication`
 - 日期：2026-09-23
 - 相关：ADR-0001（模块边界）、ADR-0004（图片管线，下载复用同一条取字节链路）、`docs/STATUS.md` S2-03
 

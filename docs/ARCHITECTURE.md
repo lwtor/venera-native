@@ -84,7 +84,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:source:engine` | QuickJS 主运行时、受控 Host binding，以及待移除的 AndroidX JavaScriptEngine 兼容实现 | `:source:api`、受控 Host API |
 | `:source:network` | 动态来源 HTTP、每来源 Cookie 与并发策略；仅爱看漫站点使用 Google DNS-over-HTTPS 回退 | `:source:api`、`:core:network`、`:core:model`、OkHttp DNS-over-HTTPS |
 
-表中“职责”是边界，不表示功能已经完成；当前处于 Stage 2，已落地范围见 `docs/STATUS.md`。
+表中“职责”是边界，不表示所有规划能力均已完成；当前状态见 `docs/STATUS.md`。
 
 S0-07 按本文件第 5 节的模块创建准则删除了两个零引用模块：`:core:common`（`AppResult`/`AppError`
 没有任何生产或测试引用）与 `:core:navigation`（`AppRoute` 唯一声明，`Navigation 3` 只被它使用，
@@ -97,7 +97,7 @@ S1-05 已建立 `:core:image`，S0-06 的解码代码随之从 `:feature:reader`
 子包），**类型名与公开签名不变**，因此阅读器 UI 契约不受影响。ADR-0004 记录的这项架构债务已解除。
 
 `:feature:sources` 直接依赖 `:data:source` 的仓库契约（`SourceRepository`），`:feature:reader` 直接依赖
-`:data:history` 的 `HistoryRepository`。这是本阶段有意的取舍：在只有一个实现、且没有依赖注入框架的情况下，
+`:data:history` 的 `HistoryRepository`。这是有意的取舍：在只有一个实现、且没有依赖注入框架的情况下，
 再把契约拆成一个只有接口的模块只是形式主义。出现第二个数据实现或引入 DI 时，把契约拆出去并让 Feature
 只依赖契约。
 
@@ -161,7 +161,7 @@ Feature 间跳转通过类型安全 Route 或 Feature Entry 契约完成，不�
 
 创建新模块前必须同时满足：
 
-1. 有当前阶段中的实际交付物，不是预留空壳。
+1. 有当前任务中的实际交付物，不是预留空壳。
 2. 职责可以用一句话说明。
 3. 有明确调用方和依赖方向。
 4. 能独立测试或显著隔离平台/第三方实现。
@@ -339,6 +339,6 @@ S3-00Y1 的源重试在 Y2 收拢到 source/core 的 SourceCallExecutor；Engine
 
 爱看漫来源的 `www.ikmmh.com` 和 `ikmmh.com` 使用 Google DNS-over-HTTPS 结果优先、系统 DNS 结果兜底，以处理设备 DNS 返回不可达地址的问题。该查询只包含主机名，不包含来源请求路径、搜索词、Cookie 或其他用户输入；DoH 沿用应用代理并正常验证 HTTPS 证书，其他来源继续使用系统 DNS。
 
-### Stage 1 质量整改：依赖生命周期
+### 依赖生命周期
 
 根依赖由 `AppGraph` AndroidViewModel 装配并跨配置变更保留；销毁时关闭 runtime、图片缓存与网络调用。来源仓库串行修改，冷启动按启用状态恢复脚本。禁用和卸载清理来源网络会话；Core 从当前实例探测能力，避免升级后的旧声明缓存。
