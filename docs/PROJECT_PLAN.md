@@ -162,7 +162,7 @@ class ReaderViewModel @Inject constructor(...) : ViewModel() {
 | `:feature:details` | 详情、标签、章节、推荐、评分和评论入口 |
 | `:feature:reader` | 网络、本地和下载漫画统一阅读器 |
 | `:feature:library` | 收藏、追更、Downloads tab 和 Local tab；仅在后续职责或独立测试需求明确时拆分独立 Feature |
-| `:feature:sources` | 漫画源仓库、安装、更新、编辑和调试 |
+| `:feature:sources` | 漫画源仓库、安装、更新、编辑和调试；按作品标题试搜目录中的来源，只安装实际命中来源 |
 | `:feature:login` | 账号密码、Cookie、WebView 登录 |
 | `:feature:settings` | 外观、阅读器、网络、同步、关于和调试设置 |
 

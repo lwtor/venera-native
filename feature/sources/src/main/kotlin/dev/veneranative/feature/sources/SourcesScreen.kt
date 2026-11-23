@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
+import dev.veneranative.core.model.ComicKey
 import dev.veneranative.data.source.SourceCatalogEntry
 
 private enum class SourcesSection { Available, Installed }
@@ -60,6 +61,7 @@ fun SourcesScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onChooseScript: () -> Unit = {},
+    onOpenComic: (ComicKey) -> Unit = {},
 ) {
     var pendingUninstall by rememberSaveable { mutableStateOf<String?>(null) }
     var section by rememberSaveable { mutableStateOf(SourcesSection.Installed) }
@@ -138,6 +140,33 @@ fun SourcesScreen(
                     }
                     if (manualInstallExpanded) {
                         ManualInstallRow(state = state, onAction = onAction)
+                    }
+                    OutlinedTextField(
+                        value = state.comicQuery,
+                        onValueChange = { onAction(SourcesAction.ComicQueryChanged(it)) },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                        label = { Text("按漫画查找来源") },
+                        placeholder = { Text("输入漫画名称，试搜当前目录中的来源") },
+                        singleLine = true,
+                        trailingIcon = {
+                            TextButton(
+                                onClick = { onAction(SourcesAction.SearchCatalogForComic) },
+                                enabled = state.comicQuery.isNotBlank() && state.catalogStatus == CatalogStatus.Ready && !state.comicSearchLoading,
+                            ) { Text("搜索") }
+                        },
+                    )
+                    if (state.comicSearchLoading) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(modifier = Modifier.heightIn(max = 22.dp))
+                            Text("正在逐个试搜目录来源…", modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    if (state.comicSearchPerformed && !state.comicSearchLoading) {
+                        ComicSearchMatches(
+                            state = state,
+                            onInstall = { onAction(SourcesAction.InstallComicMatch(it)) },
+                            onOpenComic = onOpenComic,
+                        )
                     }
                     Box(Modifier.weight(1f)) {
                         CatalogContent(state = state, onAction = onAction, onInstalledSection = { section = SourcesSection.Installed })
@@ -325,6 +354,48 @@ private fun CatalogContent(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ComicSearchMatches(
+    state: SourcesUiState,
+    onInstall: (dev.veneranative.data.comic.CatalogComicMatch) -> Unit,
+    onOpenComic: (ComicKey) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp).padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            if (state.comicSearchMatches.isEmpty()) "没有找到可用来源；来源暂时无法访问时也可能出现这种情况，请稍后重试。" else "找到 ${state.comicSearchMatches.size} 个可用来源",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        state.comicSearchMatches.take(3).forEach { match ->
+            val installed = state.sources.firstOrNull { it.sourceId == match.comic.key.sourceId }
+            Card(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(match.comic.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                        Text("${match.source.name} · ${match.source.version ?: "版本未知"}", style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (installed?.enabled == true && installed.catalogLocation == match.source.catalogLocation) {
+                        TextButton(onClick = { onOpenComic(match.comic.key) }) { Text("打开") }
+                    } else if (installed != null) {
+                        Text(
+                            if (installed.catalogLocation != match.source.catalogLocation) "已在其他目录安装"
+                            else "已安装 · 停用",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    } else {
+                        TextButton(onClick = { onInstall(match) }, enabled = !state.installing) { Text(if (state.installing) "添加中" else "添加") }
+                    }
+                }
+            }
+        }
+        if (state.comicSearchMatches.size > 3) {
+            Text("另外 ${state.comicSearchMatches.size - 3} 个来源也找到结果，请调整关键词缩小范围。", style = MaterialTheme.typography.bodySmall)
         }
     }
 }

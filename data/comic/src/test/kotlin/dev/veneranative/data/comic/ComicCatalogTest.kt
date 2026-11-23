@@ -18,6 +18,12 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
 import dev.veneranative.data.source.InstallOutcome
 import dev.veneranative.data.source.SourceRepository
+import dev.veneranative.data.source.SourceCatalogEntry
+import dev.veneranative.source.api.SourcePackage
+import dev.veneranative.source.api.SourceScriptRuntime
+import dev.veneranative.source.api.SourceInstallResult
+import dev.veneranative.source.api.SourceCall
+import dev.veneranative.source.api.SourceResult
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceCore
@@ -35,6 +41,35 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
+    @Test fun `catalog search probes in temporary identity and always unloads it`() = runTest {
+        val repo = FakeSourceRepository(emptyList()).apply {
+            probePackage = SourcePackage(SourceId("source-a"), "1.2", "fixture", "a".repeat(64))
+        }
+        val core = FakeSourceCore().apply {
+            items = listOf(Comic(ComicKey(SourceId("temporary"), RemoteComicId("42")), "Naruto"))
+            detailResponse = SourceOutcome.Success(ComicDetail(
+                comic = items.first(),
+                chapters = listOf(Chapter(
+                    ChapterKey(ComicKey(SourceId("temporary"), RemoteComicId("42")), dev.veneranative.core.model.RemoteChapterId("ch1")),
+                    "Chapter 1", 0,
+                )),
+            ))
+        }
+        val runtime = RecordingProbeRuntime()
+        val entry = SourceCatalogEntry("Source A", "source-a", "1.2", null, "https://example.test/source.js")
+        val catalog = DefaultComicCatalog(repo, core, runtime)
+
+        val matches = catalog.searchCatalog("Naruto", listOf(entry))
+
+        assertEquals(1, matches.size)
+        assertEquals(SourceId("source-a"), matches.single().comic.key.sourceId)
+        assertEquals(runtime.installed.single(), core.requests.single().sourceId)
+        assertTrue(runtime.installed.single() != SourceId("source-a"))
+        assertEquals(runtime.installed, runtime.unloaded)
+        assertEquals(runtime.installed, repo.clearedProbeIds)
+        assertTrue(repo.sources.isEmpty())
+    }
+
     @Test fun `list metadata is cached together with tags`() = runTest {
         val source = source("copy_manga")
         val original = Comic(ComicKey(source.sourceId, RemoteComicId("comic")), "Work")
@@ -383,6 +418,8 @@ class ComicCatalogTest {
 
     private class FakeSourceRepository(sources: List<InstalledSource>) : SourceRepository {
         val sources: MutableList<InstalledSource> = sources.toMutableList()
+        var probePackage: SourcePackage? = null
+        val clearedProbeIds = mutableListOf<SourceId>()
         val changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
         override val revision: kotlinx.coroutines.flow.StateFlow<Long> = changes
 
@@ -391,9 +428,27 @@ class ComicCatalogTest {
         override suspend fun install(location: String): InstallOutcome =
             error("not used in these tests")
 
+        override suspend fun packageForProbe(location: String): SourcePackage? = probePackage
+
+        override suspend fun clearProbeState(sourceId: SourceId) { clearedProbeIds += sourceId }
+
         override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean = false
 
         override suspend fun uninstall(sourceId: SourceId): Boolean = false
+    }
+
+    private class RecordingProbeRuntime : SourceScriptRuntime {
+        val installed = mutableListOf<SourceId>()
+        val unloaded = mutableListOf<SourceId>()
+        override fun isSupported() = true
+        override suspend fun install(source: SourcePackage): SourceInstallResult {
+            installed += source.sourceId
+            return SourceInstallResult.Installed(source.sourceId, source.version)
+        }
+        override suspend fun invoke(call: SourceCall): SourceResult = error("not used")
+        override suspend fun cancel(callId: String) = Unit
+        override suspend fun unload(sourceId: SourceId) { unloaded += sourceId }
+        override suspend fun close() = Unit
     }
 
     private class FakeSourceCore(

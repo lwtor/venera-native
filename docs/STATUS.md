@@ -2,6 +2,16 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-14 漫画源目录按作品试搜（DONE）
+
+- 漫画源页新增按作品标题试搜当前目录的入口；来源脚本以临时 SourceId 在共享 Runtime 中独立执行，不写入安装存储，不覆盖同 ID 的已安装来源。试搜验证标题匹配、详情与非空章节后才列为命中；用户只需安装选中的来源。
+- 单次探测并发上限为 3，每个来源最多运行 15 秒；取消及失败时清理临时 Runtime 会话和来源私有临时数据。登录凭据不会被临时探测使用，因此依赖账号登录的来源可能无法命中；探测也不验证页面图片实际下载。
+- `:data:comic` 回归测试源码已添加，验证临时来源 ID、结果映射和会话卸载；尚未执行测试。
+- JDK 17：`:data:comic:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；单元测试未运行。
+- JDK 17：`:app:assembleRelease` — BUILD SUCCESSFUL；Release Lint Vital 与构建前签名身份检查通过。
+- `apksigner verify --print-certs` SHA-256 与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.6.0 / 2006000。
+- `git diff --check` — PASS。正式 APK：[GitHub Release](https://github.com/lwtor/venera-native/releases/tag/v2.6.0)。来源目录 UI 及实机目录试搜尚待用户验收。
+
 ## 当前任务：U-13 避免凭据持久化错误覆盖漫画源登录成功（DONE）
 
 - 2.5.0 在来源 `account.login` 成功后新增 Keystore 凭据保存；原逻辑让保存异常逸出，ViewModel 因而把来源登录成功误报为失败。
@@ -68,13 +78,13 @@
 
 - 漫画源管理默认显示已安装列表，提供发现来源、手动安装和文件导入入口；已安装条目突出启用状态和设置操作。
 - 来源安装、覆盖安装、启停和移除成功后发出变更版本，搜索、探索、相关作品与详情页面刷新；同版本脚本覆盖也会使能力、详情和标签缓存失效。
-- 账号有效性检测、按漫画寻找来源和详情来源替换仍是后续用户指定批次。
+- 账号有效性检测已在 U-11 完成；按漫画试搜来源目录已在 U-14 完成。详情页跳转到试搜并提供替换原来源的流程仍待处理。
 - 页面交互与实时来源行为尚未在用户设备验证。
 
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.5.1（versionCode 2005001），对应 U-13；正式包已发布。
+- 应用版本：2.6.0（versionCode 2006000），对应 U-14；2.5.1 是上一个正式发布版本。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。

@@ -326,6 +326,8 @@ private fun AppNavHost(
                     AppRoute.Sources -> SourcesRoute(
                         repository = sourceRepository,
                         catalogRepository = sourceCatalogRepository,
+                        comicCatalog = catalog,
+                        onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
                         screenPreferences = screenPreferences,
                         onBack = onBack,
                         onRequestScript = { consume ->

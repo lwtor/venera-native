@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))
     implementation(project(":data:source"))
+    implementation(project(":data:comic"))
     implementation(project(":data:settings"))
 
     implementation(platform(libs.compose.bom))

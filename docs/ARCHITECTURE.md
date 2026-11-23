@@ -80,7 +80,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic`、`:core:image` |
 | `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |
-| `:feature:sources` | 来源管理：分开展示可用目录和已安装来源；同目录来源更新、跨目录来源切换、启停、卸载；保存最近成功加载的目录及最多 10 条目录历史，在对话框中添加或切换，以及加载 / 空 / 失败 / 成功页面状态 | Design System、`:core:model`、`:data:source`、`:data:settings` |
+| `:feature:sources` | 来源管理：目录与已安装来源管理；可在不安装来源的情况下逐个试搜漫画目录，显示能返回该漫画详情和章节的来源并仅安装选中的来源 | Design System、`:core:model`、`:data:source`、`:data:comic`、`:data:settings` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |
 | `:source:core` | `SourceCore` 的引擎实现：读取源声明的能力，把类型化操作映射成上游调用并解析响应。它只依赖 Runtime 契约，因此换引擎不影响它 | `:source:api`、kotlinx.serialization JSON |
 | `:source:engine` | QuickJS 主运行时、受控 Host binding，以及待移除的 AndroidX JavaScriptEngine 兼容实现 | `:source:api`、受控 Host API |
@@ -98,7 +98,7 @@ S1-05 已建立 `:core:image`，S0-06 的解码代码随之从 `:feature:reader`
 （`dev.veneranative.feature.reader.image` → `dev.veneranative.core.image` 的 `tiling` / `decode`
 子包），**类型名与公开签名不变**，因此阅读器 UI 契约不受影响。ADR-0004 记录的这项架构债务已解除。
 
-`:feature:sources` 直接依赖 `:data:source` 的仓库契约（`SourceRepository`），`:feature:reader` 直接依赖
+`:feature:sources` 依赖 `:data:source` 管理安装并依赖 `:data:comic` 试搜来源目录；`:feature:reader` 直接依赖
 `:data:history` 的 `HistoryRepository`。这是有意的取舍：在只有一个实现、且没有依赖注入框架的情况下，
 再把契约拆成一个只有接口的模块只是形式主义。出现第二个数据实现或引入 DI 时，把契约拆出去并让 Feature
 只依赖契约。

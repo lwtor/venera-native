@@ -5,6 +5,7 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.InstalledSourceConfiguration
 import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
+import dev.veneranative.data.comic.CatalogComicMatch
 
 /** Everything the sources screen needs to render, including its own empty state. */
 data class SourcesUiState(
@@ -21,6 +22,10 @@ data class SourcesUiState(
     val catalogStatus: CatalogStatus = CatalogStatus.Idle,
     val catalogLocation: String = defaultVeneraSourceCatalogUrl(),
     val catalogHistory: List<String> = emptyList(),
+    val comicQuery: String = "",
+    val comicSearchMatches: List<CatalogComicMatch> = emptyList(),
+    val comicSearchLoading: Boolean = false,
+    val comicSearchPerformed: Boolean = false,
     val configuration: InstalledSourceConfiguration? = null,
     val configurationLoading: Boolean = false,
     val accountActionInProgress: Boolean = false,
@@ -53,6 +58,7 @@ data class SourcesUiState(
         } ?: false
 
     val catalogUpdateCount: Int get() = sources.count { catalogUpdateFor(it) != null }
+
 }
 
 enum class CatalogStatus { Idle, Loading, Ready, Failed }

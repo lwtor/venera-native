@@ -9,6 +9,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
+import dev.veneranative.data.comic.ComicCatalog
+import dev.veneranative.core.model.ComicKey
 
 /**
  * Entry point of the sources screen: owns the ViewModel, collects state, forwards actions.
@@ -23,14 +25,17 @@ fun SourcesRoute(
     modifier: Modifier = Modifier,
     onRequestScript: (((String) -> Unit) -> Unit) = {},
     screenPreferences: ScreenPreferenceRepository? = null,
+    comicCatalog: ComicCatalog? = null,
+    onOpenComic: (ComicKey) -> Unit = {},
 ) {
-    val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository, screenPreferences) }
+    val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository, screenPreferences, comicCatalog) }
     LaunchedEffect(screenPreferences) { screenPreferences?.let(viewModel::attachScreenPreferences) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     SourcesScreen(
         state = state,
         onAction = viewModel::onAction,
         onBack = onBack,
+        onOpenComic = onOpenComic,
         onChooseScript = {
             onRequestScript { location ->
                 viewModel.onAction(SourcesAction.InstallLocationChanged(location))

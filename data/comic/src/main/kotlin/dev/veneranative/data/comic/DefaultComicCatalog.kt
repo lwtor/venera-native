@@ -16,15 +16,26 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.SourcePage
 import dev.veneranative.source.api.ExploreRequest
 import dev.veneranative.data.source.SourceRepository
+import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceCore
 import dev.veneranative.source.api.SourceOutcome
+import dev.veneranative.source.api.SourceScriptRuntime
+import dev.veneranative.source.api.SourcePackage
+import dev.veneranative.source.api.SourceInstallResult
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CancellationException
+import java.util.UUID
 
 /**
  * [ComicCatalog] over the installed sources and one [SourceCore].
@@ -37,6 +48,7 @@ import kotlinx.coroutines.coroutineScope
 class DefaultComicCatalog(
     private val sources: SourceRepository,
     private val core: SourceCore,
+    private val probeRuntime: SourceScriptRuntime? = null,
     private val detailCacheTtlMillis: Long = DEFAULT_DETAIL_CACHE_TTL_MILLIS,
     private val capabilityCacheTtlMillis: Long = DEFAULT_CAPABILITY_CACHE_TTL_MILLIS,
     private val nowMillis: () -> Long = System::currentTimeMillis,
@@ -51,6 +63,61 @@ class DefaultComicCatalog(
     override suspend fun relatedWorksFilters(sourceId: SourceId, target: TagNavigation) = core.relatedWorksFilters(sourceId, target)
 
     override fun category(request: CategoryRequest): PagingSource<PageKey, Comic> = CategoryPagingSource(core, request, ::prepareResultTags)
+
+    override suspend fun searchCatalog(query: String, entries: List<SourceCatalogEntry>): List<CatalogComicMatch> {
+        val keyword = query.trim()
+        val runtime = probeRuntime ?: return emptyList()
+        if (keyword.isBlank() || entries.isEmpty() || !runtime.isSupported()) return emptyList()
+        val semaphore = Semaphore(3)
+        return coroutineScope {
+            entries.map { entry -> async {
+                semaphore.withPermit { probeCatalogEntry(entry, keyword, runtime) }
+            } }.awaitAll().filterNotNull()
+        }
+    }
+
+    private suspend fun probeCatalogEntry(
+        entry: SourceCatalogEntry,
+        keyword: String,
+        runtime: SourceScriptRuntime,
+    ): CatalogComicMatch? = try {
+        withTimeoutOrNull(CATALOG_PROBE_TIMEOUT_MILLIS) {
+            val sourcePackage = sources.packageForProbe(entry.scriptUrl) ?: return@withTimeoutOrNull null
+            val probeId = SourceId("catalog-probe-${UUID.randomUUID()}")
+            try {
+                if (runtime.install(sourcePackage.copy(sourceId = probeId)) !is SourceInstallResult.Installed) {
+                    return@withTimeoutOrNull null
+                }
+                when (val result = core.search(SearchRequest(sourceId = probeId, keyword = keyword))) {
+                    is SourceOutcome.Failure -> null
+                    is SourceOutcome.Success -> {
+                        val candidate = result.value.items.firstOrNull { comic ->
+                            comic.title.contains(keyword, ignoreCase = true) || keyword.contains(comic.title, ignoreCase = true)
+                        } ?: return@withTimeoutOrNull null
+                        val probeComicKey = candidate.key.copy(sourceId = probeId)
+                        when (val detail = core.detail(probeComicKey)) {
+                            is SourceOutcome.Failure -> null
+                            is SourceOutcome.Success -> detail.value.takeIf { it.chapters.isNotEmpty() }?.let {
+                                CatalogComicMatch(entry, candidate.copy(key = candidate.key.copy(sourceId = sourcePackage.sourceId)))
+                            }
+                        }
+                    }
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    try {
+                        runtime.unload(probeId)
+                    } finally {
+                        sources.clearProbeState(probeId)
+                    }
+                }
+            }
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        null
+    }
 
     private data class DetailEntry(
         val mutex: Mutex = Mutex(),
@@ -252,5 +319,6 @@ class DefaultComicCatalog(
     private companion object {
         const val DEFAULT_DETAIL_CACHE_TTL_MILLIS = 5 * 60 * 1000L
         const val DEFAULT_CAPABILITY_CACHE_TTL_MILLIS = 30 * 60 * 1000L
+        const val CATALOG_PROBE_TIMEOUT_MILLIS = 15_000L
     }
 }

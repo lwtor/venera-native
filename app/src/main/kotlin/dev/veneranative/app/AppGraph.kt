@@ -202,6 +202,7 @@ class AppGraph(application: android.app.Application) : androidx.lifecycle.Androi
             android.util.Log.w("VeneraSource", "Source call failed: source=${source.value} member=$member error=$safeError")
         }, includeComicIdsInFailureDiagnostics = debugNetworkTraceEnabled,
             onSourceDataChanged = sourcePrivateSettings::writeSourceData),
+        probeRuntime = runtime,
         onDiscoveryTiming = { sourceCount, installMillis, capabilityMillis ->
             localSearchStartupLog?.append(
                 "stage=source_discovery sources=$sourceCount installedMs=$installMillis capabilitiesMs=$capabilityMillis",

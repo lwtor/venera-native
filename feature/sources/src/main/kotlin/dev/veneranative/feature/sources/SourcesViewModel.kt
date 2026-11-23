@@ -9,6 +9,8 @@ import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
 import dev.veneranative.data.settings.ScreenPreferenceRepository
+import dev.veneranative.data.comic.ComicCatalog
+import dev.veneranative.data.comic.CatalogComicMatch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
@@ -36,6 +38,7 @@ class SourcesViewModel(
     private val repository: SourceRepository,
     private val catalogRepository: SourceCatalogRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
+    private val comicCatalog: ComicCatalog? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SourcesUiState())
@@ -45,6 +48,7 @@ class SourcesViewModel(
     private var lastAppliedLocation: String? = null
     private var catalogHistoryLoaded = false
     private var catalogJob: Job? = null
+    private var comicSearchJob: Job? = null
     private var configurationGeneration = 0L
     private val preferenceWriteMutex = Mutex()
 
@@ -75,12 +79,14 @@ class SourcesViewModel(
             is SourcesAction.CatalogLocationChanged -> {
                 catalogEdited = true
                 catalogJob?.cancel()
+                cancelComicSearch()
                 _state.update { it.copy(catalogLocation = action.value, catalogStatus = CatalogStatus.Idle, catalogEntries = emptyList()) }
             }
 
             is SourcesAction.SelectCatalogLocation -> {
                 catalogEdited = true
                 catalogJob?.cancel()
+                cancelComicSearch()
                 _state.update {
                     it.copy(
                         catalogLocation = action.value,
@@ -99,6 +105,15 @@ class SourcesViewModel(
                     catalogLocation = action.entry.catalogLocation ?: _state.value.catalogLocation.trim(),
                     expectedSourceId = _state.value.installedSourceFor(action.entry)?.sourceId,
                 )
+
+            is SourcesAction.ComicQueryChanged -> {
+                comicSearchJob?.cancel()
+                _state.update { it.copy(comicQuery = action.query, comicSearchMatches = emptyList(), comicSearchLoading = false, comicSearchPerformed = false) }
+            }
+
+            SourcesAction.SearchCatalogForComic -> searchCatalogForComic()
+
+            is SourcesAction.InstallComicMatch -> installComicMatch(action.match)
 
             is SourcesAction.OpenConfiguration -> openConfiguration(action.sourceId)
 
@@ -330,6 +345,7 @@ class SourcesViewModel(
     }
 
     private fun refreshCatalog() {
+        cancelComicSearch()
         val source = catalogRepository ?: return
         val location = _state.value.catalogLocation.trim()
         if (location.isEmpty() || _state.value.catalogStatus == CatalogStatus.Loading) return
@@ -354,6 +370,12 @@ class SourcesViewModel(
                 }
             }
         }
+    }
+
+    private fun cancelComicSearch() {
+        comicSearchJob?.cancel()
+        comicSearchJob = null
+        _state.update { it.copy(comicSearchLoading = false, comicSearchMatches = emptyList(), comicSearchPerformed = false) }
     }
 
     private fun refresh() {
@@ -420,6 +442,37 @@ class SourcesViewModel(
                 }
             }
         }
+    }
+
+    private fun searchCatalogForComic() {
+        val query = _state.value.comicQuery.trim()
+        val comicCatalog = comicCatalog ?: return
+        if (query.isBlank() || _state.value.catalogStatus != CatalogStatus.Ready) return
+        comicSearchJob?.cancel()
+        _state.update { it.copy(comicSearchLoading = true, comicSearchMatches = emptyList(), comicSearchPerformed = true, message = null) }
+        comicSearchJob = viewModelScope.launch {
+            val matches = try {
+                comicCatalog.searchCatalog(query, _state.value.catalogEntries)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+            _state.update { current ->
+                if (current.comicQuery.trim() != query) current
+                else current.copy(comicSearchLoading = false, comicSearchMatches = matches)
+            }
+        }
+    }
+
+    private fun installComicMatch(match: CatalogComicMatch) {
+        val entry = match.source
+        if (entry.catalogLocation == null || _state.value.installing) return
+        if (_state.value.sources.any { it.sourceId == match.comic.key.sourceId }) {
+            _state.update { it.copy(message = "此漫画源已安装。请从已安装列表打开或切换来源。") }
+            return
+        }
+        install(entry.scriptUrl, entry.catalogLocation, expectedSourceId = match.comic.key.sourceId)
     }
 
     private fun setEnabled(sourceId: SourceId, enabled: Boolean) {

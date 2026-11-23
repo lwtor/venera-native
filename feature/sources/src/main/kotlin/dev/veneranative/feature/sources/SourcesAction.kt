@@ -2,6 +2,7 @@ package dev.veneranative.feature.sources
 
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.source.SourceCatalogEntry
+import dev.veneranative.data.comic.CatalogComicMatch
 
 /** Intents of the sources screen. */
 sealed interface SourcesAction {
@@ -26,6 +27,10 @@ sealed interface SourcesAction {
     data object RefreshCatalog : SourcesAction
 
     data class InstallCatalogEntry(val entry: SourceCatalogEntry) : SourcesAction
+
+    data class ComicQueryChanged(val query: String) : SourcesAction
+    data object SearchCatalogForComic : SourcesAction
+    data class InstallComicMatch(val match: CatalogComicMatch) : SourcesAction
 
     data class OpenConfiguration(val sourceId: SourceId) : SourcesAction
     data object CloseConfiguration : SourcesAction

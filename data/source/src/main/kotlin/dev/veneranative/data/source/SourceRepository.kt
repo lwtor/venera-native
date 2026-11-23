@@ -34,6 +34,12 @@ interface SourceRepository {
 
     suspend fun install(location: String): InstallOutcome
 
+    /** Fetches and validates a catalog script for an isolated, non-persistent search probe. */
+    suspend fun packageForProbe(location: String): SourcePackage? = null
+
+    /** Clears any source-private data emitted while an isolated probe was running. */
+    suspend fun clearProbeState(sourceId: SourceId) = Unit
+
     /** Installs a catalog entry and keeps the catalog identity for later update checks. */
     suspend fun installFromCatalog(location: String, catalogLocation: String): InstallOutcome = install(location)
 
@@ -142,6 +148,24 @@ class DefaultSourceRepository(
     }
 
     override suspend fun install(location: String): InstallOutcome = mutex.withLock { installLocked(location, null) }
+
+    override suspend fun packageForProbe(location: String): SourcePackage? {
+        val script = when (val fetched = fetcher.fetch(location)) {
+            is FetchedScript.Success -> fetched.script
+            is FetchedScript.Failure -> return null
+        }
+        val metadata = (metadataReader.read(script) as? SourceMetadataResult.Success)?.metadata ?: return null
+        return SourcePackage(
+            sourceId = metadata.sourceId,
+            version = metadata.version,
+            script = script,
+            sha256 = script.sha256Hex(),
+        )
+    }
+
+    override suspend fun clearProbeState(sourceId: SourceId) {
+        privateSettings.clear(sourceId)
+    }
     override suspend fun installFromCatalog(location: String, catalogLocation: String): InstallOutcome =
         mutex.withLock { installLocked(location, catalogLocation) }
     override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean =

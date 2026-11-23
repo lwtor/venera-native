@@ -11,6 +11,7 @@ import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ExploreItem
 import dev.veneranative.core.model.InstalledSource
+import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.core.model.PageCursor
 import dev.veneranative.core.model.SourceCapabilities
 import dev.veneranative.core.model.SourceId
@@ -52,6 +53,9 @@ interface ComicCatalog {
     /** Installed and enabled sources that declare `search`. */
     suspend fun searchableSources(): List<InstalledSource>
 
+    /** Searches catalog scripts in throwaway runtime sessions without installing them. */
+    suspend fun searchCatalog(query: String, entries: List<SourceCatalogEntry>): List<CatalogComicMatch> = emptyList()
+
     /** Installed and enabled sources that declare at least one explore page. */
     suspend fun explorableSources(): List<InstalledSource>
 
@@ -91,6 +95,8 @@ interface ComicCatalog {
     /** A fresh paging source per request. */
     fun search(request: SearchRequest): PagingSource<PageKey, Comic>
 }
+
+data class CatalogComicMatch(val source: SourceCatalogEntry, val comic: Comic)
 
 /**
  * The paging key.
