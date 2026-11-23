@@ -31,16 +31,22 @@ data class SourcesUiState(
     val canInstall: Boolean get() = installLocation.isNotBlank() && !installing
 
     fun installedSourceFor(entry: SourceCatalogEntry): InstalledSource? = sources.firstOrNull { source ->
-        entry.key?.let { it == source.sourceId.value } == true || entry.scriptUrl == source.origin
+        if (entry.key != null) entry.key == source.sourceId.value else entry.scriptUrl == source.origin
     }
 
     fun catalogUpdateFor(source: InstalledSource): SourceCatalogEntry? {
-        if (catalogStatus != CatalogStatus.Ready) return null
+        if (catalogStatus != CatalogStatus.Ready || source.catalogLocation == null) return null
         return catalogEntries.firstOrNull { entry ->
-            (entry.key == source.sourceId.value || entry.scriptUrl == source.origin) &&
+            (if (entry.key != null) entry.key == source.sourceId.value else entry.scriptUrl == source.origin) &&
+                entry.catalogLocation == source.catalogLocation &&
                 entry.version != null && entry.version != source.version
         }
     }
+
+    fun isFromDifferentCatalog(entry: SourceCatalogEntry): Boolean =
+        installedSourceFor(entry)?.catalogLocation?.let { installedCatalog ->
+            entry.catalogLocation != null && installedCatalog != entry.catalogLocation
+        } ?: false
 
     val catalogUpdateCount: Int get() = sources.count { catalogUpdateFor(it) != null }
 }

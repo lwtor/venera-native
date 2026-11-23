@@ -22,6 +22,7 @@ data class SourceCatalogEntry(
     val version: String?,
     val description: String?,
     val scriptUrl: String,
+    val catalogLocation: String? = null,
 )
 
 sealed interface SourceCatalogResult {
@@ -86,6 +87,7 @@ internal object SourceCatalogParser {
             version = item.string("version")?.trim()?.takeIf(String::isNotEmpty),
             description = item.string("description")?.trim()?.takeIf(String::isNotEmpty),
             scriptUrl = scriptUri.toString(),
+            catalogLocation = catalogUri.normalize().toString(),
         )
     }
 

@@ -132,6 +132,7 @@ class SourcePackageStore(
         val version: String,
         val enabled: Boolean,
         val origin: String,
+        val catalogLocation: String?,
         val sha256: String,
         val scriptFile: String = SCRIPT_FILE_NAME,
     ) {
@@ -141,6 +142,7 @@ class SourcePackageStore(
             version = version,
             enabled = enabled,
             origin = origin,
+            catalogLocation = catalogLocation,
         )
 
         fun toJson(): JsonObject = buildJsonObject {
@@ -149,6 +151,7 @@ class SourcePackageStore(
             put("version", JsonPrimitive(version))
             put("enabled", JsonPrimitive(enabled))
             put("origin", JsonPrimitive(origin))
+            catalogLocation?.let { put("catalogLocation", JsonPrimitive(it)) }
             put("sha256", JsonPrimitive(sha256))
             put("scriptFile", JsonPrimitive(scriptFile))
         }
@@ -160,6 +163,7 @@ class SourcePackageStore(
                 version = source.installed.version,
                 enabled = source.installed.enabled,
                 origin = source.installed.origin,
+                catalogLocation = source.installed.catalogLocation,
                 sha256 = source.sha256,
                 scriptFile = scriptFile,
             )
@@ -178,6 +182,7 @@ class SourcePackageStore(
                     version = version,
                     enabled = (element["enabled"] as? JsonPrimitive)?.booleanOrNull ?: true,
                     origin = text("origin").orEmpty(),
+                    catalogLocation = text("catalogLocation"),
                     sha256 = text("sha256").orEmpty(),
                     scriptFile = scriptFile,
                 )

@@ -2,6 +2,13 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-10 漫画源目录切换与更新范围（DONE）
+
+- 来源安装记录目录地址；更新只匹配同目录下同一来源，其他目录的同一来源显示“切换”操作。
+- 目录页仅显示当前目录；添加新目录和切换已有目录分别通过对话框操作。
+- 来源包索引为目录地址新增可选字段；旧记录和手动安装可正常读取，手动安装不会伪造目录归属。
+- 2.3.0 APK 已发布：[GitHub Release](https://github.com/lwtor/venera-native/releases/tag/v2.3.0)。页面测试源码通过编译，设备交互留待用户验收。
+
 ## 当前任务：U-08 漫画源目录历史（DONE）
 
 - 漫画源目录设置保存最多 10 个成功加载过的地址，按最近使用排序；点击历史项会立即加载并切换目录。
@@ -42,7 +49,7 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.2.0（versionCode 2002000），增加已安装漫画源版本提示与直接更新；来源管理改动仍待用户验证。
+- 应用版本：2.3.0（versionCode 2003000），限定同目录来源更新并增加目录添加/切换对话框；等待用户验证。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。
@@ -65,6 +72,14 @@
 - JDK 17：`:app:assembleDebug :app:assembleRelease` — BUILD SUCCESSFUL，Release Lint Vital 和 APK 签名校验通过。
 - `apksigner verify --print-certs` 指纹与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.2.0 / 2002000。
 - APK 已附于 GitHub Release；未安装到真机，等待用户验收更新提示和更新操作。
+
+## U-10 验证
+
+- JDK 17：`:data:source:testDebugUnitTest --tests '*SourceCatalogParserTest' --tests '*SourcePackageStoreTest' --tests '*SourceRepositoryTest' :feature:sources:testDebugUnitTest --tests '*SourcesViewModelTest' :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；相关单测共 48 项通过，Compose 页面测试源码编译通过。
+- JDK 17：`:data:source:testDebugUnitTest --tests '*SourcePackageStoreTest'` — BUILD SUCCESSFUL；新增的旧索引/目录字段兼容断言通过。
+- JDK 17：`:app:assembleRelease` — BUILD SUCCESSFUL；Release Lint Vital、构建前身份检查和 APK 签名检查通过。
+- `apksigner verify --print-certs` 指纹与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.3.0 / 2003000。
+- APK 已附于 GitHub Release；未安装到真机，等待用户验收目录添加、切换和同 ID 来源操作。
 
 ## U-06 验证
 

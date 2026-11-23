@@ -20,7 +20,9 @@ class SourcePackageStoreTest {
 
     @Test
     fun `a written package can be read back`() {
-        store.write(source(id = "source-a", version = "1.0.0", script = "class A {}"))
+        val source = source(id = "source-a", version = "1.0.0", script = "class A {}")
+            .let { it.copy(installed = it.installed.copy(catalogLocation = "https://catalog.example/index.json")) }
+        store.write(source)
 
         val stored = store.read(SourceId("source-a"))
 
@@ -28,6 +30,7 @@ class SourcePackageStoreTest {
         assertEquals("1.0.0", stored.installed.version)
         assertEquals("class A {}", stored.script)
         assertEquals(HASH, stored.sha256)
+        assertEquals("https://catalog.example/index.json", stored.installed.catalogLocation)
         assertEquals(listOf("source-a"), store.list().map { it.sourceId.value })
     }
 
@@ -75,6 +78,7 @@ class SourcePackageStoreTest {
 
         assertEquals(listOf("source-a"), reloaded.map { it.sourceId.value })
         assertEquals(listOf("Source A"), reloaded.map { it.name })
+        assertNull(reloaded.single().catalogLocation)
     }
 
     @Test

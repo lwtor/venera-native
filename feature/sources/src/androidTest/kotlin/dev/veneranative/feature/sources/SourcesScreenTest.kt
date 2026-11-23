@@ -2,14 +2,18 @@ package dev.veneranative.feature.sources
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import dev.veneranative.core.designsystem.VeneraNativeTheme
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.source.SourceCatalogEntry
+import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -138,6 +142,92 @@ class SourcesScreenTest {
         composeRule.onNodeWithTag(CATALOG_INSTALL_TAG).performClick()
 
         assertEquals(listOf(SourcesAction.InstallCatalogEntry(entry)), actions)
+    }
+
+    @Test
+    fun `source from another catalog shows a switch action without an update label`() {
+        val actions = mutableListOf<SourcesAction>()
+        val currentCatalog = "https://catalog.example/active/index.json"
+        val otherCatalog = "https://catalog.example/other/index.json"
+        val entry = SourceCatalogEntry("MangaDex", "manga_dex", "3.0.0", null, "https://cdn.example/manga.js", currentCatalog)
+        val installed = SOURCE.copy(sourceId = SourceId("manga_dex"), name = "MangaDex", catalogLocation = otherCatalog)
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(
+                        status = SourcesStatus.Ready,
+                        sources = listOf(installed),
+                        catalogStatus = CatalogStatus.Ready,
+                        catalogLocation = currentCatalog,
+                        catalogEntries = listOf(entry),
+                    ),
+                    onAction = { actions += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(AVAILABLE_SECTION_TAG).performClick()
+        composeRule.onNodeWithText("已在其他目录安装").assertIsDisplayed()
+        composeRule.onNodeWithText("切换").performClick()
+        composeRule.onAllNodesWithText("更新至 3.0.0").assertCountEquals(0)
+        assertEquals(listOf(SourcesAction.InstallCatalogEntry(entry)), actions)
+    }
+
+    @Test
+    fun `catalog history is hidden until switching and current directory is shown alone`() {
+        val actions = mutableListOf<SourcesAction>()
+        val currentCatalog = defaultVeneraSourceCatalogUrl()
+        val otherCatalog = "https://catalog.example/other/index.json"
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(
+                        status = SourcesStatus.Ready,
+                        catalogStatus = CatalogStatus.Ready,
+                        catalogLocation = currentCatalog,
+                        catalogHistory = listOf(currentCatalog, otherCatalog),
+                    ),
+                    onAction = { actions += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(AVAILABLE_SECTION_TAG).performClick()
+        composeRule.onNodeWithText("当前漫画源目录").assertIsDisplayed()
+        composeRule.onAllNodesWithText("历史目录").assertCountEquals(0)
+        composeRule.onNodeWithText("切换").performClick()
+        composeRule.onNodeWithText(otherCatalog).performClick()
+
+        assertEquals(listOf(SourcesAction.SelectCatalogLocation(otherCatalog)), actions)
+    }
+
+    @Test
+    fun `adding a catalog opens a dialog and immediately loads the entered address`() {
+        val actions = mutableListOf<SourcesAction>()
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(status = SourcesStatus.Ready, catalogStatus = CatalogStatus.Ready),
+                    onAction = { actions += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(AVAILABLE_SECTION_TAG).performClick()
+        composeRule.onNodeWithText("添加").performClick()
+        composeRule.onNodeWithText("目录地址").performTextInput("https://catalog.example/new/index.json")
+        composeRule.onNodeWithText("添加并使用").performClick()
+
+        assertEquals(
+            listOf(
+                SourcesAction.CatalogLocationChanged("https://catalog.example/new/index.json"),
+                SourcesAction.RefreshCatalog,
+            ),
+            actions,
+        )
     }
 
     @Test

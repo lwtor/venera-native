@@ -31,6 +31,9 @@ interface SourceRepository {
 
     suspend fun install(location: String): InstallOutcome
 
+    /** Installs a catalog entry and keeps the catalog identity for later update checks. */
+    suspend fun installFromCatalog(location: String, catalogLocation: String): InstallOutcome = install(location)
+
     /** Returns false when the source is not installed. */
     suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean
 
@@ -118,7 +121,9 @@ class DefaultSourceRepository(
         }
     }
 
-    override suspend fun install(location: String): InstallOutcome = mutex.withLock { installLocked(location) }
+    override suspend fun install(location: String): InstallOutcome = mutex.withLock { installLocked(location, null) }
+    override suspend fun installFromCatalog(location: String, catalogLocation: String): InstallOutcome =
+        mutex.withLock { installLocked(location, catalogLocation) }
     override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean =
         mutex.withLock { setEnabledLocked(sourceId, enabled) }
     override suspend fun uninstall(sourceId: SourceId): Boolean = mutex.withLock { uninstallLocked(sourceId) }
@@ -188,7 +193,7 @@ class DefaultSourceRepository(
     }
 
 
-    private suspend fun installLocked(location: String): InstallOutcome {
+    private suspend fun installLocked(location: String, catalogLocation: String?): InstallOutcome {
         val script = when (val fetched = fetcher.fetch(location)) {
             is FetchedScript.Failure ->
                 return InstallOutcome.Failure(SourceInstallError.LocationUnreadable, fetched.reason)
@@ -233,6 +238,7 @@ class DefaultSourceRepository(
                         version = installed.version,
                         enabled = enabled,
                         origin = location,
+                        catalogLocation = catalogLocation,
                     ),
                     script = script,
                     sha256 = packageToInstall.sha256,

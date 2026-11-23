@@ -8,6 +8,7 @@ import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
+import dev.veneranative.data.source.defaultVeneraSourceCatalogUrl
 import dev.veneranative.data.source.SourceLoginOutcome
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import kotlinx.coroutines.Dispatchers
@@ -195,7 +196,9 @@ class SourcesViewModelTest {
 
     @Test
     fun `catalog entries load and install by their resolved script URL`() = runTest(dispatcher) {
-        val entry = SourceCatalogEntry("MangaDex", "manga_dex", "1.2.0", null, "https://cdn.example/manga_dex.js")
+        val entry = SourceCatalogEntry(
+            "MangaDex", "manga_dex", "1.2.0", null, "https://cdn.example/manga_dex.js", defaultVeneraSourceCatalogUrl(),
+        )
         val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(entry)))
         repository.outcome = InstallOutcome.Success(source("manga_dex", "MangaDex"))
         val viewModel = SourcesViewModel(repository, catalog)
@@ -215,8 +218,11 @@ class SourcesViewModelTest {
     @Test
     fun `catalog version differences are shown and can update an installed source`() = runTest(dispatcher) {
         val installed = source("manga_dex", name = "MangaDex", version = "1.0.0")
+            .copy(catalogLocation = defaultVeneraSourceCatalogUrl())
         repository.sources = listOf(installed)
-        val update = SourceCatalogEntry("MangaDex", "manga_dex", "2.0.0", null, "https://cdn.example/manga_dex.js")
+        val update = SourceCatalogEntry(
+            "MangaDex", "manga_dex", "2.0.0", null, "https://cdn.example/manga_dex.js", defaultVeneraSourceCatalogUrl(),
+        )
         val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(update)))
         val viewModel = SourcesViewModel(repository, catalog)
         repository.outcome = InstallOutcome.Success(installed.copy(version = "2.0.0"))
@@ -229,8 +235,38 @@ class SourcesViewModelTest {
         advanceUntilIdle()
 
         assertEquals(listOf(update.scriptUrl), repository.installLocations)
+        assertEquals(listOf(update.catalogLocation), repository.catalogInstallLocations.map { it.second })
         assertEquals("2.0.0", viewModel.state.value.sources.single().version)
         assertEquals("MangaDex 已更新至版本 2.0.0。", viewModel.state.value.message)
+    }
+
+    @Test
+    fun `same source in another catalog offers a switch instead of an update`() = runTest(dispatcher) {
+        val firstCatalog = "https://catalog.example/first/index.json"
+        val secondCatalog = "https://catalog.example/second/index.json"
+        val installed = source("manga_dex", name = "MangaDex", version = "1.0.0").copy(catalogLocation = firstCatalog)
+        repository.sources = listOf(installed)
+        val otherCatalogCopy = SourceCatalogEntry(
+            "MangaDex", "manga_dex", "3.0.0", null, "https://cdn.example/second/manga_dex.js", secondCatalog,
+        )
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(otherCatalogCopy)))
+        val viewModel = SourcesViewModel(repository, catalog)
+        // Load the second catalog to establish it as the active directory.
+        viewModel.onAction(SourcesAction.CatalogLocationChanged(secondCatalog))
+        viewModel.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+
+        assertNull(viewModel.state.value.catalogUpdateFor(installed))
+        assertEquals(0, viewModel.state.value.catalogUpdateCount)
+        assertTrue(viewModel.state.value.isFromDifferentCatalog(otherCatalogCopy))
+
+        repository.outcome = InstallOutcome.Success(source("manga_dex", name = "MangaDex", version = "3.0.0"))
+        viewModel.onAction(SourcesAction.InstallCatalogEntry(otherCatalogCopy))
+        advanceUntilIdle()
+
+        assertEquals(listOf(secondCatalog), repository.catalogInstallLocations.map { it.second })
+        assertEquals(secondCatalog, viewModel.state.value.sources.single().catalogLocation)
+        assertEquals("MangaDex 已切换到此目录。", viewModel.state.value.message)
     }
 
     @Test
@@ -374,6 +410,7 @@ class SourcesViewModelTest {
         var listFailure: Throwable? = null
         var loginOutcome: SourceLoginOutcome = SourceLoginOutcome.Unsupported
         val installLocations = mutableListOf<String>()
+        val catalogInstallLocations = mutableListOf<Pair<String, String>>()
         val enabledChanges = mutableListOf<Pair<SourceId, Boolean>>()
         val uninstalled = mutableListOf<SourceId>()
 
@@ -388,6 +425,17 @@ class SourcesViewModelTest {
                 sources = sources.filterNot { it.sourceId == installed.installed.sourceId } + installed.installed
             }
             return outcome
+        }
+
+        override suspend fun installFromCatalog(location: String, catalogLocation: String): InstallOutcome {
+            catalogInstallLocations += location to catalogLocation
+            val result = install(location)
+            if (result is InstallOutcome.Success) {
+                val installed = result.installed.copy(catalogLocation = catalogLocation)
+                sources = sources.filterNot { it.sourceId == installed.sourceId } + installed
+                return InstallOutcome.Success(installed)
+            }
+            return result
         }
 
         override suspend fun setEnabled(sourceId: SourceId, enabled: Boolean): Boolean {

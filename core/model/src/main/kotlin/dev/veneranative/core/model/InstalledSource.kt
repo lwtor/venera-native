@@ -62,4 +62,6 @@ data class InstalledSource(
     val enabled: Boolean,
     /** Where the package came from, kept so the UI can show it and a reinstall can reuse it. */
     val origin: String,
+    /** Catalog index that supplied this package; null for manual installs and legacy records. */
+    val catalogLocation: String? = null,
 )

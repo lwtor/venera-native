@@ -91,7 +91,11 @@ class SourcesViewModel(
             SourcesAction.RefreshCatalog -> refreshCatalog()
 
             is SourcesAction.InstallCatalogEntry ->
-                install(action.entry.scriptUrl, _state.value.installedSourceFor(action.entry)?.sourceId)
+                install(
+                    location = action.entry.scriptUrl,
+                    catalogLocation = action.entry.catalogLocation ?: _state.value.catalogLocation.trim(),
+                    expectedSourceId = _state.value.installedSourceFor(action.entry)?.sourceId,
+                )
 
             is SourcesAction.OpenConfiguration -> openConfiguration(action.sourceId)
 
@@ -298,15 +302,24 @@ class SourcesViewModel(
         install(location)
     }
 
-    private fun install(location: String, expectedSourceId: SourceId? = null) {
+    private fun install(
+        location: String,
+        catalogLocation: String? = null,
+        expectedSourceId: SourceId? = null,
+    ) {
         if (location.isEmpty() || _state.value.installing) return
 
-        val replacingInstalledSource = _state.value.sources.any {
+        val existing = _state.value.sources.firstOrNull {
             it.sourceId == expectedSourceId || (expectedSourceId == null && it.origin == location)
         }
+        val switchingCatalog = existing != null && catalogLocation != null && existing.catalogLocation != catalogLocation
         _state.update { it.copy(installing = true, message = null) }
         viewModelScope.launch {
-            val outcome = repository.install(location)
+            val outcome = if (catalogLocation != null) {
+                repository.installFromCatalog(location, catalogLocation)
+            } else {
+                repository.install(location)
+            }
             val sources = runCatching { repository.installed() }.getOrDefault(_state.value.sources)
             _state.update { current ->
                 when (outcome) {
@@ -315,7 +328,9 @@ class SourcesViewModel(
                         sources = sources,
                         status = SourcesStatus.Ready,
                         installLocation = if (current.installLocation.trim() == location) "" else current.installLocation,
-                        message = if (replacingInstalledSource) {
+                        message = if (switchingCatalog) {
+                            "${outcome.installed.name} 已切换到此目录。"
+                        } else if (existing != null) {
                             "${outcome.installed.name} 已更新至版本 ${outcome.installed.version}。"
                         } else {
                             "${outcome.installed.name} 已安装。"

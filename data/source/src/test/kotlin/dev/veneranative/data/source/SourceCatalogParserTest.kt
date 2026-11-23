@@ -22,6 +22,7 @@ class SourceCatalogParserTest {
                 version = "1.2.0",
                 description = "Public catalog source",
                 scriptUrl = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/manga_dex.js",
+                catalogLocation = "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json",
             ),
             entries.single(),
         )

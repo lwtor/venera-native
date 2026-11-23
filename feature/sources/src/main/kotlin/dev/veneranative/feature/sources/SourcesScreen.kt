@@ -7,10 +7,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -64,7 +63,9 @@ fun SourcesScreen(
     var pendingUninstall by rememberSaveable { mutableStateOf<String?>(null) }
     var section by rememberSaveable { mutableStateOf(SourcesSection.Installed) }
     var manualInstallExpanded by rememberSaveable { mutableStateOf(false) }
-    var catalogAddressExpanded by rememberSaveable { mutableStateOf(false) }
+    var showAddCatalogDialog by rememberSaveable { mutableStateOf(false) }
+    var showSwitchCatalogDialog by rememberSaveable { mutableStateOf(false) }
+    var newCatalogLocation by rememberSaveable { mutableStateOf("") }
 
     Scaffold(
         modifier = modifier,
@@ -116,10 +117,13 @@ fun SourcesScreen(
 
             when (section) {
                 SourcesSection.Available -> {
-                    TextButton(onClick = { catalogAddressExpanded = !catalogAddressExpanded }, modifier = Modifier.padding(horizontal = 8.dp)) {
-                        Text(if (catalogAddressExpanded) "收起目录设置" else "目录设置")
-                    }
-                    if (catalogAddressExpanded) CatalogHeader(state = state, onAction = onAction)
+                    CatalogLocationHeader(
+                        location = state.catalogLocation,
+                        loading = state.catalogStatus == CatalogStatus.Loading,
+                        onAdd = { showAddCatalogDialog = true; newCatalogLocation = "" },
+                        onSwitch = { showSwitchCatalogDialog = true },
+                        onRefresh = { onAction(SourcesAction.RefreshCatalog) },
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -165,6 +169,69 @@ fun SourcesScreen(
         )
     }
 
+    if (showAddCatalogDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddCatalogDialog = false },
+            title = { Text("添加漫画源目录") },
+            text = {
+                OutlinedTextField(
+                    value = newCatalogLocation,
+                    onValueChange = { newCatalogLocation = it },
+                    label = { Text("目录地址") },
+                    placeholder = { Text("https://example.com/index.json") },
+                    singleLine = true,
+                    enabled = state.catalogStatus != CatalogStatus.Loading,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = newCatalogLocation.isNotBlank() && state.catalogStatus != CatalogStatus.Loading,
+                    onClick = {
+                        val location = newCatalogLocation.trim()
+                        onAction(SourcesAction.CatalogLocationChanged(location))
+                        onAction(SourcesAction.RefreshCatalog)
+                        showAddCatalogDialog = false
+                    },
+                ) { Text("添加并使用") }
+            },
+            dismissButton = { TextButton(onClick = { showAddCatalogDialog = false }) { Text("取消") } },
+        )
+    }
+
+    if (showSwitchCatalogDialog) {
+        AlertDialog(
+            onDismissRequest = { showSwitchCatalogDialog = false },
+            title = { Text("切换漫画源目录") },
+            text = {
+                if (state.catalogHistory.isEmpty()) {
+                    Text("还没有其他已添加的目录。")
+                } else {
+                    LazyColumn(modifier = Modifier.heightIn(max = 360.dp)) {
+                        items(state.catalogHistory, key = { it }) { location ->
+                            TextButton(
+                                onClick = {
+                                    showSwitchCatalogDialog = false
+                                    if (location != state.catalogLocation.trim()) {
+                                        onAction(SourcesAction.SelectCatalogLocation(location))
+                                    }
+                                },
+                                enabled = state.catalogStatus != CatalogStatus.Loading,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    if (location == state.catalogLocation.trim()) "正在使用 · $location" else location,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showSwitchCatalogDialog = false }) { Text("关闭") } },
+        )
+    }
+
     state.configuration?.let { configuration ->
         SourceConfigurationDialog(
             configuration = configuration,
@@ -176,42 +243,27 @@ fun SourcesScreen(
 }
 
 @Composable
-private fun CatalogHeader(state: SourcesUiState, onAction: (SourcesAction) -> Unit) {
-    OutlinedTextField(
-        value = state.catalogLocation,
-        onValueChange = { onAction(SourcesAction.CatalogLocationChanged(it)) },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-        label = { Text("漫画源目录地址") },
-        singleLine = true,
-        enabled = state.catalogStatus != CatalogStatus.Loading,
-        trailingIcon = {
-            IconButton(
-                onClick = { onAction(SourcesAction.RefreshCatalog) },
-                enabled = state.catalogStatus != CatalogStatus.Loading && state.catalogLocation.isNotBlank(),
-            ) {
+private fun CatalogLocationHeader(
+    location: String,
+    loading: Boolean,
+    onAdd: () -> Unit,
+    onSwitch: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Text("当前漫画源目录", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                location,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            TextButton(onClick = onAdd, enabled = !loading) { Text("添加") }
+            TextButton(onClick = onSwitch, enabled = !loading) { Text("切换") }
+            IconButton(onClick = onRefresh, enabled = !loading) {
                 Icon(Icons.Filled.Refresh, contentDescription = "刷新来源目录")
-            }
-        },
-    )
-    if (state.catalogHistory.isNotEmpty()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("历史目录", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
-            Text("点选即可切换", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(state.catalogHistory, key = { it }) { location ->
-                FilterChip(
-                    selected = state.catalogLocation.trim() == location,
-                    onClick = { onAction(SourcesAction.SelectCatalogLocation(location)) },
-                    enabled = state.catalogStatus != CatalogStatus.Loading,
-                    label = { Text(location, modifier = Modifier.widthIn(max = 260.dp), maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                )
             }
         }
     }
@@ -253,6 +305,7 @@ private fun CatalogContent(
                     CatalogSourceRow(
                         entry = entry,
                         installedSource = state.installedSourceFor(entry),
+                        installedFromDifferentCatalog = state.isFromDifferentCatalog(entry),
                         installing = state.installing,
                         onInstall = { onAction(SourcesAction.InstallCatalogEntry(entry)) },
                         onViewInstalled = onInstalledSection,
@@ -340,6 +393,7 @@ private fun ManualInstallRow(state: SourcesUiState, onAction: (SourcesAction) ->
 private fun CatalogSourceRow(
     entry: SourceCatalogEntry,
     installedSource: InstalledSource?,
+    installedFromDifferentCatalog: Boolean,
     installing: Boolean,
     onInstall: () -> Unit,
     onViewInstalled: () -> Unit,
@@ -357,20 +411,34 @@ private fun CatalogSourceRow(
                 }
             }
             if (installedSource != null) {
+                val sameCatalog = installedSource.catalogLocation != null && installedSource.catalogLocation == entry.catalogLocation
+                val differentCatalog = installedFromDifferentCatalog
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        "已安装 ${installedSource.version}",
+                        when {
+                            sameCatalog -> "已安装 ${installedSource.version}"
+                            differentCatalog -> "已在其他目录安装"
+                            else -> "已安装 ${installedSource.version}"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     TextButton(onClick = onViewInstalled) { Text("查看") }
-                    if (entry.version != null && entry.version != installedSource.version) {
+                    if (differentCatalog) {
+                        TextButton(onClick = onInstall, enabled = !installing) {
+                            Text(if (installing) "切换中…" else "切换")
+                        }
+                    } else if (sameCatalog && entry.version != null && entry.version != installedSource.version) {
                         TextButton(onClick = onInstall, enabled = !installing) {
                             Text(if (installing) "更新中…" else "更新至 ${entry.version}")
                         }
-                    } else {
+                    } else if (sameCatalog) {
                         TextButton(onClick = onInstall, enabled = !installing) {
                             Text(if (installing) "安装中…" else "重新安装")
+                        }
+                    } else {
+                        TextButton(onClick = onInstall, enabled = !installing) {
+                            Text(if (installing) "切换中…" else "切换到此目录")
                         }
                     }
                 }

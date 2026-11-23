@@ -76,6 +76,21 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun `catalog installation persists its directory and replacing the source changes directory`() = runTest {
+        val firstCatalog = "https://catalog.example/first/index.json"
+        val secondCatalog = "https://catalog.example/second/index.json"
+        givenScript(version = "1.0.0", script = "class A {}")
+
+        repository.installFromCatalog(LOCATION, firstCatalog)
+        assertEquals(firstCatalog, repository.installed().single().catalogLocation)
+
+        givenScript(version = "2.0.0", script = "class A2 {}")
+        repository.installFromCatalog(LOCATION, secondCatalog)
+        assertEquals(secondCatalog, repository.installed().single().catalogLocation)
+        assertEquals(secondCatalog, SourcePackageStore(File(temporaryFolder.root, "sources")).list().single().catalogLocation)
+    }
+
+    @Test
     fun `an upgrade replaces the stored version and loads the new one`() = runTest {
         givenScript(version = "1.0.0", script = "class A {}")
         repository.install(LOCATION)
