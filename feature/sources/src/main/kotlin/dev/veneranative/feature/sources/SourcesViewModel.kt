@@ -108,10 +108,22 @@ class SourcesViewModel(
 
             is SourcesAction.ComicQueryChanged -> {
                 comicSearchJob?.cancel()
-                _state.update { it.copy(comicQuery = action.query, comicSearchMatches = emptyList(), comicSearchLoading = false, comicSearchPerformed = false) }
+                _state.update {
+                    it.copy(
+                        comicQuery = action.query,
+                        comicSearchMatches = emptyList(),
+                        comicSearchLoading = false,
+                        comicSearchPerformed = false,
+                        comicSearchCompletedSources = 0,
+                        comicSearchTotalSources = 0,
+                        comicSearchFailedSources = 0,
+                    )
+                }
             }
 
             SourcesAction.SearchCatalogForComic -> searchCatalogForComic()
+
+            SourcesAction.CancelCatalogComicSearch -> cancelComicSearch()
 
             is SourcesAction.InstallComicMatch -> installComicMatch(action.match)
 
@@ -375,7 +387,16 @@ class SourcesViewModel(
     private fun cancelComicSearch() {
         comicSearchJob?.cancel()
         comicSearchJob = null
-        _state.update { it.copy(comicSearchLoading = false, comicSearchMatches = emptyList(), comicSearchPerformed = false) }
+        _state.update {
+            it.copy(
+                comicSearchLoading = false,
+                comicSearchMatches = emptyList(),
+                comicSearchPerformed = false,
+                comicSearchCompletedSources = 0,
+                comicSearchTotalSources = 0,
+                comicSearchFailedSources = 0,
+            )
+        }
     }
 
     private fun refresh() {
@@ -449,18 +470,46 @@ class SourcesViewModel(
         val comicCatalog = comicCatalog ?: return
         if (query.isBlank() || _state.value.catalogStatus != CatalogStatus.Ready) return
         comicSearchJob?.cancel()
-        _state.update { it.copy(comicSearchLoading = true, comicSearchMatches = emptyList(), comicSearchPerformed = true, message = null) }
+        val entries = _state.value.catalogEntries
+        _state.update {
+            it.copy(
+                comicSearchLoading = true,
+                comicSearchMatches = emptyList(),
+                comicSearchPerformed = true,
+                comicSearchCompletedSources = 0,
+                comicSearchTotalSources = entries.size,
+                comicSearchFailedSources = 0,
+                message = null,
+            )
+        }
         comicSearchJob = viewModelScope.launch {
-            val matches = try {
-                comicCatalog.searchCatalog(query, _state.value.catalogEntries)
+            val report = try {
+                comicCatalog.searchCatalog(query, entries) { completed, total ->
+                    _state.update { current ->
+                        if (current.comicQuery.trim() != query) current
+                        else current.copy(
+                            comicSearchCompletedSources = maxOf(current.comicSearchCompletedSources, completed),
+                            comicSearchTotalSources = total,
+                        )
+                    }
+                }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                emptyList()
+                dev.veneranative.data.comic.CatalogComicSearchReport(
+                    sourcesChecked = entries.size,
+                    sourcesFailed = entries.size,
+                )
             }
             _state.update { current ->
                 if (current.comicQuery.trim() != query) current
-                else current.copy(comicSearchLoading = false, comicSearchMatches = matches)
+                else current.copy(
+                    comicSearchLoading = false,
+                    comicSearchMatches = report.matches,
+                    comicSearchCompletedSources = report.sourcesChecked,
+                    comicSearchTotalSources = report.sourcesChecked,
+                    comicSearchFailedSources = report.sourcesFailed,
+                )
             }
         }
     }
@@ -468,7 +517,8 @@ class SourcesViewModel(
     private fun installComicMatch(match: CatalogComicMatch) {
         val entry = match.source
         if (entry.catalogLocation == null || _state.value.installing) return
-        if (_state.value.sources.any { it.sourceId == match.comic.key.sourceId }) {
+        val installed = _state.value.sources.firstOrNull { it.sourceId == match.comic.key.sourceId }
+        if (installed != null && installed.catalogLocation == entry.catalogLocation && installed.version == entry.version) {
             _state.update { it.copy(message = "此漫画源已安装。请从已安装列表打开或切换来源。") }
             return
         }

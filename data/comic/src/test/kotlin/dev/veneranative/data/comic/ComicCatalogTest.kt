@@ -41,12 +41,13 @@ import org.junit.Test
  * than as a string.
  */
 class ComicCatalogTest {
-    @Test fun `catalog search probes in temporary identity and always unloads it`() = runTest {
+    @Test fun `catalog search keeps localized ranked hits after source bootstrap and always unloads`() = runTest {
         val repo = FakeSourceRepository(emptyList()).apply {
             probePackage = SourcePackage(SourceId("source-a"), "1.2", "fixture", "a".repeat(64))
+            probeDelayMillis = 20_000L
         }
         val core = FakeSourceCore().apply {
-            items = listOf(Comic(ComicKey(SourceId("temporary"), RemoteComicId("42")), "Naruto"))
+            items = listOf(Comic(ComicKey(SourceId("temporary"), RemoteComicId("42")), "ナルト"))
             detailResponse = SourceOutcome.Success(ComicDetail(
                 comic = items.first(),
                 chapters = listOf(Chapter(
@@ -58,15 +59,21 @@ class ComicCatalogTest {
         val runtime = RecordingProbeRuntime()
         val entry = SourceCatalogEntry("Source A", "source-a", "1.2", null, "https://example.test/source.js")
         val catalog = DefaultComicCatalog(repo, core, runtime)
+        val progress = mutableListOf<Pair<Int, Int>>()
 
-        val matches = catalog.searchCatalog("Naruto", listOf(entry))
+        val report = catalog.searchCatalog("Naruto", listOf(entry)) { completed, total ->
+            progress += completed to total
+        }
 
-        assertEquals(1, matches.size)
-        assertEquals(SourceId("source-a"), matches.single().comic.key.sourceId)
+        assertEquals(1, report.matches.size)
+        assertEquals(0, report.sourcesFailed)
+        assertEquals("ナルト", report.matches.single().comic.title)
+        assertEquals(SourceId("source-a"), report.matches.single().comic.key.sourceId)
         assertEquals(runtime.installed.single(), core.requests.single().sourceId)
         assertTrue(runtime.installed.single() != SourceId("source-a"))
         assertEquals(runtime.installed, runtime.unloaded)
         assertEquals(runtime.installed, repo.clearedProbeIds)
+        assertEquals(listOf(1 to 1), progress)
         assertTrue(repo.sources.isEmpty())
     }
 
@@ -419,6 +426,7 @@ class ComicCatalogTest {
     private class FakeSourceRepository(sources: List<InstalledSource>) : SourceRepository {
         val sources: MutableList<InstalledSource> = sources.toMutableList()
         var probePackage: SourcePackage? = null
+        var probeDelayMillis: Long = 0
         val clearedProbeIds = mutableListOf<SourceId>()
         val changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
         override val revision: kotlinx.coroutines.flow.StateFlow<Long> = changes
@@ -428,7 +436,10 @@ class ComicCatalogTest {
         override suspend fun install(location: String): InstallOutcome =
             error("not used in these tests")
 
-        override suspend fun packageForProbe(location: String): SourcePackage? = probePackage
+        override suspend fun packageForProbe(location: String): SourcePackage? {
+            if (probeDelayMillis > 0) kotlinx.coroutines.delay(probeDelayMillis)
+            return probePackage
+        }
 
         override suspend fun clearProbeState(sourceId: SourceId) { clearedProbeIds += sourceId }
 

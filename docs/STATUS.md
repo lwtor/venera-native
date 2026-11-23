@@ -2,6 +2,16 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-15 修复漫画源目录试搜全空与搜索页布局（DONE）
+
+- U-14 试搜原先对脚本获取、运行时安装、搜索、详情和章节验证设置 15 秒总超时；来源核心自身的详情/章节调用最长 60 秒，导致正常来源会被提前判失败。另有原生端标题子串过滤，误删来源已返回的本地化/别名标题结果；全部失败又被折叠成空列表。
+- 修正为来源搜索排序负责匹配，不再二次过滤结果标题；单来源总超时 120 秒、并发上限仍为 3，支持取消，进度显示已检查数，并区分无结果与试搜失败。布局改为清晰的搜索卡片及独立全屏结果列表。
+- 新增回归覆盖 20 秒来源准备、来源返回本地化标题、临时来源隔离与清理；测试源码编译通过，测试未执行。
+- JDK 17：`:data:comic:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL。
+- JDK 17：`:app:assembleRelease` — BUILD SUCCESSFUL；Release Lint Vital 与构建前签名身份检查通过。
+- `apksigner verify --print-certs` SHA-256 与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.6.1 / 2006001。
+- `git diff --check` — PASS。正式 APK：[GitHub Release](https://github.com/lwtor/venera-native/releases/tag/v2.6.1)。新 UI 和实际目录网络行为等待用户验收。
+
 ## 当前任务：U-14 漫画源目录按作品试搜（DONE）
 
 - 漫画源页新增按作品标题试搜当前目录的入口；来源脚本以临时 SourceId 在共享 Runtime 中独立执行，不写入安装存储，不覆盖同 ID 的已安装来源。试搜验证标题匹配、详情与非空章节后才列为命中；用户只需安装选中的来源。
@@ -84,7 +94,7 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.6.0（versionCode 2006000），对应 U-14；2.5.1 是上一个正式发布版本。
+- 应用版本：2.6.1（versionCode 2006001），对应 U-15；2.6.0 是上一个正式发布版本。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。

@@ -30,6 +30,7 @@ sealed interface SourcesAction {
 
     data class ComicQueryChanged(val query: String) : SourcesAction
     data object SearchCatalogForComic : SourcesAction
+    data object CancelCatalogComicSearch : SourcesAction
     data class InstallComicMatch(val match: CatalogComicMatch) : SourcesAction
 
     data class OpenConfiguration(val sourceId: SourceId) : SourcesAction

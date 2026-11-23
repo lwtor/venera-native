@@ -54,7 +54,11 @@ interface ComicCatalog {
     suspend fun searchableSources(): List<InstalledSource>
 
     /** Searches catalog scripts in throwaway runtime sessions without installing them. */
-    suspend fun searchCatalog(query: String, entries: List<SourceCatalogEntry>): List<CatalogComicMatch> = emptyList()
+    suspend fun searchCatalog(
+        query: String,
+        entries: List<SourceCatalogEntry>,
+        onProgress: (completed: Int, total: Int) -> Unit = { _, _ -> },
+    ): CatalogComicSearchReport = CatalogComicSearchReport()
 
     /** Installed and enabled sources that declare at least one explore page. */
     suspend fun explorableSources(): List<InstalledSource>
@@ -97,6 +101,12 @@ interface ComicCatalog {
 }
 
 data class CatalogComicMatch(val source: SourceCatalogEntry, val comic: Comic)
+
+data class CatalogComicSearchReport(
+    val matches: List<CatalogComicMatch> = emptyList(),
+    val sourcesChecked: Int = 0,
+    val sourcesFailed: Int = 0,
+)
 
 /**
  * The paging key.

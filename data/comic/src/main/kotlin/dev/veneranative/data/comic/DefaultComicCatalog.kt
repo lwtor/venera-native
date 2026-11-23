@@ -36,6 +36,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CancellationException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * [ComicCatalog] over the installed sources and one [SourceCore].
@@ -64,42 +65,64 @@ class DefaultComicCatalog(
 
     override fun category(request: CategoryRequest): PagingSource<PageKey, Comic> = CategoryPagingSource(core, request, ::prepareResultTags)
 
-    override suspend fun searchCatalog(query: String, entries: List<SourceCatalogEntry>): List<CatalogComicMatch> {
+    override suspend fun searchCatalog(
+        query: String,
+        entries: List<SourceCatalogEntry>,
+        onProgress: (completed: Int, total: Int) -> Unit,
+    ): CatalogComicSearchReport {
         val keyword = query.trim()
-        val runtime = probeRuntime ?: return emptyList()
-        if (keyword.isBlank() || entries.isEmpty() || !runtime.isSupported()) return emptyList()
-        val semaphore = Semaphore(3)
-        return coroutineScope {
-            entries.map { entry -> async {
-                semaphore.withPermit { probeCatalogEntry(entry, keyword, runtime) }
-            } }.awaitAll().filterNotNull()
+        if (keyword.isBlank() || entries.isEmpty()) return CatalogComicSearchReport()
+        val runtime = probeRuntime ?: return CatalogComicSearchReport(sourcesChecked = entries.size, sourcesFailed = entries.size)
+        if (!runtime.isSupported()) {
+            onProgress(entries.size, entries.size)
+            return CatalogComicSearchReport(sourcesChecked = entries.size, sourcesFailed = entries.size)
         }
+        val semaphore = Semaphore(3)
+        val completed = AtomicInteger()
+        val outcomes = coroutineScope {
+            entries.map { entry -> async {
+                val outcome = semaphore.withPermit { probeCatalogEntry(entry, keyword, runtime) }
+                onProgress(completed.incrementAndGet(), entries.size)
+                outcome
+            } }.awaitAll()
+        }
+        return CatalogComicSearchReport(
+            matches = outcomes.mapNotNull { it.match },
+            sourcesChecked = entries.size,
+            sourcesFailed = outcomes.count { it.failed },
+        )
     }
+
+    private data class CatalogProbeOutcome(val match: CatalogComicMatch? = null, val failed: Boolean = false)
 
     private suspend fun probeCatalogEntry(
         entry: SourceCatalogEntry,
         keyword: String,
         runtime: SourceScriptRuntime,
-    ): CatalogComicMatch? = try {
+    ): CatalogProbeOutcome = try {
         withTimeoutOrNull(CATALOG_PROBE_TIMEOUT_MILLIS) {
-            val sourcePackage = sources.packageForProbe(entry.scriptUrl) ?: return@withTimeoutOrNull null
+            val sourcePackage = sources.packageForProbe(entry.scriptUrl)
+                ?: return@withTimeoutOrNull CatalogProbeOutcome(failed = true)
             val probeId = SourceId("catalog-probe-${UUID.randomUUID()}")
             try {
                 if (runtime.install(sourcePackage.copy(sourceId = probeId)) !is SourceInstallResult.Installed) {
-                    return@withTimeoutOrNull null
+                    return@withTimeoutOrNull CatalogProbeOutcome(failed = true)
                 }
                 when (val result = core.search(SearchRequest(sourceId = probeId, keyword = keyword))) {
-                    is SourceOutcome.Failure -> null
+                    is SourceOutcome.Failure -> CatalogProbeOutcome(failed = true)
                     is SourceOutcome.Success -> {
-                        val candidate = result.value.items.firstOrNull { comic ->
-                            comic.title.contains(keyword, ignoreCase = true) || keyword.contains(comic.title, ignoreCase = true)
-                        } ?: return@withTimeoutOrNull null
+                        // The source owns search ranking and matching. Titles can be localized or
+                        // use punctuation/aliases that do not contain the user's exact query.
+                        val candidate = result.value.items.firstOrNull()
+                            ?: return@withTimeoutOrNull CatalogProbeOutcome()
                         val probeComicKey = candidate.key.copy(sourceId = probeId)
                         when (val detail = core.detail(probeComicKey)) {
-                            is SourceOutcome.Failure -> null
-                            is SourceOutcome.Success -> detail.value.takeIf { it.chapters.isNotEmpty() }?.let {
-                                CatalogComicMatch(entry, candidate.copy(key = candidate.key.copy(sourceId = sourcePackage.sourceId)))
-                            }
+                            is SourceOutcome.Failure -> CatalogProbeOutcome(failed = true)
+                            is SourceOutcome.Success -> if (detail.value.chapters.isEmpty()) {
+                                CatalogProbeOutcome(failed = true)
+                            } else CatalogProbeOutcome(
+                                match = CatalogComicMatch(entry, candidate.copy(key = candidate.key.copy(sourceId = sourcePackage.sourceId))),
+                            )
                         }
                     }
                 }
@@ -112,11 +135,11 @@ class DefaultComicCatalog(
                     }
                 }
             }
-        }
+        } ?: CatalogProbeOutcome(failed = true)
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
-        null
+        CatalogProbeOutcome(failed = true)
     }
 
     private data class DetailEntry(
@@ -319,6 +342,6 @@ class DefaultComicCatalog(
     private companion object {
         const val DEFAULT_DETAIL_CACHE_TTL_MILLIS = 5 * 60 * 1000L
         const val DEFAULT_CAPABILITY_CACHE_TTL_MILLIS = 30 * 60 * 1000L
-        const val CATALOG_PROBE_TIMEOUT_MILLIS = 15_000L
+        const val CATALOG_PROBE_TIMEOUT_MILLIS = 120_000L
     }
 }
