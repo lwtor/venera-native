@@ -6,7 +6,7 @@
 
 - 当前配置中的“已登录”只是本地会话数据标记，不能作为服务器有效性结论。
 - 2.4.0 支持来源提供的 `account.validate(): Promise<boolean>` 以及上游 `loginWithCookies.validate(values)` 协议在线检查；网络 API 只允许来源读取自身、HTTPS 地址下匹配的 Cookie。配置弹窗区分本地会话与服务端校验结果，并支持有会话时直接重新登录，不要求先退出。
-- Debug、Release 编译通过，Release Lint Vital 和签名指纹检查通过；来源仓库、来源管理、元数据及来源网络测试源码编译通过，未运行单元测试。GitHub Release 与真机验收待交付。
+- Debug、Release 编译通过，Release Lint Vital 和签名指纹检查通过；来源仓库、来源管理、元数据及来源网络测试源码编译通过，未运行单元测试。2.4.0 APK 已发布：[GitHub Release](https://github.com/lwtor/venera-native/releases/tag/v2.4.0)；真机验收待用户完成。
 
 ## 当前任务：U-10 漫画源目录切换与更新范围（DONE）
 
@@ -55,7 +55,7 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.4.0（versionCode 2004000），实现漫画源账号有效性检测与直接重新登录；U-10 的 2.3.0 发布记录见上文。
+- 应用版本：2.4.1（versionCode 2004001），同步 U-11 的 Release 发布状态；功能首次交付于 2.4.0。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。
