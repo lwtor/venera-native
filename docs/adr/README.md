@@ -20,6 +20,7 @@ ADR 记录已经接受或需要长期保留上下文的架构决定。
 | [ADR-0015](0015-retained-comic-data.md) | 保留漫画资料与资源 | Accepted |
 | [ADR-0016](0016-installed-source-settings-and-login.md) | 已安装来源的私有设置与登录 | Accepted |
 | [ADR-0017](0017-github-release-self-update.md) | GitHub Release 应用内自升级 | Accepted |
+| [ADR-0018](0018-release-signing-vault.md) | Release 签名备份与强制证书检查 | Accepted |
 
 ## 编写规则
 

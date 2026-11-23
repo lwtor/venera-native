@@ -29,7 +29,7 @@
 .\gradlew.bat :app:assembleDebug
 ```
 
-Debug APK 输出到 `app/build/outputs/apk/debug/app-debug.apk`。正式 Release 使用独立签名密钥，绝不能使用仓库中的 Debug 密钥；签名与发布流程见 [`docs/release.md`](docs/release.md)。
+Debug APK 输出到 `app/build/outputs/apk/debug/app-debug.apk`。正式 Release 使用独立签名密钥，不能使用仓库中的 Debug 密钥；Mac / Windows 首次恢复签名文件、证书校验与发布流程见 [`docs/release.md`](docs/release.md)。Release 2.0.0 起使用新签名身份，不能直接覆盖旧证书签名的安装。
 
 ## 技术结构
 

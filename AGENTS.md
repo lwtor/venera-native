@@ -102,7 +102,8 @@
 - `:app` 的 Debug 构建显式使用项目签名文件 `signing/venera-native-debug.keystore`，不得回退到每台电脑各自生成的 `$HOME/.android/debug.keystore`。
 - `signing/venera-native-debug.keystore` 是有意纳入版本控制的共享开发密钥；新开发电脑直接使用仓库中的同一文件，不得重新生成或替换，否则已安装 App 将无法直接覆盖更新。
 - 该密钥的证书为 Android Debug 身份，只用于开发构建；不得用于 Release。丢失或轮换时，不能通过生成新 key 恢复原签名，应先规划应用数据迁移。
-- Release 签名须另行创建并单独保管；Release keystore、密码及其他凭据绝不能提交到仓库。
+- Release 签名须单独保管；Release keystore、密码及其他凭据绝不能提交到本公开项目仓库。按用户明确要求，加密备份和明文恢复密码存于独立私有库 `lwtor/private-vault`；能读取该私有库的人均可解密，必须限制访问。项目签名恢复和校验见 `docs/release.md`。
+- Release 必须使用 `signing/release-cert.sha256` 指定的证书；构建前与生成 APK 后的验证均不得绕过或因方便而修改指纹。
 
 编写测试代码属于实现工作，但普通节点只要求测试源码能够编译；除非用户明确要求，不因为新增了测试就自动执行完整测试。
 

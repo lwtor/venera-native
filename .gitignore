@@ -28,6 +28,9 @@ release/
 *.keystore
 !signing/venera-native-debug.keystore
 keystore.properties
+keystore-vault.properties
+backup-password.txt
+*.gpg
 secrets.properties
 
 # Native build
