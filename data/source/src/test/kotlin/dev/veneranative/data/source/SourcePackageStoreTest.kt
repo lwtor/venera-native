@@ -82,6 +82,18 @@ class SourcePackageStoreTest {
     }
 
     @Test
+    fun `reordering is persisted and stale ids remain at the end`() {
+        store.write(source("source-a", "1", "a"))
+        store.write(source("source-b", "1", "b"))
+        store.write(source("source-c", "1", "c"))
+
+        assertTrue(store.reorder(listOf(SourceId("source-c"), SourceId("source-a"))))
+
+        assertEquals(listOf("source-c", "source-a", "source-b"), store.list().map { it.sourceId.value })
+        assertEquals(listOf("source-c", "source-a", "source-b"), SourcePackageStore(File(temporaryFolder.root, "sources")).list().map { it.sourceId.value })
+    }
+
+    @Test
     fun `a malformed index entry does not hide the valid ones`() {
         store.write(source(id = "source-a", version = "1", script = "a"))
         File(temporaryFolder.root, "sources/index.json")

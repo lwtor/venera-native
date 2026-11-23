@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,30 +33,33 @@ import dev.veneranative.core.model.InstalledSourceConfiguration
 import dev.veneranative.core.model.SourceSettingDefinition
 
 @Composable
-internal fun SourceConfigurationDialog(
-    configuration: InstalledSourceConfiguration,
+internal fun SourceConfigurationPanel(
+    configuration: InstalledSourceConfiguration?,
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
-    onDismiss: () -> Unit,
 ) {
+    if (configuration == null) {
+        if (state.configurationLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        return
+    }
     var values by remember(configuration.source.sourceId.value, configuration.settingValues) {
         mutableStateOf(configuration.settingValues.toMap())
     }
     var account by remember(configuration.source.sourceId.value) { mutableStateOf("") }
-    var passwordLoginExpanded by remember(configuration.source.sourceId.value) { mutableStateOf(!configuration.loggedIn) }
+    var showCredentialFields by remember(configuration.source.sourceId.value, configuration.hasSavedLoginCredentials) {
+        mutableStateOf(!configuration.hasSavedLoginCredentials)
+    }
     // Credentials deliberately use ordinary in-memory Compose state, never rememberSaveable.
     var password by remember(configuration.source.sourceId.value) { mutableStateOf("") }
     val uriHandler = LocalUriHandler.current
     val hasEditableSettings = configuration.settings.any { it.type != SourceSettingDefinition.Type.CALLBACK }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("${configuration.source.name} 设置") },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("${configuration.source.name} 设置", style = MaterialTheme.typography.titleSmall)
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
                 if (configuration.supportsPasswordLogin || configuration.supportsLoginValidation) {
                     Text("账号", style = MaterialTheme.typography.titleSmall)
                     Text(
@@ -69,7 +71,7 @@ internal fun SourceConfigurationDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (configuration.supportsPasswordLogin && (!configuration.loggedIn || passwordLoginExpanded)) {
+                    if (configuration.supportsPasswordLogin && showCredentialFields) {
                         OutlinedTextField(
                             value = account,
                             onValueChange = { account = it },
@@ -94,19 +96,26 @@ internal fun SourceConfigurationDialog(
                             },
                             enabled = account.isNotBlank() && password.isNotBlank() && !state.accountActionInProgress,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(if (state.accountActionInProgress) "处理中…" else if (configuration.loggedIn) "重新登录" else "登录") }
+                        ) { Text(if (state.accountActionInProgress) "处理中…" else "登录并记住账号") }
+                    } else if (configuration.supportsPasswordLogin) {
+                        Button(
+                            onClick = { onAction(SourcesAction.Relogin(configuration.source.sourceId)) },
+                            enabled = !state.accountActionInProgress,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (state.accountActionInProgress) "登录中…" else "使用已保存账号重新登录") }
+                        TextButton(onClick = { showCredentialFields = true }, enabled = !state.accountActionInProgress) {
+                            Text("更换保存的账号信息")
+                        }
                     }
                     if (configuration.supportsLoginValidation) {
                         TextButton(
                             onClick = { onAction(SourcesAction.CheckLogin(configuration.source.sourceId)) },
                             enabled = !state.accountActionInProgress,
-                        ) { Text("检测登录状态") }
-                    }
-                    if (configuration.loggedIn && configuration.supportsPasswordLogin && !passwordLoginExpanded) {
-                        TextButton(
-                            onClick = { passwordLoginExpanded = true },
-                            enabled = !state.accountActionInProgress,
-                        ) { Text("重新登录") }
+                        ) {
+                            if (configuration.source.sourceId in state.manualLoginCheckSourceIds) {
+                                androidx.compose.material3.CircularProgressIndicator(modifier = Modifier.heightIn(max = 18.dp), strokeWidth = 2.dp)
+                            } else Text("检测登录状态")
+                        }
                     }
                     if (configuration.loggedIn && configuration.supportsLogout) {
                         TextButton(
@@ -114,7 +123,7 @@ internal fun SourceConfigurationDialog(
                             enabled = !state.accountActionInProgress,
                         ) { Text("退出登录") }
                     }
-                    state.loginCheckOutcome?.let { outcome ->
+                    state.loginCheckOutcomes[configuration.source.sourceId]?.let { outcome ->
                         val statusText = when (outcome) {
                             dev.veneranative.data.source.SourceLoginCheckOutcome.Valid -> "服务器确认登录有效"
                             dev.veneranative.data.source.SourceLoginCheckOutcome.Invalid -> "服务器确认登录已失效"
@@ -163,19 +172,18 @@ internal fun SourceConfigurationDialog(
                         }
                     }
                 }
-                if (state.configurationLoading || state.settingsSaving || state.accountActionInProgress) {
+                if (state.settingsSaving || state.accountActionInProgress) {
                     LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onAction(SourcesAction.SaveSettings(configuration.source.sourceId, values)) },
-                enabled = hasEditableSettings && !state.settingsSaving,
-            ) { Text(if (state.settingsSaving) "保存中…" else "保存设置") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
-    )
+        }
+    }
+
+    if (hasEditableSettings) {
+        TextButton(
+            onClick = { onAction(SourcesAction.SaveSettings(configuration.source.sourceId, values)) },
+            enabled = !state.settingsSaving,
+        ) { Text(if (state.settingsSaving) "保存中…" else "保存设置") }
+    }
 }
 
 @Composable

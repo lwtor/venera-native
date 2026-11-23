@@ -48,6 +48,8 @@ data class InstalledSourceConfiguration(
     val supportsLoginValidation: Boolean,
     val registerWebsite: String?,
     val loggedIn: Boolean,
+    /** True only when encrypted, source-scoped password-login credentials are available. */
+    val hasSavedLoginCredentials: Boolean = false,
 )
 
 /**

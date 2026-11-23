@@ -13,11 +13,13 @@ import dev.veneranative.data.source.SourceLoginOutcome
 import dev.veneranative.data.source.SourceLoginCheckOutcome
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -51,6 +53,41 @@ class SourcesViewModelTest {
 
         assertEquals(SourcesStatus.Ready, viewModel.state.value.status)
         assertEquals(listOf("a", "b"), viewModel.state.value.sources.map { it.sourceId.value })
+    }
+
+    @Test
+    fun `expansion checks login in background and manual retry joins the same request`() = runTest(dispatcher) {
+        val installed = source("a")
+        repository.sources = listOf(installed)
+        repository.configurationResult = dev.veneranative.core.model.InstalledSourceConfiguration(
+            source = installed,
+            settings = emptyList(),
+            settingValues = emptyMap(),
+            supportsPasswordLogin = true,
+            supportsLogout = false,
+            supportsLoginValidation = true,
+            registerWebsite = null,
+            loggedIn = true,
+        )
+        val gate = CompletableDeferred<SourceLoginCheckOutcome>()
+        repository.loginCheckGate = gate
+        val viewModel = SourcesViewModel(repository)
+        runCurrent()
+
+        viewModel.onAction(SourcesAction.OpenConfiguration(installed.sourceId))
+        runCurrent()
+        assertEquals(1, repository.loginCheckCalls)
+        assertTrue(installed.sourceId in viewModel.state.value.loginCheckInProgressSourceIds)
+
+        viewModel.onAction(SourcesAction.CheckLogin(installed.sourceId))
+        runCurrent()
+        assertEquals(1, repository.loginCheckCalls)
+        assertTrue(installed.sourceId in viewModel.state.value.manualLoginCheckSourceIds)
+
+        gate.complete(SourceLoginCheckOutcome.Invalid)
+        advanceUntilIdle()
+        assertEquals(SourceLoginCheckOutcome.Invalid, viewModel.state.value.loginCheckOutcomes[installed.sourceId])
+        assertTrue(installed.sourceId !in viewModel.state.value.loginCheckInProgressSourceIds)
     }
 
     @Test
@@ -425,6 +462,9 @@ class SourcesViewModelTest {
         var listFailure: Throwable? = null
         var loginOutcome: SourceLoginOutcome = SourceLoginOutcome.Unsupported
         var loginCheckOutcome: SourceLoginCheckOutcome = SourceLoginCheckOutcome.Unsupported
+        var configurationResult: dev.veneranative.core.model.InstalledSourceConfiguration? = null
+        var loginCheckGate: CompletableDeferred<SourceLoginCheckOutcome>? = null
+        var loginCheckCalls = 0
         val installLocations = mutableListOf<String>()
         val catalogInstallLocations = mutableListOf<Pair<String, String>>()
         val enabledChanges = mutableListOf<Pair<SourceId, Boolean>>()
@@ -434,6 +474,8 @@ class SourcesViewModelTest {
             listFailure?.let { throw it }
             return sources
         }
+
+        override suspend fun configuration(sourceId: SourceId) = configurationResult
 
         override suspend fun install(location: String): InstallOutcome {
             installLocations += location
@@ -469,7 +511,10 @@ class SourcesViewModelTest {
         }
 
         override suspend fun login(sourceId: SourceId, account: String, password: String) = loginOutcome
-        override suspend fun checkLogin(sourceId: SourceId) = loginCheckOutcome
+        override suspend fun checkLogin(sourceId: SourceId): SourceLoginCheckOutcome {
+            loginCheckCalls++
+            return loginCheckGate?.await() ?: loginCheckOutcome
+        }
     }
 
     private class FakeSourceCatalogRepository(

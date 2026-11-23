@@ -25,6 +25,9 @@ data class SourcesUiState(
     val configurationLoading: Boolean = false,
     val accountActionInProgress: Boolean = false,
     val loginCheckOutcome: dev.veneranative.data.source.SourceLoginCheckOutcome? = null,
+    val loginCheckOutcomes: Map<SourceId, dev.veneranative.data.source.SourceLoginCheckOutcome> = emptyMap(),
+    val loginCheckInProgressSourceIds: Set<SourceId> = emptySet(),
+    val manualLoginCheckSourceIds: Set<SourceId> = emptySet(),
     val settingsSaving: Boolean = false,
 ) {
     val isEmpty: Boolean get() = status == SourcesStatus.Ready && sources.isEmpty()

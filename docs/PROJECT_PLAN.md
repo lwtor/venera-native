@@ -530,7 +530,7 @@ sealed interface ComicPage {
 - 应用本身不内置侵权内容或不受控制的商业源。
 - 用户明确安装第三方漫画源，并看到来源地址和风险说明。
 - Release 禁止明文 HTTP；单个来源确有需要时要求用户显式授权。
-- 账户密码只用于登录请求，不持久化；必要凭据由 Keystore 保护。
+- 账户密码只在首次录入时传给来源登录方法；成功凭据作为独立的来源私有记录由 Android Keystore AES-GCM 加密，用于后续主动重新登录，不混入脚本 `settings` / `saveData`、备份或日志。Cookie/Token 仍由来源脚本的加密 `saveData` 会话管理。
 - Cookie、Token 和备份密码禁止进入普通日志与崩溃报告。
 - WebView 禁止不必要的文件访问、调试和跨来源能力。
 - 源脚本下载采用 Hash 记录，可选签名验证。

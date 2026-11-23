@@ -11,6 +11,8 @@ sealed interface SourcesAction {
 
     data class SetEnabled(val sourceId: SourceId, val enabled: Boolean) : SourcesAction
 
+    data class ReorderSources(val sourceIds: List<SourceId>) : SourcesAction
+
     data class Uninstall(val sourceId: SourceId) : SourcesAction
 
     data object Retry : SourcesAction
@@ -30,6 +32,7 @@ sealed interface SourcesAction {
     data class SaveSettings(val sourceId: SourceId, val values: Map<String, String>) : SourcesAction
     data class InvokeSettingCallback(val sourceId: SourceId, val key: String) : SourcesAction
     data class Login(val sourceId: SourceId, val account: String, val password: String) : SourcesAction
+    data class Relogin(val sourceId: SourceId) : SourcesAction
     data class CheckLogin(val sourceId: SourceId) : SourcesAction
     data class Logout(val sourceId: SourceId) : SourcesAction
 }

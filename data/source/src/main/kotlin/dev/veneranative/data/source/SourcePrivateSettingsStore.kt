@@ -19,17 +19,24 @@ interface SourcePrivateSettingsStore {
     fun write(sourceId: SourceId, values: Map<String, String>)
     fun readSourceData(sourceId: SourceId): String = "{}"
     fun writeSourceData(sourceId: SourceId, dataJson: String) = Unit
+    fun readLoginCredentials(sourceId: SourceId): Pair<String, String>? = null
+    fun writeLoginCredentials(sourceId: SourceId, account: String, password: String) = Unit
+    fun clearLoginCredentials(sourceId: SourceId) = Unit
     fun clear(sourceId: SourceId)
 }
 
 class InMemorySourcePrivateSettingsStore : SourcePrivateSettingsStore {
     private val values = mutableMapOf<SourceId, Map<String, String>>()
     private val data = mutableMapOf<SourceId, String>()
+    private val credentials = mutableMapOf<SourceId, Pair<String, String>>()
     @Synchronized override fun read(sourceId: SourceId) = values[sourceId].orEmpty()
     @Synchronized override fun write(sourceId: SourceId, values: Map<String, String>) { this.values[sourceId] = values.toMap() }
     @Synchronized override fun readSourceData(sourceId: SourceId) = data[sourceId] ?: "{}"
     @Synchronized override fun writeSourceData(sourceId: SourceId, dataJson: String) { data[sourceId] = dataJson }
-    @Synchronized override fun clear(sourceId: SourceId) { values.remove(sourceId); data.remove(sourceId) }
+    @Synchronized override fun readLoginCredentials(sourceId: SourceId) = credentials[sourceId]
+    @Synchronized override fun writeLoginCredentials(sourceId: SourceId, account: String, password: String) { credentials[sourceId] = account to password }
+    @Synchronized override fun clearLoginCredentials(sourceId: SourceId) { credentials.remove(sourceId) }
+    @Synchronized override fun clear(sourceId: SourceId) { values.remove(sourceId); data.remove(sourceId); credentials.remove(sourceId) }
 }
 
 class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSettingsStore {
@@ -125,10 +132,54 @@ class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSetting
         }
     }
 
+    @Synchronized
+    override fun readLoginCredentials(sourceId: SourceId): Pair<String, String>? {
+        val encoded = preferences.getString(credentialsPreferenceKey(sourceId), null) ?: return null
+        return runCatching {
+            val blob = Base64.decode(encoded, Base64.NO_WRAP)
+            require(blob.size > NONCE_BYTES)
+            val nonce = blob.copyOfRange(0, NONCE_BYTES)
+            val cipher = Cipher.getInstance(TRANSFORMATION).apply {
+                init(Cipher.DECRYPT_MODE, loadOrCreateKey(), GCMParameterSpec(TAG_BITS, nonce))
+                updateAAD(aad(sourceId, "login-credentials"))
+            }
+            val json = JSONObject(String(cipher.doFinal(blob.copyOfRange(NONCE_BYTES, blob.size)), Charsets.UTF_8))
+            val account = json.optString("account").takeIf(String::isNotBlank) ?: return@runCatching null
+            val password = json.optString("password").takeIf(String::isNotBlank) ?: return@runCatching null
+            account to password
+        }.getOrElse {
+            clearLoginCredentials(sourceId)
+            null
+        }
+    }
+
+    @Synchronized
+    override fun writeLoginCredentials(sourceId: SourceId, account: String, password: String) {
+        require(account.isNotBlank() && password.isNotBlank())
+        val cipher = Cipher.getInstance(TRANSFORMATION).apply {
+            init(Cipher.ENCRYPT_MODE, loadOrCreateKey())
+            updateAAD(aad(sourceId, "login-credentials"))
+        }
+        val json = JSONObject().put("account", account).put("password", password).toString()
+        val encrypted = cipher.doFinal(json.toByteArray(Charsets.UTF_8))
+        val blob = ByteArray(cipher.iv.size + encrypted.size)
+        cipher.iv.copyInto(blob)
+        encrypted.copyInto(blob, cipher.iv.size)
+        check(preferences.edit().putString(credentialsPreferenceKey(sourceId), Base64.encodeToString(blob, Base64.NO_WRAP)).commit()) {
+            "Could not save encrypted source login credentials."
+        }
+    }
+
+    @SuppressLint("ApplySharedPref")
+    @Synchronized
+    override fun clearLoginCredentials(sourceId: SourceId) {
+        check(preferences.edit().remove(credentialsPreferenceKey(sourceId)).commit()) { "Could not clear source login credentials." }
+    }
+
     @SuppressLint("ApplySharedPref")
     @Synchronized
     override fun clear(sourceId: SourceId) {
-        check(preferences.edit().remove(preferenceKey(sourceId)).remove(dataPreferenceKey(sourceId)).commit()) {
+        check(preferences.edit().remove(preferenceKey(sourceId)).remove(dataPreferenceKey(sourceId)).remove(credentialsPreferenceKey(sourceId)).commit()) {
             "Could not clear source private data."
         }
     }
@@ -144,6 +195,8 @@ class AndroidSourcePrivateSettingsStore(context: Context) : SourcePrivateSetting
     }"
 
     private fun dataPreferenceKey(sourceId: SourceId): String = preferenceKey(sourceId) + "_data"
+
+    private fun credentialsPreferenceKey(sourceId: SourceId): String = preferenceKey(sourceId) + "_login"
 
     private fun aad(sourceId: SourceId, purpose: String = "settings") =
         "venera-native-source-$purpose-v1:${sourceId.value}".toByteArray(Charsets.UTF_8)

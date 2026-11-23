@@ -2,6 +2,17 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-12 漫画源内联设置、登录恢复与来源排序（DONE）
+
+- 已确认采用单列表：折叠项展示来源名称和版本，展开项内提供启停、更新、移除、账号操作及来源自定义设置。
+- 展开账号来源后后台检查登录状态；每来源同一时刻最多一个检查请求，手动触发复用正在执行的请求；异常状态在来源行以红色感叹号标识。
+- 成功的账号密码登录将账号信息独立写入 Android Keystore AES-GCM 加密的来源私有记录，提供自动重新登录；数据不混入脚本 settings/saveData。此前版本未保存的账号需要首次补录。
+- 长按来源行进入顺序调整操作，顺序保存到来源索引；仓库列表及聚合搜索依该顺序展示。
+- JDK 17：`:data:source:compileDebugUnitTestKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL；测试源码编译通过，未执行测试。
+- JDK 17：`:app:assembleRelease` — BUILD SUCCESSFUL；Release Lint Vital、构建前签名身份与生成后 APK 签名检查均通过。
+- `apksigner verify --print-certs` SHA-256 与 `signing/release-cert.sha256` 一致；`aapt dump badging` 确认 `dev.veneranative`、2.5.0 / 2005000。
+- `git diff --check` — PASS。正式 APK 已发布：[GitHub Release](https://github.com/lwtor/venera-native/releases/tag/v2.5.0)。真机交互及升级前账号凭据补录留待用户验收。
+
 ## 当前任务：U-11 漫画源登录状态校验与重新登录（DONE）
 
 - 当前配置中的“已登录”只是本地会话数据标记，不能作为服务器有效性结论。
@@ -55,7 +66,7 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.4.1（versionCode 2004001），同步 U-11 的 Release 发布状态；功能首次交付于 2.4.0。
+- 应用版本：2.5.0（versionCode 2005000），对应 U-12；待 Release 构建与发布。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。

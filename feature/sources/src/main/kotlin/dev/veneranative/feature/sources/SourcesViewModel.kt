@@ -45,6 +45,7 @@ class SourcesViewModel(
     private var lastAppliedLocation: String? = null
     private var catalogHistoryLoaded = false
     private var catalogJob: Job? = null
+    private var configurationGeneration = 0L
     private val preferenceWriteMutex = Mutex()
 
     init {
@@ -62,6 +63,8 @@ class SourcesViewModel(
             SourcesAction.Install -> install()
 
             is SourcesAction.SetEnabled -> setEnabled(action.sourceId, action.enabled)
+
+            is SourcesAction.ReorderSources -> reorder(action.sourceIds)
 
             is SourcesAction.Uninstall -> uninstall(action.sourceId)
 
@@ -99,7 +102,10 @@ class SourcesViewModel(
 
             is SourcesAction.OpenConfiguration -> openConfiguration(action.sourceId)
 
-            SourcesAction.CloseConfiguration -> _state.update { it.copy(configuration = null) }
+            SourcesAction.CloseConfiguration -> {
+                configurationGeneration++
+                _state.update { it.copy(configuration = null, configurationLoading = false) }
+            }
 
             is SourcesAction.SaveSettings -> saveSettings(action.sourceId, action.values)
 
@@ -107,7 +113,9 @@ class SourcesViewModel(
 
             is SourcesAction.Login -> login(action.sourceId, action.account, action.password)
 
-            is SourcesAction.CheckLogin -> checkLogin(action.sourceId)
+            is SourcesAction.Relogin -> relogin(action.sourceId)
+
+            is SourcesAction.CheckLogin -> checkLogin(action.sourceId, manual = true)
 
             is SourcesAction.Logout -> logout(action.sourceId)
         }
@@ -186,17 +194,34 @@ class SourcesViewModel(
     }
 
     private fun openConfiguration(sourceId: SourceId) {
-        if (_state.value.configurationLoading) return
+        val generation = ++configurationGeneration
         _state.update { it.copy(configurationLoading = true, message = null) }
         viewModelScope.launch {
             val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
-            _state.update {
-                it.copy(
-                    configurationLoading = false,
-                    configuration = configuration,
-                    loginCheckOutcome = null,
-                    message = if (configuration == null) "无法读取该漫画源的设置。" else it.message,
-                )
+            if (generation == configurationGeneration) {
+                _state.update {
+                    it.copy(
+                        configurationLoading = false,
+                        configuration = configuration,
+                        loginCheckOutcome = null,
+                        message = if (configuration == null) "无法读取该漫画源的设置。" else it.message,
+                    )
+                }
+            }
+            if (configuration?.supportsLoginValidation == true || configuration?.supportsPasswordLogin == true) {
+                checkLogin(sourceId, manual = false)
+            }
+        }
+    }
+
+    private fun reorder(sourceIds: List<SourceId>) {
+        if (sourceIds.size != _state.value.sources.size) return
+        viewModelScope.launch {
+            if (runCatching { repository.reorder(sourceIds) }.getOrDefault(false)) {
+                _state.update { current ->
+                    val rank = sourceIds.withIndex().associate { it.value to it.index }
+                    current.copy(sources = current.sources.sortedBy { rank[it.sourceId] ?: Int.MAX_VALUE })
+                }
             }
         }
     }
@@ -239,22 +264,47 @@ class SourcesViewModel(
                 dev.veneranative.data.source.SourceLoginOutcome.Failed -> "登录失败，请检查账号密码或网络。"
             }
             _state.update { it.copy(accountActionInProgress = false, configuration = configuration ?: it.configuration, message = message) }
+            if (result == dev.veneranative.data.source.SourceLoginOutcome.Success) checkLogin(sourceId, manual = false)
         }
     }
 
-    private fun checkLogin(sourceId: SourceId) {
+    private fun relogin(sourceId: SourceId) {
         if (_state.value.accountActionInProgress) return
-        _state.update { it.copy(accountActionInProgress = true, loginCheckOutcome = null, message = null) }
+        _state.update { it.copy(accountActionInProgress = true, message = null) }
+        viewModelScope.launch {
+            val result = runCatching { repository.relogin(sourceId) }
+                .getOrDefault(dev.veneranative.data.source.SourceLoginOutcome.Failed)
+            val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
+            val message = when (result) {
+                dev.veneranative.data.source.SourceLoginOutcome.Success -> "已使用保存的账号信息重新登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.Unsupported -> "该来源不支持账号密码登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.Failed -> "自动登录失败，请检查网络或更新保存的账号信息。"
+            }
+            _state.update { it.copy(accountActionInProgress = false, configuration = configuration ?: it.configuration, message = message) }
+            if (result == dev.veneranative.data.source.SourceLoginOutcome.Success) checkLogin(sourceId, manual = false)
+        }
+    }
+
+    private fun checkLogin(sourceId: SourceId, manual: Boolean) {
+        if (sourceId in _state.value.loginCheckInProgressSourceIds) {
+            if (manual) _state.update { it.copy(manualLoginCheckSourceIds = it.manualLoginCheckSourceIds + sourceId) }
+            return
+        }
+        _state.update { current -> current.copy(
+            loginCheckInProgressSourceIds = current.loginCheckInProgressSourceIds + sourceId,
+            manualLoginCheckSourceIds = if (manual) current.manualLoginCheckSourceIds + sourceId else current.manualLoginCheckSourceIds,
+            loginCheckOutcomes = current.loginCheckOutcomes - sourceId,
+            loginCheckOutcome = null,
+        ) }
         viewModelScope.launch {
             val result = runCatching { repository.checkLogin(sourceId) }
                 .getOrDefault(dev.veneranative.data.source.SourceLoginCheckOutcome.Failed)
-            val message = when (result) {
-                dev.veneranative.data.source.SourceLoginCheckOutcome.Valid -> "账号有效，可以正常使用。"
-                dev.veneranative.data.source.SourceLoginCheckOutcome.Invalid -> "账号登录已失效，可直接重新登录。"
-                dev.veneranative.data.source.SourceLoginCheckOutcome.Unsupported -> "此来源未提供登录状态检测。"
-                dev.veneranative.data.source.SourceLoginCheckOutcome.Failed -> "暂时无法确认登录状态，请检查网络后重试。"
-            }
-            _state.update { it.copy(accountActionInProgress = false, loginCheckOutcome = result, message = message) }
+            _state.update { current -> current.copy(
+                loginCheckInProgressSourceIds = current.loginCheckInProgressSourceIds - sourceId,
+                manualLoginCheckSourceIds = current.manualLoginCheckSourceIds - sourceId,
+                loginCheckOutcomes = current.loginCheckOutcomes + (sourceId to result),
+                loginCheckOutcome = result,
+            ) }
         }
     }
 

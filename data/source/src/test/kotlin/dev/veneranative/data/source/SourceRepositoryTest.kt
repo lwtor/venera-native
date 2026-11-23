@@ -58,6 +58,24 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun `successful password login saves isolated credentials for automatic relogin`() = runTest {
+        givenScript(version = "1.0.0", script = "class A {}")
+        repository.install(LOCATION)
+        metadataReader.result = SourceMetadataResult.Success(
+            SourceMetadata(sourceId, "Source A", "1.0.0", supportsPasswordLogin = true),
+        )
+        runtime.nextInvokeResult = SourceResult.Success("login", "true")
+
+        assertEquals(SourceLoginOutcome.Success, repository.login(sourceId, "reader", "secret"))
+        assertTrue(privateSettings.readLoginCredentials(sourceId) != null)
+        assertEquals(SourceLoginOutcome.Success, repository.relogin(sourceId))
+        val relogin = runtime.calls.filterIsInstance<dev.veneranative.source.api.SourceCall.InvokeFunction>().last()
+        assertEquals("[\"reader\",\"secret\"]", relogin.argumentsJson)
+        assertTrue(privateSettings.read(sourceId).isEmpty())
+        assertEquals("{}", privateSettings.readSourceData(sourceId))
+    }
+
+    @Test
     fun `revision changes only after successful source mutations`() = runTest {
         givenScript(version = "1.0.0", script = "class A {}")
         assertEquals(0L, repository.revision.value)

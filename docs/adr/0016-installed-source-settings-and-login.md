@@ -26,6 +26,8 @@ The upstream source contract lets each script declare settings controls and opti
 - The encrypted settings/session store depends on the device's Android Keystore key and is not portable across backup/restore or devices.
 - If source data contains a password under a field whose name does not identify it as a password, it cannot be reliably distinguished from a session token; the host filters common password field names and never stores login arguments directly.
 
+**Credential persistence decision superseded:** ADR-0020 changes the transient-only password rule above. To satisfy the user's explicit one-tap re-login requirement, successful login credentials may now be persisted only in a separate source-scoped Android Keystore AES-GCM encrypted record, with independent authenticated data, and are never passed to source `settings` or `saveData`. See ADR-0020 for lifecycle and deletion rules.
+
 ## References
 
 - [Venera comic source guide](https://github.com/venera-app/venera/blob/master/doc/comic_source.md)

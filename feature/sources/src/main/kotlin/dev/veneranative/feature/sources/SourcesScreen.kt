@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -66,6 +67,8 @@ fun SourcesScreen(
     var showAddCatalogDialog by rememberSaveable { mutableStateOf(false) }
     var showSwitchCatalogDialog by rememberSaveable { mutableStateOf(false) }
     var newCatalogLocation by rememberSaveable { mutableStateOf("") }
+    var expandedSourceId by rememberSaveable { mutableStateOf<String?>(null) }
+    var reorderSourceId by rememberSaveable { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -147,6 +150,24 @@ fun SourcesScreen(
                         onAction = onAction,
                         onUninstall = { pendingUninstall = it.sourceId.value },
                         onDiscover = { section = SourcesSection.Available },
+                        expandedSourceId = expandedSourceId,
+                        reorderSourceId = reorderSourceId,
+                        onToggleExpanded = { source ->
+                            if (expandedSourceId == source.sourceId.value) {
+                                expandedSourceId = null
+                                onAction(SourcesAction.CloseConfiguration)
+                            } else {
+                                expandedSourceId = source.sourceId.value
+                                onAction(SourcesAction.OpenConfiguration(source.sourceId))
+                            }
+                        },
+                        onStartReorder = { reorderSourceId = if (reorderSourceId == it.sourceId.value) null else it.sourceId.value },
+                        onMove = { source, delta ->
+                            val current = state.sources
+                            val index = current.indexOfFirst { it.sourceId == source.sourceId }
+                            val target = (index + delta).coerceIn(0, current.lastIndex)
+                            if (index != target) onAction(SourcesAction.ReorderSources(current.toMutableList().apply { add(target, removeAt(index)) }.map { it.sourceId }))
+                        },
                     )
                 }
             }
@@ -232,14 +253,6 @@ fun SourcesScreen(
         )
     }
 
-    state.configuration?.let { configuration ->
-        SourceConfigurationDialog(
-            configuration = configuration,
-            state = state,
-            onAction = onAction,
-            onDismiss = { onAction(SourcesAction.CloseConfiguration) },
-        )
-    }
 }
 
 @Composable
@@ -322,6 +335,11 @@ private fun InstalledContent(
     onAction: (SourcesAction) -> Unit,
     onUninstall: (InstalledSource) -> Unit,
     onDiscover: () -> Unit,
+    expandedSourceId: String?,
+    reorderSourceId: String?,
+    onToggleExpanded: (InstalledSource) -> Unit,
+    onStartReorder: (InstalledSource) -> Unit,
+    onMove: (InstalledSource, Int) -> Unit,
 ) {
     when (state.status) {
         SourcesStatus.Loading -> Column(
@@ -361,7 +379,14 @@ private fun InstalledContent(
                         onUpdate = { update?.let { onAction(SourcesAction.InstallCatalogEntry(it)) } },
                         onEnabledChange = { enabled -> onAction(SourcesAction.SetEnabled(source.sourceId, enabled)) },
                         onUninstall = { onUninstall(source) },
-                        onConfigure = { onAction(SourcesAction.OpenConfiguration(source.sourceId)) },
+                        expanded = expandedSourceId == source.sourceId.value,
+                        reorderMode = reorderSourceId == source.sourceId.value,
+                        configuration = state.configuration?.takeIf { it.source.sourceId == source.sourceId },
+                        state = state,
+                        onToggleExpanded = { onToggleExpanded(source) },
+                        onStartReorder = { onStartReorder(source) },
+                        onMove = { delta -> onMove(source, delta) },
+                        onAction = onAction,
                     )
                 }
             }
@@ -460,28 +485,49 @@ private fun SourceRow(
     onUpdate: () -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     onUninstall: () -> Unit,
-    onConfigure: () -> Unit,
+    expanded: Boolean,
+    reorderMode: Boolean,
+    configuration: dev.veneranative.core.model.InstalledSourceConfiguration?,
+    state: SourcesUiState,
+    onToggleExpanded: () -> Unit,
+    onStartReorder: () -> Unit,
+    onMove: (Int) -> Unit,
+    onAction: (SourcesAction) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onToggleExpanded, onLongClick = onStartReorder),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(source.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("版本 ${source.version}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("版本 ${source.version}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Switch(checked = source.enabled, onCheckedChange = onEnabledChange, enabled = !busy)
+                val check = state.loginCheckOutcomes[source.sourceId]
+                if (check == dev.veneranative.data.source.SourceLoginCheckOutcome.Invalid || check == dev.veneranative.data.source.SourceLoginCheckOutcome.Failed) {
+                    Text("!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium)
+                }
+                Text(if (expanded) "收起" else "设置", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(if (source.enabled) "已启用" else "已停用", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (update != null) {
-                    TextButton(
-                        onClick = onUpdate,
-                        enabled = !busy && !installing,
-                    ) { Text(if (installing) "更新中…" else "更新 ${update.version}") }
+            if (reorderMode) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("调整来源顺序", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = { onMove(-1) }, enabled = state.sources.firstOrNull()?.sourceId != source.sourceId) { Text("↑ 上移") }
+                    TextButton(onClick = { onMove(1) }, enabled = state.sources.lastOrNull()?.sourceId != source.sourceId) { Text("↓ 下移") }
+                    TextButton(onClick = onStartReorder) { Text("完成") }
                 }
-                TextButton(onClick = onConfigure, enabled = !busy) { Text("设置") }
-                TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
+            }
+            if (expanded) {
+                androidx.compose.material3.HorizontalDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (source.enabled) "已启用" else "已停用", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (update != null) TextButton(onClick = onUpdate, enabled = !busy && !installing) { Text(if (installing) "更新中…" else "更新 ${update.version}") }
+                    TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
+                    Switch(checked = source.enabled, onCheckedChange = onEnabledChange, enabled = !busy)
+                }
+                SourceConfigurationPanel(configuration, state, onAction)
             }
         }
     }

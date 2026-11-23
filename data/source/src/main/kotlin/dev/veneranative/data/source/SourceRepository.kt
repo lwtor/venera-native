@@ -29,6 +29,9 @@ interface SourceRepository {
 
     suspend fun installed(): List<InstalledSource>
 
+    /** Persist the installed-source display order. Unknown IDs are ignored. */
+    suspend fun reorder(sourceIds: List<SourceId>): Boolean = false
+
     suspend fun install(location: String): InstallOutcome
 
     /** Installs a catalog entry and keeps the catalog identity for later update checks. */
@@ -51,6 +54,8 @@ interface SourceRepository {
     suspend fun invokeSettingCallback(sourceId: SourceId, key: String): Boolean = false
 
     suspend fun login(sourceId: SourceId, account: String, password: String): SourceLoginOutcome = SourceLoginOutcome.Unsupported
+
+    suspend fun relogin(sourceId: SourceId): SourceLoginOutcome = SourceLoginOutcome.Unsupported
 
     suspend fun logout(sourceId: SourceId): SourceLoginOutcome = SourceLoginOutcome.Unsupported
 
@@ -130,6 +135,10 @@ class DefaultSourceRepository(
         }
     }
 
+    override suspend fun reorder(sourceIds: List<SourceId>): Boolean = mutex.withLock {
+        store.reorder(sourceIds).also { if (it) mutableRevision.value++ }
+    }
+
     override suspend fun install(location: String): InstallOutcome = mutex.withLock { installLocked(location, null) }
     override suspend fun installFromCatalog(location: String, catalogLocation: String): InstallOutcome =
         mutex.withLock { installLocked(location, catalogLocation) }
@@ -183,8 +192,27 @@ class DefaultSourceRepository(
         val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata
             ?: return@withLock SourceLoginOutcome.Unsupported
         if (!metadata.supportsPasswordLogin) return@withLock SourceLoginOutcome.Unsupported
+        when (val outcome = loginLocked(sourceId, account, password)) {
+            SourceLoginOutcome.Success -> {
+                privateSettings.writeLoginCredentials(sourceId, account, password)
+                SourceLoginOutcome.Success
+            }
+            else -> outcome
+        }
+    }
+
+    override suspend fun relogin(sourceId: SourceId): SourceLoginOutcome = mutex.withLock {
+        val credentials = privateSettings.readLoginCredentials(sourceId) ?: return@withLock SourceLoginOutcome.Failed
+        val stored = store.read(sourceId) ?: return@withLock SourceLoginOutcome.Unsupported
+        val metadata = (metadataReader.read(stored.script) as? SourceMetadataResult.Success)?.metadata
+            ?: return@withLock SourceLoginOutcome.Unsupported
+        if (!metadata.supportsPasswordLogin) return@withLock SourceLoginOutcome.Unsupported
+        loginLocked(sourceId, credentials.first, credentials.second)
+    }
+
+    private suspend fun loginLocked(sourceId: SourceId, account: String, password: String): SourceLoginOutcome {
         val arguments = org.json.JSONArray().put(account).put(password).toString()
-        when (val result = invokeInternal(sourceId, "account.login", arguments)) {
+        return when (val result = invokeInternal(sourceId, "account.login", arguments)) {
             is SourceResult.Success -> SourceLoginOutcome.Success
             is SourceResult.Failure -> SourceLoginOutcome.Failed
         }
@@ -196,7 +224,10 @@ class DefaultSourceRepository(
             ?: return@withLock SourceLoginOutcome.Unsupported
         if (!metadata.supportsLogout) return@withLock SourceLoginOutcome.Unsupported
         when (val result = invokeInternal(sourceId, "account.logout")) {
-            is SourceResult.Success -> SourceLoginOutcome.Success
+            is SourceResult.Success -> {
+                privateSettings.clearLoginCredentials(sourceId)
+                SourceLoginOutcome.Success
+            }
             is SourceResult.Failure -> SourceLoginOutcome.Failed
         }
     }
@@ -340,6 +371,7 @@ class DefaultSourceRepository(
             supportsLoginValidation = metadata.supportsLoginValidation,
             registerWebsite = metadata.registerWebsite,
             loggedIn = loggedIn,
+            hasSavedLoginCredentials = privateSettings.readLoginCredentials(sourceId) != null,
         )
     }
 

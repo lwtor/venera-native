@@ -82,6 +82,18 @@ class SourcePackageStore(
         true
     }
 
+    /** Reorders known entries while preserving any IDs omitted by a stale caller. */
+    fun reorder(sourceIds: List<SourceId>): Boolean = synchronized(LOCK) {
+        val entries = readIndex()
+        val rank = sourceIds.map { it.value }.distinct().withIndex().associate { it.value to it.index }
+        val reordered = entries.withIndex()
+            .sortedWith(compareBy<IndexedValue<ManifestEntry>> { rank[it.value.sourceId] ?: Int.MAX_VALUE }.thenBy { it.index })
+            .map { it.value }
+        if (entries == reordered) return@synchronized false
+        writeIndex(reordered)
+        true
+    }
+
     /** Removes the entry and its directory; returns false when the source was not installed. */
     fun remove(sourceId: SourceId): Boolean = synchronized(LOCK) {
         val entries = readIndex()
