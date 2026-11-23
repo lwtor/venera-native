@@ -2,6 +2,13 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-06 GitHub 设备授权错误
+
+- GitHub 设备授权明确请求 `offline_access`，确保支持可刷新的用户令牌；授权轮询遇到短暂连接错误或服务端暂时性错误时有限重试，不立即丢弃授权流程。非网络类错误不再直接提示网络断开。
+- GitHub 官方允许不返回刷新令牌的配置，旧实现却无条件读取；它是已确认的兼容缺口，但尚不能确定就是本次设备故障的唯一原因。
+- 最小回归覆盖授权 scope、临时失败恢复和客户端错误不重试。Xiaomi 25128PNA1C 原 2.0.0 与新 APK 签名一致，已用 `adb install -r` 保留数据覆盖安装 2.0.1；用户反馈 GitHub 连接已恢复。未获得原始异常，不将具体缺口认定为唯一根因。
+- 本次修正已有 `AboutViewModelTest` 替身遗漏 `cachedApk` 实现导致的测试编译错误。
+
 ## 当前任务：U-05 Release 签名备份与校验
 
 - 按用户要求生成新 Release 密钥并创建独立 GitHub 私有库 `lwtor/private-vault`；加密备份和用户要求明文保存的随机恢复密码存于该库。可读取私有库者可以解密，需限制账号权限并另行备份。
@@ -19,11 +26,16 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.0.0（versionCode 2000000），本次交付新的签名备份与验证机制；来源管理改动仍待用户验证。
+- 应用版本：2.0.1（versionCode 2000001），本次修复 GitHub 设备授权的已知兼容缺口；来源管理改动仍待用户验证。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。
 - 再漫画多个作品详情失败的原因尚未确认；之前的 Debug 诊断与结果可在 Git 历史查阅。是否继续排查由用户指定。
+
+## U-06 验证
+
+- JDK 17：`.\gradlew.bat --no-daemon --no-configuration-cache --max-workers=2 :data:backup:testDebugUnitTest --tests '*GitHubDeviceFlowTest' :feature:profile:testDebugUnitTest --tests '*ProfileViewModelTest' :app:assembleDebug :app:assembleRelease` — BUILD SUCCESSFUL；5 项测试通过，Release Lint Vital 与最终 APK 签名检查通过。
+- 真机 25128PNA1C 保留数据从 2.0.0 覆盖安装 2.0.1 成功；用户反馈 GitHub 连接已恢复。设备原始应用及数据均保留。
 
 ## U-05 验证
 

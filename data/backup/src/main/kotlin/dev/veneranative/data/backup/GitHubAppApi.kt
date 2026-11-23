@@ -59,7 +59,9 @@ class GitHubAppApi(
     }
 
     suspend fun beginDeviceAuthorization(): GitHubDeviceAuthorization {
-        val body = FormBody.Builder().add("client_id", clientId).build()
+        // GitHub Apps can be configured to issue non-expiring tokens without a refresh token.
+        // The account store requires a refresh token, so explicitly request the supported scope.
+        val body = FormBody.Builder().add("client_id", clientId).add("scope", "offline_access").build()
         val json = requestJson(
             Request.Builder().url("https://github.com/login/device/code")
                 .header("Accept", "application/json").post(body).build(),

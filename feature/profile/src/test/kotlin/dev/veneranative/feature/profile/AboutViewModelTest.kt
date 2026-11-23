@@ -176,6 +176,8 @@ class AboutViewModelTest {
         var foregroundDownloads = 0
         var cancels = 0
 
+        override fun cachedApk(versionCode: Long): File? = null
+
         override suspend fun checkForUpdate(installedVersionCode: Long): SelfUpdateCheck {
             checks++
             return when (val value = check) {

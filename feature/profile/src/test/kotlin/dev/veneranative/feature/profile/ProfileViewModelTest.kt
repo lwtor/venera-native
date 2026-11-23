@@ -51,16 +51,51 @@ class ProfileViewModelTest {
         assertFalse(model.state.value.account.connected)
     }
 
+    @Test fun transientPollFailureDoesNotDiscardAnAuthorizedDeviceFlow() = runTest(dispatcher) {
+        val service = FakeAccount(authorized = true).apply { pollFailures = 1 }
+        val model = ProfileViewModel(service, nowEpochMillis = { 0 }, workerDispatcher = dispatcher)
+        model.onAction(ProfileAction.Connect)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertNotNull(model.state.value.authorization)
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals("Reader", model.state.value.account.profile?.displayName)
+        assertNull(model.state.value.error)
+    }
+
+    @Test fun authorizationFailureDoesNotRetryClientErrors() = runTest(dispatcher) {
+        val service = FakeAccount().apply {
+            pollFailures = 3
+            pollException = GitHubApiException(403, "fixture")
+        }
+        val model = ProfileViewModel(service, nowEpochMillis = { 0 }, workerDispatcher = dispatcher)
+        model.onAction(ProfileAction.Connect)
+        runCurrent()
+        advanceTimeBy(5_000)
+        runCurrent()
+        assertEquals(1, service.polls)
+        assertNull(model.state.value.authorization)
+        assertNotNull(model.state.value.error)
+    }
+
     private class FakeAccount(private val authorized: Boolean = false) : GitHubAccountService {
         override val account = MutableStateFlow(GitHubAccountState())
         var starts = 0
         var polls = 0
+        var pollFailures = 0
+        var pollException: java.io.IOException = java.io.IOException("simulated temporary connection failure")
         override suspend fun beginAuthorization(): GitHubDeviceAuthorization {
             starts++
             return GitHubDeviceAuthorization("device", "CODE", "https://github.com/login/device", 60_000, 5)
         }
         override suspend fun pollAuthorization(deviceCode: String): GitHubDevicePollResult {
             polls++
+            if (pollFailures > 0) {
+                pollFailures--
+                throw pollException
+            }
             if (!authorized) return GitHubDevicePollResult.Pending
             account.value = GitHubAccountState(connected = true)
             return GitHubDevicePollResult.Authorized(GitHubUserToken("fake", 1, "fake", 1))

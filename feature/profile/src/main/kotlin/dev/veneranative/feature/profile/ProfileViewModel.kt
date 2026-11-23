@@ -7,6 +7,8 @@ import dev.veneranative.data.backup.GitHubAccountState
 import dev.veneranative.data.backup.GitHubDeviceAuthorization
 import dev.veneranative.data.backup.GitHubDevicePollResult
 import dev.veneranative.data.backup.GitHubAuthorizationRequiredException
+import dev.veneranative.data.backup.GitHubApiException
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CoroutineDispatcher
@@ -96,9 +98,18 @@ class ProfileViewModel(
                 val authorization = withContext(workerDispatcher) { accountService.beginAuthorization() }
                 mutableState.update { it.copy(authorization = authorization, busy = false) }
                 var interval = authorization.intervalSeconds
+                var consecutiveFailures = 0
                 while (nowEpochMillis() < authorization.expiresAtEpochMillis) {
                     delay(interval * 1_000)
-                    when (val result = withContext(workerDispatcher) { accountService.pollAuthorization(authorization.deviceCode) }) {
+                    val result = try {
+                        withContext(workerDispatcher) { accountService.pollAuthorization(authorization.deviceCode) }
+                            .also { consecutiveFailures = 0 }
+                    } catch (failure: IOException) {
+                        val retryable = failure !is GitHubApiException || failure.statusCode == 429 || failure.statusCode in 500..599
+                        if (retryable && ++consecutiveFailures < 3) continue
+                        throw failure
+                    }
+                    when (result) {
                         GitHubDevicePollResult.Pending -> Unit
                         is GitHubDevicePollResult.WaitLonger -> interval += result.additionalSeconds
                         GitHubDevicePollResult.Expired -> {
@@ -119,7 +130,9 @@ class ProfileViewModel(
                 mutableState.update { it.copy(authorization = null, error = "授权码已过期，请重新连接") }
             } catch (failure: Exception) {
                 if (failure is CancellationException) throw failure
-                mutableState.update { it.copy(busy = false, authorization = null, error = "暂时无法连接 GitHub，请检查网络后重试") }
+                val message = if (failure is IOException) "暂时无法连接 GitHub，请检查网络后重试"
+                    else "无法完成 GitHub 授权，请重试"
+                mutableState.update { it.copy(busy = false, authorization = null, error = message) }
             }
         }
     }

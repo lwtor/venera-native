@@ -9,4 +9,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.junit4)
+    testImplementation(libs.json)
+    testImplementation(libs.okhttp.jvm)
 }
