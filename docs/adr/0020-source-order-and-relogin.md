@@ -15,6 +15,7 @@ The installed source list should be scannable without opening a dialog, and user
 - Expanding an account-capable source starts one validation request in the background. Concurrent checks are deduplicated per source. A manual check during an automatic check joins that request and shows loading only on the manual check control. Invalid or failed checks are marked on the collapsed row.
 - After a successful password login, store the account and password in a separate, source-scoped record encrypted with the existing Android Keystore AES-GCM key and authenticated data purpose. Do not place credentials in source setting overrides, exported script `saveData`, backups, logs, or Compose saved state. Re-login reads the encrypted record only inside the repository and sends it as transient arguments to `account.login`.
 - A user can replace saved credentials by submitting another successful login. Explicit logout and source uninstall clear the saved credentials. Existing installs without saved credentials require one interactive login to seed the encrypted record.
+- Failure to persist a credential record must not override a successful `account.login` result. The UI reports that login succeeded but automatic re-login credentials were not saved.
 
 ## Consequences
 

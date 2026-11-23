@@ -76,6 +76,25 @@ class SourceRepositoryTest {
     }
 
     @Test
+    fun `credential persistence failure does not turn a successful source login into a login failure`() = runTest {
+        givenScript(version = "1.0.0", script = "class A {}")
+        metadataReader.result = SourceMetadataResult.Success(
+            SourceMetadata(sourceId, "Source A", "1.0.0", supportsPasswordLogin = true),
+        )
+        val failingSettings = object : SourcePrivateSettingsStore by InMemorySourcePrivateSettingsStore() {
+            override fun writeLoginCredentials(sourceId: SourceId, account: String, password: String) {
+                error("storage unavailable")
+            }
+        }
+        val repository = DefaultSourceRepository(store, runtime, metadataReader, fetcher, failingSettings)
+        assertTrue(repository.install(LOCATION) is InstallOutcome.Success)
+        runtime.nextInvokeResult = SourceResult.Success("login", "\"ok\"")
+
+        assertEquals(SourceLoginOutcome.SuccessCredentialsNotSaved, repository.login(sourceId, "reader", "password"))
+        assertEquals("account.login", runtime.calls.filterIsInstance<dev.veneranative.source.api.SourceCall.InvokeFunction>().last().functionName)
+    }
+
+    @Test
     fun `revision changes only after successful source mutations`() = runTest {
         givenScript(version = "1.0.0", script = "class A {}")
         assertEquals(0L, repository.revision.value)

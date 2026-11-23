@@ -66,6 +66,8 @@ private val EMPTY_REVISION = kotlinx.coroutines.flow.MutableStateFlow(0L)
 
 sealed interface SourceLoginOutcome {
     data object Success : SourceLoginOutcome
+    /** The source accepted the login, but encrypted credential persistence failed. */
+    data object SuccessCredentialsNotSaved : SourceLoginOutcome
     data object Unsupported : SourceLoginOutcome
     data object Failed : SourceLoginOutcome
 }
@@ -194,8 +196,11 @@ class DefaultSourceRepository(
         if (!metadata.supportsPasswordLogin) return@withLock SourceLoginOutcome.Unsupported
         when (val outcome = loginLocked(sourceId, account, password)) {
             SourceLoginOutcome.Success -> {
-                privateSettings.writeLoginCredentials(sourceId, account, password)
-                SourceLoginOutcome.Success
+                runCatching { privateSettings.writeLoginCredentials(sourceId, account, password) }
+                    .fold(
+                        onSuccess = { SourceLoginOutcome.Success },
+                        onFailure = { SourceLoginOutcome.SuccessCredentialsNotSaved },
+                    )
             }
             else -> outcome
         }

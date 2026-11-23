@@ -260,11 +260,14 @@ class SourcesViewModel(
             val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
             val message = when (result) {
                 dev.veneranative.data.source.SourceLoginOutcome.Success -> "登录成功。"
+                dev.veneranative.data.source.SourceLoginOutcome.SuccessCredentialsNotSaved -> "登录成功，但无法安全保存账号信息；下次需要手动登录。"
                 dev.veneranative.data.source.SourceLoginOutcome.Unsupported -> "该来源不支持账号密码登录。"
                 dev.veneranative.data.source.SourceLoginOutcome.Failed -> "登录失败，请检查账号密码或网络。"
             }
             _state.update { it.copy(accountActionInProgress = false, configuration = configuration ?: it.configuration, message = message) }
-            if (result == dev.veneranative.data.source.SourceLoginOutcome.Success) checkLogin(sourceId, manual = false)
+            if (result == dev.veneranative.data.source.SourceLoginOutcome.Success ||
+                result == dev.veneranative.data.source.SourceLoginOutcome.SuccessCredentialsNotSaved
+            ) checkLogin(sourceId, manual = false)
         }
     }
 
@@ -277,6 +280,7 @@ class SourcesViewModel(
             val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
             val message = when (result) {
                 dev.veneranative.data.source.SourceLoginOutcome.Success -> "已使用保存的账号信息重新登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.SuccessCredentialsNotSaved -> "已使用保存的账号信息重新登录。"
                 dev.veneranative.data.source.SourceLoginOutcome.Unsupported -> "该来源不支持账号密码登录。"
                 dev.veneranative.data.source.SourceLoginOutcome.Failed -> "自动登录失败，请检查网络或更新保存的账号信息。"
             }
@@ -317,6 +321,7 @@ class SourcesViewModel(
             val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
             val message = when (result) {
                 dev.veneranative.data.source.SourceLoginOutcome.Success -> "已退出登录。"
+                dev.veneranative.data.source.SourceLoginOutcome.SuccessCredentialsNotSaved -> "已退出登录。"
                 dev.veneranative.data.source.SourceLoginOutcome.Unsupported -> "该来源不支持退出登录。"
                 dev.veneranative.data.source.SourceLoginOutcome.Failed -> "退出登录失败。"
             }

@@ -34,7 +34,9 @@ class InMemorySourcePrivateSettingsStore : SourcePrivateSettingsStore {
     @Synchronized override fun readSourceData(sourceId: SourceId) = data[sourceId] ?: "{}"
     @Synchronized override fun writeSourceData(sourceId: SourceId, dataJson: String) { data[sourceId] = dataJson }
     @Synchronized override fun readLoginCredentials(sourceId: SourceId) = credentials[sourceId]
-    @Synchronized override fun writeLoginCredentials(sourceId: SourceId, account: String, password: String) { credentials[sourceId] = account to password }
+    @Synchronized override fun writeLoginCredentials(sourceId: SourceId, account: String, password: String) {
+        credentials[sourceId] = account to password
+    }
     @Synchronized override fun clearLoginCredentials(sourceId: SourceId) { credentials.remove(sourceId) }
     @Synchronized override fun clear(sourceId: SourceId) { values.remove(sourceId); data.remove(sourceId); credentials.remove(sourceId) }
 }
