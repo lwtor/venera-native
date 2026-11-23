@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)

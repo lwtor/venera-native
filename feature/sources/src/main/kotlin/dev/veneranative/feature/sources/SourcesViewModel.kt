@@ -9,6 +9,12 @@ import dev.veneranative.data.source.SourceRepository
 import dev.veneranative.data.source.SourceCatalogRepository
 import dev.veneranative.data.source.SourceCatalogResult
 import dev.veneranative.data.settings.ScreenPreferenceRepository
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +43,7 @@ class SourcesViewModel(
     private var screenPreferences = screenPreferences
     private var catalogEdited = false
     private var lastAppliedLocation: String? = null
+    private var catalogHistoryLoaded = false
     private var catalogJob: Job? = null
     private val preferenceWriteMutex = Mutex()
 
@@ -68,6 +75,19 @@ class SourcesViewModel(
                 _state.update { it.copy(catalogLocation = action.value, catalogStatus = CatalogStatus.Idle, catalogEntries = emptyList()) }
             }
 
+            is SourcesAction.SelectCatalogLocation -> {
+                catalogEdited = true
+                catalogJob?.cancel()
+                _state.update {
+                    it.copy(
+                        catalogLocation = action.value,
+                        catalogStatus = CatalogStatus.Idle,
+                        catalogEntries = emptyList(),
+                    )
+                }
+                refreshCatalog()
+            }
+
             SourcesAction.RefreshCatalog -> refreshCatalog()
 
             is SourcesAction.InstallCatalogEntry -> install(action.entry.scriptUrl)
@@ -89,24 +109,55 @@ class SourcesViewModel(
     fun attachScreenPreferences(preferences: ScreenPreferenceRepository) {
         if (screenPreferences === preferences) return
         screenPreferences = preferences
-        if (!catalogEdited) restoreCatalog()
-        else lastAppliedLocation?.let(::persistCatalog)
+        if (lastAppliedLocation != null) restoreHistoryAndPersistCurrent()
+        else if (!catalogEdited) restoreCatalog()
     }
 
     private fun restoreCatalog() {
         viewModelScope.launch {
-            val saved = try {
-                screenPreferences?.get(CATALOG_LOCATION_KEY)?.trim()?.takeIf(String::isNotEmpty)
+            val (saved, history) = try {
+                val preferences = screenPreferences
+                val location = preferences?.get(CATALOG_LOCATION_KEY)?.trim()?.takeIf(String::isNotEmpty)
+                val storedHistory = preferences?.get(CATALOG_HISTORY_KEY)
+                val history = storedHistory?.let(::decodeCatalogHistory)
+                    ?: location?.let(::listOf).orEmpty()
+                location to history
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 _state.update { it.copy(message = "无法读取已保存的目录地址，已使用默认地址。") }
-                null
+                null to emptyList()
             }
             if (catalogEdited) return@launch
+            catalogHistoryLoaded = true
             catalogJob?.cancel()
-            _state.update { it.copy(catalogLocation = saved ?: it.catalogLocation, catalogStatus = CatalogStatus.Idle) }
+            _state.update {
+                it.copy(
+                    catalogLocation = saved ?: it.catalogLocation,
+                    catalogHistory = history,
+                    catalogStatus = CatalogStatus.Idle,
+                )
+            }
             refreshCatalog()
+        }
+    }
+
+    private fun restoreHistoryAndPersistCurrent() {
+        viewModelScope.launch {
+            val savedHistory = try {
+                val preferences = screenPreferences
+                val stored = preferences?.get(CATALOG_HISTORY_KEY)
+                stored?.let(::decodeCatalogHistory)
+                    ?: preferences?.get(CATALOG_LOCATION_KEY)?.trim()?.takeIf(String::isNotEmpty)?.let(::listOf).orEmpty()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val merged = mergeCatalogHistory(_state.value.catalogHistory, savedHistory)
+            _state.update { it.copy(catalogHistory = merged) }
+            catalogHistoryLoaded = true
+            lastAppliedLocation?.let(::persistCatalog)
         }
     }
 
@@ -115,7 +166,9 @@ class SourcesViewModel(
             preferenceWriteMutex.withLock {
                 if (lastAppliedLocation != location) return@withLock
                 try {
-                    screenPreferences?.put(CATALOG_LOCATION_KEY, location)
+                    val preferences = screenPreferences ?: return@withLock
+                    preferences.put(CATALOG_HISTORY_KEY, encodeCatalogHistory(_state.value.catalogHistory))
+                    preferences.put(CATALOG_LOCATION_KEY, location)
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
@@ -205,21 +258,23 @@ class SourcesViewModel(
         catalogJob = viewModelScope.launch {
             when (val result = source.load(location)) {
                 is SourceCatalogResult.Success -> {
-                    _state.update { it.copy(catalogEntries = result.entries, catalogStatus = CatalogStatus.Ready) }
-                    if (catalogEdited) {
-                        lastAppliedLocation = location
-                        persistCatalog(location)
+                    val history = rememberCatalogLocation(_state.value.catalogHistory, location)
+                    lastAppliedLocation = location
+                    catalogEdited = false
+                    _state.update {
+                        it.copy(
+                            catalogEntries = result.entries,
+                            catalogStatus = CatalogStatus.Ready,
+                            catalogHistory = history,
+                        )
                     }
+                    if (catalogHistoryLoaded || screenPreferences != null) persistCatalog(location)
                 }
                 is SourceCatalogResult.Failure -> _state.update {
                     it.copy(catalogStatus = CatalogStatus.Failed)
                 }
             }
         }
-    }
-
-    private companion object {
-        const val CATALOG_LOCATION_KEY = "sources.catalog.location"
     }
 
     private fun refresh() {
@@ -304,6 +359,29 @@ class SourcesViewModel(
         }
     }
 }
+
+private const val CATALOG_LOCATION_KEY = "sources.catalog.location"
+private const val CATALOG_HISTORY_KEY = "sources.catalog.history"
+private const val MAX_CATALOG_HISTORY = 10
+
+private fun rememberCatalogLocation(history: List<String>, location: String): List<String> =
+    (listOf(location.trim()) + history.filterNot { it.trim() == location.trim() })
+        .filter(String::isNotEmpty)
+        .take(MAX_CATALOG_HISTORY)
+
+private fun mergeCatalogHistory(primary: List<String>, secondary: List<String>): List<String> =
+    (primary + secondary).distinct().take(MAX_CATALOG_HISTORY)
+
+private fun encodeCatalogHistory(history: List<String>): String =
+    JsonArray(history.map(::JsonPrimitive)).toString()
+
+private fun decodeCatalogHistory(encoded: String): List<String> = runCatching {
+    Json.parseToJsonElement(encoded).jsonArray.mapNotNull { it.jsonPrimitive.contentOrNull }
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .distinct()
+        .take(MAX_CATALOG_HISTORY)
+}.getOrDefault(emptyList())
 
 /**
  * Maps a domain error to product copy.

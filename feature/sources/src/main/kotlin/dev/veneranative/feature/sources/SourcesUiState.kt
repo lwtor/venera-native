@@ -20,6 +20,7 @@ data class SourcesUiState(
     val catalogEntries: List<SourceCatalogEntry> = emptyList(),
     val catalogStatus: CatalogStatus = CatalogStatus.Idle,
     val catalogLocation: String = defaultVeneraSourceCatalogUrl(),
+    val catalogHistory: List<String> = emptyList(),
     val configuration: InstalledSourceConfiguration? = null,
     val configurationLoading: Boolean = false,
     val accountActionInProgress: Boolean = false,

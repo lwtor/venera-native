@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -186,6 +188,28 @@ private fun CatalogHeader(state: SourcesUiState, onAction: (SourcesAction) -> Un
             }
         },
     )
+    if (state.catalogHistory.isNotEmpty()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("历史目录", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            Text("点选即可切换", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(state.catalogHistory, key = { it }) { location ->
+                FilterChip(
+                    selected = state.catalogLocation.trim() == location,
+                    onClick = { onAction(SourcesAction.SelectCatalogLocation(location)) },
+                    enabled = state.catalogStatus != CatalogStatus.Loading,
+                    label = { Text(location, modifier = Modifier.widthIn(max = 260.dp), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+                )
+            }
+        }
+    }
 }
 
 @Composable

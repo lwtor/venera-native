@@ -19,6 +19,8 @@ sealed interface SourcesAction {
 
     data class CatalogLocationChanged(val value: String) : SourcesAction
 
+    data class SelectCatalogLocation(val value: String) : SourcesAction
+
     data object RefreshCatalog : SourcesAction
 
     data class InstallCatalogEntry(val entry: SourceCatalogEntry) : SourcesAction

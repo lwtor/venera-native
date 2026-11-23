@@ -230,6 +230,53 @@ class SourcesViewModelTest {
     }
 
     @Test
+    fun `successful catalog locations are kept in most recently used history`() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val model = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        val firstUrl = "https://example.com/first/index.json"
+        val secondUrl = "https://example.com/second/index.json"
+
+        model.onAction(SourcesAction.CatalogLocationChanged(firstUrl))
+        model.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+        model.onAction(SourcesAction.CatalogLocationChanged(secondUrl))
+        model.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+
+        assertEquals(listOf(secondUrl, firstUrl), model.state.value.catalogHistory.take(2))
+        assertTrue(preferences.get("sources.catalog.history").orEmpty().contains(secondUrl))
+
+        val restored = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        assertEquals(model.state.value.catalogHistory, restored.state.value.catalogHistory)
+    }
+
+    @Test
+    fun `selecting a catalog history item immediately loads it and moves it to the top`() = runTest(dispatcher) {
+        val preferences = FakePreferences()
+        val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val model = SourcesViewModel(repository, catalog, preferences)
+        advanceUntilIdle()
+        val firstUrl = "https://example.com/first/index.json"
+        val secondUrl = "https://example.com/second/index.json"
+        model.onAction(SourcesAction.CatalogLocationChanged(firstUrl))
+        model.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+        model.onAction(SourcesAction.CatalogLocationChanged(secondUrl))
+        model.onAction(SourcesAction.RefreshCatalog)
+        advanceUntilIdle()
+
+        model.onAction(SourcesAction.SelectCatalogLocation(firstUrl))
+        advanceUntilIdle()
+
+        assertEquals(firstUrl, catalog.locations.last())
+        assertEquals(firstUrl, model.state.value.catalogHistory.first())
+        assertEquals(CatalogStatus.Ready, model.state.value.catalogStatus)
+    }
+
+    @Test
     fun `failed catalog change does not replace last successful address`() = runTest(dispatcher) {
         val preferences = FakePreferences()
         val catalog = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
@@ -247,6 +294,7 @@ class SourcesViewModelTest {
         val restored = SourcesViewModel(repository, catalog, preferences)
         advanceUntilIdle()
         assertEquals(customUrl, restored.state.value.catalogLocation)
+        assertTrue(restored.state.value.catalogHistory.none { it.contains("bad/index.json") })
     }
 
     @Test
