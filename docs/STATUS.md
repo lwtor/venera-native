@@ -2,6 +2,23 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-18 失败页按章节内页码显示（DONE）
+
+- 用户反馈阅读器顶部显示 16 / 22，但失败页按钮写「重试第 33 页」。根因是翻页/连续模式下
+  `ComicPage.index` 是跨章节画布的全局索引：上一章 17 页时，本章第 16 页的全局索引为 32。
+  顶部页码与滑杆用章节内索引计算，失败页、占位文字和无障碍描述却直接用全局 `index + 1`。
+- `ReaderUiState` 新增 `chapterPageRanges` 与 `pageNumber(index)`；View Model 在初始化、追加下一章、
+  前置上一章和重算拆分页时同步各章节的全局页区间。页面失败/占位/无障碍文案改用章节内页码；
+  `ReaderAction.RetryPage` 仍传全局索引，重试目标不变。
+- 排查「最近频繁加载失败」：索引计算不参与图片请求，加载与重试全程使用同一全局索引；失败按钮只在
+  `resolvePageBounded` 三次超时/IO 失败后出现。`CoilPageImagePipeline.sizeOf` 会下载整张图片再读尺寸，
+  View Model 预取半径为 3（当前页前后共 7 页），屏幕层另有同等半径的预解码；在有限流/签名过期的来源上
+  容易并发触发下载失败。本次未把网络失败归因于页码计算，也未改动预取策略。
+- JDK 17：`:feature:reader:compileDebugUnitTestKotlin :feature:reader:compileDebugAndroidTestKotlin :app:assembleDebug`
+  — BUILD SUCCESSFUL。新增 View Model 与 Compose 回归用例；`:feature:reader:testDebugUnitTest --tests
+  'dev.veneranative.feature.reader.ReaderViewModelTest'` — BUILD SUCCESSFUL。
+  `git diff --check` — PASS。未发布 Release；真机观感与来源网络状况待用户验收。
+
 ## 当前任务：U-17 目录搜索复用聚合搜索结果并逐源呈现（DONE）
 
 - 按用户反馈，目录搜索结果与搜索页聚合结果一致：按来源分组显示封面横向列表，复用相同 PagingSource、空筛选请求和首屏结果顺序；来源目录搜索全部条目，搜索页仍只覆盖已安装来源。每个有结果的来源行增加添加/更新/切换操作。
@@ -114,7 +131,7 @@
 ## 当前状态
 
 - Venera Native 是兼容 Venera 漫画源生态的非官方 Android 原生阅读器。模块职责见 [架构文档](ARCHITECTURE.md)。
-- 应用版本：2.6.3（versionCode 2006003），对应 U-17；2.6.2 是上一个正式发布版本。
+- 应用版本：2.6.4（versionCode 2006004），对应 U-18；2.6.3 是上一个正式发布版本。
 - 上一功能交付：1.9.11 应用内更新。正式 APK 构建和签名证书核对通过；Release Lint 报告 13 项依赖有新版可用，依赖升级留待单独任务。
 - 来源兼容性：支持二进制响应、图片 Hook URL 改写和有序章节结果；飞翔实时封面检测及相关 Android UI 未单独复验。
 - 应用内更新的设备端完整升级、授权返回及后台下载行为仍需设备复验；不能将构建或 JVM 测试等同于真机验收。

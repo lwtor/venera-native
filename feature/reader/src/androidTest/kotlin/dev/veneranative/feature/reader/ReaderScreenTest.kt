@@ -318,6 +318,47 @@ class ReaderScreenTest {
     }
 
     @Test
+    fun failedPageInLaterChapterShowsChapterLocalNumber() {
+        val failedPages = List(4) { index ->
+            ComicPage(
+                index = index,
+                imageRef = "test://$index",
+                widthPx = 1080,
+                heightPx = 1440,
+                sizeState = if (index == 2) PageSizeState.Failed else PageSizeState.Ready,
+            )
+        }
+        val retried = mutableListOf<Int>()
+        val decoder = object : PageImageDecoder {
+            override val strategy = DecodeStrategy.Region
+            override fun plan(page: ComicPage, viewport: PageViewport, zoom: Float, continuous: Boolean) =
+                listOf(PageTile(PageRegion(0, 0, page.widthPx, page.heightPx), viewport.widthPx, viewport.heightPx))
+            override suspend fun decode(request: PageDecodeRequest): DecodedPageImage = awaitCancellation()
+            override suspend fun predecode(request: PageDecodeRequest) = Unit
+        }
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "Chapter 2",
+                    pages = failedPages,
+                    currentPageIndex = 2,
+                    currentChapterStartIndex = 2,
+                    currentChapterPageCount = 2,
+                    chapterPageRanges = listOf(0..1, 2..3),
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = { action -> if (action is ReaderAction.RetryPage) retried += action.index },
+                onBack = {},
+                decoderFactory = { decoder },
+            )
+        }
+
+        composeRule.onNodeWithText("重试第 1 页").performClick()
+
+        assertEquals(listOf(2), retried)
+    }
+
+    @Test
     fun emitsDirectionChange() {
         var requested: ReadingDirection? = null
         composeRule.setContent {

@@ -1038,6 +1038,7 @@ private fun ContinuousPages(
         items(items, key = { stableTileKey(it) }) { item ->
             PageTile(
                 item = item,
+                pageNumber = state.pageNumber(item.page.index),
                 decoder = decoder,
                 modifier = Modifier.padding(vertical = 4.dp),
                 onRetry = { onAction(ReaderAction.RetryPage(item.page.index)) },
@@ -1139,6 +1140,7 @@ private fun SinglePagePager(
     ) { index ->
         PagedPage(
             page = state.pages[index],
+            pageNumber = state.pageNumber(index),
             viewport = viewport,
             decoder = decoder,
             isLastChapterPage = index == state.pageCount - 1,
@@ -1319,6 +1321,7 @@ private fun decodeRequestFor(page: ComicPage, tile: PageTile): PageDecodeRequest
 @Composable
 private fun PagedPage(
     page: ComicPage,
+    pageNumber: Int,
     viewport: PageViewport,
     decoder: PageImageDecoder?,
     isLastChapterPage: Boolean,
@@ -1438,6 +1441,7 @@ private fun PagedPage(
                 tiles.forEachIndexed { tileIndex, tile ->
                     PageTile(
                         item = TileItem(page, tileIndex, tile),
+                        pageNumber = pageNumber,
                         decoder = decoder,
                         onRetry = onRetry,
                         modifier = Modifier.padding(vertical = 4.dp),
@@ -1458,6 +1462,7 @@ private sealed interface PageImageState {
 @Composable
 private fun PageTile(
     item: TileItem,
+    pageNumber: Int,
     decoder: PageImageDecoder?,
     modifier: Modifier = Modifier,
     onRetry: () -> Unit = {},
@@ -1474,7 +1479,7 @@ private fun PageTile(
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "第 ${item.page.index + 1} 页",
+                text = "第 $pageNumber 页",
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1485,7 +1490,7 @@ private fun PageTile(
     if (item.page.sizeState != dev.veneranative.core.model.PageSizeState.Ready) {
         Box(modifier = boxModifier, contentAlignment = Alignment.Center) {
             if (item.page.sizeState == dev.veneranative.core.model.PageSizeState.Failed) {
-                Button(onClick = onRetry) { Text("重试第 ${item.page.index + 1} 页") }
+                Button(onClick = onRetry) { Text("重试第 $pageNumber 页") }
             } else CircularProgressIndicator()
         }
         return
@@ -1509,7 +1514,7 @@ private fun PageTile(
         when (val current = imageState) {
             null -> CircularProgressIndicator()
 
-            PageImageState.Failed -> Button(onClick = { retryGeneration++ }) { Text("重试第 ${item.page.index + 1} 页") }
+            PageImageState.Failed -> Button(onClick = { retryGeneration++ }) { Text("重试第 $pageNumber 页") }
 
             PageImageState.OutOfMemory -> Text(
                 text = "图片过大，无法解码。",
@@ -1518,7 +1523,7 @@ private fun PageTile(
 
             is PageImageState.Decoded -> FittedPageImage(
                 bitmap = current.image.bitmap.asImageBitmap(),
-                contentDescription = "第 ${item.page.index + 1} 页",
+                contentDescription = "第 $pageNumber 页",
                 modifier = Modifier.fillMaxSize(),
             )
         }

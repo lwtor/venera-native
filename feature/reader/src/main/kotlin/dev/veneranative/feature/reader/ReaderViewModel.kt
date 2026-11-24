@@ -169,6 +169,7 @@ class ReaderViewModel(
                         currentPageIndex = displayIndex,
                         currentChapterStartIndex = 0,
                         currentChapterPageCount = displayPages.size,
+                        chapterPageRanges = chapterPageRanges(),
                         previousChapter = content.previousChapter,
                         nextChapterStartIndex = null,
                         nextChapter = content.nextChapter,
@@ -308,6 +309,7 @@ class ReaderViewModel(
                         currentPageIndex = if (navigateAfterLoad) startIndex else current.currentPageIndex,
                         currentChapterStartIndex = if (navigateAfterLoad) startIndex else current.currentChapterStartIndex,
                         currentChapterPageCount = if (navigateAfterLoad) displayPages.size else current.currentChapterPageCount,
+                        chapterPageRanges = chapterPageRanges(),
                         nextChapterStartIndex = if (navigateAfterLoad) null else visibleSegment?.let { segment ->
                             chapters.firstOrNull { it.startPageIndex == segment.endPageIndex + 1 }?.startPageIndex
                         },
@@ -377,6 +379,7 @@ class ReaderViewModel(
                         currentPageIndex = if (preserveVisiblePage) current.currentPageIndex + count else count - 1,
                         currentChapterStartIndex = if (preserveVisiblePage) preservedSegmentStart else 0,
                         currentChapterPageCount = if (preserveVisiblePage) current.currentChapterPageCount else count,
+                        chapterPageRanges = chapterPageRanges(),
                         chapterTitle = if (preserveVisiblePage) current.chapterTitle else content.title,
                         previousChapter = if (preserveVisiblePage) current.previousChapter else content.previousChapter,
                         nextChapterStartIndex = if (preserveVisiblePage) {
@@ -546,6 +549,9 @@ class ReaderViewModel(
         }
     }
 
+    private fun chapterPageRanges(): List<IntRange> =
+        chapters.map { it.startPageIndex..it.endPageIndex }
+
     private fun segmentIndexOfPage(pageIndex: Int): Int =
         chapters.indexOfLast { pageIndex in it.startPageIndex..it.endPageIndex }
 
@@ -594,6 +600,7 @@ class ReaderViewModel(
                 currentPageIndex = pageIndex,
                 currentChapterStartIndex = starts[target],
                 currentChapterPageCount = displays[target].size,
+                chapterPageRanges = chapterPageRanges(),
                 nextChapterStartIndex = chapters.getOrNull(target + 1)
                     ?.takeIf { it.startPageIndex == starts[target] + displays[target].size }
                     ?.startPageIndex,

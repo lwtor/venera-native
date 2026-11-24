@@ -117,6 +117,37 @@ class ReaderViewModelTest {
     }
 
     @Test
+    fun `page numbers stay chapter local after another chapter is appended`() = runTest(dispatcher) {
+        val next = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-2")))
+        val provider = object : PageProvider {
+            override suspend fun loadChapter(chapter: ChapterRef): ChapterContent =
+                if (chapter == ChapterRef.Remote(chapterKey)) {
+                    ChapterContent(
+                        "Chapter 1", listOf(ComicPage(0, "current-0", 100, 100), ComicPage(1, "current-1", 100, 100)),
+                        nextChapter = next,
+                    )
+                } else {
+                    ChapterContent(
+                        "Chapter 2", listOf(ComicPage(0, "next-0", 100, 100), ComicPage(1, "next-1", 100, 100),
+                            ComicPage(2, "next-2", 100, 100)),
+                    )
+                }
+        }
+        val viewModel = ReaderViewModel(chapterKey, provider)
+        advanceUntilIdle()
+
+        viewModel.onAction(ReaderAction.LoadNextChapter)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertEquals(listOf(0..1, 2..4), state.chapterPageRanges)
+        assertEquals(1, state.pageNumber(0))
+        assertEquals(2, state.pageNumber(1))
+        assertEquals(1, state.pageNumber(2))
+        assertEquals(3, state.pageNumber(4))
+    }
+
+    @Test
     fun `quick chapter navigation loads the previous chapter and keeps pages on one canvas`() = runTest(dispatcher) {
         val previous = ChapterRef.Remote(chapterKey.copy(remoteId = RemoteChapterId("chapter-0")))
         val provider = object : PageProvider {

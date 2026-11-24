@@ -29,6 +29,15 @@ data class ReaderUiState(
     val currentPageIndex: Int = 0,
     val currentChapterStartIndex: Int = 0,
     val currentChapterPageCount: Int = 0,
+    /**
+     * Global page ranges of every chapter currently on the canvas, in reading order.
+     *
+     * [ComicPage.index] addresses the flattened canvas, so it keeps growing as chapters are
+     * appended or prepended. Any user-facing page number must instead be relative to the chapter
+     * that owns the page; without these ranges a failed page in chapter 2 is reported as page 33
+     * while the toolbar says 16 / 22.
+     */
+    val chapterPageRanges: List<IntRange> = emptyList(),
     val previousChapter: ChapterRef? = null,
     val nextChapterStartIndex: Int? = null,
     val nextChapter: ChapterRef? = null,
@@ -69,4 +78,10 @@ data class ReaderUiState(
     /** 1-based page number for display; 0 while nothing is loaded. */
     val currentPageNumber: Int get() = if (pages.isEmpty()) 0 else currentPageIndex - currentChapterStartIndex + 1
     val currentChapterEndIndex: Int get() = currentChapterStartIndex + currentChapterPageCount - 1
+
+    /** 1-based chapter-local display number of a flattened canvas page. */
+    fun pageNumber(index: Int): Int {
+        val range = chapterPageRanges.firstOrNull { index in it } ?: return index + 1
+        return index - range.first + 1
+    }
 }
