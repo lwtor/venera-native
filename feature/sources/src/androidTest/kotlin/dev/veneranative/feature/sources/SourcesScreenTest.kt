@@ -246,6 +246,69 @@ class SourcesScreenTest {
         composeRule.onNodeWithText("Demo Source").assertIsDisplayed()
     }
 
+    @Test
+    fun `update all banner appears with two outdated sources and dispatches the batch action`() {
+        val actions = mutableListOf<SourcesAction>()
+        val catalog = defaultVeneraSourceCatalogUrl()
+        val a = SOURCE.copy(sourceId = SourceId("a"), name = "A", catalogLocation = catalog)
+        val b = SOURCE.copy(sourceId = SourceId("b"), name = "B", catalogLocation = catalog)
+        val entries = listOf(
+            SourceCatalogEntry("A", "a", "2.0.0", null, "https://cdn.example/a.js", catalog),
+            SourceCatalogEntry("B", "b", "2.0.0", null, "https://cdn.example/b.js", catalog),
+        )
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(
+                        status = SourcesStatus.Ready,
+                        sources = listOf(a, b),
+                        catalogStatus = CatalogStatus.Ready,
+                        catalogLocation = catalog,
+                        catalogEntries = entries,
+                    ),
+                    onAction = { actions += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
+        composeRule.onNodeWithTag(UPDATE_ALL_BANNER_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("全部更新").performClick()
+
+        assertEquals(listOf(SourcesAction.UpdateAllOutdated), actions)
+    }
+
+    @Test
+    fun `tapping the enabled switch does not expand the source settings`() {
+        val actions = mutableListOf<SourcesAction>()
+        composeRule.setContent {
+            VeneraNativeTheme {
+                SourcesScreen(
+                    state = SourcesUiState(
+                        status = SourcesStatus.Ready,
+                        sources = listOf(SOURCE),
+                        configuration = null,
+                    ),
+                    onAction = { actions += it },
+                    onBack = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
+        // Toggling the switch fires SetEnabled but must NOT open the configuration.
+        composeRule.onNodeWithTag(SOURCE_ENABLED_TAG).performClick()
+        assertEquals(listOf(SourcesAction.SetEnabled(SOURCE.sourceId, false)), actions)
+
+        // The expand target is the name block; tapping it opens configuration as before.
+        composeRule.onNodeWithText("Demo Source").performClick()
+        assertEquals(
+            listOf(SourcesAction.SetEnabled(SOURCE.sourceId, false), SourcesAction.OpenConfiguration(SOURCE.sourceId)),
+            actions,
+        )
+    }
+
     private companion object {
         val SOURCE = InstalledSource(
             sourceId = SourceId("demo"),

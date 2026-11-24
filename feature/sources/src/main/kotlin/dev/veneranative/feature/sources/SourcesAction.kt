@@ -27,6 +27,7 @@ sealed interface SourcesAction {
     data object RefreshCatalog : SourcesAction
 
     data class InstallCatalogEntry(val entry: SourceCatalogEntry) : SourcesAction
+    data object UpdateAllOutdated : SourcesAction
 
     data class ComicQueryChanged(val query: String) : SourcesAction
     data object SearchCatalogForComic : SourcesAction

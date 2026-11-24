@@ -1,29 +1,38 @@
 package dev.veneranative.feature.sources
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,7 +51,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -373,11 +385,19 @@ private fun InstalledContent(
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (state.catalogUpdateCount >= 2) {
+                    item(key = "update-all-banner") {
+                        UpdateAllBanner(
+                            count = state.catalogUpdateCount,
+                            busy = state.installing,
+                            onUpdateAll = { onAction(SourcesAction.UpdateAllOutdated) },
+                        )
+                    }
+                }
                 items(state.sources, key = { it.sourceId.value }) { source ->
                     val update = state.catalogUpdateFor(source)
-                    SourceRow(
+                    SourceGroup(
                         source = source,
                         update = update,
                         installing = state.installing,
@@ -394,6 +414,7 @@ private fun InstalledContent(
                         onMove = { delta -> onMove(source, delta) },
                         onAction = onAction,
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -483,7 +504,42 @@ private fun CatalogSourceRow(
 }
 
 @Composable
-private fun SourceRow(
+private fun UpdateAllBanner(
+    count: Int,
+    busy: Boolean,
+    onUpdateAll: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag(UPDATE_ALL_BANNER_TAG),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "$count 个来源有更新",
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            TextButton(onClick = onUpdateAll, enabled = !busy) {
+                Text(if (busy) "更新中…" else "全部更新")
+            }
+        }
+    }
+}
+
+/**
+ * A source as one flat group: a visually weighted header plus an indented settings body.
+ *
+ * The header has two independent hit targets — the left block (arrow + name + version) only
+ * toggles expansion, while the right block (status / switch / overflow) never triggers it, so a
+ * switch tap cannot also expand the group.
+ */
+@Composable
+private fun SourceGroup(
     source: InstalledSource,
     update: SourceCatalogEntry?,
     installing: Boolean,
@@ -500,40 +556,105 @@ private fun SourceRow(
     onMove: (Int) -> Unit,
     onAction: (SourcesAction) -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth().combinedClickable(onClick = onToggleExpanded, onLongClick = onStartReorder),
-                verticalAlignment = Alignment.CenterVertically,
+    var overflowExpanded by rememberSaveable { mutableStateOf(false) }
+    Column(
+        modifier = Modifier.fillMaxWidth().animateContentSize()
+            .background(if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Left hit target: expansion only.
+            Column(
+                modifier = Modifier.weight(1f)
+                    .combinedClickable(onClick = onToggleExpanded, onLongClick = onStartReorder)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "${if (expanded) "收起" else "展开"}${source.name} 的设置"
+                    },
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(source.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("版本 ${source.version}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                val check = state.loginCheckOutcomes[source.sourceId]
-                if (check == dev.veneranative.data.source.SourceLoginCheckOutcome.Invalid || check == dev.veneranative.data.source.SourceLoginCheckOutcome.Failed) {
-                    Text("!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMedium)
-                }
-                Text(if (expanded) "收起" else "设置", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
-            }
-            if (reorderMode) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("调整来源顺序", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
-                    TextButton(onClick = { onMove(-1) }, enabled = state.sources.firstOrNull()?.sourceId != source.sourceId) { Text("↑ 上移") }
-                    TextButton(onClick = { onMove(1) }, enabled = state.sources.lastOrNull()?.sourceId != source.sourceId) { Text("↓ 下移") }
-                    TextButton(onClick = onStartReorder) { Text("完成") }
-                }
-            }
-            if (expanded) {
-                androidx.compose.material3.HorizontalDivider()
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (source.enabled) "已启用" else "已停用", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (update != null) TextButton(onClick = onUpdate, enabled = !busy && !installing) { Text(if (installing) "更新中…" else "更新 ${update.version}") }
-                    TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
-                    Switch(checked = source.enabled, onCheckedChange = onEnabledChange, enabled = !busy)
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp).rotate(if (expanded) 180f else 0f),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(source.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                SourceConfigurationPanel(configuration, state, onAction)
+                Text(
+                    "版本 ${source.version}" + if (source.enabled) "" else " · 已停用",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Right hit target: status / switch / overflow; never toggles expansion.
+            Spacer(Modifier.width(8.dp))
+            val check = state.loginCheckOutcomes[source.sourceId]
+            if (check == dev.veneranative.data.source.SourceLoginCheckOutcome.Invalid ||
+                check == dev.veneranative.data.source.SourceLoginCheckOutcome.Failed
+            ) {
+                Text("登录异常", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.width(6.dp))
+            }
+            if (update != null) {
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
+                    Text(
+                        "有更新",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+            Switch(
+                checked = source.enabled,
+                onCheckedChange = onEnabledChange,
+                enabled = !busy,
+                modifier = Modifier.testTag(SOURCE_ENABLED_TAG),
+            )
+            Box {
+                IconButton(onClick = { overflowExpanded = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = "${source.name} 的更多操作")
+                }
+                DropdownMenu(expanded = overflowExpanded, onDismissRequest = { overflowExpanded = false }) {
+                    if (update != null) {
+                        DropdownMenuItem(
+                            text = { Text(if (installing) "更新中…" else "更新至 ${update.version}") },
+                            enabled = !busy && !installing,
+                            onClick = { overflowExpanded = false; onUpdate() },
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = { Text("调整顺序") },
+                        onClick = { overflowExpanded = false; onStartReorder() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("移除") },
+                        enabled = !busy,
+                        onClick = { overflowExpanded = false; onUninstall() },
+                    )
+                }
+            }
+        }
+
+        if (reorderMode) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("调整来源顺序", modifier = Modifier.weight(1f), style = MaterialTheme.typography.labelSmall)
+                TextButton(onClick = { onMove(-1) }, enabled = state.sources.firstOrNull()?.sourceId != source.sourceId) { Text("↑ 上移") }
+                TextButton(onClick = { onMove(1) }, enabled = state.sources.lastOrNull()?.sourceId != source.sourceId) { Text("↓ 下移") }
+                TextButton(onClick = onStartReorder) { Text("完成") }
+            }
+        }
+
+        if (expanded) {
+            // Indented body with a 2dp guide line: these settings visibly belong to the header above.
+            Row(modifier = Modifier.padding(start = 20.dp, end = 12.dp, bottom = 12.dp)) {
+                Box(Modifier.width(2.dp).heightIn(min = 24.dp).background(MaterialTheme.colorScheme.primary))
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    SourceConfigurationPanel(configuration, state, onAction)
+                }
             }
         }
     }
@@ -570,6 +691,8 @@ internal const val CATALOG_INSTALL_TAG = "source-catalog-install"
 internal const val AVAILABLE_SECTION_TAG = "source-section-available"
 internal const val INSTALLED_SECTION_TAG = "source-section-installed"
 internal const val MANUAL_INSTALL_TAG = "source-manual-install"
+internal const val UPDATE_ALL_BANNER_TAG = "source-update-all-banner"
+internal const val SOURCE_ENABLED_TAG = "source-enabled-switch"
 
 @Preview(showBackground = true)
 @Composable

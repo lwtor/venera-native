@@ -2,6 +2,28 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-19 漫画源设置页 v2 改版（DONE）
+
+- 按用户三轮反馈重做已安装来源列表：问题不是视觉样式，而是层级与热区——来源与设置项压在同一层看不出分区，
+  头行整行可点导致「点开关/更新」与「展开设置」语义冲突，配置面板还有 520dp 嵌套滚动与重复的账号按钮堆。
+- 渲染层（`SourcesScreen.kt`）：多张 Card 改为一张连续列表 + 细分割线 + 淡色分组头；每个来源头拆成两个独立热区，
+  左侧（箭头 + 名称 + 版本）只管展开，右侧（登录异常文字 / 有更新角标 / 启用开关 / ⋮ 溢出菜单）永不触发展开；
+  更新、调整顺序、移除收进溢出菜单；展开体缩进 16dp 并带 2dp 引导线，视觉上从属于来源头。箭头 180° 旋转 + `animateContentSize`，遵守系统减少动态效果。
+- 配置面板（`SourceConfigurationDialog.kt`）：去掉内部 520dp 滚动；账号收敛为「登录状态（带检测）」「重新登录 / 更换账号」
+  「注销」「注册」等统一行；四种设置类型统一为 `SettingRow(title, subtitle?, control)`，INPUT 就地展开编辑；保存按钮全页仅一处，
+  移除了与页面顶部重复的消息条。
+- 更新入口上提：单个来源在分组头显示「有更新」角标；≥2 个来源有更新时顶部出现「N 个来源有更新 · 全部更新」横幅，
+  新增 `SourcesAction.UpdateAllOutdated` 与 ViewModel 串行批量实现（逐个走 `installFromCatalog`，单个失败不中断其余）。
+- 状态层未动：展开仍是单 id 手风琴（`expandedSourceId`），配置仍按展开的来源按需加载，不增加脚本执行；未触碰数据层与配置缓存。
+- 依赖：新增 `libs.compose.animation` 并在 `:feature:sources` 显式 implementation（供 `animateContentSize` 使用）。
+- 验证：`:feature:sources:compileDebugKotlin :feature:sources:compileDebugUnitTestKotlin :feature:sources:compileDebugAndroidTestKotlin :app:assembleDebug` — BUILD SUCCESSFUL。
+  新增 2 条批量更新 ViewModel 用例（全成功 / 无过期源）与 2 条 Compose 用例（批量横幅动作 / 点开关不触发展开）均编译通过；
+  `testDebugUnitTest --tests '...update all*'` — BUILD SUCCESSFUL。全量 `SourcesViewModelTest` 24 项中 1 项失败：
+  `login validity check reports a source confirmed expired session`（期望 `checkLogin` 失效时写 message，但 HEAD 原实现只写 outcome），
+  经 `git show HEAD` 核实为改动前既有失败，与本次无关，未在本任务顺带修改。
+- `git diff --check` — PASS。未发布 Release（等待用户指令）；v2 真机观感与操作手感待用户验收。
+- 方案与逐条依据见 `docs/reviews/sources-loading-and-update-ux-review.md`（含 v2 定稿章节）。
+
 ## 当前任务：U-18 失败页按章节内页码显示（DONE）
 
 - 用户反馈阅读器顶部显示 16 / 22，但失败页按钮写「重试第 33 页」。根因是翻页/连续模式下

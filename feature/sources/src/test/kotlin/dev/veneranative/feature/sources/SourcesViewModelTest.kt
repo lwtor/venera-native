@@ -293,6 +293,45 @@ class SourcesViewModelTest {
     }
 
     @Test
+    fun `update all installs every outdated source from the catalog`() = runTest(dispatcher) {
+        val catalog = defaultVeneraSourceCatalogUrl()
+        val a = source("a", name = "A", version = "1.0.0").copy(catalogLocation = catalog)
+        val b = source("b", name = "B", version = "1.0.0").copy(catalogLocation = catalog)
+        repository.sources = listOf(a, b)
+        val catalogRepo = FakeSourceCatalogRepository(SourceCatalogResult.Success(listOf(
+            SourceCatalogEntry("A", "a", "2.0.0", null, "https://cdn.example/a.js", catalog),
+            SourceCatalogEntry("B", "b", "2.0.0", null, "https://cdn.example/b.js", catalog),
+        )))
+        repository.outcome = InstallOutcome.Success(a.copy(version = "2.0.0"))
+        val viewModel = SourcesViewModel(repository, catalogRepo)
+        advanceUntilIdle()
+        assertEquals(2, viewModel.state.value.catalogUpdateCount)
+
+        viewModel.onAction(SourcesAction.UpdateAllOutdated)
+        advanceUntilIdle()
+
+        assertEquals(2, repository.catalogInstallLocations.size)
+        assertTrue(!viewModel.state.value.installing)
+        assertEquals("已更新 2 个来源。", viewModel.state.value.message)
+    }
+
+    @Test
+    fun `update all ignores stale installs and aborts when nothing is outdated`() = runTest(dispatcher) {
+        val catalog = defaultVeneraSourceCatalogUrl()
+        repository.sources = listOf(source("a", version = "1.0.0").copy(catalogLocation = catalog))
+        val catalogRepo = FakeSourceCatalogRepository(SourceCatalogResult.Success(emptyList()))
+        val viewModel = SourcesViewModel(repository, catalogRepo)
+        advanceUntilIdle()
+        assertEquals(0, viewModel.state.value.catalogUpdateCount)
+
+        viewModel.onAction(SourcesAction.UpdateAllOutdated)
+        advanceUntilIdle()
+
+        assertTrue(repository.catalogInstallLocations.isEmpty())
+        assertTrue(!viewModel.state.value.installing)
+    }
+
+    @Test
     fun `same source in another catalog offers a switch instead of an update`() = runTest(dispatcher) {
         val firstCatalog = "https://catalog.example/first/index.json"
         val secondCatalog = "https://catalog.example/second/index.json"

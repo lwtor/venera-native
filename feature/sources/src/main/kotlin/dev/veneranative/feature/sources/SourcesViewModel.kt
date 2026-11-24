@@ -108,6 +108,8 @@ class SourcesViewModel(
                     expectedSourceId = _state.value.installedSourceFor(action.entry)?.sourceId,
                 )
 
+            SourcesAction.UpdateAllOutdated -> updateAllOutdated()
+
             is SourcesAction.ComicQueryChanged -> {
                 comicSearchJob?.cancel()
                 _state.update {
@@ -463,6 +465,42 @@ class SourcesViewModel(
                         message = outcome.error.toMessage(),
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Updates every installed source that has a newer catalog version, one at a time.
+     *
+     * Reuses the same catalog/install path as a single update so signature and catalog switching
+     * behave identically. The whole batch is one busy window; a failure does not abort the rest.
+     */
+    private fun updateAllOutdated() {
+        if (_state.value.installing) return
+        val targets = _state.value.sources.mapNotNull { source ->
+            val entry = _state.value.catalogUpdateFor(source) ?: return@mapNotNull null
+            Triple(entry, entry.catalogLocation ?: _state.value.catalogLocation.trim(), source.sourceId)
+        }
+        if (targets.isEmpty()) return
+        _state.update { it.copy(installing = true, message = null) }
+        viewModelScope.launch {
+            var updated = 0
+            var failed = 0
+            for ((entry, catalogLocation, sourceId) in targets) {
+                val outcome = runCatching { repository.installFromCatalog(entry.scriptUrl, catalogLocation) }.getOrNull()
+                if (outcome is InstallOutcome.Success) updated++ else failed++
+            }
+            val sources = runCatching { repository.installed() }.getOrDefault(_state.value.sources)
+            _state.update { current ->
+                current.copy(
+                    installing = false,
+                    sources = sources,
+                    status = SourcesStatus.Ready,
+                    message = buildString {
+                        if (updated > 0) append("已更新 $updated 个来源。")
+                        if (failed > 0) append("${if (updated > 0) " " else ""}$failed 个更新失败，请重试。")
+                    },
+                )
             }
         }
     }
