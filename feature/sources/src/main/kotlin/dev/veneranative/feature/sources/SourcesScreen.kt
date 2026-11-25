@@ -536,21 +536,69 @@ private fun SourceCard(
                         modifier = Modifier.padding(horizontal = 14.dp),
                         color = MaterialTheme.colorScheme.outlineVariant,
                     )
-                    Box(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 16.dp)) {
+                    Box(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)) {
                         SourceSettingsBody(
                             configuration = configuration,
                             configurationLoading = state.configurationLoading,
                             state = state,
-                            update = update,
-                            installing = installing,
                             busy = busy,
                             onAction = onAction,
-                            onUpdate = onUpdate,
-                            onUninstall = onUninstall,
                         )
                     }
+                    SourceMaintenanceFooter(
+                        update = update,
+                        installing = installing,
+                        busy = busy,
+                        onUpdate = onUpdate,
+                        onUninstall = onUninstall,
+                    )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Update and remove, on one row along the card's bottom edge.
+ *
+ * They used to be a third labelled group — a heading, then one row per action with a two-line
+ * explanation each — which cost roughly three rows of height under every expanded card for what is
+ * two buttons. The heading also framed them as settings, and they are not: they act on the source
+ * rather than configure it. At the card's edge, outside the settings body's inset, the row reads as
+ * "actions on this source" and costs one row. The labels keep enough wording to stand alone, since
+ * the explanation that used to sit beside them is gone.
+ */
+@Composable
+private fun SourceMaintenanceFooter(
+    update: SourceCatalogEntry?,
+    installing: Boolean,
+    busy: Boolean,
+    onUpdate: () -> Unit,
+    onUninstall: () -> Unit,
+) {
+    HorizontalDivider(
+        modifier = Modifier.padding(horizontal = 14.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End,
+    ) {
+        if (update?.version != null) {
+            TextButton(onClick = onUpdate, enabled = !busy && !installing) {
+                Text(
+                    text = if (installing) "更新中…" else "更新到 ${update.version}",
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
+        }
+        TextButton(onClick = onUninstall, enabled = !busy) {
+            Text(
+                text = "移除来源",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.error,
+            )
         }
     }
 }

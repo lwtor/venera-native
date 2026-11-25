@@ -42,7 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.veneranative.core.model.InstalledSourceConfiguration
 import dev.veneranative.core.model.SourceSettingDefinition
-import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.SourceLoginCheckOutcome
 
 /**
@@ -61,12 +60,8 @@ internal fun SourceSettingsBody(
     configuration: InstalledSourceConfiguration?,
     configurationLoading: Boolean,
     state: SourcesUiState,
-    update: SourceCatalogEntry?,
-    installing: Boolean,
     busy: Boolean,
     onAction: (SourcesAction) -> Unit,
-    onUpdate: () -> Unit,
-    onUninstall: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         when {
@@ -120,14 +115,6 @@ internal fun SourceSettingsBody(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-
-        MaintenanceSection(
-            update = update,
-            installing = installing,
-            busy = busy,
-            onUpdate = onUpdate,
-            onUninstall = onUninstall,
-        )
 
         state.settingsMessage?.let { message ->
             Text(
@@ -281,33 +268,6 @@ private fun DeclaredSettingsSection(
                 onValueChange = { json -> onAction(SourcesAction.SetSettingValue(sourceId, setting.key, json)) },
                 onCallback = { onAction(SourcesAction.InvokeSettingCallback(sourceId, setting.key)) },
             )
-        }
-    }
-}
-
-@Composable
-private fun MaintenanceSection(
-    update: SourceCatalogEntry?,
-    installing: Boolean,
-    busy: Boolean,
-    onUpdate: () -> Unit,
-    onUninstall: () -> Unit,
-) {
-    SettingsGroup(title = "维护") {
-        if (update?.version != null) {
-            SettingRow(title = "更新到 ${update.version}", subtitle = "从当前目录重新安装此来源") {
-                TextButton(onClick = onUpdate, enabled = !busy && !installing) {
-                    Text(if (installing) "更新中…" else "更新")
-                }
-            }
-            RowDivider()
-        }
-        SettingRow(
-            title = "移除来源",
-            titleColor = MaterialTheme.colorScheme.error,
-            subtitle = "从设备上删除脚本与设置",
-        ) {
-            TextButton(onClick = onUninstall, enabled = !busy) { Text("移除") }
         }
     }
 }
