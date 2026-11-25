@@ -2,6 +2,27 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-21 换源页面的返回目标与按钮取舍（DONE）
+
+- 用户反馈两点：①从换源结果打开的详情页按返回落在首页，「每次做一个新页面都是返回首页」；
+  ②该页面只需换源、不需要收藏，换源按钮应占据收藏的位置。
+- 返回目标（`SourceSwitchNavigation.kt`）：2.6.6 把换源当「替换」，新页面继承旧页面的 `backTo`，
+  于是旧页面被抹掉、返回跳到更早的列表（常见就是首页）。现改为压栈：新页面的 `backTo` 是
+  当前详情页本身，层层可回退（A → B → C，返回依次 C→B→A→A 自己的列表）。
+  纯函数 `sourceSwitchDestination(current, key, title)` 与 `openedBySourceSwitch()` 放在
+  `:core:navigation`，装配层只做连线，语义可单测。
+- 按钮取舍：`openedBySourceSwitch()` 为真（`backTo is ComicDetails`）的页面隐藏收藏——
+  封面右下角的收藏圆钮换成同尺寸同位置的换源圆钮（`SwitchSourceAction`），顶栏只留一个换源按钮，
+  正好落在原收藏的右端位置。非换源进入的页面不受影响，仍是「换源 + 收藏」。
+  收藏状态本身没变：改绑时 `replaceSource` 已把书架条目迁到新来源，只是这一页不再提供收藏入口。
+- 已知取舍：换源后旧源页面仍留在返回链上，若旧源已卸载/停用，返回时显示的是它的「源不可用 + 切换其他源」
+  状态页而不是列表。这是用户明确要求的「返回上一页」，比抹掉历史更符合预期。
+- 验证：`:core:navigation:testDebugUnitTest` 20 项通过（新增 `SourceSwitchNavigationTest` 3 项：
+  换源页返回上一详情页、连续换源逐层回退、换源进入判定）；`:app:assembleDebug` BUILD SUCCESSFUL；
+  `git diff --check` PASS。版本 2.6.12 / 2006012。
+- 未加 Compose 断言：`:feature:details` 没有 androidTest 源集，为一条按钮可见性断言新建整套
+  instrumentation 依赖不划算，按钮条件保持在渲染层参数 `enteredBySourceSwitch`（由装配层传入）。
+
 ## 当前任务：U-20 详情页切换其他漫画源（DONE）
 
 - 场景：已安装源加载详情失败、或源被卸载后进入详情页时，按钮区提供「切换其他源」。点击后拿当前标题

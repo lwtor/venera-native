@@ -35,7 +35,9 @@ import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.backDestination
 import dev.veneranative.core.navigation.decodeAppRoute
+import dev.veneranative.core.navigation.openedBySourceSwitch
 import dev.veneranative.core.navigation.readerDetailsDestination
+import dev.veneranative.core.navigation.sourceSwitchDestination
 import dev.veneranative.core.navigation.encode
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.comic.DefaultComicCatalog
@@ -377,8 +379,9 @@ private fun AppNavHost(
                             onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, current.backTo ?: AppRoute.Home))
                         },
                         onOpenOtherSource = { key, title ->
-                            onRouteChange(AppRoute.ComicDetails(key, title, current.backTo))
+                            onRouteChange(sourceSwitchDestination(current, key, title))
                         },
+                        enteredBySourceSwitch = current.openedBySourceSwitch(),
                         onBack = onBack,
                     )
 

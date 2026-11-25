@@ -23,6 +23,10 @@ import dev.veneranative.data.settings.ScreenPreferenceRepository
  * [collection] is nullable because the assembly layer builds it from the database, which does not
  * exist for the first moments of the process; until it arrives the comic is readable but cannot be
  * kept, which is better than a screen that waits.
+ *
+ * [enteredBySourceSwitch] is true when this page sits on top of another source's page for the same
+ * comic. Such a page exists to compare sources, so it shows the switch action in place of the shelf
+ * action instead of offering both.
  */
 @Composable
 fun DetailsRoute(
@@ -40,6 +44,7 @@ fun DetailsRoute(
     onOpenDownloads: () -> Unit = {},
     onOpenRelatedWorks: (String, TagNavigation) -> Unit = { _, _ -> },
     onOpenOtherSource: (ComicKey, String?) -> Unit = { _, _ -> },
+    enteredBySourceSwitch: Boolean = false,
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences, title)
@@ -51,8 +56,8 @@ fun DetailsRoute(
             onOpenRelatedWorks(navigation.tag, navigation.target)
         }
     }
-    // Switching sources is a replacement, not a push: the comic the user asked for is the same one,
-    // only its source changed, so going back must not land on the source that just failed.
+    // Switching sources stacks the comic's page for the new source on top of this one, so back
+    // returns here rather than to the list this page came from.
     androidx.compose.runtime.LaunchedEffect(state.sourceSwitchTarget) {
         val target = state.sourceSwitchTarget ?: return@LaunchedEffect
         val hint = state.title.takeIf { it.isNotBlank() }
@@ -79,6 +84,7 @@ fun DetailsRoute(
         onBack = onBack,
         onOpenDownloads = onOpenDownloads,
         modifier = modifier,
+        enteredBySourceSwitch = enteredBySourceSwitch,
     )
 }
 

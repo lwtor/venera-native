@@ -134,6 +134,7 @@ fun DetailsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenDownloads: () -> Unit = {},
+    enteredBySourceSwitch: Boolean = false,
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -173,6 +174,15 @@ fun DetailsScreen(
     val collapseFraction = (scrollPx / collapseDistancePx).coerceIn(0f, 1f)
     val title = state.detail?.comic?.title.orEmpty()
     val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
+    // A page reached by switching source exists to compare sources: the comic is already on the
+    // shelf under the source it came from, so the shelf action gives way to the switch action
+    // instead of sitting next to it.
+    val showFavorite = state.hasShelf && !enteredBySourceSwitch
+    val heroAction: (@Composable () -> Unit)? = when {
+        enteredBySourceSwitch -> ({ SwitchSourceAction { onAction(DetailsAction.OpenSourceSwitch) } })
+        showFavorite -> ({ FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } })
+        else -> null
+    }
     val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
     val toolbarHeight = WindowInsets.safeDrawing.getTop(density) + with(density) { 56.dp.roundToPx() }
     val currentChapterIndex = state.currentChapterListIndex()
@@ -298,6 +308,7 @@ fun DetailsScreen(
                         onAction = onAction,
                         onOpenChapter = onOpenChapter,
                         bottomPadding = directoryBottomPadding,
+                        heroAction = heroAction,
                     )
                 }
 
@@ -355,9 +366,10 @@ fun DetailsScreen(
                 collapseFraction = collapseFraction,
                 onBack = onBack,
                 isFavorite = state.isFavorite,
-                showFavorite = state.hasShelf,
+                showFavorite = showFavorite,
                 onToggleFavorite = { onAction(DetailsAction.ToggleFavorite) },
                 onSwitchSource = { onAction(DetailsAction.OpenSourceSwitch) },
+                enteredBySourceSwitch = enteredBySourceSwitch,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -464,6 +476,7 @@ private fun Content(
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (Chapter) -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    heroAction: (@Composable () -> Unit)?,
 ) {
     val chapterBounds = remember { mutableStateMapOf<ChapterKey, Rect>() }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -513,6 +526,7 @@ private fun Content(
                 heroHeight = heroHeight,
                 tagGroups = tagGroups,
                 collapseFraction = collapseFraction,
+                heroAction = heroAction,
             )
         }
         if (state.status == DetailsStatus.Failed) {
@@ -643,6 +657,7 @@ private fun Header(
     heroHeight: androidx.compose.ui.unit.Dp,
     tagGroups: Map<String, List<String>>,
     collapseFraction: Float,
+    heroAction: (@Composable () -> Unit)?,
 ) {
     val comic = state.detail?.comic ?: return
     Box(
@@ -676,9 +691,7 @@ private fun Header(
             if (state.detail.metadata.isNotEmpty()) {
                 HeroFacts(
                     metadata = state.detail.metadata,
-                    trailingFavorite = if (!hasTagGroups && state.hasShelf) {
-                        { FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }
-                    } else null,
+                    trailingAction = if (hasTagGroups) null else heroAction,
                 )
             }
             if (hasTagGroups) {
@@ -687,14 +700,12 @@ private fun Header(
                     onTagClick = if (state.canOpenTags && !state.openingTag) {
                         { namespace, author -> onAction(DetailsAction.TagClicked(namespace, author)) }
                     } else null,
-                    trailingFavorite = if (state.hasShelf) {
-                        { FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }
-                    } else null,
+                    trailingAction = heroAction,
                 )
             }
-            if (state.detail.metadata.isEmpty() && !hasTagGroups && state.hasShelf) {
+            if (state.detail.metadata.isEmpty() && !hasTagGroups && heroAction != null) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) }
+                    heroAction()
                 }
             }
         }
@@ -718,6 +729,7 @@ private fun DetailsToolbar(
     showFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onSwitchSource: () -> Unit,
+    enteredBySourceSwitch: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val background = androidx.compose.ui.graphics.lerp(Color.Transparent, MaterialTheme.colorScheme.surface, collapseFraction)
@@ -751,20 +763,10 @@ private fun DetailsToolbar(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            IconButton(
-                onClick = onSwitchSource,
-                modifier = Modifier.alpha(collapseFraction).testTag(DETAILS_SOURCE_SWITCH_TOOLBAR_TAG)
-                    .semantics { contentDescription = "切换漫画源" },
-                // The expanded header is a full-bleed cover; controls only make sense once it is a bar.
-                enabled = collapseFraction >= 0.98f,
-            ) {
-                SwapSourceGlyph(
-                    color = androidx.compose.ui.graphics.lerp(
-                        Color.White,
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                        collapseFraction,
-                    ),
-                )
+            // Normally the switch glyph sits left of the shelf glyph. A page reached by switching
+            // source keeps only the switch action, in the slot the shelf glyph would have used.
+            if (!enteredBySourceSwitch) {
+                ToolbarSwitchSourceButton(collapseFraction = collapseFraction, onClick = onSwitchSource)
             }
             if (showFavorite) {
                 IconButton(
@@ -779,10 +781,31 @@ private fun DetailsToolbar(
                         color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
                     )
                 }
+            } else if (enteredBySourceSwitch) {
+                ToolbarSwitchSourceButton(collapseFraction = collapseFraction, onClick = onSwitchSource)
             } else {
                 Spacer(modifier = Modifier.width(16.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun ToolbarSwitchSourceButton(collapseFraction: Float, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.alpha(collapseFraction).testTag(DETAILS_SOURCE_SWITCH_TOOLBAR_TAG)
+            .semantics { contentDescription = "切换漫画源" },
+        // The expanded header is a full-bleed cover; controls only make sense once it is a bar.
+        enabled = collapseFraction >= 0.98f,
+    ) {
+        SwapSourceGlyph(
+            color = androidx.compose.ui.graphics.lerp(
+                Color.White,
+                MaterialTheme.colorScheme.onSurfaceVariant,
+                collapseFraction,
+            ),
+        )
     }
 }
 
@@ -834,7 +857,7 @@ private fun Section(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun HeroFacts(metadata: Map<String, String>, trailingFavorite: (@Composable () -> Unit)? = null) {
+private fun HeroFacts(metadata: Map<String, String>, trailingAction: (@Composable () -> Unit)? = null) {
     if (metadata.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val factRows = metadata.entries.toList().chunked(2)
@@ -869,7 +892,7 @@ private fun HeroFacts(metadata: Map<String, String>, trailingFavorite: (@Composa
                     }
                 }
                 if (rowFacts.size == 1) Spacer(modifier = Modifier.weight(1f))
-                if (rowIndex == factRows.lastIndex) trailingFavorite?.invoke()
+                if (rowIndex == factRows.lastIndex) trailingAction?.invoke()
             }
         }
     }
@@ -888,6 +911,25 @@ private fun FavoriteAction(isFavorite: Boolean, onToggleFavorite: () -> Unit) {
                 contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
             },
         ) { BookmarkGlyph(favorite = isFavorite, color = Color.White) }
+    }
+}
+
+/**
+ * The switch action that stands where the shelf action normally does, on a page reached by
+ * switching source. Same 44dp circle, same place, so the control the user just used does not move.
+ */
+@Composable
+private fun SwitchSourceAction(onOpen: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color.Black.copy(alpha = 0.34f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.68f)),
+    ) {
+        IconButton(
+            onClick = onOpen,
+            modifier = Modifier.size(44.dp).testTag(DETAILS_SOURCE_SWITCH_HERO_TAG)
+                .semantics { contentDescription = "切换漫画源" },
+        ) { SwapSourceGlyph(color = Color.White) }
     }
 }
 
@@ -921,7 +963,7 @@ private fun InfoLabel(text: String) {
 private fun HeroTagGroups(
     groups: Map<String, List<String>>,
     onTagClick: ((String, String) -> Unit)? = null,
-    trailingFavorite: (@Composable () -> Unit)? = null,
+    trailingAction: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val visibleGroups = groups.filterValues { it.isNotEmpty() }
@@ -977,7 +1019,7 @@ private fun HeroTagGroups(
                             }
                         }
                     }
-                    if (index == visibleGroups.size - 1) trailingFavorite?.invoke()
+                    if (index == visibleGroups.size - 1) trailingAction?.invoke()
                 }
         }
     }
@@ -1643,6 +1685,7 @@ internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 internal const val DETAILS_SOURCE_SWITCH_ENTRY_TAG = "details-source-switch-entry"
 internal const val DETAILS_SOURCE_SWITCH_QUERY_TAG = "details-source-switch-query"
 internal const val DETAILS_SOURCE_SWITCH_TOOLBAR_TAG = "details-source-switch-toolbar"
+internal const val DETAILS_SOURCE_SWITCH_HERO_TAG = "details-source-switch-hero"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"
