@@ -2,9 +2,12 @@ package dev.veneranative.feature.details
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingSource
+import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ComicRef
+import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.CollectionRepository
@@ -18,6 +21,8 @@ import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.download.DownloadChapterState
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
+import dev.veneranative.data.comic.PageKey
+import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
@@ -45,6 +50,7 @@ class DetailsViewModel(
     private val downloads: DownloadRepository? = null,
     private val history: HistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
+    private val titleHint: String? = null,
     private val loadTimeoutMillis: Long = 120_000L,
 ) : ViewModel() {
 
@@ -52,10 +58,13 @@ class DetailsViewModel(
     private var presentationSelectionChanged = false
     private var nextChapterLocationRequest = 0L
     private var loadJob: Job? = null
+    private var sourceSwitchJob: Job? = null
 
     private val comicRef = ComicRef.Remote(comicKey)
 
-    private val _state = MutableStateFlow(DetailsUiState(hasShelf = collection != null))
+    private val _state = MutableStateFlow(
+        DetailsUiState(hasShelf = collection != null, titleHint = titleHint)
+    )
     val state: StateFlow<DetailsUiState> = _state.asStateFlow()
 
     /** Clears route-local editing and result UI when this details screen is opened again. */
@@ -206,6 +215,16 @@ class DetailsViewModel(
             is DetailsAction.NewFavoriteFolderDraftChanged -> _state.update { it.copy(newFavoriteFolderDraft = action.draft) }
             DetailsAction.CreateFavoriteFolder -> createFavoriteFolder()
             DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null) }
+
+            DetailsAction.OpenSourceSwitch -> openSourceSwitch()
+            DetailsAction.CloseSourceSwitch -> closeSourceSwitch()
+            is DetailsAction.SourceSwitchQueryChanged -> _state.update { it.copy(sourceSwitchQuery = action.query) }
+            DetailsAction.SearchOtherSources -> searchOtherSources()
+            is DetailsAction.SourceSwitchResultSelected -> _state.update {
+                it.copy(sourceSwitchSelection = action.comic, sourceSwitchMessage = null)
+            }
+            DetailsAction.ReplaceSource -> replaceSource()
+            DetailsAction.SourceSwitchTargetConsumed -> _state.update { it.copy(sourceSwitchTarget = null) }
         }
     }
 
@@ -253,6 +272,9 @@ class DetailsViewModel(
                         val folderIds = item?.folderIds.orEmpty()
                         current.copy(
                             isFavorite = item != null,
+                            // The shelf remembers the title of a comic whose source is gone; without it
+                            // there would be nothing to search the other sources with.
+                            titleHint = current.titleHint ?: item?.title?.takeIf { it.isNotBlank() },
                             favoriteFolderIds = folderIds,
                             favoriteFolderSelection = if (current.favoriteDialog == null) {
                                 folderIds
@@ -449,6 +471,158 @@ class DetailsViewModel(
                 _state.update { it.copy(tagMessage = "无法打开相关作品，请稍后重试。") }
             } finally {
                 _state.update { it.copy(openingTag = false) }
+            }
+        }
+    }
+
+    /**
+     * Opens the source switcher, seeded with the title we already know. On a failed or removed
+     * source there is no detail to read a title from, which is why the route carries one.
+     */
+    private fun openSourceSwitch() {
+        val seed = _state.value.detail?.comic?.title ?: _state.value.titleHint.orEmpty()
+        _state.update {
+            it.copy(
+                sourceSwitchOpen = true,
+                sourceSwitchQuery = if (it.sourceSwitchQuery.isBlank()) seed else it.sourceSwitchQuery,
+                sourceSwitchSelection = null,
+                sourceSwitchMessage = null,
+            )
+        }
+        if (seed.isNotBlank()) searchOtherSources()
+    }
+
+    private fun closeSourceSwitch() {
+        sourceSwitchJob?.cancel()
+        sourceSwitchJob = null
+        _state.update {
+            it.copy(
+                sourceSwitchOpen = false,
+                sourceSwitchRows = emptyList(),
+                sourceSwitchSearching = false,
+                sourceSwitchSelection = null,
+                sourceSwitchMessage = null,
+            )
+        }
+    }
+
+    /**
+     * Asks every other searchable source for the first page of the same title.
+     *
+     * Each source owns one row that is replaced as soon as it answers, mirroring the aggregate
+     * search: a slow or broken source never hides the ones that already replied. Results are
+     * fetched on a background job so leaving the panel cancels outstanding network work.
+     */
+    private fun searchOtherSources() {
+        sourceSwitchJob?.cancel()
+        val keyword = _state.value.sourceSwitchQuery.trim()
+        if (keyword.isBlank()) {
+            _state.update {
+                it.copy(
+                    sourceSwitchRows = emptyList(),
+                    sourceSwitchSearching = false,
+                    sourceSwitchSelection = null,
+                    sourceSwitchMessage = "请输入漫画标题后搜索。",
+                )
+            }
+            return
+        }
+        sourceSwitchJob = viewModelScope.launch {
+            val sources = try {
+                catalog.searchableSources().filter { it.sourceId != comicKey.sourceId }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _state.update { it.copy(sourceSwitchSearching = false, sourceSwitchMessage = "暂时无法获取漫画源列表。") }
+                return@launch
+            }
+            _state.update {
+                it.copy(
+                    sourceSwitchRows = sources.map { source ->
+                        SourceSwitchRow(sourceId = source.sourceId, sourceName = source.name)
+                    },
+                    sourceSwitchSearching = true,
+                    sourceSwitchSelection = null,
+                    sourceSwitchMessage = null,
+                )
+            }
+            if (sources.isEmpty()) {
+                _state.update { it.copy(sourceSwitchSearching = false, sourceSwitchMessage = "没有其他可用的漫画源。") }
+                return@launch
+            }
+            sources.forEach { source ->
+                try {
+                    val paging = catalog.search(
+                        SearchRequest(sourceId = source.sourceId, keyword = keyword, filters = FilterSelection.Empty)
+                    )
+                    val loaded = paging.load(
+                        PagingSource.LoadParams.Refresh(key = PageKey.Start, loadSize = 8, placeholdersEnabled = false)
+                    )
+                    val (comics, failed) = when (loaded) {
+                        is PagingSource.LoadResult.Page -> loaded.data to false
+                        is PagingSource.LoadResult.Error -> emptyList<Comic>() to true
+                        else -> emptyList<Comic>() to false
+                    }
+                    _state.update { current ->
+                        current.copy(sourceSwitchRows = current.sourceSwitchRows.map { row ->
+                            if (row.sourceId == source.sourceId) {
+                                row.copy(comics = comics, isLoading = false, hasError = failed)
+                            } else row
+                        })
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    _state.update { current ->
+                        current.copy(sourceSwitchRows = current.sourceSwitchRows.map { row ->
+                            if (row.sourceId == source.sourceId) row.copy(isLoading = false, hasError = true) else row
+                        })
+                    }
+                }
+            }
+            _state.update { it.copy(sourceSwitchSearching = false) }
+        }
+    }
+
+    /**
+     * Rebinds the shelf entry to the chosen comic, then hands the new key to the assembly layer.
+     *
+     * Migrating the favourite is best effort: a comic that was never kept has nothing to move, and
+     * even a failed rebind must not stop the user from reading the comic on the other source. The
+     * message says plainly that progress and downloads stay behind, since chapter ids differ.
+     */
+    private fun replaceSource() {
+        if (_state.value.sourceSwitchTarget != null) return
+        val comic = _state.value.sourceSwitchSelection ?: run {
+            _state.update { it.copy(sourceSwitchMessage = "请先选择要替换的搜索结果。") }
+            return
+        }
+        val target = comic.key
+        if (target == comicKey) {
+            _state.update { it.copy(sourceSwitchMessage = "这是当前漫画源。") }
+            return
+        }
+        viewModelScope.launch {
+            var moved = false
+            var failed = false
+            if (collection != null) {
+                try {
+                    moved = collection.replaceSource(ComicRef.Remote(comicKey), ComicRef.Remote(target))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    failed = true
+                }
+            }
+            _state.update {
+                it.copy(
+                    sourceSwitchTarget = target,
+                    sourceSwitchMessage = when {
+                        failed -> "已打开新来源，但收藏迁移失败，请稍后在书架手动处理。"
+                        moved -> "已切换到新来源并保留收藏；阅读进度和已下载章节不会迁移。"
+                        else -> "已切换到新来源；阅读进度和已下载章节不会迁移。"
+                    },
+                )
             }
         }
     }

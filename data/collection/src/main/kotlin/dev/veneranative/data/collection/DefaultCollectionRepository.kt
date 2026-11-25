@@ -241,6 +241,45 @@ class DefaultCollectionRepository internal constructor(
         dao.deleteEntry(ref.refSource(), ref.refComic())
     }
 
+    override suspend fun replaceSource(from: ComicRef.Remote, to: ComicRef.Remote): Boolean {
+        if (from == to) return false
+        var rebound = false
+        transaction {
+            val old = dao.entry(from.key.sourceId.value, from.key.remoteId.value) ?: return@transaction
+            val folders = dao.folderIds(from.key.sourceId.value, from.key.remoteId.value)
+            // If the target is already kept, keep its row and merge folders rather than overwrite it.
+            if (dao.entry(to.key.sourceId.value, to.key.remoteId.value) == null) {
+                dao.upsertEntry(
+                    FavoriteEntryEntity(
+                        refSource = to.key.sourceId.value,
+                        refComic = to.key.remoteId.value,
+                        folderId = "", // Historical column; membership now lives in favorite_membership.
+                        title = old.title,
+                        subtitle = old.subtitle,
+                        coverRef = old.coverRef,
+                        addedAt = old.addedAt,
+                        lastReadAt = old.lastReadAt,
+                        chapterCount = null,
+                        latestChapterId = null,
+                        hasUpdate = false,
+                        updatedAt = null,
+                        lastUpdated = old.lastUpdated,
+                        chaptersJson = null,
+                    ),
+                )
+            }
+            dao.insertMemberships(folders.map { folderId ->
+                FavoriteMembershipEntity(to.key.sourceId.value, to.key.remoteId.value, folderId)
+            })
+            // The old record's chapter directory belongs to the old source; do not carry it over.
+            records?.delete(from)
+            dao.deleteEntry(from.key.sourceId.value, from.key.remoteId.value)
+            rebound = true
+        }
+        if (rebound) requestCoverRepair(to)
+        return rebound
+    }
+
     override suspend fun moveTo(ref: ComicRef, folderId: String) {
         if (dao.folder(folderId) == null) return
         setFolders(ref, setOf(folderId))

@@ -128,6 +128,7 @@ internal class FakeComicRecordDao : ComicRecordDao {
     override suspend fun upsert(record: ComicRecordEntity) { records.value = records.value.filterNot { it.sourceId == record.sourceId && it.comicId == record.comicId } + record }
     override suspend fun upsertChapters(chapters: List<ComicChapterEntity>) { directory.value = directory.value + chapters }
     override suspend fun deleteChapters(sourceId: String, comicId: String) { directory.value = directory.value.filterNot { it.sourceId == sourceId && it.comicId == comicId } }
+    override suspend fun deleteRecord(sourceId: String, comicId: String) { records.value = records.value.filterNot { it.sourceId == sourceId && it.comicId == comicId } }
     override suspend fun dueFavorites(now: Long) = records.value.filter { it.nextRefreshAt <= now }
     override suspend fun schedule(sourceId: String, comicId: String, attemptAt: Long, nextAt: Long) { record(sourceId, comicId)?.let { upsert(it.copy(lastAttemptAt = attemptAt, nextRefreshAt = nextAt)) } }
     override suspend fun coverFetched(sourceId: String, comicId: String, fetchedAt: Long) { record(sourceId, comicId)?.let { upsert(it.copy(coverFetchedAt = fetchedAt)) } }

@@ -173,7 +173,8 @@ class HomeViewModelTest {
 
     override suspend fun updateChapters(ref: dev.veneranative.core.model.ComicRef, chapters: List<dev.veneranative.core.model.Chapter>) = Unit
 
-    override suspend fun remove(ref: ComicRef) = error("Not used in this test")
+        override suspend fun remove(ref: ComicRef) = error("Not used in this test")
+        override suspend fun replaceSource(from: ComicRef.Remote, to: ComicRef.Remote): Boolean = error("Not used in this test")
         override suspend fun moveTo(ref: ComicRef, folderId: String) = error("Not used in this test")
         override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) = error("Not used in this test")
         override suspend fun clearUpdate(ref: ComicRef) = error("Not used in this test")

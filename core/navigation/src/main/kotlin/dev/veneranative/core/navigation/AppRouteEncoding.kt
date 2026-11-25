@@ -36,7 +36,7 @@ fun AppRoute.encode(): String = when (this) {
         ":${target.keyword.escape()}:${when (target) { is TagNavigation.Search -> target.authorId; is TagNavigation.Category -> target.param }.escape()}:${returnOrigin.encode().escape()}" +
         target.options.joinToString(separator = "", transform = { ":${it.escape()}" })
     is AppRoute.ComicDetails ->
-        "comic:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}"
+        "comic:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}:${title.escape()}"
 
     is AppRoute.Reader -> when (val ref = chapter) {
         is ChapterRef.Remote -> "reader:${ref.key.comicKey.sourceId.value.escape()}:" +
@@ -83,7 +83,7 @@ fun decodeAppRoute(encoded: String): AppRoute? {
             if (sourceId.isNullOrEmpty() || comicId.isNullOrEmpty()) {
                 null
             } else {
-                AppRoute.ComicDetails(ComicKey(SourceId(sourceId), RemoteComicId(comicId)))
+                AppRoute.ComicDetails(ComicKey(SourceId(sourceId), RemoteComicId(comicId)), parts.getOrNull(3)?.unescapeOrNull())
             }
         }
 

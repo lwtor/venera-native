@@ -48,4 +48,22 @@ sealed interface DetailsAction {
     data class NewFavoriteFolderDraftChanged(val draft: String) : DetailsAction
     data object CreateFavoriteFolder : DetailsAction
     data object DismissNewFavoriteFolder : DetailsAction
+
+    /** Opens the panel that looks for this title on the other installed sources. */
+    data object OpenSourceSwitch : DetailsAction
+
+    data object CloseSourceSwitch : DetailsAction
+
+    data class SourceSwitchQueryChanged(val query: String) : DetailsAction
+
+    /** Starts or restarts the per-source search with the current query. */
+    data object SearchOtherSources : DetailsAction
+
+    /** Marks one search result as the replacement candidate; "替换" in the top bar acts on it. */
+    data class SourceSwitchResultSelected(val comic: dev.veneranative.core.model.Comic) : DetailsAction
+
+    /** Rebinds the shelf entry, if any, then asks the assembly layer to open the new comic. */
+    data object ReplaceSource : DetailsAction
+
+    data object SourceSwitchTargetConsumed : DetailsAction
 }

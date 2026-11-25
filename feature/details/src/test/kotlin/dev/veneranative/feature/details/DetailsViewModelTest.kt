@@ -2,6 +2,7 @@ package dev.veneranative.feature.details
 
 import dev.veneranative.core.model.TagNavigation
 import androidx.paging.PagingSource
+import androidx.paging.PagingState
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
@@ -696,6 +697,109 @@ class DetailsViewModelTest {
         assertTrue(collection.added.isEmpty())
     }
 
+    @Test
+    fun `a failed source searches the other sources with the title the route carried`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        catalog.searchableSourceList = listOf(installed("s"), installed("t", name = "Source T"))
+        val found = Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")
+        catalog.searchResults = mapOf(SourceId("t") to listOf(found))
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, titleHint = "Frieren")
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.OpenSourceSwitch)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertTrue(state.sourceSwitchOpen)
+        assertEquals("Frieren", state.sourceSwitchQuery)
+        // The source the comic came from is not a candidate for replacing it.
+        assertEquals(listOf(SourceId("t")), state.sourceSwitchRows.map { it.sourceId })
+        assertEquals(listOf(found), state.sourceSwitchRows.single().comics)
+        assertEquals("Frieren", catalog.searchRequests.single().keyword)
+        assertFalse(state.sourceSwitchPending)
+        assertTrue(state.sourceSwitchHasResults)
+    }
+
+    @Test
+    fun `an uninstalled source still offers a title to search with from the shelf`() = runTest(dispatcher) {
+        catalog.source = null
+        collection.addToFolders(
+            ComicRef.Remote(comicKey),
+            emptySet(),
+            dev.veneranative.data.collection.ComicSnapshot(title = "Frieren"),
+        )
+        catalog.searchableSourceList = listOf(installed("t", name = "Source T"))
+        catalog.searchResults = mapOf(
+            SourceId("t") to listOf(Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")),
+        )
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+        assertEquals(DetailsStatus.SourceUnavailable, viewModel.state.value.status)
+        viewModel.onAction(DetailsAction.OpenSourceSwitch)
+        advanceUntilIdle()
+
+        assertEquals("Frieren", viewModel.state.value.sourceSwitchQuery)
+        assertEquals(1, viewModel.state.value.sourceSwitchRows.single().comics.size)
+    }
+
+    @Test
+    fun `replacing the source moves the shelf entry and asks for the new comic`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        catalog.searchableSourceList = listOf(installed("t", name = "Source T"))
+        val found = Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")
+        catalog.searchResults = mapOf(SourceId("t") to listOf(found))
+        collection.addToFolders(
+            ComicRef.Remote(comicKey),
+            setOf("folder-1"),
+            dev.veneranative.data.collection.ComicSnapshot(title = "Frieren"),
+        )
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, titleHint = "Frieren")
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.OpenSourceSwitch)
+        advanceUntilIdle()
+
+        // Nothing to replace with until the user picks a candidate.
+        viewModel.onAction(DetailsAction.ReplaceSource)
+        advanceUntilIdle()
+        assertNull(viewModel.state.value.sourceSwitchTarget)
+        assertTrue(collection.replacedSources.isEmpty())
+
+        viewModel.onAction(DetailsAction.SourceSwitchResultSelected(found))
+        viewModel.onAction(DetailsAction.ReplaceSource)
+        advanceUntilIdle()
+
+        assertEquals(found.key, viewModel.state.value.sourceSwitchTarget)
+        assertEquals(ComicRef.Remote(comicKey) to ComicRef.Remote(found.key), collection.replacedSources.single())
+        assertEquals(
+            "已切换到新来源并保留收藏；阅读进度和已下载章节不会迁移。",
+            viewModel.state.value.sourceSwitchMessage,
+        )
+    }
+
+    @Test
+    fun `replacing a comic that was never kept just opens the new source`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        catalog.searchableSourceList = listOf(installed("t"))
+        val found = Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")
+        catalog.searchResults = mapOf(SourceId("t") to listOf(found))
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, titleHint = "Frieren")
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.OpenSourceSwitch)
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.SourceSwitchResultSelected(found))
+        viewModel.onAction(DetailsAction.ReplaceSource)
+        advanceUntilIdle()
+
+        assertEquals(found.key, viewModel.state.value.sourceSwitchTarget)
+        assertEquals("已切换到新来源；阅读进度和已下载章节不会迁移。", viewModel.state.value.sourceSwitchMessage)
+    }
+
     private fun detail(title: String, grouped: Boolean = false) = ComicDetail(
         comic = Comic(comicKey, title = title),
         chapters = if (grouped) {
@@ -745,7 +849,11 @@ class DetailsViewModelTest {
         var stallDetail = false
         var pagesResponse: SourceOutcome<List<SourcePage>> = SourceOutcome.Success(emptyList())
 
-        override suspend fun searchableSources(): List<InstalledSource> = emptyList()
+        var searchableSourceList: List<InstalledSource> = emptyList()
+        var searchResults: Map<SourceId, List<Comic>> = emptyMap()
+        val searchRequests = mutableListOf<SearchRequest>()
+
+        override suspend fun searchableSources(): List<InstalledSource> = searchableSourceList
 
         override suspend fun explorableSources(): List<InstalledSource> = emptyList()
 
@@ -767,8 +875,18 @@ class DetailsViewModelTest {
         override fun explore(request: ExploreRequest): PagingSource<PageKey, ExploreItem> =
             error("not used by the details screen")
 
-        override fun search(request: SearchRequest): PagingSource<PageKey, Comic> =
-            error("not used by the details screen")
+        override fun search(request: SearchRequest): PagingSource<PageKey, Comic> {
+            searchRequests += request
+            val comics = searchResults[request.sourceId].orEmpty()
+            return SinglePageSource(comics)
+        }
+    }
+
+    /** One page of results, which is all the "find it on another source" panel ever asks for. */
+    private class SinglePageSource(private val comics: List<Comic>) : PagingSource<PageKey, Comic>() {
+        override fun getRefreshKey(state: PagingState<PageKey, Comic>): PageKey? = null
+        override suspend fun load(params: LoadParams<PageKey>): LoadResult<PageKey, Comic> =
+            LoadResult.Page(data = comics, prevKey = null, nextKey = null)
     }
 
     private class RecordingDownloadRepository : DownloadRepository {

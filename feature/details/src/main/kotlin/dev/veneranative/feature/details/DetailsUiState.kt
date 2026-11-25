@@ -3,14 +3,26 @@ package dev.veneranative.feature.details
 import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
+import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
+import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.RemoteChapterId
+import dev.veneranative.core.model.SourceId
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.FavoriteFolder
 
 enum class FavoriteDialog { Add, Remove }
 
 data class TagNavigationRequest(val tag: String, val target: TagNavigation)
+
+/** One source's answer in the "find this comic elsewhere" panel. */
+data class SourceSwitchRow(
+    val sourceId: SourceId,
+    val sourceName: String,
+    val comics: List<Comic> = emptyList(),
+    val isLoading: Boolean = true,
+    val hasError: Boolean = false,
+)
 
 /**
  * Everything the details screen renders.
@@ -63,8 +75,35 @@ data class DetailsUiState(
     val downloadQueueVersion: Int = 0,
     /** Product copy for the last failure; never a lower layer's wording. */
     val message: String? = null,
+    /**
+     * Hint carried by the route so a failed or removed source still has a title to search with.
+     * The loaded details always take precedence over it.
+     */
+    val titleHint: String? = null,
+    /** Whether the "find this comic on another source" panel is showing. */
+    val sourceSwitchOpen: Boolean = false,
+    /** Query used to look for the same title on other sources; editable by the user. */
+    val sourceSwitchQuery: String = "",
+    /** One row per source, so a slow or broken source cannot hide the others' results. */
+    val sourceSwitchRows: List<SourceSwitchRow> = emptyList(),
+    val sourceSwitchSearching: Boolean = false,
+    /** The candidate the user picked; "替换" in the panel's top bar acts on it. */
+    val sourceSwitchSelection: Comic? = null,
+    /** Product copy while looking for or switching to another source. */
+    val sourceSwitchMessage: String? = null,
+    /** The replacement comic chosen by the user, handed to the assembly layer as a navigation request. */
+    val sourceSwitchTarget: ComicKey? = null,
 ) {
-    val title: String get() = detail?.comic?.title.orEmpty()
+    val title: String get() = detail?.comic?.title ?: titleHint.orEmpty()
+
+    /** True while at least one source is still answering the "find it elsewhere" search. */
+    val sourceSwitchPending: Boolean get() = sourceSwitchRows.any { it.isLoading }
+
+    /** True once every source answered, so "nowhere else" can be stated with confidence. */
+    val sourceSwitchFinished: Boolean get() = sourceSwitchRows.isNotEmpty() && !sourceSwitchPending
+
+    /** Whether any other source found the title at all. */
+    val sourceSwitchHasResults: Boolean get() = sourceSwitchRows.any { it.comics.isNotEmpty() }
 
     private val chapters: List<Chapter> get() = detail?.chapters.orEmpty()
 

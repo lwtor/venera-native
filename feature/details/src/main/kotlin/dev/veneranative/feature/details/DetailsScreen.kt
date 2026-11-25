@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -56,6 +57,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -89,6 +92,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -96,6 +101,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
@@ -294,26 +300,46 @@ fun DetailsScreen(
 
                 state.status == DetailsStatus.SourceUnavailable -> Centered {
                     Column(
+                        modifier = Modifier.padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
                             text = "此漫画所属的漫画源已卸载或停用。",
                             style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
                         )
+                        Text(
+                            text = "可以在其他漫画源里找同一部作品继续阅读。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(
+                            onClick = { onAction(DetailsAction.OpenSourceSwitch) },
+                            modifier = Modifier.testTag(DETAILS_SOURCE_SWITCH_ENTRY_TAG),
+                        ) { Text("切换其他源") }
                     }
                 }
 
                 else -> Centered {
                     Column(
+                        modifier = Modifier.padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Text(
                             text = state.message ?: "无法获取漫画详情，请重试。",
                             style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
                         )
-                        Button(onClick = { onAction(DetailsAction.Retry) }) { Text("重试") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = { onAction(DetailsAction.Retry) }) { Text("重试") }
+                            OutlinedButton(
+                                onClick = { onAction(DetailsAction.OpenSourceSwitch) },
+                                modifier = Modifier.testTag(DETAILS_SOURCE_SWITCH_ENTRY_TAG),
+                            ) { Text("切换其他源") }
+                        }
                     }
                 }
 
@@ -415,6 +441,10 @@ fun DetailsScreen(
                 ) { Text(if (!removing && state.isFavorite) "取消收藏" else "返回") }
             },
         )
+    }
+
+    if (state.sourceSwitchOpen) {
+        SourceSwitchPanel(state = state, onAction = onAction)
     }
 }
 
@@ -995,6 +1025,259 @@ private fun SourcePageButton(url: String) {
     ) { Text("在漫画源网页打开") }
 }
 
+/**
+ * Full-screen panel that looks for the same title on every other installed source.
+ *
+ * One section per source rather than one flat result list: the user is choosing a *source* as much
+ * as a comic, and a source that answers slowly or breaks must not hide the ones that already did.
+ * Picking a row only marks the candidate; the action that actually switches sources sits in the top
+ * bar, so a mis-tap costs nothing until it is confirmed there.
+ */
+@Composable
+private fun SourceSwitchPanel(
+    state: DetailsUiState,
+    onAction: (DetailsAction) -> Unit,
+) {
+    Dialog(
+        onDismissRequest = { onAction(DetailsAction.CloseSourceSwitch) },
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = { onAction(DetailsAction.CloseSourceSwitch) },
+                        modifier = Modifier.padding(start = 4.dp).semantics { contentDescription = "关闭" },
+                    ) { CloseGlyph() }
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                        Text(
+                            text = "切换漫画源",
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            text = state.sourceName?.let { "当前来源 · $it" } ?: "当前来源不可用",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    TextButton(
+                        onClick = { onAction(DetailsAction.ReplaceSource) },
+                        enabled = state.sourceSwitchSelection != null && state.sourceSwitchTarget == null,
+                        modifier = Modifier.padding(end = 8.dp).testTag(DETAILS_SOURCE_SWITCH_REPLACE_TAG),
+                    ) { Text("替换") }
+                }
+                androidx.compose.material3.HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                )
+
+                OutlinedTextField(
+                    value = state.sourceSwitchQuery,
+                    onValueChange = { onAction(DetailsAction.SourceSwitchQueryChanged(it)) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                        .testTag(DETAILS_SOURCE_SWITCH_QUERY_TAG),
+                    singleLine = true,
+                    label = { Text("漫画标题") },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Search,
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSearch = { onAction(DetailsAction.SearchOtherSources) },
+                    ),
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { onAction(DetailsAction.SearchOtherSources) },
+                            modifier = Modifier.semantics { contentDescription = "搜索其他漫画源" },
+                        ) { SearchGlyph() }
+                    },
+                )
+
+                state.sourceSwitchMessage?.takeIf { state.sourceSwitchRows.isNotEmpty() }?.let { message ->
+                    Text(
+                        text = message,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+
+                if (state.sourceSwitchRows.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = state.sourceSwitchMessage ?: if (state.sourceSwitchQuery.isBlank()) {
+                                "输入标题后搜索其他漫画源。"
+                            } else {
+                                "没有其他可用的漫画源。"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    return@Column
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    contentPadding = PaddingValues(bottom = 24.dp),
+                ) {
+                    state.sourceSwitchRows.forEach { row ->
+                        item(key = "source:${row.sourceId.value}") { SourceSwitchHeader(row) }
+                        itemsIndexed(
+                            items = row.comics,
+                            key = { index, _ -> "result:${row.sourceId.value}:$index" },
+                        ) { _, comic ->
+                            SourceSwitchResultRow(
+                                comic = comic,
+                                selected = state.sourceSwitchSelection?.key == comic.key,
+                                onSelect = { onAction(DetailsAction.SourceSwitchResultSelected(comic)) },
+                            )
+                        }
+                    }
+                    if (state.sourceSwitchFinished && !state.sourceSwitchHasResults) {
+                        item(key = "no-results") {
+                            Text(
+                                text = "没有在其他来源找到同名作品，可以修改标题再试。",
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One source's heading: its name plus how its own search went. */
+@Composable
+private fun SourceSwitchHeader(row: SourceSwitchRow) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = row.sourceName,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (row.isLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+        }
+        Text(
+            text = when {
+                row.isLoading -> "搜索中"
+                row.hasError -> "搜索失败"
+                row.comics.isEmpty() -> "无同名结果"
+                else -> "${row.comics.size} 个结果"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}
+
+/** One candidate on one source. Selecting it fills the top bar's "替换" target. */
+@Composable
+private fun SourceSwitchResultRow(
+    comic: Comic,
+    selected: Boolean,
+    onSelect: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Surface(
+            modifier = Modifier.size(width = 44.dp, height = 60.dp),
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+        ) {
+            comic.coverUrl?.let { cover ->
+                ComicImage(
+                    request = ComicImageRequest(url = cover, sourceId = comic.key.sourceId, variant = DETAIL_SWITCH_COVER_VARIANT),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = comic.title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            val meta = listOfNotNull(
+                comic.subtitle?.takeIf { it.isNotBlank() },
+                comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / "),
+                comic.lastUpdated?.takeIf { it.isNotBlank() },
+            ).joinToString(" · ")
+            if (meta.isNotBlank()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        RadioButton(
+            selected = selected,
+            onClick = null,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+    }
+}
+
+@Composable
+private fun CloseGlyph() {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    androidx.compose.foundation.Canvas(modifier = Modifier.size(20.dp)) {
+        val inset = size.minDimension * 0.22f
+        drawLine(
+            color = color,
+            start = androidx.compose.ui.geometry.Offset(inset, inset),
+            end = androidx.compose.ui.geometry.Offset(size.width - inset, size.height - inset),
+            strokeWidth = 1.8.dp.toPx(),
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+        )
+        drawLine(
+            color = color,
+            start = androidx.compose.ui.geometry.Offset(size.width - inset, inset),
+            end = androidx.compose.ui.geometry.Offset(inset, size.height - inset),
+            strokeWidth = 1.8.dp.toPx(),
+            cap = androidx.compose.ui.graphics.StrokeCap.Round,
+        )
+    }
+}
+
 @Composable
 private fun CoverTitle(title: String) {
     Box(
@@ -1321,8 +1604,12 @@ internal fun String.isHttpUrl(): Boolean = startsWith("https://", ignoreCase = t
 internal const val DETAILS_LOADING_TAG = "details-loading"
 internal const val DETAILS_CONTENT_TAG = "details-content"
 internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
+internal const val DETAILS_SOURCE_SWITCH_ENTRY_TAG = "details-source-switch-entry"
+internal const val DETAILS_SOURCE_SWITCH_REPLACE_TAG = "details-source-switch-replace"
+internal const val DETAILS_SOURCE_SWITCH_QUERY_TAG = "details-source-switch-query"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"
 private const val DETAIL_BACKDROP_VARIANT = "detail-backdrop"
 private const val DETAIL_COMMENT_AVATAR_VARIANT = "detail-comment-avatar"
+private const val DETAIL_SWITCH_COVER_VARIANT = "detail-source-switch-cover"

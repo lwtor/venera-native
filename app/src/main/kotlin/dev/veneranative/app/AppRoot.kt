@@ -369,6 +369,7 @@ private fun AppNavHost(
                     is AppRoute.ComicDetails -> DetailsRoute(
                         catalog = catalog,
                         comicKey = current.comicKey,
+                        title = current.title,
                         collection = collectionRepository,
                         downloads = downloadRepository,
                         history = historyRepository,
@@ -377,6 +378,7 @@ private fun AppNavHost(
                         onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                         onOpenDownloads = { onRouteChange(AppRoute.Downloads) },
                         onOpenRelatedWorks = { author, target -> onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, detailsOrigin)) },
+                        onOpenOtherSource = { key, title -> onRouteChange(AppRoute.ComicDetails(key, title)) },
                         onBack = onBack,
                     )
 

@@ -32,15 +32,17 @@ fun DetailsRoute(
     onOpenChapter: (Chapter) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
     downloads: DownloadRepository? = null,
     onScheduleDownloads: () -> Unit = {},
     history: HistoryRepository? = null,
     screenPreferences: ScreenPreferenceRepository? = null,
     onOpenDownloads: () -> Unit = {},
     onOpenRelatedWorks: (String, TagNavigation) -> Unit = { _, _ -> },
+    onOpenOtherSource: (ComicKey, String?) -> Unit = { _, _ -> },
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
-        DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences)
+        DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences, title)
     }
     val state by viewModel.state.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(state.tagNavigation) {
@@ -48,6 +50,14 @@ fun DetailsRoute(
             viewModel.onAction(DetailsAction.TagNavigationConsumed)
             onOpenRelatedWorks(navigation.tag, navigation.target)
         }
+    }
+    // Switching sources is a replacement, not a push: the comic the user asked for is the same one,
+    // only its source changed, so going back must not land on the source that just failed.
+    androidx.compose.runtime.LaunchedEffect(state.sourceSwitchTarget) {
+        val target = state.sourceSwitchTarget ?: return@LaunchedEffect
+        val hint = state.title.takeIf { it.isNotBlank() }
+        viewModel.onAction(DetailsAction.SourceSwitchTargetConsumed)
+        onOpenOtherSource(target, hint)
     }
     androidx.compose.runtime.LaunchedEffect(comicKey) {
         viewModel.onScreenEntered()

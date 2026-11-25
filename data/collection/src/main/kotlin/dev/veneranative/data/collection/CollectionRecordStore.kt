@@ -24,6 +24,15 @@ internal class CollectionRecordStore(
                 ?: decodeChapterCatalog(book.legacyChaptersJson)) }
     }.flowOn(io)
     suspend fun find(ref: ComicRef): ComicRecordEntity? = records.record(ref.refSource(), ref.refComic())
+
+    /** Drops the cached metadata and directory of a comic that is being rebound to another source. */
+    suspend fun delete(ref: ComicRef) {
+        transaction {
+            records.deleteRecord(ref.refSource(), ref.refComic())
+            // The directory belongs to the old source's chapter ids, so it must not outlive the record.
+            records.deleteChapters(ref.refSource(), ref.refComic())
+        }
+    }
     suspend fun seed(favorite: FavoriteEntryEntity) {
         transaction {
             var record = records.record(favorite.refSource, favorite.refComic)

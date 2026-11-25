@@ -99,6 +99,8 @@ internal class FakeCollectionRepository : CollectionRepository {
         removed += ref
     }
 
+    override suspend fun replaceSource(from: ComicRef.Remote, to: ComicRef.Remote): Boolean = false
+
     override suspend fun moveTo(ref: ComicRef, folderId: String) {
         moved += ref to folderId
     }

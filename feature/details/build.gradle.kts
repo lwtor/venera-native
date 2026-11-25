@@ -25,6 +25,8 @@ dependencies {
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    // "Find this comic on another source" reads one search page per source from the catalog.
+    implementation(libs.androidx.paging.common)
 
     // The details screen never pages, but its test doubles implement `ComicCatalog`, whose signatures
     // name Paging types.

@@ -81,6 +81,18 @@ internal class FakeCollectionRepository : CollectionRepository {
         entries.value = entries.value - ref
     }
 
+    override suspend fun replaceSource(from: ComicRef.Remote, to: ComicRef.Remote): Boolean {
+        val old = entries.value[from] ?: return false
+        val merged = (entries.value[to]?.folderIds.orEmpty() + old.folderIds)
+        entries.value = entries.value - from + (
+            to to old.copy(ref = to, folderIds = merged)
+        )
+        replacedSources += from to to
+        return true
+    }
+
+    val replacedSources = mutableListOf<Pair<ComicRef.Remote, ComicRef.Remote>>()
+
     override suspend fun moveTo(ref: ComicRef, folderId: String) = Unit
 
     override suspend fun setFolders(ref: ComicRef, folderIds: Set<String>) {

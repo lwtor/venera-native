@@ -35,6 +35,7 @@ class AppRouteEncodingTest {
         AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3")),
         AppRoute.ComicDetails(comicKey("manga_dex", "id:with:colons")),
         AppRoute.ComicDetails(comicKey("manga_dex", "100%25")),
+        AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), title = "葬送的芙莉莲: 第1卷 100%"),
         AppRoute.Reader(
             ChapterRef.Remote(ChapterKey(
                 comicKey = comicKey("manga_dex", "a1b2c3"),
@@ -74,6 +75,14 @@ class AppRouteEncodingTest {
     @Test
     fun `no source selected stays distinguishable from a source named empty`() {
         assertEquals(AppRoute.Explore(null), decodeAppRoute("explore:"))
+    }
+
+    @Test
+    fun `a details route without a title still decodes, so older links keep working`() {
+        assertEquals(
+            AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3")),
+            decodeAppRoute("comic:manga_dex:a1b2c3"),
+        )
     }
 
     private fun comicKey(source: String, comic: String) =

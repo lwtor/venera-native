@@ -112,6 +112,18 @@ interface CollectionRepository {
 
     suspend fun remove(ref: ComicRef)
 
+    /**
+     * Rebinds a favourited comic to the same title on another source.
+     *
+     * The shelf row's title, cover, folders, added time and last-read time are kept; chapter
+     * snapshots and update markers are cleared because they describe the old source's chapters.
+     * Reading history and downloads are deliberately untouched: the two sources do not share
+     * chapter ids, so progress cannot be carried over safely.
+     *
+     * Returns true when a favourite existed and was rebound, false when there was nothing to move.
+     */
+    suspend fun replaceSource(from: ComicRef.Remote, to: ComicRef.Remote): Boolean
+
     suspend fun moveTo(ref: ComicRef, folderId: String)
 
     /** Replaces optional memberships without removing the comic from All. */
