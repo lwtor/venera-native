@@ -43,9 +43,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.AlertDialog
@@ -64,6 +67,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -100,14 +104,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
-import dev.veneranative.core.designsystem.component.ComicHorizontalCard
+import dev.veneranative.core.designsystem.component.ComicCoverCard
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicComment
-import dev.veneranative.core.model.ComicPublicationStatus
 import dev.veneranative.core.model.SourceId
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import kotlinx.coroutines.launch
@@ -1135,18 +1138,13 @@ private fun SourceSwitchPanel(
 
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
                     state.sourceSwitchRows.forEach { row ->
-                        item(key = "source:${row.sourceId.value}") { SourceSwitchHeader(row) }
-                        itemsIndexed(
-                            items = row.comics,
-                            key = { index, _ -> "result:${row.sourceId.value}:$index" },
-                        ) { _, comic ->
-                            SourceSwitchResultCard(
-                                comic = comic,
-                                onClick = { onAction(DetailsAction.SourceSwitchResultChosen(comic)) },
+                        item(key = "source:${row.sourceId.value}") {
+                            SourceSwitchRowSection(
+                                row = row,
+                                onChoose = { onAction(DetailsAction.SourceSwitchResultChosen(it)) },
                             )
                         }
                     }
@@ -1167,117 +1165,84 @@ private fun SourceSwitchPanel(
     }
 }
 
-/** One source's heading: its name plus how its own search went. */
-@Composable
-private fun SourceSwitchHeader(row: SourceSwitchRow) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Text(
-            text = row.sourceName,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (row.isLoading) {
-            CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
-        }
-        Text(
-            text = when {
-                row.isLoading -> "搜索中"
-                row.hasError -> "搜索失败"
-                row.comics.isEmpty() -> "无同名结果"
-                else -> "${row.comics.size} 个结果"
-            },
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-        )
-    }
-}
-
 /**
- * One candidate, drawn with the same card the search screen uses.
+ * One source's candidates, laid out exactly like an aggregate search result.
  *
- * The first version of this panel drew its own row — a 44×60 thumbnail, a title and a radio button —
- * which read as a settings list rather than as "these are comics you can open", and tapping it only
- * moved a dot. It is a search result, so it looks like one: cover, title, status, byline, tags, and
- * the whole card opens the comic on that source.
+ * The panel shows comics, so it uses the search screen's own arrangement rather than one of its
+ * own: a source name with how its search went, then a horizontal run of cover cards. It replaced a
+ * hand-built list row that read as a settings entry and, being a 120dp strip on a surface-coloured
+ * panel, still looked like the plain list it was meant to replace.
  */
 @Composable
-private fun SourceSwitchResultCard(
-    comic: Comic,
-    onClick: () -> Unit,
+private fun SourceSwitchRowSection(
+    row: SourceSwitchRow,
+    onChoose: (Comic) -> Unit,
 ) {
-    val status = comic.publicationStatus
-    ComicHorizontalCard(
-        title = comic.title,
-        request = comic.coverUrl?.let { cover ->
-            // Same size and crop as a search result, so both screens share one cache entry.
-            ComicImageRequest(url = cover, sourceId = comic.key.sourceId, variant = SEARCH_RESULT_VARIANT)
-        },
-        onClick = onClick,
-        badge = status?.let { if (it == ComicPublicationStatus.Completed) "已完结" else "连载中" },
-        badgeColor = if (status == ComicPublicationStatus.Ongoing) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-        } else {
-            Color.Black.copy(alpha = 0.72f)
-        },
-        supportingContent = {
-            val byline = comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
-            byline?.takeIf { it.isNotBlank() }?.let { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            comic.lastUpdated?.takeIf { it.isNotBlank() }?.let { text ->
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        },
-        bottomContent = { SourceSwitchTags(comic.tags) },
-    )
-}
-
-/** The tag strip from the search result card; kept here so the panel does not import the search UI. */
-@Composable
-private fun SourceSwitchTags(tags: List<String>) {
-    val visible = tags.filter(String::isNotBlank).distinct()
-    if (visible.isEmpty()) return
-    Row(
-        modifier = Modifier.fillMaxWidth().height(22.dp).horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        visible.forEach { tag ->
-            Surface(
-                shape = RoundedCornerShape(5.dp),
-                color = Color.Transparent,
-                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)),
+    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = row.sourceName,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = when {
+                    row.isLoading -> "搜索中"
+                    row.hasError -> "搜索失败"
+                    row.comics.isEmpty() -> "无同名结果"
+                    else -> "${row.comics.size} 部"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (row.hasError) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 1,
+            )
+        }
+        when {
+            row.isLoading -> LinearProgressIndicator(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            row.hasError -> Text(
+                text = "该来源搜索失败，可继续查看其他来源。",
+                Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            row.comics.isEmpty() -> Text(
+                text = "该来源没有同名作品。",
+                Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            else -> LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(
-                    text = tag,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                items(row.comics, key = { it.key.remoteId.value }) { comic ->
+                    ComicCoverCard(
+                        title = comic.title,
+                        request = comic.coverUrl?.let { cover ->
+                            // Same variant as aggregate search, so both share one cache entry.
+                            ComicImageRequest(url = cover, sourceId = comic.key.sourceId, variant = COMIC_COVER_VARIANT)
+                        },
+                        chapterLabel = comic.authors.firstOrNull()?.takeIf { it.isNotBlank() } ?: "章节未知",
+                        sourceLabel = row.sourceName,
+                        onClick = { onChoose(comic) },
+                        modifier = Modifier.width(128.dp),
+                    )
+                }
             }
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     }
 }
 
@@ -1636,5 +1601,5 @@ internal const val DETAILS_SOURCE_SWITCH_QUERY_TAG = "details-source-switch-quer
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"
 private const val DETAIL_BACKDROP_VARIANT = "detail-backdrop"
 private const val DETAIL_COMMENT_AVATAR_VARIANT = "detail-comment-avatar"
-/** Same variant as the search screen: both render an 80×120 crop of the same URL. */
-private const val SEARCH_RESULT_VARIANT = "search-result"
+/** Same variant as aggregate search: both render the same cover at the same size. */
+private const val COMIC_COVER_VARIANT = "comic-cover"
