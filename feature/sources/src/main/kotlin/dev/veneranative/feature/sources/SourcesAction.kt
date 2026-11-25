@@ -37,7 +37,12 @@ sealed interface SourcesAction {
 
     data class OpenConfiguration(val sourceId: SourceId) : SourcesAction
     data object CloseConfiguration : SourcesAction
-    data class SaveSettings(val sourceId: SourceId, val values: Map<String, String>) : SourcesAction
+
+    /**
+     * One setting changed. The screen never batches values into an explicit "save": every edit is
+     * applied on its own, and the ViewModel coalesces rapid changes into a single write.
+     */
+    data class SetSettingValue(val sourceId: SourceId, val key: String, val json: String) : SourcesAction
     data class InvokeSettingCallback(val sourceId: SourceId, val key: String) : SourcesAction
     data class Login(val sourceId: SourceId, val account: String, val password: String) : SourcesAction
     data class Relogin(val sourceId: SourceId) : SourcesAction

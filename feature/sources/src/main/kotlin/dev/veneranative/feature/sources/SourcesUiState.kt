@@ -34,6 +34,8 @@ data class SourcesUiState(
     val loginCheckInProgressSourceIds: Set<SourceId> = emptySet(),
     val manualLoginCheckSourceIds: Set<SourceId> = emptySet(),
     val settingsSaving: Boolean = false,
+    /** Copy for a settings write that failed, shown inside the source it belongs to. */
+    val settingsMessage: String? = null,
 ) {
     val isEmpty: Boolean get() = status == SourcesStatus.Ready && sources.isEmpty()
 

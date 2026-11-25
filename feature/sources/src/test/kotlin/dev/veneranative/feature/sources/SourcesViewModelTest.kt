@@ -91,6 +91,93 @@ class SourcesViewModelTest {
     }
 
     @Test
+    fun `a setting change shows at once and is written after the quiet period`() = runTest(dispatcher) {
+        val installed = source("a")
+        repository.sources = listOf(installed)
+        repository.configurationResult = dev.veneranative.core.model.InstalledSourceConfiguration(
+            source = installed,
+            settings = emptyList(),
+            settingValues = mapOf("quality" to "\"sd\""),
+            supportsPasswordLogin = false,
+            supportsLogout = false,
+            supportsLoginValidation = false,
+            registerWebsite = null,
+            loggedIn = false,
+        )
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+        viewModel.onAction(SourcesAction.OpenConfiguration(installed.sourceId))
+        advanceUntilIdle()
+
+        viewModel.onAction(SourcesAction.SetSettingValue(installed.sourceId, "quality", "\"hd\""))
+
+        // No save button: the control's value has to be true immediately.
+        assertEquals("\"hd\"", viewModel.state.value.configuration?.settingValues?.get("quality"))
+        assertTrue(repository.writtenSettings.isEmpty())
+
+        advanceUntilIdle()
+        assertEquals(listOf("quality" to "\"hd\""), repository.writtenSettings.map { it.second to it.third })
+        assertTrue(!viewModel.state.value.settingsSaving)
+    }
+
+    @Test
+    fun `a burst of edits writes each key once, with the last value`() = runTest(dispatcher) {
+        val installed = source("a")
+        repository.sources = listOf(installed)
+        repository.configurationResult = dev.veneranative.core.model.InstalledSourceConfiguration(
+            source = installed,
+            settings = emptyList(),
+            settingValues = mapOf("quality" to "\"sd\"", "interval" to "\"500\""),
+            supportsPasswordLogin = false,
+            supportsLogout = false,
+            supportsLoginValidation = false,
+            registerWebsite = null,
+            loggedIn = false,
+        )
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+        viewModel.onAction(SourcesAction.OpenConfiguration(installed.sourceId))
+        advanceUntilIdle()
+
+        viewModel.onAction(SourcesAction.SetSettingValue(installed.sourceId, "quality", "\"h\""))
+        viewModel.onAction(SourcesAction.SetSettingValue(installed.sourceId, "quality", "\"hd\""))
+        viewModel.onAction(SourcesAction.SetSettingValue(installed.sourceId, "interval", "\"800\""))
+        advanceUntilIdle()
+
+        assertEquals(
+            listOf("quality" to "\"hd\"", "interval" to "\"800\""),
+            repository.writtenSettings.map { it.second to it.third },
+        )
+    }
+
+    @Test
+    fun `a refused write puts the control back and says so in place`() = runTest(dispatcher) {
+        val installed = source("a")
+        repository.sources = listOf(installed)
+        repository.configurationResult = dev.veneranative.core.model.InstalledSourceConfiguration(
+            source = installed,
+            settings = emptyList(),
+            settingValues = mapOf("quality" to "\"sd\""),
+            supportsPasswordLogin = false,
+            supportsLogout = false,
+            supportsLoginValidation = false,
+            registerWebsite = null,
+            loggedIn = false,
+        )
+        repository.settingWriteResult = false
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+        viewModel.onAction(SourcesAction.OpenConfiguration(installed.sourceId))
+        advanceUntilIdle()
+
+        viewModel.onAction(SourcesAction.SetSettingValue(installed.sourceId, "quality", "\"hd\""))
+        advanceUntilIdle()
+
+        assertEquals("\"sd\"", viewModel.state.value.configuration?.settingValues?.get("quality"))
+        assertEquals("这项设置没能保存，请重试。", viewModel.state.value.settingsMessage)
+    }
+
+    @Test
     fun `an install without a location does nothing`() = runTest(dispatcher) {
         val viewModel = SourcesViewModel(repository)
         advanceUntilIdle()
@@ -242,7 +329,9 @@ class SourcesViewModelTest {
         advanceUntilIdle()
 
         assertEquals(SourceLoginCheckOutcome.Invalid, viewModel.state.value.loginCheckOutcome)
-        assertEquals("账号登录已失效，可直接重新登录。", viewModel.state.value.message)
+        // The result is now carried by the outcome the "登录状态" row renders as a chip; a banner
+        // message on top of it said the same thing twice.
+        assertNull(viewModel.state.value.message)
         assertTrue(!viewModel.state.value.accountActionInProgress)
     }
 
@@ -515,6 +604,14 @@ class SourcesViewModelTest {
         }
 
         override suspend fun configuration(sourceId: SourceId) = configurationResult
+
+        var settingWriteResult = true
+        val writtenSettings = mutableListOf<Triple<SourceId, String, String>>()
+
+        override suspend fun updateSetting(sourceId: SourceId, key: String, valueJson: String): Boolean {
+            writtenSettings += Triple(sourceId, key, valueJson)
+            return settingWriteResult
+        }
 
         override suspend fun install(location: String): InstallOutcome {
             installLocations += location

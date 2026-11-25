@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -52,6 +53,11 @@ class SourcesViewModel(
     private var catalogJob: Job? = null
     private var comicSearchJob: Job? = null
     private var configurationGeneration = 0L
+    private var settingsSaveJob: Job? = null
+
+    /** Keys edited but not yet written, so a cancelled flush can be retried instead of lost. */
+    private val pendingSettingChanges = linkedMapOf<String, String>()
+    private var pendingSettingSourceId: SourceId? = null
     private val preferenceWriteMutex = Mutex()
 
     init {
@@ -137,10 +143,15 @@ class SourcesViewModel(
 
             SourcesAction.CloseConfiguration -> {
                 configurationGeneration++
-                _state.update { it.copy(configuration = null, configurationLoading = false) }
+                settingsSaveJob?.cancel()
+                pendingSettingChanges.clear()
+                pendingSettingSourceId = null
+                _state.update {
+                    it.copy(configuration = null, configurationLoading = false, settingsSaving = false, settingsMessage = null)
+                }
             }
 
-            is SourcesAction.SaveSettings -> saveSettings(action.sourceId, action.values)
+            is SourcesAction.SetSettingValue -> setSettingValue(action.sourceId, action.key, action.json)
 
             is SourcesAction.InvokeSettingCallback -> invokeSettingCallback(action.sourceId, action.key)
 
@@ -228,7 +239,10 @@ class SourcesViewModel(
 
     private fun openConfiguration(sourceId: SourceId) {
         val generation = ++configurationGeneration
-        _state.update { it.copy(configurationLoading = true, message = null) }
+        settingsSaveJob?.cancel()
+        pendingSettingChanges.clear()
+        pendingSettingSourceId = null
+        _state.update { it.copy(configurationLoading = true, message = null, settingsMessage = null) }
         viewModelScope.launch {
             val configuration = runCatching { repository.configuration(sourceId) }.getOrNull()
             if (generation == configurationGeneration) {
@@ -259,18 +273,59 @@ class SourcesViewModel(
         }
     }
 
-    private fun saveSettings(sourceId: SourceId, values: Map<String, String>) {
-        if (_state.value.settingsSaving) return
-        _state.update { it.copy(settingsSaving = true, message = null) }
-        viewModelScope.launch {
-            val saved = runCatching { repository.updateSettings(sourceId, values) }.getOrDefault(false)
-            val configuration = if (saved) runCatching { repository.configuration(sourceId) }.getOrNull() else null
-            _state.update {
-                it.copy(
-                    settingsSaving = false,
-                    configuration = configuration ?: it.configuration,
-                    message = if (saved) "设置已保存；如账号未登录，请重新登录。" else "设置保存失败，请检查输入后重试。",
-                )
+    /**
+     * Applies one setting immediately, then writes it once the user stops changing things.
+     *
+     * The screen has no save button, so the state has to move the moment the control does — a switch
+     * that waits for a commit would look broken. Only the keys that actually changed are written,
+     * one by one, so a burst of typing or a rapid series of toggles cannot overwrite an unrelated
+     * value; a short quiet period folds a keystroke storm into a single write.
+     */
+    private fun setSettingValue(sourceId: SourceId, key: String, json: String) {
+        val configuration = _state.value.configuration ?: return
+        if (configuration.source.sourceId != sourceId) return
+        if (configuration.settingValues[key] == json) return
+        _state.update { current ->
+            val target = current.configuration?.takeIf { it.source.sourceId == sourceId } ?: return@update current
+            current.copy(
+                configuration = target.copy(settingValues = target.settingValues + (key to json)),
+                settingsMessage = null,
+            )
+        }
+        if (pendingSettingSourceId != sourceId) {
+            pendingSettingChanges.clear()
+            pendingSettingSourceId = sourceId
+        }
+        pendingSettingChanges[key] = json
+        settingsSaveJob?.cancel()
+        settingsSaveJob = viewModelScope.launch {
+            delay(SETTINGS_SAVE_QUIET_MILLIS)
+            _state.update { it.copy(settingsSaving = true) }
+            var failed = false
+            for ((changedKey, changedJson) in pendingSettingChanges.toMap()) {
+                val stored = runCatching { repository.updateSetting(sourceId, changedKey, changedJson) }
+                    .getOrDefault(false)
+                if (stored) {
+                    pendingSettingChanges.remove(changedKey)
+                } else {
+                    failed = true
+                    break
+                }
+            }
+            if (failed) {
+                // Put the controls back to what the repository still holds rather than leaving the
+                // screen claiming a value that was never stored.
+                pendingSettingChanges.clear()
+                val stored = runCatching { repository.configuration(sourceId) }.getOrNull()
+                _state.update {
+                    it.copy(
+                        settingsSaving = false,
+                        configuration = stored ?: it.configuration,
+                        settingsMessage = "这项设置没能保存，请重试。",
+                    )
+                }
+            } else {
+                _state.update { it.copy(settingsSaving = false) }
             }
         }
     }
@@ -604,6 +659,9 @@ class SourcesViewModel(
 private const val CATALOG_LOCATION_KEY = "sources.catalog.location"
 private const val CATALOG_HISTORY_KEY = "sources.catalog.history"
 private const val MAX_CATALOG_HISTORY = 10
+
+/** Long enough to fold a burst of typing into one write, short enough to feel immediate. */
+private const val SETTINGS_SAVE_QUIET_MILLIS = 350L
 
 private fun rememberCatalogLocation(history: List<String>, location: String): List<String> =
     (listOf(location.trim()) + history.filterNot { it.trim() == location.trim() })
