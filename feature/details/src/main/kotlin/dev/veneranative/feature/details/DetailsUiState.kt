@@ -68,6 +68,8 @@ data class DetailsUiState(
     val switchConfirmed: Boolean = false,
     /** What the commit did, said out loud: the button vanishing is not proof enough on its own. */
     val switchMessage: String? = null,
+    /** A switch that could not be settled; said once, on the candidate page the user is still on. */
+    val switchError: String? = null,
     val downloadMessage: String? = null,
     val downloadQueueVersion: Int = 0,
     /** Product copy for the last failure; never a lower layer's wording. */

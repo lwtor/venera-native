@@ -4,6 +4,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.os.Build
@@ -37,6 +38,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Brush
@@ -88,6 +90,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
@@ -96,6 +99,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -141,10 +145,10 @@ fun DetailsScreen(
             onAction(DetailsAction.TagMessageConsumed)
         }
     }
-    LaunchedEffect(state.switchMessage) {
-        val message = state.switchMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
-        onAction(DetailsAction.SwitchMessageConsumed)
+    LaunchedEffect(state.switchError) {
+        val message = state.switchError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message, withDismissAction = true, duration = SnackbarDuration.Short)
+        onAction(DetailsAction.SwitchErrorConsumed)
     }
     LaunchedEffect(state.downloadMessage) {
         val message = state.downloadMessage ?: return@LaunchedEffect
@@ -170,22 +174,54 @@ fun DetailsScreen(
     val heroHeight = maxOf(480, estimatedHeroHeight).dp
     val density = androidx.compose.ui.platform.LocalDensity.current
     val collapseDistancePx = with(density) { (heroHeight - 96.dp).toPx() }
-    val scrollPx by remember(listState, collapseDistancePx) {
+    val title = state.detail?.comic?.title.orEmpty()
+    val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
+    // Two different questions, two different answers. How much of the header has been scrolled
+    // away decides how far its content fades; whether the bar has finished becoming a bar decides
+    // its colour. They used to be one number, which broke the page in both directions: a comic with
+    // a handful of chapters cannot scroll the header's full height, so the bar stayed a transparent
+    // overlay forever — no title, and its actions disabled on a page with nothing to scroll — while
+    // forcing it to finish would have faded away a header that never moved.
+    val scrolledPx by remember(listState, collapseDistancePx) {
         derivedStateOf {
             if (listState.firstVisibleItemIndex > 0) collapseDistancePx
             else listState.firstVisibleItemScrollOffset.toFloat()
         }
     }
-    val collapseFraction = (scrollPx / collapseDistancePx).coerceIn(0f, 1f)
-    val title = state.detail?.comic?.title.orEmpty()
-    val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
+    val heroFraction = if (showContent) (scrolledPx / collapseDistancePx).coerceIn(0f, 1f) else 1f
+    // The bar is done at the end of the list, not only at the end of the header: what has been
+    // scrolled plus what is left to scroll is the list's whole range, so the collapse finishes at
+    // whichever comes first and a short page gets its title and its actions back immediately.
+    val collapseFraction by remember(listState, collapseDistancePx, showContent) {
+        derivedStateOf {
+            val layout = listState.layoutInfo
+            val last = layout.visibleItemsInfo.lastOrNull()
+            if (last == null || !showContent) {
+                // Nothing measured yet, or nothing to fade out of: a loading or failed page is
+                // already a bar.
+                if (showContent) 0f else 1f
+            } else {
+                val remaining = (last.offset + last.size + layout.afterContentPadding - layout.viewportEndOffset)
+                    .toFloat().coerceAtLeast(0f)
+                val range = scrolledPx + remaining
+                if (range <= 0.5f) 1f else (scrolledPx / minOf(collapseDistancePx, range)).coerceIn(0f, 1f)
+            }
+        }
+    }
     // Only one of the three comic actions is ever on screen. A page reached from a switch's results
     // is a candidate, and the only thing worth offering there is the commit that settles it: the
     // shelf action would be taken off a source the user is in the middle of leaving, and the switch
     // glyph is the very control that brought them here, so repeating it reads as "search again".
     val showFavorite = state.hasShelf && !confirmingSwitch
-    val heroAction: (@Composable () -> Unit)? =
-        if (showFavorite) ({ FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }) else null
+    // A switch's outcome is said on the page it lands on, never on the candidate that is about to be
+    // replaced by it: showing it here would show it a second time a frame later, because the
+    // ViewModel outlives the page and the message is only consumed once it has been read.
+    LaunchedEffect(state.switchMessage, confirmingSwitch) {
+        if (confirmingSwitch) return@LaunchedEffect
+        val message = state.switchMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message, withDismissAction = true, duration = SnackbarDuration.Short)
+        onAction(DetailsAction.SwitchMessageConsumed)
+    }
     val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
     val toolbarHeight = WindowInsets.safeDrawing.getTop(density) + with(density) { 56.dp.roundToPx() }
     val currentChapterIndex = state.currentChapterListIndex()
@@ -307,11 +343,10 @@ fun DetailsScreen(
                         listState = listState,
                         heroHeight = heroHeight,
                         tagGroups = tagGroups,
-                        collapseFraction = collapseFraction,
+                        heroFraction = heroFraction,
                         onAction = onAction,
                         onOpenChapter = onOpenChapter,
                         bottomPadding = directoryBottomPadding,
-                        heroAction = heroAction,
                         onConfirmSwitch = onConfirmSourceSwitch,
                     )
                 }
@@ -368,6 +403,7 @@ fun DetailsScreen(
             DetailsToolbar(
                 title = title,
                 collapseFraction = collapseFraction,
+                heroFraction = heroFraction,
                 onBack = onBack,
                 isFavorite = state.isFavorite,
                 showFavorite = showFavorite,
@@ -473,11 +509,10 @@ private fun Content(
     listState: androidx.compose.foundation.lazy.LazyListState,
     heroHeight: androidx.compose.ui.unit.Dp,
     tagGroups: Map<String, List<String>>,
-    collapseFraction: Float,
+    heroFraction: Float,
     onAction: (DetailsAction) -> Unit,
     onOpenChapter: (Chapter) -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
-    heroAction: (@Composable () -> Unit)?,
     onConfirmSwitch: (() -> Unit)?,
 ) {
     val chapterBounds = remember { mutableStateMapOf<ChapterKey, Rect>() }
@@ -527,8 +562,7 @@ private fun Content(
                 onAction = onAction,
                 heroHeight = heroHeight,
                 tagGroups = tagGroups,
-                collapseFraction = collapseFraction,
-                heroAction = heroAction,
+                heroFraction = heroFraction,
                 onConfirmSwitch = onConfirmSwitch,
             )
         }
@@ -659,8 +693,7 @@ private fun Header(
     onAction: (DetailsAction) -> Unit,
     heroHeight: androidx.compose.ui.unit.Dp,
     tagGroups: Map<String, List<String>>,
-    collapseFraction: Float,
-    heroAction: (@Composable () -> Unit)?,
+    heroFraction: Float,
     onConfirmSwitch: (() -> Unit)?,
 ) {
     val comic = state.detail?.comic ?: return
@@ -688,15 +721,12 @@ private fun Header(
                 .align(Alignment.BottomStart)
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 24.dp)
-                .alpha(1f - collapseFraction),
+                .alpha(1f - heroFraction),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val hasTagGroups = tagGroups.any { (_, values) -> values.isNotEmpty() }
             if (state.detail.metadata.isNotEmpty()) {
-                HeroFacts(
-                    metadata = state.detail.metadata,
-                    trailingAction = if (hasTagGroups) null else heroAction,
-                )
+                HeroFacts(metadata = state.detail.metadata)
             }
             if (hasTagGroups) {
                 HeroTagGroups(
@@ -704,13 +734,7 @@ private fun Header(
                     onTagClick = if (state.canOpenTags && !state.openingTag) {
                         { namespace, author -> onAction(DetailsAction.TagClicked(namespace, author)) }
                     } else null,
-                    trailingAction = heroAction,
                 )
-            }
-            if (state.detail.metadata.isEmpty() && !hasTagGroups && heroAction != null) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    heroAction()
-                }
             }
             // The commit gets a row of its own instead of the 44dp slot the round actions share:
             // it is the only way off this page, and it has to say what it does.
@@ -722,14 +746,6 @@ private fun Header(
                 )
             }
         }
-        state.shelfMessage?.let { message ->
-            Text(
-                text = message,
-                modifier = Modifier.align(Alignment.BottomStart).padding(start = 20.dp, bottom = 30.dp).alpha(1f - collapseFraction),
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.White,
-            )
-        }
     }
 }
 
@@ -737,6 +753,7 @@ private fun Header(
 private fun DetailsToolbar(
     title: String,
     collapseFraction: Float,
+    heroFraction: Float,
     onBack: () -> Unit,
     isFavorite: Boolean,
     showFavorite: Boolean,
@@ -756,22 +773,20 @@ private fun DetailsToolbar(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
-                .height(56.dp),
+                .height(56.dp)
+                .padding(start = 6.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            IconButton(
+            ToolbarAction(
+                contentDescription = "返回",
+                tint = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.onSurface, collapseFraction),
+                collapseFraction = collapseFraction,
                 onClick = onBack,
-                modifier = Modifier
-                    .padding(start = 4.dp)
-                    .semantics { contentDescription = "返回" },
-            ) {
-                CanvasBackArrow(
-                    color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.onSurface, collapseFraction),
-                )
-            }
+            ) { CanvasBackArrow(color = it) }
             Text(
                 text = title,
-                modifier = Modifier.weight(1f).alpha(collapseFraction),
+                modifier = Modifier.weight(1f).padding(start = 4.dp).alpha(collapseFraction),
                 style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -779,77 +794,90 @@ private fun DetailsToolbar(
             )
             // Three actions, never more than one at a time: a candidate page offers the commit in the
             // slot the shelf glyph would use; every other page offers the switch glyph, and the
-            // shelf glyph beside it when the comic is kept.
+            // shelf glyph before it when the comic is kept.
+            //
+            // Shelf and switch work in both states — over the cover they sit on their own disc, once
+            // the header is a bar they are plain glyphs on it. Nothing here is disabled just because
+            // the header happens to be open: a control that is on screen but refuses to be tapped is
+            // how the actions became unreachable on a comic with too few chapters to scroll. The
+            // commit is the one exception, because while the cover is open the labelled button in the
+            // hero is its entry, and the bar only takes over once that button has scrolled away
+            // ([heroFraction], not the bar's own colour: a page too short to scroll keeps its hero,
+            // and with it the labelled button).
             if (onConfirmSwitch != null) {
-                ToolbarConfirmSwitchButton(
+                ToolbarAction(
+                    contentDescription = "确认换源",
+                    tint = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
                     collapseFraction = collapseFraction,
-                    saving = switchConfirming,
+                    reveal = heroFraction,
+                    enabled = !switchConfirming,
+                    tag = DETAILS_SOURCE_SWITCH_CONFIRM_TOOLBAR_TAG,
                     onClick = onConfirmSwitch,
-                )
+                ) { CheckGlyph(color = it) }
             } else {
-                ToolbarSwitchSourceButton(collapseFraction = collapseFraction, onClick = onSwitchSource)
+                ToolbarAction(
+                    contentDescription = "切换漫画源",
+                    tint = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.onSurfaceVariant, collapseFraction),
+                    collapseFraction = collapseFraction,
+                    tag = DETAILS_SOURCE_SWITCH_TOOLBAR_TAG,
+                    onClick = onSwitchSource,
+                ) { SwapSourceGlyph(color = it) }
+                // Keeping a comic is the action of the two that gets used, so it holds the edge
+                // nearest the thumb.
                 if (showFavorite) {
-                    IconButton(
+                    ToolbarAction(
+                        contentDescription = if (isFavorite) "管理收藏夹" else "收藏",
+                        tint = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
+                        collapseFraction = collapseFraction,
                         onClick = onToggleFavorite,
-                        modifier = Modifier.alpha(collapseFraction).semantics {
-                            contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
-                        },
-                        enabled = collapseFraction >= 0.98f,
-                    ) {
-                        BookmarkGlyph(
-                            favorite = isFavorite,
-                            color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
-                        )
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(16.dp))
+                    ) { BookmarkGlyph(favorite = isFavorite, color = it) }
                 }
             }
         }
     }
 }
 
-@Composable
-private fun ToolbarSwitchSourceButton(collapseFraction: Float, onClick: () -> Unit) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.alpha(collapseFraction).testTag(DETAILS_SOURCE_SWITCH_TOOLBAR_TAG)
-            .semantics { contentDescription = "切换漫画源" },
-        // The expanded header is a full-bleed cover; controls only make sense once it is a bar.
-        enabled = collapseFraction >= 0.98f,
-    ) {
-        SwapSourceGlyph(
-            color = androidx.compose.ui.graphics.lerp(
-                Color.White,
-                MaterialTheme.colorScheme.onSurfaceVariant,
-                collapseFraction,
-            ),
-        )
-    }
-}
-
 /**
- * The commit's toolbar home, in the slot the shelf glyph uses elsewhere.
+ * One control in the bar, 44dp on a side.
  *
- * It only appears once the header has collapsed into a bar: while the cover is expanded the labelled
- * button in the hero is the one the user is looking at.
+ * Over the cover it is a dark disc inside a thin white ring: the cover behind it is whatever the
+ * source published, and a bare white glyph disappears on a bright one. Once the bar has a surface
+ * the disc and the ring fade out and the glyph takes the bar's own colour. The disc is the touch
+ * target as much as the decoration — 44dp is the smallest size a fingertip hits reliably.
+ *
+ * [reveal] hides a control that has a better entry elsewhere on the screen; while it is hidden it
+ * also stops taking taps, so nothing is hit by a button that is not there yet.
  */
 @Composable
-private fun ToolbarConfirmSwitchButton(collapseFraction: Float, saving: Boolean, onClick: () -> Unit) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.alpha(collapseFraction).testTag(DETAILS_SOURCE_SWITCH_CONFIRM_TOOLBAR_TAG)
-            .semantics { contentDescription = "确认换源" },
-        enabled = collapseFraction >= 0.98f && !saving,
-    ) {
-        CheckGlyph(
-            color = androidx.compose.ui.graphics.lerp(
-                Color.White,
-                MaterialTheme.colorScheme.primary,
-                collapseFraction,
-            ),
-        )
-    }
+private fun ToolbarAction(
+    contentDescription: String,
+    tint: Color,
+    collapseFraction: Float,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    reveal: Float = 1f,
+    tag: String? = null,
+    glyph: @Composable (Color) -> Unit,
+) {
+    val scrim = androidx.compose.ui.graphics.lerp(Color.Black.copy(alpha = 0.38f), Color.Transparent, collapseFraction)
+    val ring = androidx.compose.ui.graphics.lerp(Color.White.copy(alpha = 0.66f), Color.Transparent, collapseFraction)
+    Box(
+        modifier = Modifier
+            .alpha(reveal)
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(scrim)
+            .border(1.dp, ring, CircleShape)
+            .clickable(
+                enabled = enabled && reveal >= 0.98f,
+                onClickLabel = contentDescription,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .then(if (tag != null) Modifier.testTag(tag) else Modifier)
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
+    ) { glyph(tint) }
 }
 
 @Composable
@@ -900,11 +928,11 @@ private fun Section(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun HeroFacts(metadata: Map<String, String>, trailingAction: (@Composable () -> Unit)? = null) {
+private fun HeroFacts(metadata: Map<String, String>) {
     if (metadata.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val factRows = metadata.entries.toList().chunked(2)
-        factRows.forEachIndexed { rowIndex, rowFacts ->
+        factRows.forEach { rowFacts ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 rowFacts.forEach { (label, value) ->
                     Surface(
@@ -935,25 +963,8 @@ private fun HeroFacts(metadata: Map<String, String>, trailingAction: (@Composabl
                     }
                 }
                 if (rowFacts.size == 1) Spacer(modifier = Modifier.weight(1f))
-                if (rowIndex == factRows.lastIndex) trailingAction?.invoke()
             }
         }
-    }
-}
-
-@Composable
-private fun FavoriteAction(isFavorite: Boolean, onToggleFavorite: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = Color.Black.copy(alpha = 0.34f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.68f)),
-    ) {
-        IconButton(
-            onClick = onToggleFavorite,
-            modifier = Modifier.size(44.dp).semantics {
-                contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
-            },
-        ) { BookmarkGlyph(favorite = isFavorite, color = Color.White) }
     }
 }
 
@@ -1024,12 +1035,11 @@ private fun InfoLabel(text: String) {
 private fun HeroTagGroups(
     groups: Map<String, List<String>>,
     onTagClick: ((String, String) -> Unit)? = null,
-    trailingAction: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val visibleGroups = groups.filterValues { it.isNotEmpty() }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        visibleGroups.entries.forEachIndexed { index, (name, values) ->
+        visibleGroups.entries.forEach { (name, values) ->
             Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1080,7 +1090,6 @@ private fun HeroTagGroups(
                             }
                         }
                     }
-                    if (index == visibleGroups.size - 1) trailingAction?.invoke()
                 }
         }
     }

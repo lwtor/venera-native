@@ -71,6 +71,7 @@ class DetailsViewModel(
                 chapterLocationRequest = null,
                 tagNavigation = null,
                 tagMessage = null,
+                switchError = null,
             )
         }
     }
@@ -204,15 +205,20 @@ class DetailsViewModel(
                 })
             }
             DetailsAction.ConfirmFavorite -> confirmFavorite()
-            DetailsAction.DismissFavoriteDialog -> _state.update { it.copy(favoriteDialog = null, newFavoriteFolderDraft = null) }
-            DetailsAction.NewFavoriteFolderRequested -> _state.update { it.copy(newFavoriteFolderDraft = "") }
+            // Closing the sheet also drops whatever it was saying: an error belongs to the attempt
+            // that caused it, not to the next time the sheet is opened.
+            DetailsAction.DismissFavoriteDialog -> _state.update {
+                it.copy(favoriteDialog = null, newFavoriteFolderDraft = null, shelfMessage = null)
+            }
+            DetailsAction.NewFavoriteFolderRequested -> _state.update { it.copy(newFavoriteFolderDraft = "", shelfMessage = null) }
             is DetailsAction.NewFavoriteFolderDraftChanged -> _state.update { it.copy(newFavoriteFolderDraft = action.draft) }
             DetailsAction.CreateFavoriteFolder -> createFavoriteFolder()
-            DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null) }
+            DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null, shelfMessage = null) }
 
             is DetailsAction.ConfirmSourceSwitch -> confirmSourceSwitch(action.from)
             DetailsAction.SourceSwitchConfirmed -> _state.update { it.copy(switchConfirmed = false) }
             DetailsAction.SwitchMessageConsumed -> _state.update { it.copy(switchMessage = null) }
+            DetailsAction.SwitchErrorConsumed -> _state.update { it.copy(switchError = null) }
         }
     }
 
@@ -358,7 +364,7 @@ class DetailsViewModel(
             _state.update { it.copy(switchConfirmed = true, shelfMessage = null) }
             return
         }
-        _state.update { it.copy(switchConfirming = true, shelfMessage = null, switchMessage = null) }
+        _state.update { it.copy(switchConfirming = true, switchError = null, switchMessage = null) }
         viewModelScope.launch {
             runCatching { repository.replaceSource(ComicRef.Remote(from), ComicRef.Remote(target)) }
                 .onSuccess { moved ->
@@ -377,8 +383,10 @@ class DetailsViewModel(
                 }
                 .onFailure { failure ->
                     failUnlessCancelled(failure)
+                    // Not aimed at the shelf dialogs: no dialog is open, and a line left standing on
+                    // the page reads as a state rather than as an answer to the tap that failed.
                     _state.update {
-                        it.copy(switchConfirming = false, shelfMessage = "无法把收藏迁移到新来源，请重试。")
+                        it.copy(switchConfirming = false, switchError = "无法把收藏迁移到新来源，请重试。")
                     }
                 }
         }

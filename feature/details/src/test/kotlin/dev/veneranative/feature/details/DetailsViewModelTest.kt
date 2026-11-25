@@ -765,15 +765,47 @@ class DetailsViewModelTest {
         // Not confirmed: leaving now would strand the shelf on the source being abandoned with
         // nothing on screen saying so.
         assertFalse(viewModel.state.value.switchConfirmed)
-        assertEquals("无法把收藏迁移到新来源，请重试。", viewModel.state.value.shelfMessage)
+        // A failure is a one-off answer to the tap, not a line that stands on the page.
+        assertEquals("无法把收藏迁移到新来源，请重试。", viewModel.state.value.switchError)
+        assertNull(viewModel.state.value.switchMessage)
+        assertNull(viewModel.state.value.shelfMessage)
 
         collection.replaceError = null
         viewModel.onAction(DetailsAction.ConfirmSourceSwitch(broken))
         advanceUntilIdle()
 
         assertTrue(viewModel.state.value.switchConfirmed)
+        assertNull(viewModel.state.value.switchError)
         assertNull(viewModel.state.value.shelfMessage)
         assertEquals("已换到「s」，收藏条目已跟着迁移。", viewModel.state.value.switchMessage)
+    }
+
+    @Test
+    fun `a switch failure does not come back with the next visit`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val broken = ComicKey(SourceId("broken"), RemoteComicId("c1"))
+        collection.seed(
+            FavoriteItem(
+                ref = ComicRef.Remote(broken),
+                title = "Frieren",
+                folderId = "",
+                folderIds = setOf("reading"),
+                addedAtEpochMillis = 1_000L,
+            ),
+        )
+        collection.replaceError = IllegalStateException("fixture")
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ConfirmSourceSwitch(broken))
+        advanceUntilIdle()
+        assertEquals("无法把收藏迁移到新来源，请重试。", viewModel.state.value.switchError)
+
+        // Leaving before the snackbar timed out must not make the comic say it again next time.
+        viewModel.onScreenEntered()
+
+        assertNull(viewModel.state.value.switchError)
     }
 
     private fun detail(title: String, grouped: Boolean = false) = ComicDetail(

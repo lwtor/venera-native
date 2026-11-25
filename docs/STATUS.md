@@ -2,6 +2,35 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-25 顶栏在内容不足时也可用；换源提示改成一次性（DONE）
+
+- 用户第四轮反馈：①「章节过少的话，根本出现不了顶部的标题栏，导致上面的按钮无法点击」；
+  ②「换源后干嘛一直提示，觉得这个提示需要一直显示吗」；③要求把三个按钮的交互和样式一起优化。
+- ① 根因：`collapseFraction = 已滚距离 / (hero 高度 - 96dp)`。章节少时列表根本没有那么多可滚距离，
+  比例永远到不了 1，于是顶栏一直停在「展开态」：标题 alpha 为 0 不显示，收藏 / 换源
+  `enabled = collapseFraction >= 0.98f` 恒为 false —— 控件在屏幕上却点不动。
+  - 折叠进度改为按**列表真实可滚范围**计算：`已滚 + 列表剩余可滚（末项 offset+size+afterContentPadding
+    - viewportEndOffset）`，分母取 `min(hero 可折叠距离, 真实范围)`。内容不足一屏时范围 ≈ 0，直接视为收起；
+    恰好在列表底部也会收满，不再是「永远差一点」。
+  - 没有封面可折叠的页面（加载中 / 加载失败 / 源已卸载）直接按收起态渲染，返回按钮不再在浅色背景上用白图形。
+- ①③ 交互与样式：顶栏返回、收藏、换源统一为 44dp 圆形控件（`ToolbarAction`）。展开态压着封面时带
+  38% 黑色底盘 + 66% 白色描边、白色图形（封面由源提供，亮色封面上裸白图形会看不见）；收起后在 surface 上
+  只剩图形本身，颜色过渡到 onSurface / primary。收藏与换源**两种状态都可点**，只有「确认换源」的顶栏勾号
+  仍随折叠淡入 —— 它在展开态有 hero 里那枚带文字的实心按钮作为入口，不存在无路可走的情况。
+  - 删除 hero 信息区末尾那枚重复的收藏圆钮（`FavoriteAction`）与 `HeroFacts`/`HeroTagGroups` 的
+    `trailingAction` 参数：收藏只在顶栏有一处，不会「展开态两个、收起态一个」。
+- ② 根因有两处，都是「提示被当成状态挂在页面上」：
+  - 换源成功：`switchConfirmed` 与 `switchMessage` 同一次更新里写入，`DetailsRoute` 立刻换路由，
+    候选页的 snackbar 协程被销毁、`SwitchMessageConsumed` 没发出；落点页（同一 ViewModel）重新组合时
+    又弹一次。现在候选页不显示这条消息，只由落点页显示一次（`SnackbarDuration.Short` + 可手动关闭）。
+  - 换源失败：原先写进 `shelfMessage`，而 `shelfMessage` 会作为白字常驻在 hero 左下角，直到下次收藏动作才清。
+    现在失败走独立的 `switchError` + snackbar，一次即清；`onScreenEntered()` 也会清掉它，
+    刷新页面不会重放上一次点击的答案。hero 里的常驻提示文本一并删除，`shelfMessage` 只留在收藏弹窗内，
+    关闭弹窗即清。
+- 验证：`:feature:details:compileDebugKotlin`、`:feature:details:compileDebugUnitTestKotlin` 通过；
+  `:feature:details:testDebugUnitTest` 51 项通过（新增「换源失败不随下次进入重放」）；`:app:assembleDebug`
+  BUILD SUCCESSFUL；版本 2.7.2 / 2007002。
+
 ## 当前任务：U-24 换源的确认动作、三个按钮的关系、返回保留滚动位置（DONE）
 
 - 用户第三轮反馈（2.7.0 之后）：①「无法替换，现在的替换按钮直接又跳转到换源搜索的页面」；

@@ -63,4 +63,7 @@ sealed interface DetailsAction {
 
     /** The commit's confirmation has been shown. */
     data object SwitchMessageConsumed : DetailsAction
+
+    /** A failed commit has been shown; it is a one-off, not something to keep on the page. */
+    data object SwitchErrorConsumed : DetailsAction
 }
