@@ -1,11 +1,7 @@
 package dev.veneranative.feature.search
 
-import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.InstalledSource
 import dev.veneranative.core.model.SourceId
-
-/** The comic the user settled on, handed to the assembly layer as a navigation request. */
-data class SourceSwitchChoice(val comicKey: ComicKey, val title: String?)
 
 /**
  * Everything the source switcher renders.
@@ -23,10 +19,18 @@ data class SourceSwitchUiState(
     val openedSourceId: SourceId? = null,
     /** Product copy for the last failure; never a lower layer's wording. */
     val message: String? = null,
-    val choosing: Boolean = false,
-    val chosen: SourceSwitchChoice? = null,
 ) {
     val canSearch: Boolean get() = keyword.isNotBlank() && candidates.isNotEmpty()
 
     val openedSourceName: String? get() = candidates.firstOrNull { it.sourceId == openedSourceId }?.name
 }
+
+/**
+ * Where a scrollable area of the switcher was left.
+ *
+ * The page is rebuilt whenever the user comes back from a candidate they did not take, and a
+ * rebuilt list starts at the top — which costs them the result they were about to look at. The
+ * position lives on the ViewModel beside the results it belongs to, so the two stay in step:
+ * searching again starts at the top because the results are new, coming back does not.
+ */
+data class ScrollSlot(val index: Int = 0, val offset: Int = 0)

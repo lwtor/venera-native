@@ -48,4 +48,30 @@ class SourceSwitchNavigationTest {
     @Test fun aSwitchPageWithoutARecordedOriginFallsBackToHome() {
         assertEquals(AppRoute.Home, backDestination(AppRoute.SourceSwitch(comic)))
     }
+
+    @Test fun aCandidateKnowsWhichSourceItWouldReplace() {
+        val details = AppRoute.ComicDetails(comic, backTo = AppRoute.Home)
+        val picked = AppRoute.ComicDetails(other, "作品", backTo = sourceSwitchDestination(details, "作品"))
+
+        assertEquals(comic, picked.sourceSwitchOrigin())
+        assertEquals(null, AppRoute.ComicDetails(other, backTo = AppRoute.Home).sourceSwitchOrigin())
+    }
+
+    @Test fun confirmingACandidateDropsTheSwitchChainAndKeepsWhereTheComicCameFrom() {
+        val details = AppRoute.ComicDetails(comic, title = "作品", backTo = AppRoute.Search("source"))
+        val picked = AppRoute.ComicDetails(other, "作品", backTo = sourceSwitchDestination(details, "作品"))
+
+        val committed = sourceSwitchCommit(picked)
+
+        // Same comic, same page, but back now leaves for the list the original comic came from
+        // instead of walking back into a switch the user has already settled.
+        assertEquals(AppRoute.ComicDetails(other, "作品", backTo = AppRoute.Search("source")), committed)
+        assertFalse(committed!!.openedBySourceSwitch())
+        assertEquals(AppRoute.Search("source"), backDestination(committed))
+    }
+
+    @Test fun aPageThatIsNotACandidateHasNothingToCommit() {
+        assertEquals(null, sourceSwitchCommit(AppRoute.ComicDetails(comic, backTo = AppRoute.Home)))
+        assertEquals(null, sourceSwitchCommit(AppRoute.ComicDetails(comic)))
+    }
 }

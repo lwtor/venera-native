@@ -12,7 +12,6 @@ import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.ComicCatalog
 import dev.veneranative.source.api.SearchRequest
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
@@ -29,15 +28,13 @@ import kotlinx.coroutines.launch
  *
  * Deliberately the same shape as [SearchViewModel]: one keyword, one fan-out through the shared
  * aggregate search, one preview row per source that fills in as it answers, and an optional full
- * list for a single source. The difference is only where the keyword comes from and what a tap does
- * — a switch rebinds the shelf entry to the picked source before the assembly layer opens it.
+ * list for a single source. The difference is only where the keyword comes from and what happens
+ * after a tap — a switch opens the candidate, and the candidate page is what settles it.
  */
 class SourceSwitchViewModel(
     private val catalog: ComicCatalog,
     private val comicKey: ComicKey,
     seedTitle: String?,
-    /** Moves the shelf entry from the source being left to the one being picked. */
-    private val moveShelfEntry: suspend (from: ComicKey, to: ComicKey) -> Unit,
     private val pageSize: Int = DEFAULT_PAGE_SIZE,
 ) : ViewModel() {
 
@@ -66,13 +63,12 @@ class SourceSwitchViewModel(
         .cachedIn(viewModelScope)
 
     /**
-     * The key the shelf entry currently points at.
+     * Where each scrollable area was left, keyed by the area itself.
      *
-     * The user can come back to this page and pick again, so after the first switch the entry lives
-     * under the previous choice; rebinding from the source being left would find nothing and leave
-     * the shelf pointing at a comic the user has moved on from.
+     * Kept out of [state] on purpose: scroll positions change on every frame, and they are only read
+     * when an area is built, so publishing them would recompose the page for nothing.
      */
-    private var shelfOwner: ComicKey = comicKey
+    private val scrollSlots = mutableMapOf<String, ScrollSlot>()
 
     init {
         viewModelScope.launch {
@@ -107,6 +103,8 @@ class SourceSwitchViewModel(
         searchJob?.cancel()
         openQuery.value = null
         _state.update { it.copy(openedSourceId = null, message = null) }
+        // New results, so the old position would point at a list that no longer exists.
+        scrollSlots.keys.toList().forEach(scrollSlots::remove)
         searchJob = searchEverySource(viewModelScope, catalog, state.candidates, keyword, _rows)
     }
 
@@ -114,6 +112,7 @@ class SourceSwitchViewModel(
         val keyword = _state.value.keyword.trim().takeIf(String::isNotEmpty) ?: return
         if (_state.value.candidates.none { it.sourceId == sourceId }) return
         _state.update { it.copy(openedSourceId = sourceId, message = null) }
+        scrollSlots.remove(SOURCE_SCROLL_SLOT_PREFIX + sourceId.value)
         openQuery.value = SearchRequest(sourceId = sourceId, keyword = keyword, filters = FilterSelection.Empty)
     }
 
@@ -122,39 +121,23 @@ class SourceSwitchViewModel(
         openQuery.value = null
     }
 
-    /**
-     * Takes one result as the choice.
-     *
-     * A comic that was never kept has nothing to migrate, which is a normal outcome. A *failed*
-     * rebind is not: navigating away would leave the shelf pointing at the old, broken source with
-     * nothing on screen saying so, so the switch stops and stays retryable.
-     */
-    fun choose(comic: Comic) {
-        if (_state.value.choosing) return
-        _state.update { it.copy(choosing = true, message = null) }
-        viewModelScope.launch {
-            val rebound = try {
-                moveShelfEntry(shelfOwner, comic.key)
-                shelfOwner = comic.key
-                true
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                false
-            }
-            if (!rebound) {
-                _state.update { it.copy(choosing = false, message = "无法把收藏迁移到新来源，请重试。") }
-                return@launch
-            }
-            _state.update { it.copy(choosing = false, chosen = SourceSwitchChoice(comic.key, comic.title)) }
-        }
-    }
+    /** Where [slot] was left; the overview and each source's full list keep their own. */
+    fun scrollSlot(slot: String): ScrollSlot = scrollSlots[slot] ?: ScrollSlot()
 
-    fun choiceConsumed() {
-        _state.update { it.copy(chosen = null) }
+    fun keepScrollSlot(slot: String, index: Int, offset: Int) {
+        scrollSlots[slot] = ScrollSlot(index, offset)
     }
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 20
     }
 }
+
+/** The grouped overview's own scroll position. */
+internal const val OVERVIEW_SCROLL_SLOT = "overview"
+
+/** Prefix of a single source's full list; the source id completes it. */
+internal const val SOURCE_SCROLL_SLOT_PREFIX = "source:"
+
+/** One slot per source row of the overview, so scrolling one row does not move the others. */
+internal fun rowScrollSlot(sourceId: SourceId): String = "$OVERVIEW_SCROLL_SLOT:row:${sourceId.value}"

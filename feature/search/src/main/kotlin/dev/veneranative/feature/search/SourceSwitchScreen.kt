@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -14,7 +15,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,6 +45,9 @@ fun SourceSwitchScreen(
     state: SourceSwitchUiState,
     rows: List<AggregateSearchResult>,
     results: LazyPagingItems<Comic>,
+    overviewState: LazyListState,
+    sourceState: @Composable (SourceId) -> LazyListState,
+    rowState: @Composable (SourceId) -> LazyListState,
     onKeywordChanged: (String) -> Unit,
     onSearch: () -> Unit,
     onOpenSource: (SourceId) -> Unit,
@@ -107,9 +110,6 @@ fun SourceSwitchScreen(
                     color = MaterialTheme.colorScheme.error,
                 )
             }
-            if (state.choosing) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
-            }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when {
                     !state.ready -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -120,12 +120,18 @@ fun SourceSwitchScreen(
                         Text("没有其他可用的漫画源。", style = MaterialTheme.typography.titleMedium)
                     }
 
-                    openedSourceId != null -> Results(results, onOpenComic = onChooseComic)
+                    openedSourceId != null -> Results(
+                        results,
+                        onOpenComic = onChooseComic,
+                        listState = sourceState(openedSourceId),
+                    )
 
                     else -> AggregateSourceResults(
                         rows = rows,
                         onOpenComic = onChooseComic,
                         onOpenSource = onOpenSource,
+                        listState = overviewState,
+                        rowState = rowState,
                     )
                 }
             }

@@ -209,6 +209,10 @@ class DetailsViewModel(
             is DetailsAction.NewFavoriteFolderDraftChanged -> _state.update { it.copy(newFavoriteFolderDraft = action.draft) }
             DetailsAction.CreateFavoriteFolder -> createFavoriteFolder()
             DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null) }
+
+            is DetailsAction.ConfirmSourceSwitch -> confirmSourceSwitch(action.from)
+            DetailsAction.SourceSwitchConfirmed -> _state.update { it.copy(switchConfirmed = false) }
+            DetailsAction.SwitchMessageConsumed -> _state.update { it.copy(switchMessage = null) }
         }
     }
 
@@ -334,6 +338,49 @@ class DetailsViewModel(
                 failUnlessCancelled(failure)
                 _state.update { it.copy(favoriteSaving = false, shelfMessage = "无法保存此更改。") }
             }
+        }
+    }
+
+    /**
+     * Settles a page reached from the switch results.
+     *
+     * The shelf entry still points at the source the user came from — looking at a candidate must
+     * not move it, or walking back through three candidates would leave the shelf on the last one
+     * they glanced at. Confirm is where the move happens, and only after it succeeds does the page
+     * ask to become the comic's page. Nothing to move is a normal outcome: a comic that was never
+     * kept has nothing to migrate and the switch is still real.
+     */
+    private fun confirmSourceSwitch(from: ComicKey?) {
+        if (_state.value.switchConfirming) return
+        val repository = collection
+        val target = _state.value.detail?.comic?.key ?: comicKey
+        if (from == null || repository == null) {
+            _state.update { it.copy(switchConfirmed = true, shelfMessage = null) }
+            return
+        }
+        _state.update { it.copy(switchConfirming = true, shelfMessage = null, switchMessage = null) }
+        viewModelScope.launch {
+            runCatching { repository.replaceSource(ComicRef.Remote(from), ComicRef.Remote(target)) }
+                .onSuccess { moved ->
+                    val name = _state.value.sourceName
+                    _state.update {
+                        it.copy(
+                            switchConfirming = false,
+                            switchConfirmed = true,
+                            switchMessage = if (moved) {
+                                "已换到「$name」，收藏条目已跟着迁移。"
+                            } else {
+                                "已换到「$name」。"
+                            },
+                        )
+                    }
+                }
+                .onFailure { failure ->
+                    failUnlessCancelled(failure)
+                    _state.update {
+                        it.copy(switchConfirming = false, shelfMessage = "无法把收藏迁移到新来源，请重试。")
+                    }
+                }
         }
     }
 

@@ -1,5 +1,7 @@
 package dev.veneranative.feature.details
 
+import dev.veneranative.core.model.ComicKey
+
 /** Everything the user can do on the details screen. */
 sealed interface DetailsAction {
 
@@ -48,4 +50,17 @@ sealed interface DetailsAction {
     data class NewFavoriteFolderDraftChanged(val draft: String) : DetailsAction
     data object CreateFavoriteFolder : DetailsAction
     data object DismissNewFavoriteFolder : DetailsAction
+
+    /**
+     * Settles a page reached from the switch results: moves the shelf entry onto this page's source
+     * and asks the assembly layer to make this the comic's page. [from] is the source the switch
+     * started from, or null when this page was not reached through one.
+     */
+    data class ConfirmSourceSwitch(val from: ComicKey?) : DetailsAction
+
+    /** Acknowledges that the switch went through; the page itself is already on its way out. */
+    data object SourceSwitchConfirmed : DetailsAction
+
+    /** The commit's confirmation has been shown. */
+    data object SwitchMessageConsumed : DetailsAction
 }

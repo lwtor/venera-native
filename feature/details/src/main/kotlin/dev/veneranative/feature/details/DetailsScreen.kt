@@ -129,8 +129,9 @@ fun DetailsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenDownloads: () -> Unit = {},
-    enteredBySourceSwitch: Boolean = false,
     onSwitchSource: () -> Unit = {},
+    /** Set only on a switch's candidate page: the commit that settles the switch. */
+    onConfirmSourceSwitch: (() -> Unit)? = null,
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -139,6 +140,11 @@ fun DetailsScreen(
             snackbarHostState.showSnackbar(message)
             onAction(DetailsAction.TagMessageConsumed)
         }
+    }
+    LaunchedEffect(state.switchMessage) {
+        val message = state.switchMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        onAction(DetailsAction.SwitchMessageConsumed)
     }
     LaunchedEffect(state.downloadMessage) {
         val message = state.downloadMessage ?: return@LaunchedEffect
@@ -157,7 +163,10 @@ fun DetailsScreen(
     }.orEmpty()
     val metadataRowCount = ((state.detail?.metadata?.size ?: 0) + 1) / 2
     val tagRowCount = tagGroups.values.sumOf { (it.size + 1) / 2 }
-    val estimatedHeroHeight = 200 + metadataRowCount * 52 + tagRowCount * 34 + tagGroups.size * 8
+    // A candidate page carries the confirm button as its own row under the facts.
+    val confirmingSwitch = onConfirmSourceSwitch != null
+    val estimatedHeroHeight = 200 + metadataRowCount * 52 + tagRowCount * 34 + tagGroups.size * 8 +
+        if (confirmingSwitch) 52 else 0
     val heroHeight = maxOf(480, estimatedHeroHeight).dp
     val density = androidx.compose.ui.platform.LocalDensity.current
     val collapseDistancePx = with(density) { (heroHeight - 96.dp).toPx() }
@@ -170,15 +179,13 @@ fun DetailsScreen(
     val collapseFraction = (scrollPx / collapseDistancePx).coerceIn(0f, 1f)
     val title = state.detail?.comic?.title.orEmpty()
     val showContent = state.detail != null && state.status != DetailsStatus.SourceUnavailable
-    // A page reached by switching source exists to compare sources: the comic is already on the
-    // shelf under the source it came from, so the shelf action gives way to the switch action
-    // instead of sitting next to it.
-    val showFavorite = state.hasShelf && !enteredBySourceSwitch
-    val heroAction: (@Composable () -> Unit)? = when {
-        enteredBySourceSwitch -> ({ SwitchSourceAction(onSwitchSource) })
-        showFavorite -> ({ FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } })
-        else -> null
-    }
+    // Only one of the three comic actions is ever on screen. A page reached from a switch's results
+    // is a candidate, and the only thing worth offering there is the commit that settles it: the
+    // shelf action would be taken off a source the user is in the middle of leaving, and the switch
+    // glyph is the very control that brought them here, so repeating it reads as "search again".
+    val showFavorite = state.hasShelf && !confirmingSwitch
+    val heroAction: (@Composable () -> Unit)? =
+        if (showFavorite) ({ FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } }) else null
     val isRefreshing = state.status == DetailsStatus.Loading && state.detail != null
     val toolbarHeight = WindowInsets.safeDrawing.getTop(density) + with(density) { 56.dp.roundToPx() }
     val currentChapterIndex = state.currentChapterListIndex()
@@ -305,6 +312,7 @@ fun DetailsScreen(
                         onOpenChapter = onOpenChapter,
                         bottomPadding = directoryBottomPadding,
                         heroAction = heroAction,
+                        onConfirmSwitch = onConfirmSourceSwitch,
                     )
                 }
 
@@ -365,7 +373,8 @@ fun DetailsScreen(
                 showFavorite = showFavorite,
                 onToggleFavorite = { onAction(DetailsAction.ToggleFavorite) },
                 onSwitchSource = onSwitchSource,
-                enteredBySourceSwitch = enteredBySourceSwitch,
+                onConfirmSwitch = onConfirmSourceSwitch,
+                switchConfirming = state.switchConfirming,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -469,6 +478,7 @@ private fun Content(
     onOpenChapter: (Chapter) -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
     heroAction: (@Composable () -> Unit)?,
+    onConfirmSwitch: (() -> Unit)?,
 ) {
     val chapterBounds = remember { mutableStateMapOf<ChapterKey, Rect>() }
     var listCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -519,6 +529,7 @@ private fun Content(
                 tagGroups = tagGroups,
                 collapseFraction = collapseFraction,
                 heroAction = heroAction,
+                onConfirmSwitch = onConfirmSwitch,
             )
         }
         if (state.status == DetailsStatus.Failed) {
@@ -650,6 +661,7 @@ private fun Header(
     tagGroups: Map<String, List<String>>,
     collapseFraction: Float,
     heroAction: (@Composable () -> Unit)?,
+    onConfirmSwitch: (() -> Unit)?,
 ) {
     val comic = state.detail?.comic ?: return
     Box(
@@ -700,6 +712,15 @@ private fun Header(
                     heroAction()
                 }
             }
+            // The commit gets a row of its own instead of the 44dp slot the round actions share:
+            // it is the only way off this page, and it has to say what it does.
+            if (onConfirmSwitch != null) {
+                ConfirmSwitchAction(
+                    saving = state.switchConfirming,
+                    onConfirm = onConfirmSwitch,
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                )
+            }
         }
         state.shelfMessage?.let { message ->
             Text(
@@ -721,7 +742,8 @@ private fun DetailsToolbar(
     showFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onSwitchSource: () -> Unit,
-    enteredBySourceSwitch: Boolean,
+    onConfirmSwitch: (() -> Unit)?,
+    switchConfirming: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val background = androidx.compose.ui.graphics.lerp(Color.Transparent, MaterialTheme.colorScheme.surface, collapseFraction)
@@ -755,28 +777,33 @@ private fun DetailsToolbar(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            // Normally the switch glyph sits left of the shelf glyph. A page reached by switching
-            // source keeps only the switch action, in the slot the shelf glyph would have used.
-            if (!enteredBySourceSwitch) {
-                ToolbarSwitchSourceButton(collapseFraction = collapseFraction, onClick = onSwitchSource)
-            }
-            if (showFavorite) {
-                IconButton(
-                    onClick = onToggleFavorite,
-                    modifier = Modifier.alpha(collapseFraction).semantics {
-                        contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
-                    },
-                    enabled = collapseFraction >= 0.98f,
-                ) {
-                    BookmarkGlyph(
-                        favorite = isFavorite,
-                        color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
-                    )
-                }
-            } else if (enteredBySourceSwitch) {
-                ToolbarSwitchSourceButton(collapseFraction = collapseFraction, onClick = onSwitchSource)
+            // Three actions, never more than one at a time: a candidate page offers the commit in the
+            // slot the shelf glyph would use; every other page offers the switch glyph, and the
+            // shelf glyph beside it when the comic is kept.
+            if (onConfirmSwitch != null) {
+                ToolbarConfirmSwitchButton(
+                    collapseFraction = collapseFraction,
+                    saving = switchConfirming,
+                    onClick = onConfirmSwitch,
+                )
             } else {
-                Spacer(modifier = Modifier.width(16.dp))
+                ToolbarSwitchSourceButton(collapseFraction = collapseFraction, onClick = onSwitchSource)
+                if (showFavorite) {
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.alpha(collapseFraction).semantics {
+                            contentDescription = if (isFavorite) "管理收藏夹" else "收藏"
+                        },
+                        enabled = collapseFraction >= 0.98f,
+                    ) {
+                        BookmarkGlyph(
+                            favorite = isFavorite,
+                            color = androidx.compose.ui.graphics.lerp(Color.White, MaterialTheme.colorScheme.primary, collapseFraction),
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
             }
         }
     }
@@ -795,6 +822,30 @@ private fun ToolbarSwitchSourceButton(collapseFraction: Float, onClick: () -> Un
             color = androidx.compose.ui.graphics.lerp(
                 Color.White,
                 MaterialTheme.colorScheme.onSurfaceVariant,
+                collapseFraction,
+            ),
+        )
+    }
+}
+
+/**
+ * The commit's toolbar home, in the slot the shelf glyph uses elsewhere.
+ *
+ * It only appears once the header has collapsed into a bar: while the cover is expanded the labelled
+ * button in the hero is the one the user is looking at.
+ */
+@Composable
+private fun ToolbarConfirmSwitchButton(collapseFraction: Float, saving: Boolean, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.alpha(collapseFraction).testTag(DETAILS_SOURCE_SWITCH_CONFIRM_TOOLBAR_TAG)
+            .semantics { contentDescription = "确认换源" },
+        enabled = collapseFraction >= 0.98f && !saving,
+    ) {
+        CheckGlyph(
+            color = androidx.compose.ui.graphics.lerp(
+                Color.White,
+                MaterialTheme.colorScheme.primary,
                 collapseFraction,
             ),
         )
@@ -907,21 +958,39 @@ private fun FavoriteAction(isFavorite: Boolean, onToggleFavorite: () -> Unit) {
 }
 
 /**
- * The switch action that stands where the shelf action normally does, on a page reached by
- * switching source. Same 44dp circle, same place, so the control the user just used does not move.
+ * The only action a candidate page offers: take this source.
+ *
+ * Labelled rather than a 44dp circle, because the circle that used to sit here carried the switch
+ * glyph — the same control that brought the user to this page — so tapping it looked like "search
+ * again" and the switch itself had nowhere to happen. It ends the alignment to the cover's edge:
+ * a committing action may take the width it needs to say what it commutes.
  */
 @Composable
-private fun SwitchSourceAction(onOpen: () -> Unit) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = Color.Black.copy(alpha = 0.34f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.68f)),
-    ) {
-        IconButton(
-            onClick = onOpen,
-            modifier = Modifier.size(44.dp).testTag(DETAILS_SOURCE_SWITCH_HERO_TAG)
-                .semantics { contentDescription = "切换漫画源" },
-        ) { SwapSourceGlyph(color = Color.White) }
+private fun ConfirmSwitchAction(
+    saving: Boolean,
+    onConfirm: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, horizontalArrangement = Arrangement.Start) {
+        Button(
+            onClick = onConfirm,
+            enabled = !saving,
+            shape = RoundedCornerShape(50),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 0.dp),
+            modifier = Modifier.height(44.dp).testTag(DETAILS_SOURCE_SWITCH_CONFIRM_HERO_TAG),
+        ) {
+            if (saving) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            } else {
+                CheckGlyph(color = MaterialTheme.colorScheme.onPrimary, size = 18.dp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("确认换源", style = MaterialTheme.typography.labelLarge)
+            }
+        }
     }
 }
 
@@ -1105,6 +1174,28 @@ private fun SwapSourceGlyph(color: Color) {
         drawLine(color, Offset(right, bottom), Offset(left, bottom), stroke, StrokeCap.Round)
         drawLine(color, Offset(left + head, bottom - head * 0.62f), Offset(left, bottom), stroke, StrokeCap.Round)
         drawLine(color, Offset(left + head, bottom + head * 0.62f), Offset(left, bottom), stroke, StrokeCap.Round)
+    }
+}
+
+/** A tick: the commit on a candidate page, drawn like the glyphs beside it instead of an icon font. */
+@Composable
+private fun CheckGlyph(color: Color, size: androidx.compose.ui.unit.Dp = 22.dp) {
+    Canvas(modifier = Modifier.size(size)) {
+        val stroke = 1.9.dp.toPx()
+        drawLine(
+            color = color,
+            start = Offset(this.size.width * 0.20f, this.size.height * 0.53f),
+            end = Offset(this.size.width * 0.42f, this.size.height * 0.75f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color = color,
+            start = Offset(this.size.width * 0.42f, this.size.height * 0.75f),
+            end = Offset(this.size.width * 0.81f, this.size.height * 0.28f),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round,
+        )
     }
 }
 
@@ -1458,7 +1549,8 @@ internal const val DETAILS_CONTENT_TAG = "details-content"
 internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 internal const val DETAILS_SOURCE_SWITCH_ENTRY_TAG = "details-source-switch-entry"
 internal const val DETAILS_SOURCE_SWITCH_TOOLBAR_TAG = "details-source-switch-toolbar"
-internal const val DETAILS_SOURCE_SWITCH_HERO_TAG = "details-source-switch-hero"
+internal const val DETAILS_SOURCE_SWITCH_CONFIRM_HERO_TAG = "details-source-switch-confirm-hero"
+internal const val DETAILS_SOURCE_SWITCH_CONFIRM_TOOLBAR_TAG = "details-source-switch-confirm-toolbar"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"

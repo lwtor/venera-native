@@ -20,8 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -306,8 +308,10 @@ internal fun AggregateSourceResults(
     onOpenComic: (Comic) -> Unit,
     onOpenSource: ((SourceId) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    listState: LazyListState = rememberLazyListState(),
+    rowState: @Composable (SourceId) -> LazyListState = { rememberLazyListState() },
 ) {
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(state = listState, modifier = modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         items(rows, key = { it.sourceId.value }) { row ->
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -325,7 +329,7 @@ internal fun AggregateSourceResults(
                         }
                     }
                     row.comics.isEmpty() -> Text(stringResource(R.string.no_results), Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall)
-                    else -> LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    else -> LazyRow(state = rowState(row.sourceId), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         items(row.comics, key = { it.key.remoteId.value }) { comic ->
                             ComicCoverCard(
                                 title = comic.title,
@@ -349,6 +353,7 @@ internal fun Results(
     onResultVisible: (Comic) -> Unit = {},
     onResultHidden: (ComicKey) -> Unit = {},
     resultInfo: Map<ComicKey, Comic> = emptyMap(),
+    listState: LazyListState = rememberLazyListState(),
 ) {
     when (val refresh = results.loadState.refresh) {
         is LoadState.Loading -> Centered { CircularProgressIndicator(Modifier.testTag(SEARCH_LOADING_TAG)) }
@@ -359,7 +364,7 @@ internal fun Results(
             }
         }
         else -> if (results.itemCount == 0) Centered { Text(stringResource(R.string.no_results), style = MaterialTheme.typography.titleMedium) }
-        else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        else LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(results.itemCount, key = { index -> results.peek(index)?.key?.remoteId?.value ?: index }) { index ->
                 results[index]?.let { comic ->
                     DisposableEffect(comic.key) {

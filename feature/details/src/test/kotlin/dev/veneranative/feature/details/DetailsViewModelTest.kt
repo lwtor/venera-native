@@ -697,6 +697,85 @@ class DetailsViewModelTest {
         assertTrue(collection.added.isEmpty())
     }
 
+    @Test
+    fun `confirming a switch moves the shelf entry off the source it came from`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val broken = ComicKey(SourceId("broken"), RemoteComicId("c1"))
+        collection.seed(
+            FavoriteItem(
+                ref = ComicRef.Remote(broken),
+                title = "Frieren",
+                folderId = "",
+                folderIds = setOf("reading"),
+                addedAtEpochMillis = 1_000L,
+            ),
+        )
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ConfirmSourceSwitch(broken))
+        advanceUntilIdle()
+
+        assertEquals(listOf(ComicRef.Remote(broken) to ComicRef.Remote(comicKey)), collection.replacedSources)
+        assertTrue(viewModel.state.value.switchConfirmed)
+        // The commit says what it did: the button disappearing is not proof the shelf moved.
+        assertEquals("已换到「s」，收藏条目已跟着迁移。", viewModel.state.value.switchMessage)
+        // The shelf now points here, which is what the page shows once it stops being a candidate.
+        assertTrue(viewModel.state.value.isFavorite)
+    }
+
+    @Test
+    fun `a switch on a comic that was never kept moves nothing and still goes through`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val broken = ComicKey(SourceId("broken"), RemoteComicId("c1"))
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ConfirmSourceSwitch(broken))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.switchConfirmed)
+        assertNull(viewModel.state.value.shelfMessage)
+        assertEquals("已换到「s」。", viewModel.state.value.switchMessage)
+    }
+
+    @Test
+    fun `a shelf that refuses the move keeps the switch retryable`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Success(detail(title = "Frieren"))
+        val broken = ComicKey(SourceId("broken"), RemoteComicId("c1"))
+        collection.seed(
+            FavoriteItem(
+                ref = ComicRef.Remote(broken),
+                title = "Frieren",
+                folderId = "",
+                folderIds = setOf("reading"),
+                addedAtEpochMillis = 1_000L,
+            ),
+        )
+        collection.replaceError = IllegalStateException("fixture")
+        val viewModel = DetailsViewModel(catalog, comicKey, collection)
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.ConfirmSourceSwitch(broken))
+        advanceUntilIdle()
+
+        // Not confirmed: leaving now would strand the shelf on the source being abandoned with
+        // nothing on screen saying so.
+        assertFalse(viewModel.state.value.switchConfirmed)
+        assertEquals("无法把收藏迁移到新来源，请重试。", viewModel.state.value.shelfMessage)
+
+        collection.replaceError = null
+        viewModel.onAction(DetailsAction.ConfirmSourceSwitch(broken))
+        advanceUntilIdle()
+
+        assertTrue(viewModel.state.value.switchConfirmed)
+        assertNull(viewModel.state.value.shelfMessage)
+        assertEquals("已换到「s」，收藏条目已跟着迁移。", viewModel.state.value.switchMessage)
+    }
+
     private fun detail(title: String, grouped: Boolean = false) = ComicDetail(
         comic = Comic(comicKey, title = title),
         chapters = if (grouped) {

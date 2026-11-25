@@ -35,10 +35,11 @@ import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.backDestination
 import dev.veneranative.core.navigation.decodeAppRoute
-import dev.veneranative.core.navigation.openedBySourceSwitch
 import dev.veneranative.core.navigation.readerDetailsDestination
-import dev.veneranative.core.navigation.sourceSwitchDestination
 import dev.veneranative.core.navigation.encode
+import dev.veneranative.core.navigation.sourceSwitchCommit
+import dev.veneranative.core.navigation.sourceSwitchDestination
+import dev.veneranative.core.navigation.sourceSwitchOrigin
 import dev.veneranative.data.collection.CollectionRepository
 import dev.veneranative.data.comic.DefaultComicCatalog
 import dev.veneranative.data.download.DownloadRepository
@@ -382,7 +383,10 @@ private fun AppNavHost(
                         onSwitchSource = { title ->
                             onRouteChange(sourceSwitchDestination(current, title))
                         },
-                        enteredBySourceSwitch = current.openedBySourceSwitch(),
+                        switchOrigin = current.sourceSwitchOrigin(),
+                        onConfirmSourceSwitch = {
+                            sourceSwitchCommit(current)?.let(onRouteChange)
+                        },
                         onBack = onBack,
                     )
 
@@ -390,12 +394,6 @@ private fun AppNavHost(
                         catalog = catalog,
                         comicKey = current.comicKey,
                         title = current.title,
-                        onMoveShelfEntry = { from, to ->
-                            collectionRepository?.replaceSource(
-                                dev.veneranative.core.model.ComicRef.Remote(from),
-                                dev.veneranative.core.model.ComicRef.Remote(to),
-                            )
-                        },
                         onOpenComic = { key, title ->
                             onRouteChange(AppRoute.ComicDetails(key, title, backTo = current))
                         },

@@ -24,12 +24,14 @@ import dev.veneranative.data.settings.ScreenPreferenceRepository
  * exist for the first moments of the process; until it arrives the comic is readable but cannot be
  * kept, which is better than a screen that waits.
  *
- * [enteredBySourceSwitch] is true when this page was opened from another source's candidates. Such a
- * page exists to compare sources, so it shows the switch action in place of the shelf action instead
- * of offering both.
- *
  * [onSwitchSource] leaves through the title the page ended up showing, which is what a search needs
  * when the route's own hint is missing or the source named the work differently.
+ *
+ * [switchOrigin] is the source a switch started from, and it is what makes this page a candidate:
+ * the page offers the commit that settles the switch and nothing else, so the shelf action and the
+ * way back into a switch are not beside it. Confirming hands the settled page to
+ * [onConfirmSourceSwitch], which drops the switch chain so the page stops being a stop on the way to
+ * somewhere else.
  */
 @Composable
 fun DetailsRoute(
@@ -47,7 +49,8 @@ fun DetailsRoute(
     onOpenDownloads: () -> Unit = {},
     onOpenRelatedWorks: (String, TagNavigation) -> Unit = { _, _ -> },
     onSwitchSource: (String?) -> Unit = {},
-    enteredBySourceSwitch: Boolean = false,
+    switchOrigin: ComicKey? = null,
+    onConfirmSourceSwitch: () -> Unit = {},
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences, title)
@@ -58,6 +61,11 @@ fun DetailsRoute(
             viewModel.onAction(DetailsAction.TagNavigationConsumed)
             onOpenRelatedWorks(navigation.tag, navigation.target)
         }
+    }
+    androidx.compose.runtime.LaunchedEffect(state.switchConfirmed) {
+        if (!state.switchConfirmed) return@LaunchedEffect
+        viewModel.onAction(DetailsAction.SourceSwitchConfirmed)
+        onConfirmSourceSwitch()
     }
     androidx.compose.runtime.LaunchedEffect(comicKey) {
         viewModel.onScreenEntered()
@@ -72,6 +80,9 @@ fun DetailsRoute(
         if (state.downloadQueueVersion > 0) onScheduleDownloads()
     }
 
+    // The commit's presence is what makes this a candidate page: there is no second flag that could
+    // disagree with it.
+    val origin = switchOrigin
     DetailsScreen(
         state = state,
         onAction = viewModel::onAction,
@@ -79,8 +90,12 @@ fun DetailsRoute(
         onBack = onBack,
         onOpenDownloads = onOpenDownloads,
         modifier = modifier,
-        enteredBySourceSwitch = enteredBySourceSwitch,
         onSwitchSource = { onSwitchSource(state.title.takeIf(String::isNotBlank)) },
+        onConfirmSourceSwitch = if (origin == null) {
+            null
+        } else {
+            { viewModel.onAction(DetailsAction.ConfirmSourceSwitch(origin)) }
+        },
     )
 }
 

@@ -37,7 +37,6 @@ import org.junit.Test
 class SourceSwitchViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val catalog = FakeCatalog()
-    private val moved = mutableListOf<Pair<ComicKey, ComicKey>>()
     private val comic = ComicKey(SourceId("broken"), RemoteComicId("42"))
     private val found = Comic(ComicKey(SourceId("other"), RemoteComicId("7")), title = "Frieren")
 
@@ -48,7 +47,7 @@ class SourceSwitchViewModelTest {
         catalog.installed = listOf(source("broken"), source("other"), source("third"))
         catalog.results = mapOf(SourceId("other") to listOf(found))
 
-        val model = SourceSwitchViewModel(catalog, comic, "Frieren", ::moveShelf)
+        val model = SourceSwitchViewModel(catalog, comic, "Frieren")
 
         advanceUntilIdle()
         assertEquals("Frieren", model.state.value.keyword)
@@ -62,7 +61,7 @@ class SourceSwitchViewModelTest {
     @Test fun `a page opened without a title waits for one instead of searching everything`() = runTest(dispatcher) {
         catalog.installed = listOf(source("broken"), source("other"))
 
-        val model = SourceSwitchViewModel(catalog, comic, null, ::moveShelf)
+        val model = SourceSwitchViewModel(catalog, comic, null)
         advanceUntilIdle()
 
         assertEquals(emptyList<SearchRequest>(), catalog.searchRequests)
@@ -72,7 +71,7 @@ class SourceSwitchViewModelTest {
 
     @Test fun `a wrong seed can be corrected and searched again`() = runTest(dispatcher) {
         catalog.installed = listOf(source("broken"), source("other"))
-        val model = SourceSwitchViewModel(catalog, comic, "葬送的芙莉", ::moveShelf)
+        val model = SourceSwitchViewModel(catalog, comic, "葬送的芙莉")
         advanceUntilIdle()
 
         model.onKeywordChanged("Frieren")
@@ -82,57 +81,54 @@ class SourceSwitchViewModelTest {
         assertEquals("Frieren", catalog.searchRequests.last().keyword)
     }
 
-    @Test fun `choosing a result moves the shelf entry and hands back the pick`() = runTest(dispatcher) {
+    @Test fun `coming back to the results finds the list where it was left`() = runTest(dispatcher) {
         catalog.installed = listOf(source("broken"), source("other"))
-        val model = SourceSwitchViewModel(catalog, comic, "Frieren", ::moveShelf)
+        val model = SourceSwitchViewModel(catalog, comic, "Frieren")
         advanceUntilIdle()
 
-        model.choose(found)
-        advanceUntilIdle()
+        model.keepScrollSlot(OVERVIEW_SCROLL_SLOT, index = 3, offset = 128)
+        model.keepScrollSlot(rowScrollSlot(SourceId("other")), index = 5, offset = 40)
 
-        assertEquals(listOf(comic to found.key), moved)
-        assertEquals(SourceSwitchChoice(found.key, "Frieren"), model.state.value.chosen)
+        // A rebuilt page asks for the same slots again; the row of one source must not move with
+        // another's, or the card the user was about to tap would not be there when they return.
+        assertEquals(ScrollSlot(3, 128), model.scrollSlot(OVERVIEW_SCROLL_SLOT))
+        assertEquals(ScrollSlot(5, 40), model.scrollSlot(rowScrollSlot(SourceId("other"))))
+        assertEquals(ScrollSlot(), model.scrollSlot(rowScrollSlot(SourceId("broken"))))
     }
 
-    @Test fun `picking again moves the entry from the last pick rather than the source it started on`() = runTest(dispatcher) {
-        catalog.installed = listOf(source("broken"), source("other"), source("third"))
-        val model = SourceSwitchViewModel(catalog, comic, "Frieren", ::moveShelf)
+    @Test fun `searching again starts at the top because the results are new`() = runTest(dispatcher) {
+        catalog.installed = listOf(source("broken"), source("other"))
+        val model = SourceSwitchViewModel(catalog, comic, "Frieren")
+        advanceUntilIdle()
+        model.keepScrollSlot(OVERVIEW_SCROLL_SLOT, index = 4, offset = 90)
+        model.keepScrollSlot(rowScrollSlot(SourceId("other")), index = 2, offset = 10)
+        model.openSource(SourceId("other"))
+        model.keepScrollSlot(SOURCE_SCROLL_SLOT_PREFIX + "other", index = 6, offset = 0)
+
+        model.onKeywordChanged("Frieren 2")
+        model.search()
         advanceUntilIdle()
 
-        model.choose(found)
-        advanceUntilIdle()
-        model.choiceConsumed()
-        val second = Comic(ComicKey(SourceId("third"), RemoteComicId("9")), title = "Frieren")
-        model.choose(second)
-        advanceUntilIdle()
-
-        assertEquals(listOf(comic to found.key, found.key to second.key), moved)
+        assertEquals(ScrollSlot(), model.scrollSlot(OVERVIEW_SCROLL_SLOT))
+        assertEquals(ScrollSlot(), model.scrollSlot(rowScrollSlot(SourceId("other"))))
+        assertEquals(ScrollSlot(), model.scrollSlot(SOURCE_SCROLL_SLOT_PREFIX + "other"))
     }
 
-    @Test fun `a shelf that refuses the move keeps the page and says so`() = runTest(dispatcher) {
+    @Test fun `reopening a source starts its full list at the top`() = runTest(dispatcher) {
         catalog.installed = listOf(source("broken"), source("other"))
-        var refuse = true
-        val model = SourceSwitchViewModel(catalog, comic, "Frieren", moveShelfEntry = { from, to ->
-            moved += from to to
-            if (refuse) throw IllegalStateException("fixture") else Unit
-        })
+        val model = SourceSwitchViewModel(catalog, comic, "Frieren")
+        advanceUntilIdle()
+        model.keepScrollSlot(SOURCE_SCROLL_SLOT_PREFIX + "other", index = 7, offset = 12)
+
+        model.openSource(SourceId("other"))
         advanceUntilIdle()
 
-        model.choose(found)
-        advanceUntilIdle()
-
-        assertNull(model.state.value.chosen)
-        assertEquals("无法把收藏迁移到新来源，请重试。", model.state.value.message)
-
-        refuse = false
-        model.choose(found)
-        advanceUntilIdle()
-        assertEquals(SourceSwitchChoice(found.key, "Frieren"), model.state.value.chosen)
+        assertEquals(ScrollSlot(), model.scrollSlot(SOURCE_SCROLL_SLOT_PREFIX + "other"))
     }
 
     @Test fun `opening one source lists its own results without touching the others`() = runTest(dispatcher) {
         catalog.installed = listOf(source("broken"), source("other"))
-        val model = SourceSwitchViewModel(catalog, comic, "Frieren", ::moveShelf)
+        val model = SourceSwitchViewModel(catalog, comic, "Frieren")
         advanceUntilIdle()
 
         model.openSource(SourceId("other"))
@@ -144,10 +140,6 @@ class SourceSwitchViewModelTest {
         assertEquals(1, model.rows.value.size)
         model.closeSource()
         assertNull(model.state.value.openedSourceId)
-    }
-
-    private suspend fun moveShelf(from: ComicKey, to: ComicKey) {
-        moved += from to to
     }
 
     private fun source(id: String) = InstalledSource(

@@ -59,6 +59,15 @@ data class DetailsUiState(
     val hasShelf: Boolean = false,
     /** Product copy when keeping or removing the comic failed; never a lower layer's wording. */
     val shelfMessage: String? = null,
+    /** True while the shelf entry is being moved onto this page's source. */
+    val switchConfirming: Boolean = false,
+    /**
+     * Set once the switch this page was opened for has been committed. The assembly layer reads it
+     * to replace the page with itself off the switch chain, then clears it by leaving.
+     */
+    val switchConfirmed: Boolean = false,
+    /** What the commit did, said out loud: the button vanishing is not proof enough on its own. */
+    val switchMessage: String? = null,
     val downloadMessage: String? = null,
     val downloadQueueVersion: Int = 0,
     /** Product copy for the last failure; never a lower layer's wording. */
