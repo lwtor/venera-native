@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
-import androidx.paging.PagingSource
 import androidx.paging.cachedIn
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.SourceCapability
@@ -13,12 +12,11 @@ import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.SourceFilter
 import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.ComicCatalog
-import dev.veneranative.data.comic.PageKey
-import dev.veneranative.data.comic.SourceLoadException
 import dev.veneranative.data.search.SearchHistoryRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
 import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
+import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,11 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -345,50 +338,17 @@ class SearchViewModel(
 
     private fun searchAll(keyword: String) {
         aggregateJob?.cancel()
-        val sources = _state.value.sources
-        _aggregateResults.value = sources.map { AggregateSearchResult(it.sourceId, it.name) }
-        aggregateJob = viewModelScope.launch {
-            val semaphore = Semaphore(AGGREGATE_CONCURRENCY)
-            coroutineScope {
-                sources.map { source ->
-                    async {
-                        semaphore.withPermit {
-                            val row = runCatching {
-                                val pagingSource = catalog.search(SearchRequest(sourceId = source.sourceId, keyword = keyword, filters = FilterSelection.Empty))
-                                val load = pagingSource.load(
-                                    PagingSource.LoadParams.Refresh(PageKey.Start, AGGREGATE_PREVIEW_SIZE, false),
-                                )
-                                when (load) {
-                                    is PagingSource.LoadResult.Page -> AggregateSearchResult(source.sourceId, source.name, load.data, false, false)
-                                    is PagingSource.LoadResult.Error -> throw load.throwable
-                                    is PagingSource.LoadResult.Invalid -> AggregateSearchResult(source.sourceId, source.name, emptyList(), false, false)
-                                }
-                            }.getOrElse { failure ->
-                                if (failure is kotlinx.coroutines.CancellationException) throw failure
-                                val detail = ((failure as? SourceLoadException)?.error?.message ?: failure.message)
-                                    ?.filterNot(Char::isISOControl)
-                                    ?.take(180)
-                                AggregateSearchResult(
-                                    source.sourceId,
-                                    source.name,
-                                    emptyList(),
-                                    false,
-                                    true,
-                                    detail,
-                                )
-                            }
-                            _aggregateResults.update { rows -> rows.map { if (it.sourceId == source.sourceId) row else it } }
-                        }
-                    }
-                }.awaitAll()
-            }
-        }
+        aggregateJob = searchEverySource(
+            scope = viewModelScope,
+            catalog = catalog,
+            sources = _state.value.sources,
+            keyword = keyword,
+            rows = _aggregateResults,
+        )
     }
 
     private companion object {
         const val DEFAULT_PAGE_SIZE = 20
-        const val AGGREGATE_PREVIEW_SIZE = 8
-        const val AGGREGATE_CONCURRENCY = 3
         const val PREF_SOURCE = "search.source"
         const val PREF_AGGREGATE = "search.aggregate"
         const val PREF_FILTERS = "search.filters"

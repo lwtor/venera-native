@@ -24,6 +24,7 @@ fun backDestination(
     is AppRoute.Explore, is AppRoute.Search -> AppRoute.Home
     is AppRoute.AuthorWorks -> AppRoute.ComicDetails(route.origin, backTo = route.returnOrigin)
     is AppRoute.ComicDetails -> route.backTo ?: AppRoute.Home
+    is AppRoute.SourceSwitch -> route.backTo ?: AppRoute.Home
     is AppRoute.Reader -> readerOrigin ?: when (val chapter = route.chapter) {
         is ChapterRef.Local -> AppRoute.Library
         is ChapterRef.Remote -> AppRoute.ComicDetails(chapter.key.comicKey)

@@ -60,6 +60,7 @@ import dev.veneranative.feature.profile.InstalledAppInfo
 import dev.veneranative.feature.profile.ProfileRoute
 import dev.veneranative.feature.reader.ReaderRoute
 import dev.veneranative.feature.search.SearchRoute
+import dev.veneranative.feature.search.SourceSwitchRoute
 import dev.veneranative.feature.sources.SourcesRoute
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
@@ -378,11 +379,26 @@ private fun AppNavHost(
                         onOpenRelatedWorks = { author, target ->
                             onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, current.backTo ?: AppRoute.Home))
                         },
-                        onOpenOtherSource = { key, title ->
-                            onRouteChange(sourceSwitchDestination(current, key, title))
+                        onSwitchSource = { title ->
+                            onRouteChange(sourceSwitchDestination(current, title))
                         },
                         enteredBySourceSwitch = current.openedBySourceSwitch(),
-                        showSourceSwitch = current.showSourceSwitch,
+                        onBack = onBack,
+                    )
+
+                    is AppRoute.SourceSwitch -> SourceSwitchRoute(
+                        catalog = catalog,
+                        comicKey = current.comicKey,
+                        title = current.title,
+                        onMoveShelfEntry = { from, to ->
+                            collectionRepository?.replaceSource(
+                                dev.veneranative.core.model.ComicRef.Remote(from),
+                                dev.veneranative.core.model.ComicRef.Remote(to),
+                            )
+                        },
+                        onOpenComic = { key, title ->
+                            onRouteChange(AppRoute.ComicDetails(key, title, backTo = current))
+                        },
                         onBack = onBack,
                     )
 

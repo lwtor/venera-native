@@ -56,6 +56,7 @@ import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.SourceFilter
+import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.comic.SourceLoadException
 import dev.veneranative.source.api.SourceRuntimeError
 
@@ -153,9 +154,17 @@ fun SearchResultScreen(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (showingSourceResults) Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden, resultInfo)
-            else if (state.aggregateSearch) AggregateResults(aggregateResults, onAction, onOpenComic)
-            else Results(results, onOpenComic, resultTags, onResultVisible, onResultHidden, resultInfo)
+            if (showingSourceResults) {
+                Results(results, onOpenComic = { onOpenComic(it.key) }, resultTags, onResultVisible, onResultHidden, resultInfo)
+            } else if (state.aggregateSearch) {
+                AggregateSourceResults(
+                    rows = aggregateResults,
+                    onOpenComic = { onOpenComic(it.key) },
+                    onOpenSource = { onAction(SearchAction.AggregatedSourceSelected(it)) },
+                )
+            } else {
+                Results(results, onOpenComic = { onOpenComic(it.key) }, resultTags, onResultVisible, onResultHidden, resultInfo)
+            }
         }
     }
 }
@@ -285,14 +294,27 @@ private fun SearchHistory(state: SearchUiState, onAction: (SearchAction) -> Unit
     }
 }
 
+/**
+ * One row per source: its name, an optional way into its full list, and a horizontal preview.
+ *
+ * Shared with the source switcher so both screens show the same thing: a switch is a search, and a
+ * second, drifting copy of this list was exactly what made the switcher feel like another product.
+ */
 @Composable
-private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (SearchAction) -> Unit, onOpenComic: (ComicKey) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+internal fun AggregateSourceResults(
+    rows: List<AggregateSearchResult>,
+    onOpenComic: (Comic) -> Unit,
+    onOpenSource: ((SourceId) -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
         items(rows, key = { it.sourceId.value }) { row ->
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(row.sourceName, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { onAction(SearchAction.AggregatedSourceSelected(row.sourceId)) }) { Text(stringResource(R.string.view_all)) }
+                    if (onOpenSource != null) {
+                        TextButton(onClick = { onOpenSource(row.sourceId) }) { Text(stringResource(R.string.view_all)) }
+                    }
                 }
                 when {
                     row.isLoading -> LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
@@ -309,7 +331,7 @@ private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (Searc
                                 title = comic.title,
                                 request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "comic-cover") },
                                 chapterLabel = "章节未知", sourceLabel = row.sourceName,
-                                onClick = { onOpenComic(comic.key) }, modifier = Modifier.width(128.dp),
+                                onClick = { onOpenComic(comic) }, modifier = Modifier.width(128.dp),
                             )
                         }
                     }
@@ -321,10 +343,12 @@ private fun AggregateResults(rows: List<AggregateSearchResult>, onAction: (Searc
 }
 
 @Composable
-private fun Results(
-    results: LazyPagingItems<Comic>, onOpenComic: (ComicKey) -> Unit,
-    resultTags: Map<ComicKey, List<String>>, onResultVisible: (Comic) -> Unit, onResultHidden: (ComicKey) -> Unit,
-    resultInfo: Map<ComicKey, Comic>,
+internal fun Results(
+    results: LazyPagingItems<Comic>, onOpenComic: (Comic) -> Unit,
+    resultTags: Map<ComicKey, List<String>> = emptyMap(),
+    onResultVisible: (Comic) -> Unit = {},
+    onResultHidden: (ComicKey) -> Unit = {},
+    resultInfo: Map<ComicKey, Comic> = emptyMap(),
 ) {
     when (val refresh = results.loadState.refresh) {
         is LoadState.Loading -> Centered { CircularProgressIndicator(Modifier.testTag(SEARCH_LOADING_TAG)) }
@@ -346,7 +370,7 @@ private fun Results(
                     ComicHorizontalCard(
                         title = comic.title,
                         request = comic.coverUrl?.let { ComicImageRequest(it, sourceId = comic.key.sourceId, variant = "search-result") },
-                        onClick = { onOpenComic(comic.key) },
+                        onClick = { onOpenComic(comic) },
                         badge = info.publicationStatus?.let { if (it == dev.veneranative.core.model.ComicPublicationStatus.Completed) "已完结" else "连载中" },
                         badgeColor = if (info.publicationStatus == dev.veneranative.core.model.ComicPublicationStatus.Ongoing)
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.9f) else Color.Black.copy(alpha = 0.72f),

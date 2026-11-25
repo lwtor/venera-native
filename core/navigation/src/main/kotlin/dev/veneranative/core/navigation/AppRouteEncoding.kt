@@ -37,9 +37,11 @@ fun AppRoute.encode(): String = when (this) {
         target.options.joinToString(separator = "", transform = { ":${it.escape()}" })
     is AppRoute.ComicDetails ->
         "comic:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}:${title.escape()}:" +
-            (backTo?.encode()?.escape() ?: "") +
-            // Absent when the page does not re-open the switcher, which keeps older links identical.
-            (if (showSourceSwitch) ":1" else "")
+            (backTo?.encode()?.escape() ?: "")
+
+    is AppRoute.SourceSwitch ->
+        "switch:${comicKey.sourceId.value.escape()}:${comicKey.remoteId.value.escape()}:${title.escape()}:" +
+            (backTo?.encode()?.escape() ?: "")
 
     is AppRoute.Reader -> when (val ref = chapter) {
         is ChapterRef.Remote -> "reader:${ref.key.comicKey.sourceId.value.escape()}:" +
@@ -91,7 +93,20 @@ fun decodeAppRoute(encoded: String): AppRoute? {
                     parts.getOrNull(3)?.unescapeOrNull(),
                     // Absent in links written before details carried their own back target.
                     parts.getOrNull(4)?.unescapeOrNull()?.let(::decodeAppRoute),
-                    showSourceSwitch = parts.getOrNull(5) == "1",
+                )
+            }
+        }
+
+        "switch" -> {
+            val sourceId = parts.getOrNull(1)?.unescapeOrNull()
+            val comicId = parts.getOrNull(2)?.unescapeOrNull()
+            if (sourceId.isNullOrEmpty() || comicId.isNullOrEmpty()) {
+                null
+            } else {
+                AppRoute.SourceSwitch(
+                    ComicKey(SourceId(sourceId), RemoteComicId(comicId)),
+                    parts.getOrNull(3)?.unescapeOrNull(),
+                    parts.getOrNull(4)?.unescapeOrNull()?.let(::decodeAppRoute),
                 )
             }
         }

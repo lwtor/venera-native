@@ -24,9 +24,12 @@ import dev.veneranative.data.settings.ScreenPreferenceRepository
  * exist for the first moments of the process; until it arrives the comic is readable but cannot be
  * kept, which is better than a screen that waits.
  *
- * [enteredBySourceSwitch] is true when this page sits on top of another source's page for the same
- * comic. Such a page exists to compare sources, so it shows the switch action in place of the shelf
- * action instead of offering both.
+ * [enteredBySourceSwitch] is true when this page was opened from another source's candidates. Such a
+ * page exists to compare sources, so it shows the switch action in place of the shelf action instead
+ * of offering both.
+ *
+ * [onSwitchSource] leaves through the title the page ended up showing, which is what a search needs
+ * when the route's own hint is missing or the source named the work differently.
  */
 @Composable
 fun DetailsRoute(
@@ -43,9 +46,8 @@ fun DetailsRoute(
     screenPreferences: ScreenPreferenceRepository? = null,
     onOpenDownloads: () -> Unit = {},
     onOpenRelatedWorks: (String, TagNavigation) -> Unit = { _, _ -> },
-    onOpenOtherSource: (ComicKey, String?) -> Unit = { _, _ -> },
+    onSwitchSource: (String?) -> Unit = {},
     enteredBySourceSwitch: Boolean = false,
-    showSourceSwitch: Boolean = false,
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences, title)
@@ -57,21 +59,8 @@ fun DetailsRoute(
             onOpenRelatedWorks(navigation.tag, navigation.target)
         }
     }
-    // Switching sources stacks the comic's page for the new source on top of this one, so back
-    // returns here rather than to the list this page came from.
-    androidx.compose.runtime.LaunchedEffect(state.sourceSwitchTarget) {
-        val target = state.sourceSwitchTarget ?: return@LaunchedEffect
-        val hint = state.title.takeIf { it.isNotBlank() }
-        viewModel.onAction(DetailsAction.SourceSwitchTargetConsumed)
-        onOpenOtherSource(target, hint)
-    }
     androidx.compose.runtime.LaunchedEffect(comicKey) {
         viewModel.onScreenEntered()
-    }
-    // Coming back after switching source has to land on the results that switch started from, not on
-    // the comic page they cover. The route asks for it because this screen is rebuilt on the way back.
-    androidx.compose.runtime.LaunchedEffect(comicKey, showSourceSwitch) {
-        if (showSourceSwitch) viewModel.onAction(DetailsAction.RestoreSourceSwitch)
     }
     androidx.compose.runtime.LaunchedEffect(screenPreferences) {
         screenPreferences?.let(viewModel::attachScreenPreferences)
@@ -91,6 +80,7 @@ fun DetailsRoute(
         onOpenDownloads = onOpenDownloads,
         modifier = modifier,
         enteredBySourceSwitch = enteredBySourceSwitch,
+        onSwitchSource = { onSwitchSource(state.title.takeIf(String::isNotBlank)) },
     )
 }
 

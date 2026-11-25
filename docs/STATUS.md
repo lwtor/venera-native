@@ -2,6 +2,31 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-23 换源重做成独立搜索页（DONE）
+
+- 用户判定前三版（2.6.6 / 2.6.12 / 2.6.13）都不可用：「都是类似搜索的逻辑，但是跟搜索的体验差太多了」，
+  要求把换源逻辑重做。根因不是修细节，而是形态错了：换源一直是详情页里的一个 Dialog，
+  自己维护查询、结果与选中态，与搜索页是两套实现，自然越改越不像。
+- 形态：新增目的地 `AppRoute.SourceSwitch(comicKey, title, backTo)`，换源成为真正的页面
+  （`:feature:search` 的 `SourceSwitchRoute`），返回链自然变成「详情 → 换源结果 → 新详情 → 新换源结果…」，
+  每一步 back 都回到用户刚才站着的那一页，不再靠复制出来的面板状态。
+- 与搜索同源：`searchEverySource()` 从 `SearchViewModel` 抽出为共享实现，聚合搜索与换源共用同一份
+  并发/预览/逐源错误隔离逻辑；`AggregateSourceResults` 从 `SearchScreen` 抽出为共享组件，
+  两个页面渲染的是同一个列表（来源标题 + 横向 `ComicCoverCard` 流 + 「查看全部」）。
+  换源页因此天然具备搜索的：可编辑标题（种子是作品名）、逐源进度、单源失败不遮挡其他源、
+  点「查看全部」进该源分页列表。
+- 交互：点选作品即改绑书架条目并打开它的详情页（仍需一次点击决定，不做选中态）；改绑失败留在本页并提示；
+  连续改选时从「上一次选中」的来源改绑，而不是从最初那个已不在书架上的来源。
+  书架改绑通过 `onMoveShelfEntry` 回调传入，`:feature:search` 不依赖 `:data:collection`。
+- 详情页瘦身：删除 `SourceSwitchPanel`、`SourceSwitchRow`、7 个换源 Action、ViewModel 里的换源搜索与改绑
+  实现、`:feature:details` 的 paging 主源码依赖；详情只保留「跳转换源页」一个回调。
+  换源进入的详情页仍只显示换源入口、不显示收藏（判定改为 `backTo is AppRoute.SourceSwitch`）。
+- 验证：`:core:navigation:testDebugUnitTest` 23 项（新增 switch 路由往返与旧链接、返回链、判定）；
+  `:feature:search:testDebugUnitTest` 29 项（新增 `SourceSwitchViewModelTest` 7 项：只在其他源搜索、
+  无标题不搜、改标题重搜、改绑并回传、连续改选从上次选中改绑、改绑失败可重试、单源列表不干扰分组）；
+  `:feature:details:testDebugUnitTest` 通过（换源用例随实现删除）；`:app:assembleDebug` BUILD SUCCESSFUL；
+  `git diff --check` PASS。版本 2.7.0 / 2007000。
+
 ## 当前任务：U-22 换源返回落到候选结果（DONE）
 
 - 用户第二轮反馈：2.6.12 让返回落到「上一层详情页」，但换源这一步的上一层是**换源候选列表**，

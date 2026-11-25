@@ -48,29 +48,4 @@ sealed interface DetailsAction {
     data class NewFavoriteFolderDraftChanged(val draft: String) : DetailsAction
     data object CreateFavoriteFolder : DetailsAction
     data object DismissNewFavoriteFolder : DetailsAction
-
-    /** Opens the panel that looks for this title on the other installed sources. */
-    data object OpenSourceSwitch : DetailsAction
-
-    /**
-     * Opens the panel again on a page the user came back to after switching source, keeping the
-     * results it already has. Searches again only when nothing survived, as after process death.
-     */
-    data object RestoreSourceSwitch : DetailsAction
-
-    data object CloseSourceSwitch : DetailsAction
-
-    data class SourceSwitchQueryChanged(val query: String) : DetailsAction
-
-    /** Starts or restarts the per-source search with the current query. */
-    data object SearchOtherSources : DetailsAction
-
-    /**
-     * Picks one search result: rebinds the shelf entry if there is one, then asks the assembly layer
-     * to open that comic. There is no separate confirm step — the panel lists nothing but candidates,
-     * and tapping one is the choice.
-     */
-    data class SourceSwitchResultChosen(val comic: dev.veneranative.core.model.Comic) : DetailsAction
-
-    data object SourceSwitchTargetConsumed : DetailsAction
 }

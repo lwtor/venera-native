@@ -45,7 +45,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -69,7 +68,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -105,13 +103,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.window.Dialog
-import dev.veneranative.core.designsystem.component.ComicCoverCard
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
-import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicComment
 import dev.veneranative.core.model.SourceId
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -135,6 +130,7 @@ fun DetailsScreen(
     modifier: Modifier = Modifier,
     onOpenDownloads: () -> Unit = {},
     enteredBySourceSwitch: Boolean = false,
+    onSwitchSource: () -> Unit = {},
 ) {
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -179,7 +175,7 @@ fun DetailsScreen(
     // instead of sitting next to it.
     val showFavorite = state.hasShelf && !enteredBySourceSwitch
     val heroAction: (@Composable () -> Unit)? = when {
-        enteredBySourceSwitch -> ({ SwitchSourceAction { onAction(DetailsAction.OpenSourceSwitch) } })
+        enteredBySourceSwitch -> ({ SwitchSourceAction(onSwitchSource) })
         showFavorite -> ({ FavoriteAction(state.isFavorite) { onAction(DetailsAction.ToggleFavorite) } })
         else -> null
     }
@@ -332,7 +328,7 @@ fun DetailsScreen(
                             textAlign = TextAlign.Center,
                         )
                         Button(
-                            onClick = { onAction(DetailsAction.OpenSourceSwitch) },
+                            onClick = onSwitchSource,
                             modifier = Modifier.testTag(DETAILS_SOURCE_SWITCH_ENTRY_TAG),
                         ) { Text("切换其他源") }
                     }
@@ -352,7 +348,7 @@ fun DetailsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Button(onClick = { onAction(DetailsAction.Retry) }) { Text("重试") }
                             OutlinedButton(
-                                onClick = { onAction(DetailsAction.OpenSourceSwitch) },
+                                onClick = onSwitchSource,
                                 modifier = Modifier.testTag(DETAILS_SOURCE_SWITCH_ENTRY_TAG),
                             ) { Text("切换其他源") }
                         }
@@ -368,7 +364,7 @@ fun DetailsScreen(
                 isFavorite = state.isFavorite,
                 showFavorite = showFavorite,
                 onToggleFavorite = { onAction(DetailsAction.ToggleFavorite) },
-                onSwitchSource = { onAction(DetailsAction.OpenSourceSwitch) },
+                onSwitchSource = onSwitchSource,
                 enteredBySourceSwitch = enteredBySourceSwitch,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
@@ -459,10 +455,6 @@ fun DetailsScreen(
                 ) { Text(if (!removing && state.isFavorite) "取消收藏" else "返回") }
             },
         )
-    }
-
-    if (state.sourceSwitchOpen) {
-        SourceSwitchPanel(state = state, onAction = onAction)
     }
 }
 
@@ -1090,224 +1082,6 @@ private fun SourcePageButton(url: String) {
 }
 
 /**
- * Full-screen panel that looks for the same title on every other installed source.
- *
- * One section per source rather than one flat result list: the user is choosing a *source* as much
- * as a comic, and a source that answers slowly or breaks must not hide the ones that already did.
- * Picking a row only marks the candidate; the action that actually switches sources sits in the top
- * bar, so a mis-tap costs nothing until it is confirmed there.
- */
-@Composable
-private fun SourceSwitchPanel(
-    state: DetailsUiState,
-    onAction: (DetailsAction) -> Unit,
-) {
-    Dialog(
-        onDismissRequest = { onAction(DetailsAction.CloseSourceSwitch) },
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.surface,
-        ) {
-            Column(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(56.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = { onAction(DetailsAction.CloseSourceSwitch) },
-                        modifier = Modifier.padding(start = 4.dp).semantics { contentDescription = "关闭" },
-                    ) { CloseGlyph() }
-                    Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                        Text(
-                            text = "切换漫画源",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = state.sourceName?.let { "当前来源 · $it" } ?: "当前来源不可用",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                }
-                androidx.compose.material3.HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
-                )
-
-                OutlinedTextField(
-                    value = state.sourceSwitchQuery,
-                    onValueChange = { onAction(DetailsAction.SourceSwitchQueryChanged(it)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 12.dp)
-                        .testTag(DETAILS_SOURCE_SWITCH_QUERY_TAG),
-                    singleLine = true,
-                    label = { Text("漫画标题") },
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        imeAction = androidx.compose.ui.text.input.ImeAction.Search,
-                    ),
-                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                        onSearch = { onAction(DetailsAction.SearchOtherSources) },
-                    ),
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { onAction(DetailsAction.SearchOtherSources) },
-                            modifier = Modifier.semantics { contentDescription = "搜索其他漫画源" },
-                        ) { SearchGlyph() }
-                    },
-                )
-
-                if (state.sourceSwitchHasResults) {
-                    Text(
-                        text = "点选任意作品即切换到该来源，并打开它的详情页。",
-                        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                state.sourceSwitchMessage?.takeIf { state.sourceSwitchRows.isNotEmpty() }?.let { message ->
-                    Text(
-                        text = message,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-
-                if (state.sourceSwitchRows.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = state.sourceSwitchMessage ?: if (state.sourceSwitchQuery.isBlank()) {
-                                "输入标题后搜索其他漫画源。"
-                            } else {
-                                "没有其他可用的漫画源。"
-                            },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                    return@Column
-                }
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                ) {
-                    state.sourceSwitchRows.forEach { row ->
-                        item(key = "source:${row.sourceId.value}") {
-                            SourceSwitchRowSection(
-                                row = row,
-                                onChoose = { onAction(DetailsAction.SourceSwitchResultChosen(it)) },
-                            )
-                        }
-                    }
-                    if (state.sourceSwitchFinished && !state.sourceSwitchHasResults) {
-                        item(key = "no-results") {
-                            Text(
-                                text = "没有在其他来源找到同名作品，可以修改标题再试。",
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 20.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * One source's candidates, laid out exactly like an aggregate search result.
- *
- * The panel shows comics, so it uses the search screen's own arrangement rather than one of its
- * own: a source name with how its search went, then a horizontal run of cover cards. It replaced a
- * hand-built list row that read as a settings entry and, being a 120dp strip on a surface-coloured
- * panel, still looked like the plain list it was meant to replace.
- */
-@Composable
-private fun SourceSwitchRowSection(
-    row: SourceSwitchRow,
-    onChoose: (Comic) -> Unit,
-) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = row.sourceName,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = when {
-                    row.isLoading -> "搜索中"
-                    row.hasError -> "搜索失败"
-                    row.comics.isEmpty() -> "无同名结果"
-                    else -> "${row.comics.size} 部"
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = if (row.hasError) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                maxLines = 1,
-            )
-        }
-        when {
-            row.isLoading -> LinearProgressIndicator(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-            row.hasError -> Text(
-                text = "该来源搜索失败，可继续查看其他来源。",
-                Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-            row.comics.isEmpty() -> Text(
-                text = "该来源没有同名作品。",
-                Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            else -> LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(row.comics, key = { it.key.remoteId.value }) { comic ->
-                    ComicCoverCard(
-                        title = comic.title,
-                        request = comic.coverUrl?.let { cover ->
-                            // Same variant as aggregate search, so both share one cache entry.
-                            ComicImageRequest(url = cover, sourceId = comic.key.sourceId, variant = COMIC_COVER_VARIANT)
-                        },
-                        chapterLabel = comic.authors.firstOrNull()?.takeIf { it.isNotBlank() } ?: "章节未知",
-                        sourceLabel = row.sourceName,
-                        onClick = { onChoose(comic) },
-                        modifier = Modifier.width(128.dp),
-                    )
-                }
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-    }
-}
-
-/**
  * Two arrows pointing opposite ways: move this comic to another source.
  *
  * Drawn here like the screen's other glyphs so the icon set keeps one weight and one join style.
@@ -1683,7 +1457,6 @@ internal const val DETAILS_LOADING_TAG = "details-loading"
 internal const val DETAILS_CONTENT_TAG = "details-content"
 internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 internal const val DETAILS_SOURCE_SWITCH_ENTRY_TAG = "details-source-switch-entry"
-internal const val DETAILS_SOURCE_SWITCH_QUERY_TAG = "details-source-switch-query"
 internal const val DETAILS_SOURCE_SWITCH_TOOLBAR_TAG = "details-source-switch-toolbar"
 internal const val DETAILS_SOURCE_SWITCH_HERO_TAG = "details-source-switch-hero"
 

@@ -78,7 +78,7 @@ S4-10C3：data:collection 通过 CollectionRecordStore 读取独立漫画资料/
 | `:feature:backup` | GitHub 数据备份页面：选择快照类别、密码输入、手动备份与确认后合并恢复；账号授权移到我的页，Compose 仅发出 MVI Action，不直接访问网络/Room | Design System、`:core:backup`、`:data:backup`、Lifecycle |
 | `:feature:profile` | 我的根页、GitHub 账号授权与资料、最近成功同步时间、漫画源管理与关于页设置入口；通过导航回调进入来源管理、备份和关于页，不依赖其他 Feature；关于页含检查更新入口（ADR-0017） | Design System、`:core:image`、`:data:backup`、`:data:update`、Lifecycle |
 | `:feature:explore` | 单源探索：来源与探索页选择、该页的分页内容（列表 / 分区 / 混合三种形状） | Design System、`:data:comic`、`:core:image` |
-| `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
+| `:feature:search` | 单源搜索和聚合搜索：来源选择、来源能力声明的动态筛选、分页结果、按来源分组预览和隔离错误状态；带可恢复的搜索历史并保存最近来源/聚合/筛选选择。换源搜索复用同一套聚合逻辑与结果列表，区别只是关键词由作品标题种子化、点选结果时把书架条目改绑到新来源 | Design System、`:data:comic`、`:data:search`、`:data:settings`、`:core:image` |
 | `:feature:reader` | 阅读器：使用统一 `ChapterRef` 载入页、方向切换、页码、预取及渲染进度；Compose 内管理每页缩放/平移手势状态 | Design System、`:core:model`、`:core:image` |
 | `:feature:sources` | 来源管理：目录与已安装来源管理；可在不安装来源的情况下搜索漫画目录，逐来源展示聚合搜索样式的首屏结果，并只安装选中的来源 | Design System、`:core:model`、`:core:image`（来源搜索封面）、`:data:source`、`:data:comic`、`:data:settings` |
 | `:source:api` | Runtime、包、调用和结果契约，Feature/Data 使用的 `SourceCore` 五个能力契约，以及上游协议的编解码（`protocol` 包） | `:core:model`、kotlinx.serialization JSON（仅树 API，不用编译器插件） |

@@ -2,12 +2,9 @@ package dev.veneranative.feature.details
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingSource
-import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicDetail
 import dev.veneranative.core.model.ComicKey
 import dev.veneranative.core.model.ComicRef
-import dev.veneranative.core.model.FilterSelection
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.data.collection.CollectionRepository
@@ -21,8 +18,6 @@ import dev.veneranative.data.download.DownloadRepository
 import dev.veneranative.data.download.DownloadChapterState
 import dev.veneranative.data.history.HistoryRepository
 import dev.veneranative.data.settings.ScreenPreferenceRepository
-import dev.veneranative.data.comic.PageKey
-import dev.veneranative.source.api.SearchRequest
 import dev.veneranative.source.api.SourceOutcome
 import dev.veneranative.source.api.SourceRuntimeError
 import kotlinx.coroutines.CancellationException
@@ -58,7 +53,6 @@ class DetailsViewModel(
     private var presentationSelectionChanged = false
     private var nextChapterLocationRequest = 0L
     private var loadJob: Job? = null
-    private var sourceSwitchJob: Job? = null
 
     private val comicRef = ComicRef.Remote(comicKey)
 
@@ -215,14 +209,6 @@ class DetailsViewModel(
             is DetailsAction.NewFavoriteFolderDraftChanged -> _state.update { it.copy(newFavoriteFolderDraft = action.draft) }
             DetailsAction.CreateFavoriteFolder -> createFavoriteFolder()
             DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null) }
-
-            DetailsAction.OpenSourceSwitch -> openSourceSwitch()
-            DetailsAction.RestoreSourceSwitch -> restoreSourceSwitch()
-            DetailsAction.CloseSourceSwitch -> closeSourceSwitch()
-            is DetailsAction.SourceSwitchQueryChanged -> _state.update { it.copy(sourceSwitchQuery = action.query) }
-            DetailsAction.SearchOtherSources -> searchOtherSources()
-            is DetailsAction.SourceSwitchResultChosen -> chooseSourceResult(action.comic)
-            DetailsAction.SourceSwitchTargetConsumed -> _state.update { it.copy(sourceSwitchTarget = null) }
         }
     }
 
@@ -470,159 +456,6 @@ class DetailsViewModel(
             } finally {
                 _state.update { it.copy(openingTag = false) }
             }
-        }
-    }
-
-    /**
-     * Opens the source switcher, seeded with the title we already know. On a failed or removed
-     * source there is no detail to read a title from, which is why the route carries one.
-     */
-    private fun openSourceSwitch() {
-        val seed = _state.value.detail?.comic?.title ?: _state.value.titleHint.orEmpty()
-        _state.update {
-            it.copy(
-                sourceSwitchOpen = true,
-                sourceSwitchQuery = if (it.sourceSwitchQuery.isBlank()) seed else it.sourceSwitchQuery,
-                sourceSwitchMessage = null,
-            )
-        }
-        if (seed.isNotBlank()) searchOtherSources()
-    }
-
-    /**
-     * Puts the switcher back on screen for a page the user returned to after switching source.
-     *
-     * The results are still in this instance, so they come back untouched; only a page rebuilt from
-     * scratch (process death, restored route) has to search again.
-     */
-    private fun restoreSourceSwitch() {
-        _state.update { it.copy(sourceSwitchOpen = true, sourceSwitchMessage = null) }
-        if (_state.value.sourceSwitchRows.isEmpty()) openSourceSwitch()
-    }
-
-    private fun closeSourceSwitch() {
-        sourceSwitchJob?.cancel()
-        sourceSwitchJob = null
-        _state.update {
-            it.copy(
-                sourceSwitchOpen = false,
-                sourceSwitchRows = emptyList(),
-                sourceSwitchSearching = false,
-                sourceSwitchMessage = null,
-            )
-        }
-    }
-
-    /**
-     * Asks every other searchable source for the first page of the same title.
-     *
-     * Each source owns one row that is replaced as soon as it answers, mirroring the aggregate
-     * search: a slow or broken source never hides the ones that already replied. Results are
-     * fetched on a background job so leaving the panel cancels outstanding network work.
-     */
-    private fun searchOtherSources() {
-        sourceSwitchJob?.cancel()
-        val keyword = _state.value.sourceSwitchQuery.trim()
-        if (keyword.isBlank()) {
-            _state.update {
-                it.copy(
-                    sourceSwitchRows = emptyList(),
-                    sourceSwitchSearching = false,
-                    sourceSwitchMessage = "请输入漫画标题后搜索。",
-                )
-            }
-            return
-        }
-        sourceSwitchJob = viewModelScope.launch {
-            val sources = try {
-                catalog.searchableSources().filter { it.sourceId != comicKey.sourceId }
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                _state.update { it.copy(sourceSwitchSearching = false, sourceSwitchMessage = "暂时无法获取漫画源列表。") }
-                return@launch
-            }
-            _state.update {
-                it.copy(
-                    sourceSwitchRows = sources.map { source ->
-                        SourceSwitchRow(sourceId = source.sourceId, sourceName = source.name)
-                    },
-                    sourceSwitchSearching = true,
-                    sourceSwitchMessage = null,
-                )
-            }
-            if (sources.isEmpty()) {
-                _state.update { it.copy(sourceSwitchSearching = false, sourceSwitchMessage = "没有其他可用的漫画源。") }
-                return@launch
-            }
-            sources.forEach { source ->
-                try {
-                    val paging = catalog.search(
-                        SearchRequest(sourceId = source.sourceId, keyword = keyword, filters = FilterSelection.Empty)
-                    )
-                    val loaded = paging.load(
-                        PagingSource.LoadParams.Refresh(key = PageKey.Start, loadSize = 8, placeholdersEnabled = false)
-                    )
-                    val (comics, failed) = when (loaded) {
-                        is PagingSource.LoadResult.Page -> loaded.data to false
-                        is PagingSource.LoadResult.Error -> emptyList<Comic>() to true
-                        else -> emptyList<Comic>() to false
-                    }
-                    _state.update { current ->
-                        current.copy(sourceSwitchRows = current.sourceSwitchRows.map { row ->
-                            if (row.sourceId == source.sourceId) {
-                                row.copy(comics = comics, isLoading = false, hasError = failed)
-                            } else row
-                        })
-                    }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    _state.update { current ->
-                        current.copy(sourceSwitchRows = current.sourceSwitchRows.map { row ->
-                            if (row.sourceId == source.sourceId) row.copy(isLoading = false, hasError = true) else row
-                        })
-                    }
-                }
-            }
-            _state.update { it.copy(sourceSwitchSearching = false) }
-        }
-    }
-
-    /**
-     * Takes one search result as the choice: rebinds the shelf entry, then hands the new key to the
-     * assembly layer.
-     *
-     * The tap *is* the decision. The first version asked for a select-then-confirm step, but a tap
-     * that only moves a radio dot reads as "nothing happened", and this app keeps no details back
-     * stack — a preview trip to the candidate could never lead back to this list, so there was no
-     * way to confirm afterwards either.
-     *
-     * A comic that was never kept has nothing to migrate, which is a normal outcome. A *failed*
-     * rebind is not: navigating away would leave the shelf pointing at the old, broken source with
-     * nothing on screen saying so, so the switch stops and stays retryable.
-     */
-    private fun chooseSourceResult(comic: Comic) {
-        if (_state.value.sourceSwitchTarget != null) return
-        val target = comic.key
-        if (target == comicKey) {
-            _state.update { it.copy(sourceSwitchMessage = "这是当前漫画源。") }
-            return
-        }
-        viewModelScope.launch {
-            val rebindOk = if (collection == null) true else try {
-                collection.replaceSource(ComicRef.Remote(comicKey), ComicRef.Remote(target))
-                true
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                false
-            }
-            if (!rebindOk) {
-                _state.update { it.copy(sourceSwitchMessage = "无法把收藏迁移到新来源，请重试。") }
-                return@launch
-            }
-            _state.update { it.copy(sourceSwitchOpen = false, sourceSwitchTarget = target) }
         }
     }
 

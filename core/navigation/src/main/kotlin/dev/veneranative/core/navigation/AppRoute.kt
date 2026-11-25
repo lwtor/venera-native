@@ -64,18 +64,27 @@ sealed interface AppRoute {
      *
      * [backTo] is the page that opened this one, carried on the route instead of in a separate piece
      * of navigation state. A details screen can be reached from six different lists, from the reader
-     * and from another details screen that switched source; keeping that answer inside the route
-     * means it survives process death and cannot be overwritten by the next entry.
-     *
-     * [showSourceSwitch] makes this page re-open the source switcher when it becomes visible. It is
-     * set on the page a switch started from, so coming back from the source that was picked lands on
-     * the results the user chose from rather than on the comic they left behind.
+     * and from a source switch page; keeping that answer inside the route means it survives process
+     * death and cannot be overwritten by the next entry.
      */
     data class ComicDetails(
         val comicKey: ComicKey,
         val title: String? = null,
         val backTo: AppRoute? = null,
-        val showSourceSwitch: Boolean = false,
+    ) : AppRoute
+
+    /**
+     * Searching the other installed sources for a comic the user is already looking at.
+     *
+     * A full destination rather than a panel inside details: it is a search, so it has to behave
+     * like one — keep its results while the user opens a candidate, come back to them, and let the
+     * user edit the title it was seeded with. [comicKey] is the source being left, which is never a
+     * candidate for itself; [title] is the seed for the search box.
+     */
+    data class SourceSwitch(
+        val comicKey: ComicKey,
+        val title: String? = null,
+        val backTo: AppRoute? = null,
     ) : AppRoute
 
     /** The reader, showing one chapter. */

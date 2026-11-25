@@ -36,12 +36,12 @@ class AppRouteEncodingTest {
         AppRoute.ComicDetails(comicKey("manga_dex", "id:with:colons")),
         AppRoute.ComicDetails(comicKey("manga_dex", "100%25")),
         AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), title = "葬送的芙莉莲: 第1卷 100%"),
-        AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), showSourceSwitch = true),
+        AppRoute.SourceSwitch(comicKey("manga_dex", "a1b2c3")),
+        AppRoute.SourceSwitch(comicKey("manga_dex", "id:with:colons"), title = "葬送的芙莉莲: 第1卷 100%"),
         AppRoute.ComicDetails(
-            comicKey("manga_dex", "a1b2c3"),
+            comicKey("copy_manga", "42"),
             title = "作品",
-            backTo = AppRoute.ComicDetails(comicKey("copy_manga", "42"), showSourceSwitch = true),
-            showSourceSwitch = true,
+            backTo = AppRoute.SourceSwitch(comicKey("manga_dex", "a1b2c3"), title = "作品"),
         ),
         AppRoute.Reader(
             ChapterRef.Remote(ChapterKey(
@@ -93,15 +93,16 @@ class AppRouteEncodingTest {
     }
 
     @Test
-    fun `links written before the switch flag decode it as off`() {
+    fun `a switch page decodes with the comic it is leaving and the page it returns to`() {
         assertEquals(
-            AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), title = "作品", backTo = AppRoute.Home),
-            decodeAppRoute("comic:manga_dex:a1b2c3:作品:home"),
+            AppRoute.SourceSwitch(comicKey("manga_dex", "a1b2c3"), title = "作品", backTo = AppRoute.Home),
+            decodeAppRoute("switch:manga_dex:a1b2c3:作品:home"),
         )
         assertEquals(
-            AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), showSourceSwitch = true),
-            decodeAppRoute("comic:manga_dex:a1b2c3:::1"),
+            AppRoute.SourceSwitch(comicKey("manga_dex", "a1b2c3")),
+            decodeAppRoute("switch:manga_dex:a1b2c3"),
         )
+        assertNull(decodeAppRoute("switch:manga_dex"))
     }
 
     private fun comicKey(source: String, comic: String) =
