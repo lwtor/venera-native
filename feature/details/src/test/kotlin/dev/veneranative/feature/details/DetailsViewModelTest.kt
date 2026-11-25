@@ -745,7 +745,7 @@ class DetailsViewModelTest {
     }
 
     @Test
-    fun `replacing the source moves the shelf entry and asks for the new comic`() = runTest(dispatcher) {
+    fun `choosing a result rebinds the shelf entry and asks for the new comic`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
         catalog.searchableSourceList = listOf(installed("t", name = "Source T"))
@@ -762,26 +762,18 @@ class DetailsViewModelTest {
         viewModel.onAction(DetailsAction.OpenSourceSwitch)
         advanceUntilIdle()
 
-        // Nothing to replace with until the user picks a candidate.
-        viewModel.onAction(DetailsAction.ReplaceSource)
-        advanceUntilIdle()
-        assertNull(viewModel.state.value.sourceSwitchTarget)
-        assertTrue(collection.replacedSources.isEmpty())
-
-        viewModel.onAction(DetailsAction.SourceSwitchResultSelected(found))
-        viewModel.onAction(DetailsAction.ReplaceSource)
+        // One tap is the whole decision: no selection to hold, nothing left to confirm.
+        viewModel.onAction(DetailsAction.SourceSwitchResultChosen(found))
         advanceUntilIdle()
 
         assertEquals(found.key, viewModel.state.value.sourceSwitchTarget)
         assertEquals(ComicRef.Remote(comicKey) to ComicRef.Remote(found.key), collection.replacedSources.single())
-        assertEquals(
-            "已切换到新来源并保留收藏；阅读进度和已下载章节不会迁移。",
-            viewModel.state.value.sourceSwitchMessage,
-        )
+        assertTrue(collection.contains(ComicRef.Remote(found.key)))
+        assertFalse(viewModel.state.value.sourceSwitchOpen)
     }
 
     @Test
-    fun `replacing a comic that was never kept just opens the new source`() = runTest(dispatcher) {
+    fun `choosing a comic that was never kept just opens the new source`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
         catalog.searchableSourceList = listOf(installed("t"))
@@ -792,12 +784,40 @@ class DetailsViewModelTest {
         advanceUntilIdle()
         viewModel.onAction(DetailsAction.OpenSourceSwitch)
         advanceUntilIdle()
-        viewModel.onAction(DetailsAction.SourceSwitchResultSelected(found))
-        viewModel.onAction(DetailsAction.ReplaceSource)
+        viewModel.onAction(DetailsAction.SourceSwitchResultChosen(found))
         advanceUntilIdle()
 
         assertEquals(found.key, viewModel.state.value.sourceSwitchTarget)
-        assertEquals("已切换到新来源；阅读进度和已下载章节不会迁移。", viewModel.state.value.sourceSwitchMessage)
+        assertTrue(collection.replacedSources.isEmpty())
+        assertNull(viewModel.state.value.sourceSwitchMessage)
+    }
+
+    @Test
+    fun `a failed shelf rebind keeps the panel open instead of stranding the shelf`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        catalog.searchableSourceList = listOf(installed("t"))
+        val found = Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")
+        catalog.searchResults = mapOf(SourceId("t") to listOf(found))
+        collection.addToFolders(
+            ComicRef.Remote(comicKey),
+            setOf("folder-1"),
+            dev.veneranative.data.collection.ComicSnapshot(title = "Frieren"),
+        )
+        collection.replaceError = IllegalStateException("fixture")
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, titleHint = "Frieren")
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.OpenSourceSwitch)
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.SourceSwitchResultChosen(found))
+        advanceUntilIdle()
+
+        // Navigating would leave the shelf pointing at the broken source with nothing on screen
+        // saying so; staying here keeps the choice retryable.
+        assertNull(viewModel.state.value.sourceSwitchTarget)
+        assertTrue(viewModel.state.value.sourceSwitchOpen)
+        assertEquals("无法把收藏迁移到新来源，请重试。", viewModel.state.value.sourceSwitchMessage)
     }
 
     private fun detail(title: String, grouped: Boolean = false) = ComicDetail(

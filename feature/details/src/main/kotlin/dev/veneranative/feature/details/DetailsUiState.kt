@@ -87,11 +87,9 @@ data class DetailsUiState(
     /** One row per source, so a slow or broken source cannot hide the others' results. */
     val sourceSwitchRows: List<SourceSwitchRow> = emptyList(),
     val sourceSwitchSearching: Boolean = false,
-    /** The candidate the user picked; "替换" in the panel's top bar acts on it. */
-    val sourceSwitchSelection: Comic? = null,
     /** Product copy while looking for or switching to another source. */
     val sourceSwitchMessage: String? = null,
-    /** The replacement comic chosen by the user, handed to the assembly layer as a navigation request. */
+    /** The comic the user chose, handed to the assembly layer as a navigation request. */
     val sourceSwitchTarget: ComicKey? = null,
 ) {
     val title: String get() = detail?.comic?.title ?: titleHint.orEmpty()

@@ -220,10 +220,7 @@ class DetailsViewModel(
             DetailsAction.CloseSourceSwitch -> closeSourceSwitch()
             is DetailsAction.SourceSwitchQueryChanged -> _state.update { it.copy(sourceSwitchQuery = action.query) }
             DetailsAction.SearchOtherSources -> searchOtherSources()
-            is DetailsAction.SourceSwitchResultSelected -> _state.update {
-                it.copy(sourceSwitchSelection = action.comic, sourceSwitchMessage = null)
-            }
-            DetailsAction.ReplaceSource -> replaceSource()
+            is DetailsAction.SourceSwitchResultChosen -> chooseSourceResult(action.comic)
             DetailsAction.SourceSwitchTargetConsumed -> _state.update { it.copy(sourceSwitchTarget = null) }
         }
     }
@@ -485,7 +482,6 @@ class DetailsViewModel(
             it.copy(
                 sourceSwitchOpen = true,
                 sourceSwitchQuery = if (it.sourceSwitchQuery.isBlank()) seed else it.sourceSwitchQuery,
-                sourceSwitchSelection = null,
                 sourceSwitchMessage = null,
             )
         }
@@ -500,7 +496,6 @@ class DetailsViewModel(
                 sourceSwitchOpen = false,
                 sourceSwitchRows = emptyList(),
                 sourceSwitchSearching = false,
-                sourceSwitchSelection = null,
                 sourceSwitchMessage = null,
             )
         }
@@ -521,7 +516,6 @@ class DetailsViewModel(
                 it.copy(
                     sourceSwitchRows = emptyList(),
                     sourceSwitchSearching = false,
-                    sourceSwitchSelection = null,
                     sourceSwitchMessage = "请输入漫画标题后搜索。",
                 )
             }
@@ -542,7 +536,6 @@ class DetailsViewModel(
                         SourceSwitchRow(sourceId = source.sourceId, sourceName = source.name)
                     },
                     sourceSwitchSearching = true,
-                    sourceSwitchSelection = null,
                     sourceSwitchMessage = null,
                 )
             }
@@ -585,45 +578,39 @@ class DetailsViewModel(
     }
 
     /**
-     * Rebinds the shelf entry to the chosen comic, then hands the new key to the assembly layer.
+     * Takes one search result as the choice: rebinds the shelf entry, then hands the new key to the
+     * assembly layer.
      *
-     * Migrating the favourite is best effort: a comic that was never kept has nothing to move, and
-     * even a failed rebind must not stop the user from reading the comic on the other source. The
-     * message says plainly that progress and downloads stay behind, since chapter ids differ.
+     * The tap *is* the decision. The first version asked for a select-then-confirm step, but a tap
+     * that only moves a radio dot reads as "nothing happened", and this app keeps no details back
+     * stack — a preview trip to the candidate could never lead back to this list, so there was no
+     * way to confirm afterwards either.
+     *
+     * A comic that was never kept has nothing to migrate, which is a normal outcome. A *failed*
+     * rebind is not: navigating away would leave the shelf pointing at the old, broken source with
+     * nothing on screen saying so, so the switch stops and stays retryable.
      */
-    private fun replaceSource() {
+    private fun chooseSourceResult(comic: Comic) {
         if (_state.value.sourceSwitchTarget != null) return
-        val comic = _state.value.sourceSwitchSelection ?: run {
-            _state.update { it.copy(sourceSwitchMessage = "请先选择要替换的搜索结果。") }
-            return
-        }
         val target = comic.key
         if (target == comicKey) {
             _state.update { it.copy(sourceSwitchMessage = "这是当前漫画源。") }
             return
         }
         viewModelScope.launch {
-            var moved = false
-            var failed = false
-            if (collection != null) {
-                try {
-                    moved = collection.replaceSource(ComicRef.Remote(comicKey), ComicRef.Remote(target))
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    failed = true
-                }
+            val rebindOk = if (collection == null) true else try {
+                collection.replaceSource(ComicRef.Remote(comicKey), ComicRef.Remote(target))
+                true
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                false
             }
-            _state.update {
-                it.copy(
-                    sourceSwitchTarget = target,
-                    sourceSwitchMessage = when {
-                        failed -> "已打开新来源，但收藏迁移失败，请稍后在书架手动处理。"
-                        moved -> "已切换到新来源并保留收藏；阅读进度和已下载章节不会迁移。"
-                        else -> "已切换到新来源；阅读进度和已下载章节不会迁移。"
-                    },
-                )
+            if (!rebindOk) {
+                _state.update { it.copy(sourceSwitchMessage = "无法把收藏迁移到新来源，请重试。") }
+                return@launch
             }
+            _state.update { it.copy(sourceSwitchOpen = false, sourceSwitchTarget = target) }
         }
     }
 

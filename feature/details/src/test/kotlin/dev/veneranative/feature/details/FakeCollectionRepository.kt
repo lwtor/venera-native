@@ -23,6 +23,7 @@ internal class FakeCollectionRepository : CollectionRepository {
 
     var addError: Throwable? = null
     var removeError: Throwable? = null
+    var replaceError: Throwable? = null
 
     val added = mutableListOf<AddedToShelf>()
     val removed = mutableListOf<ComicRef>()
@@ -82,6 +83,7 @@ internal class FakeCollectionRepository : CollectionRepository {
     }
 
     override suspend fun replaceSource(from: ComicRef.Remote, to: ComicRef.Remote): Boolean {
+        replaceError?.let { throw it }
         val old = entries.value[from] ?: return false
         val merged = (entries.value[to]?.folderIds.orEmpty() + old.folderIds)
         entries.value = entries.value - from + (

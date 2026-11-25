@@ -59,11 +59,12 @@ sealed interface DetailsAction {
     /** Starts or restarts the per-source search with the current query. */
     data object SearchOtherSources : DetailsAction
 
-    /** Marks one search result as the replacement candidate; "替换" in the top bar acts on it. */
-    data class SourceSwitchResultSelected(val comic: dev.veneranative.core.model.Comic) : DetailsAction
-
-    /** Rebinds the shelf entry, if any, then asks the assembly layer to open the new comic. */
-    data object ReplaceSource : DetailsAction
+    /**
+     * Picks one search result: rebinds the shelf entry if there is one, then asks the assembly layer
+     * to open that comic. There is no separate confirm step — the panel lists nothing but candidates,
+     * and tapping one is the choice.
+     */
+    data class SourceSwitchResultChosen(val comic: dev.veneranative.core.model.Comic) : DetailsAction
 
     data object SourceSwitchTargetConsumed : DetailsAction
 }

@@ -1,6 +1,7 @@
 package dev.veneranative.feature.details
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -58,7 +59,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -92,8 +92,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
@@ -102,12 +100,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
+import dev.veneranative.core.designsystem.component.ComicHorizontalCard
 import dev.veneranative.core.image.ComicImageRequest
 import dev.veneranative.core.image.compose.ComicImage
 import dev.veneranative.core.model.Chapter
 import dev.veneranative.core.model.ChapterKey
 import dev.veneranative.core.model.Comic
 import dev.veneranative.core.model.ComicComment
+import dev.veneranative.core.model.ComicPublicationStatus
 import dev.veneranative.core.model.SourceId
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import kotlinx.coroutines.launch
@@ -1070,11 +1070,7 @@ private fun SourceSwitchPanel(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    TextButton(
-                        onClick = { onAction(DetailsAction.ReplaceSource) },
-                        enabled = state.sourceSwitchSelection != null && state.sourceSwitchTarget == null,
-                        modifier = Modifier.padding(end = 8.dp).testTag(DETAILS_SOURCE_SWITCH_REPLACE_TAG),
-                    ) { Text("替换") }
+                    Spacer(Modifier.width(8.dp))
                 }
                 androidx.compose.material3.HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
@@ -1103,6 +1099,15 @@ private fun SourceSwitchPanel(
                     },
                 )
 
+                if (state.sourceSwitchHasResults) {
+                    Text(
+                        text = "点选任意作品即切换到该来源，并打开它的详情页。",
+                        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
                 state.sourceSwitchMessage?.takeIf { state.sourceSwitchRows.isNotEmpty() }?.let { message ->
                     Text(
                         text = message,
@@ -1130,7 +1135,8 @@ private fun SourceSwitchPanel(
 
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     state.sourceSwitchRows.forEach { row ->
                         item(key = "source:${row.sourceId.value}") { SourceSwitchHeader(row) }
@@ -1138,10 +1144,9 @@ private fun SourceSwitchPanel(
                             items = row.comics,
                             key = { index, _ -> "result:${row.sourceId.value}:$index" },
                         ) { _, comic ->
-                            SourceSwitchResultRow(
+                            SourceSwitchResultCard(
                                 comic = comic,
-                                selected = state.sourceSwitchSelection?.key == comic.key,
-                                onSelect = { onAction(DetailsAction.SourceSwitchResultSelected(comic)) },
+                                onClick = { onAction(DetailsAction.SourceSwitchResultChosen(comic)) },
                             )
                         }
                     }
@@ -1166,14 +1171,14 @@ private fun SourceSwitchPanel(
 @Composable
 private fun SourceSwitchHeader(row: SourceSwitchRow) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 16.dp, bottom = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = row.sourceName,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1195,52 +1200,77 @@ private fun SourceSwitchHeader(row: SourceSwitchRow) {
     }
 }
 
-/** One candidate on one source. Selecting it fills the top bar's "替换" target. */
+/**
+ * One candidate, drawn with the same card the search screen uses.
+ *
+ * The first version of this panel drew its own row — a 44×60 thumbnail, a title and a radio button —
+ * which read as a settings list rather than as "these are comics you can open", and tapping it only
+ * moved a dot. It is a search result, so it looks like one: cover, title, status, byline, tags, and
+ * the whole card opens the comic on that source.
+ */
 @Composable
-private fun SourceSwitchResultRow(
+private fun SourceSwitchResultCard(
     comic: Comic,
-    selected: Boolean,
-    onSelect: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Surface(
-            modifier = Modifier.size(width = 44.dp, height = 60.dp),
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-        ) {
-            comic.coverUrl?.let { cover ->
-                ComicImage(
-                    request = ComicImageRequest(url = cover, sourceId = comic.key.sourceId, variant = DETAIL_SWITCH_COVER_VARIANT),
-                    contentDescription = null,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop,
+    val status = comic.publicationStatus
+    ComicHorizontalCard(
+        title = comic.title,
+        request = comic.coverUrl?.let { cover ->
+            // Same size and crop as a search result, so both screens share one cache entry.
+            ComicImageRequest(url = cover, sourceId = comic.key.sourceId, variant = SEARCH_RESULT_VARIANT)
+        },
+        onClick = onClick,
+        badge = status?.let { if (it == ComicPublicationStatus.Completed) "已完结" else "连载中" },
+        badgeColor = if (status == ComicPublicationStatus.Ongoing) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+        } else {
+            Color.Black.copy(alpha = 0.72f)
+        },
+        supportingContent = {
+            val byline = comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / ") ?: comic.subtitle
+            byline?.takeIf { it.isNotBlank() }?.let { text ->
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = comic.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val meta = listOfNotNull(
-                comic.subtitle?.takeIf { it.isNotBlank() },
-                comic.authors.takeIf { it.isNotEmpty() }?.joinToString(" / "),
-                comic.lastUpdated?.takeIf { it.isNotBlank() },
-            ).joinToString(" · ")
-            if (meta.isNotBlank()) {
+            comic.lastUpdated?.takeIf { it.isNotBlank() }?.let { text ->
                 Text(
-                    text = meta,
+                    text = text,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        bottomContent = { SourceSwitchTags(comic.tags) },
+    )
+}
+
+/** The tag strip from the search result card; kept here so the panel does not import the search UI. */
+@Composable
+private fun SourceSwitchTags(tags: List<String>) {
+    val visible = tags.filter(String::isNotBlank).distinct()
+    if (visible.isEmpty()) return
+    Row(
+        modifier = Modifier.fillMaxWidth().height(22.dp).horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        visible.forEach { tag ->
+            Surface(
+                shape = RoundedCornerShape(5.dp),
+                color = Color.Transparent,
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)),
+            ) {
+                Text(
+                    text = tag,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -1248,11 +1278,6 @@ private fun SourceSwitchResultRow(
                 )
             }
         }
-        RadioButton(
-            selected = selected,
-            onClick = null,
-            modifier = Modifier.clearAndSetSemantics {},
-        )
     }
 }
 
@@ -1605,11 +1630,11 @@ internal const val DETAILS_LOADING_TAG = "details-loading"
 internal const val DETAILS_CONTENT_TAG = "details-content"
 internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 internal const val DETAILS_SOURCE_SWITCH_ENTRY_TAG = "details-source-switch-entry"
-internal const val DETAILS_SOURCE_SWITCH_REPLACE_TAG = "details-source-switch-replace"
 internal const val DETAILS_SOURCE_SWITCH_QUERY_TAG = "details-source-switch-query"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"
 private const val DETAIL_BACKDROP_VARIANT = "detail-backdrop"
 private const val DETAIL_COMMENT_AVATAR_VARIANT = "detail-comment-avatar"
-private const val DETAIL_SWITCH_COVER_VARIANT = "detail-source-switch-cover"
+/** Same variant as the search screen: both render an 80×120 crop of the same URL. */
+private const val SEARCH_RESULT_VARIANT = "search-result"
