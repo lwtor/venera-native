@@ -382,6 +382,7 @@ private fun AppNavHost(
                             onRouteChange(sourceSwitchDestination(current, key, title))
                         },
                         enteredBySourceSwitch = current.openedBySourceSwitch(),
+                        showSourceSwitch = current.showSourceSwitch,
                         onBack = onBack,
                     )
 

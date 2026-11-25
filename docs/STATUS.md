@@ -2,6 +2,24 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-22 换源返回落到候选结果（DONE）
+
+- 用户第二轮反馈：2.6.12 让返回落到「上一层详情页」，但换源这一步的上一层是**换源候选列表**，
+  从候选进入详情后按返回应当回到那页结果继续挑，而不是回到被结果盖住的旧详情页。
+- 做法：`AppRoute.ComicDetails` 增加 `showSourceSwitch: Boolean`（随路由编码，`comic:...:backTo:1`，
+  旧链接缺该段解析为 false）。`sourceSwitchDestination()` 把返回目标写成
+  `current.copy(showSourceSwitch = true)`：返回的目标页会自己把候选面板重新打开。
+  装配层把 `current.showSourceSwitch` 传进 `DetailsRoute`，路由变化时发 `RestoreSourceSwitch`。
+- 面板重开复用内存里的行：`RestoreSourceSwitch` 只置 `sourceSwitchOpen = true`，不清空
+  `sourceSwitchRows`，也不会重复搜索；只有进程重建后行已丢失（`sourceSwitchRows` 为空）才回到
+  `openSourceSwitch()` 用标题重搜。新增用例断言重开不产生第二次搜索、重建后会补搜。
+- 链路保持一致：A →(换源) B →(换源) C，返回依次回到 B 的候选列表、A 的候选列表、A 自己的来源；
+  `openedBySourceSwitch()` 仍以 `backTo is ComicDetails` 判定，B、C 继续隐藏收藏、只留换源。
+- 验证：`:core:navigation:testDebugUnitTest` 21 项通过（`AppRouteEncodingTest` 6 项含带标记往返与旧链接兼容、
+  `SourceSwitchNavigationTest` 3 项断言返回目标带标记）；`:feature:details:testDebugUnitTest` 54 项通过
+  （新增「返回时重开已有结果不重搜」「重建后补搜」）；`:app:assembleDebug` BUILD SUCCESSFUL；`git diff --check` PASS。
+  版本 2.6.13 / 2006013。
+
 ## 当前任务：U-21 换源页面的返回目标与按钮取舍（DONE）
 
 - 用户反馈两点：①从换源结果打开的详情页按返回落在首页，「每次做一个新页面都是返回首页」；

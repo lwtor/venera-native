@@ -66,11 +66,16 @@ sealed interface AppRoute {
      * of navigation state. A details screen can be reached from six different lists, from the reader
      * and from another details screen that switched source; keeping that answer inside the route
      * means it survives process death and cannot be overwritten by the next entry.
+     *
+     * [showSourceSwitch] makes this page re-open the source switcher when it becomes visible. It is
+     * set on the page a switch started from, so coming back from the source that was picked lands on
+     * the results the user chose from rather than on the comic they left behind.
      */
     data class ComicDetails(
         val comicKey: ComicKey,
         val title: String? = null,
         val backTo: AppRoute? = null,
+        val showSourceSwitch: Boolean = false,
     ) : AppRoute
 
     /** The reader, showing one chapter. */

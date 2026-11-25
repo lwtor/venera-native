@@ -45,6 +45,7 @@ fun DetailsRoute(
     onOpenRelatedWorks: (String, TagNavigation) -> Unit = { _, _ -> },
     onOpenOtherSource: (ComicKey, String?) -> Unit = { _, _ -> },
     enteredBySourceSwitch: Boolean = false,
+    showSourceSwitch: Boolean = false,
 ) {
     val viewModel: DetailsViewModel = viewModel(key = comicKey.storeKey()) {
         DetailsViewModel(catalog, comicKey, collection, downloads, history, screenPreferences, title)
@@ -66,6 +67,11 @@ fun DetailsRoute(
     }
     androidx.compose.runtime.LaunchedEffect(comicKey) {
         viewModel.onScreenEntered()
+    }
+    // Coming back after switching source has to land on the results that switch started from, not on
+    // the comic page they cover. The route asks for it because this screen is rebuilt on the way back.
+    androidx.compose.runtime.LaunchedEffect(comicKey, showSourceSwitch) {
+        if (showSourceSwitch) viewModel.onAction(DetailsAction.RestoreSourceSwitch)
     }
     androidx.compose.runtime.LaunchedEffect(screenPreferences) {
         screenPreferences?.let(viewModel::attachScreenPreferences)

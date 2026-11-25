@@ -793,6 +793,53 @@ class DetailsViewModelTest {
     }
 
     @Test
+    fun `coming back from a switched page reopens the results it already had`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        catalog.searchableSourceList = listOf(installed("t", name = "Source T"))
+        val found = Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")
+        catalog.searchResults = mapOf(SourceId("t") to listOf(found))
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, titleHint = "Frieren")
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.OpenSourceSwitch)
+        advanceUntilIdle()
+        viewModel.onAction(DetailsAction.SourceSwitchResultChosen(found))
+        advanceUntilIdle()
+        assertFalse(viewModel.state.value.sourceSwitchOpen)
+
+        // The page the switch started from is rebuilt on the way back, so it asks for its panel again.
+        viewModel.onAction(DetailsAction.RestoreSourceSwitch)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertTrue(state.sourceSwitchOpen)
+        assertEquals(listOf(found), state.sourceSwitchRows.single().comics)
+        assertEquals(1, catalog.searchRequests.size)
+    }
+
+    @Test
+    fun `a page rebuilt after process death searches again when its results are gone`() = runTest(dispatcher) {
+        catalog.source = installed("s")
+        catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))
+        catalog.searchableSourceList = listOf(installed("t", name = "Source T"))
+        val found = Comic(ComicKey(SourceId("t"), RemoteComicId("c9")), title = "Frieren")
+        catalog.searchResults = mapOf(SourceId("t") to listOf(found))
+
+        val viewModel = DetailsViewModel(catalog, comicKey, collection, titleHint = "Frieren")
+        advanceUntilIdle()
+
+        viewModel.onAction(DetailsAction.RestoreSourceSwitch)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertTrue(state.sourceSwitchOpen)
+        assertEquals("Frieren", state.sourceSwitchQuery)
+        assertEquals(listOf(found), state.sourceSwitchRows.single().comics)
+        assertEquals(1, catalog.searchRequests.size)
+    }
+
+    @Test
     fun `a failed shelf rebind keeps the panel open instead of stranding the shelf`() = runTest(dispatcher) {
         catalog.source = installed("s")
         catalog.detailResponse = SourceOutcome.Failure(SourceRuntimeError.ScriptExecution("fixture"))

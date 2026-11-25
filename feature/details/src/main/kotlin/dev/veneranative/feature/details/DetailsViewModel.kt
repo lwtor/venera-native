@@ -217,6 +217,7 @@ class DetailsViewModel(
             DetailsAction.DismissNewFavoriteFolder -> _state.update { it.copy(newFavoriteFolderDraft = null) }
 
             DetailsAction.OpenSourceSwitch -> openSourceSwitch()
+            DetailsAction.RestoreSourceSwitch -> restoreSourceSwitch()
             DetailsAction.CloseSourceSwitch -> closeSourceSwitch()
             is DetailsAction.SourceSwitchQueryChanged -> _state.update { it.copy(sourceSwitchQuery = action.query) }
             DetailsAction.SearchOtherSources -> searchOtherSources()
@@ -486,6 +487,17 @@ class DetailsViewModel(
             )
         }
         if (seed.isNotBlank()) searchOtherSources()
+    }
+
+    /**
+     * Puts the switcher back on screen for a page the user returned to after switching source.
+     *
+     * The results are still in this instance, so they come back untouched; only a page rebuilt from
+     * scratch (process death, restored route) has to search again.
+     */
+    private fun restoreSourceSwitch() {
+        _state.update { it.copy(sourceSwitchOpen = true, sourceSwitchMessage = null) }
+        if (_state.value.sourceSwitchRows.isEmpty()) openSourceSwitch()
     }
 
     private fun closeSourceSwitch() {

@@ -36,6 +36,13 @@ class AppRouteEncodingTest {
         AppRoute.ComicDetails(comicKey("manga_dex", "id:with:colons")),
         AppRoute.ComicDetails(comicKey("manga_dex", "100%25")),
         AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), title = "葬送的芙莉莲: 第1卷 100%"),
+        AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), showSourceSwitch = true),
+        AppRoute.ComicDetails(
+            comicKey("manga_dex", "a1b2c3"),
+            title = "作品",
+            backTo = AppRoute.ComicDetails(comicKey("copy_manga", "42"), showSourceSwitch = true),
+            showSourceSwitch = true,
+        ),
         AppRoute.Reader(
             ChapterRef.Remote(ChapterKey(
                 comicKey = comicKey("manga_dex", "a1b2c3"),
@@ -82,6 +89,18 @@ class AppRouteEncodingTest {
         assertEquals(
             AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3")),
             decodeAppRoute("comic:manga_dex:a1b2c3"),
+        )
+    }
+
+    @Test
+    fun `links written before the switch flag decode it as off`() {
+        assertEquals(
+            AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), title = "作品", backTo = AppRoute.Home),
+            decodeAppRoute("comic:manga_dex:a1b2c3:作品:home"),
+        )
+        assertEquals(
+            AppRoute.ComicDetails(comicKey("manga_dex", "a1b2c3"), showSourceSwitch = true),
+            decodeAppRoute("comic:manga_dex:a1b2c3:::1"),
         )
     }
 

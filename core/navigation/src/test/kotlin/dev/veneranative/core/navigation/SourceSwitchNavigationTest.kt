@@ -12,30 +12,34 @@ class SourceSwitchNavigationTest {
     private val comic = ComicKey(SourceId("source"), RemoteComicId("comic"))
     private val other = ComicKey(SourceId("other"), RemoteComicId("comic"))
 
-    @Test fun aSwitchReturnsToThePageTheUserSwitchedFromRatherThanItsList() {
-        // The page that switched was opened from search; the switch must not lose it.
-        val from = AppRoute.ComicDetails(comic, backTo = AppRoute.Search("source"))
+    @Test fun aSwitchReturnsToTheResultsItStartedFrom() {
+        val from = AppRoute.ComicDetails(comic, title = "作品", backTo = AppRoute.Search("source"))
 
-        val switched = sourceSwitchDestination(from, other, "title")
+        val switched = sourceSwitchDestination(from, other, "作品")
 
         assertEquals(other, switched.comicKey)
-        assertEquals("title", switched.title)
-        assertEquals(from, backDestination(switched))
+        assertEquals("作品", switched.title)
+        // Back lands on the page that ran the search, and that page re-opens its results.
+        assertEquals(from.copy(showSourceSwitch = true), backDestination(switched))
         assertEquals(AppRoute.Search("source"), backDestination(from))
     }
 
-    @Test fun repeatedSwitchesWalkBackThroughEverySourceInTurn() {
+    @Test fun everyStepBackOntoASwitchPageReopensItsResults() {
         val first = AppRoute.ComicDetails(comic, backTo = AppRoute.Home)
         val second = sourceSwitchDestination(first, other, null)
         val third = sourceSwitchDestination(second, comic, null)
 
-        assertEquals(second, backDestination(third))
-        assertEquals(first, backDestination(second))
+        assertEquals(second.copy(showSourceSwitch = true), backDestination(third))
+        assertEquals(first.copy(showSourceSwitch = true), backDestination(second))
         assertEquals(AppRoute.Home, backDestination(first))
     }
 
-    @Test fun aPageIsMarkedAsSwitchEntryOnlyWhenAnotherDetailsOpenedIt() {
-        assertTrue(AppRoute.ComicDetails(other, backTo = AppRoute.ComicDetails(comic)).openedBySourceSwitch())
+    @Test fun onlyThePagesASwitchOpenedCountAsSwitchEntries() {
+        val from = AppRoute.ComicDetails(comic, backTo = AppRoute.Home)
+        val switched = sourceSwitchDestination(from, other, null)
+
+        assertTrue(switched.openedBySourceSwitch())
+        assertFalse(from.openedBySourceSwitch())
         assertFalse(AppRoute.ComicDetails(other, backTo = AppRoute.Search("source")).openedBySourceSwitch())
         assertFalse(AppRoute.ComicDetails(other, backTo = AppRoute.Library).openedBySourceSwitch())
         assertFalse(AppRoute.ComicDetails(other).openedBySourceSwitch())

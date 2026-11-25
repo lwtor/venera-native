@@ -52,6 +52,12 @@ sealed interface DetailsAction {
     /** Opens the panel that looks for this title on the other installed sources. */
     data object OpenSourceSwitch : DetailsAction
 
+    /**
+     * Opens the panel again on a page the user came back to after switching source, keeping the
+     * results it already has. Searches again only when nothing survived, as after process death.
+     */
+    data object RestoreSourceSwitch : DetailsAction
+
     data object CloseSourceSwitch : DetailsAction
 
     data class SourceSwitchQueryChanged(val query: String) : DetailsAction
