@@ -13,53 +13,69 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class BackDestinationTest {
+    private val comic = ComicKey(SourceId("source"), RemoteComicId("comic"))
+    private val reader = AppRoute.Reader(ChapterRef.Remote(ChapterKey(comic, RemoteChapterId("chapter"))))
+
     @Test fun personalPagesReturnToProfileAndProfileReturnsHome() {
-        assertEquals(AppRoute.Profile, backDestination(AppRoute.About, AppRoute.Home))
-        assertEquals(AppRoute.Profile, backDestination(AppRoute.Backup, AppRoute.Home))
-        assertEquals(AppRoute.Home, backDestination(AppRoute.Profile, AppRoute.Home))
+        assertEquals(AppRoute.Profile, backDestination(AppRoute.About))
+        assertEquals(AppRoute.Profile, backDestination(AppRoute.Backup))
+        assertEquals(AppRoute.Home, backDestination(AppRoute.Profile))
     }
 
-    private val comic = ComicKey(SourceId("source"), RemoteComicId("comic"))
-    private val origin = AppRoute.Search("source")
-
     @Test fun homeAllowsSystemExitAndTopLevelPagesReturnTheirParent() {
-        assertNull(backDestination(AppRoute.Home, origin))
+        assertNull(backDestination(AppRoute.Home))
         for (route in listOf(
             AppRoute.Sources,
             AppRoute.SourceComicSearch,
             AppRoute.Library,
             AppRoute.Downloads,
             AppRoute.Explore("source"),
-            origin,
+            AppRoute.Search("source"),
         )) {
             assertEquals(when (route) {
                 AppRoute.Sources -> AppRoute.Profile
                 AppRoute.SourceComicSearch -> AppRoute.Sources
                 AppRoute.Downloads -> AppRoute.Library
                 else -> AppRoute.Home
-            }, backDestination(route, origin))
+            }, backDestination(route))
         }
     }
 
-    @Test fun detailsAndReaderReturnAlongTheirOriginalPath() {
-        val details = AppRoute.ComicDetails(comic)
-        assertEquals(origin, backDestination(details, origin))
-        assertEquals(details, backDestination(
-            AppRoute.Reader(ChapterRef.Remote(ChapterKey(comic, RemoteChapterId("chapter")))),
-            origin,
-        ))
-        assertEquals(AppRoute.Library, backDestination(
-            AppRoute.Reader(ChapterRef.Local(LocalComicId("local"), LocalChapterId("chapter"))),
-            origin,
-        ))
+    @Test fun detailsReturnToTheListTheyRecordedWhenTheyWereOpened() {
+        for (origin in listOf(
+            AppRoute.Library,
+            AppRoute.Downloads,
+            AppRoute.Explore("source"),
+            AppRoute.Search("source"),
+            AppRoute.Sources,
+        )) {
+            assertEquals(origin, backDestination(AppRoute.ComicDetails(comic, backTo = origin)))
+        }
+    }
+
+    @Test fun detailsWithoutARecordedListReturnHome() {
+        // Old links and restored state written before details carried their origin.
+        assertEquals(AppRoute.Home, backDestination(AppRoute.ComicDetails(comic)))
+    }
+
+    @Test fun authorWorksReturnToDetailsThatReturnToWhereTheyBegan() {
+        val works = AppRoute.AuthorWorks(comic, "author", dev.veneranative.core.model.TagNavigation.Search("author"),
+            AppRoute.Search("source"))
+        val details = backDestination(works) as AppRoute.ComicDetails
+        assertEquals(comic, details.comicKey)
+        assertEquals(AppRoute.Search("source"), backDestination(details))
     }
 
     @Test fun readerReturnsToTheRouteThatOpenedIt() {
-        val reader = AppRoute.Reader(ChapterRef.Remote(ChapterKey(comic, RemoteChapterId("chapter"))))
-        val details = AppRoute.ComicDetails(comic)
+        assertEquals(AppRoute.Home, backDestination(reader, AppRoute.Home))
+        assertEquals(AppRoute.ComicDetails(comic), backDestination(reader, AppRoute.ComicDetails(comic)))
+        assertEquals(AppRoute.Library, backDestination(reader, AppRoute.Library))
+    }
 
-        assertEquals(AppRoute.Home, backDestination(reader, origin, AppRoute.Home))
-        assertEquals(details, backDestination(reader, origin, details))
-        assertEquals(AppRoute.Library, backDestination(reader, origin, AppRoute.Library))
+    @Test fun localReadingWithoutAnOriginReturnsToTheShelf() {
+        assertEquals(
+            AppRoute.Library,
+            backDestination(AppRoute.Reader(ChapterRef.Local(LocalComicId("local"), LocalChapterId("chapter")))),
+        )
     }
 }

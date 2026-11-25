@@ -61,8 +61,17 @@ sealed interface AppRoute {
      * [title] is a hint from the list the user tapped. Details normally replace it with the source's
      * answer, but a failed or removed source leaves no title to search other sources with, so the
      * hint is carried here rather than read from a shelf the comic may never have been on.
+     *
+     * [backTo] is the page that opened this one, carried on the route instead of in a separate piece
+     * of navigation state. A details screen can be reached from six different lists, from the reader
+     * and from another details screen that switched source; keeping that answer inside the route
+     * means it survives process death and cannot be overwritten by the next entry.
      */
-    data class ComicDetails(val comicKey: ComicKey, val title: String? = null) : AppRoute
+    data class ComicDetails(
+        val comicKey: ComicKey,
+        val title: String? = null,
+        val backTo: AppRoute? = null,
+    ) : AppRoute
 
     /** The reader, showing one chapter. */
     data class Reader(val chapter: ChapterRef) : AppRoute

@@ -2,6 +2,7 @@ package dev.veneranative.feature.details
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -40,6 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -355,6 +357,7 @@ fun DetailsScreen(
                 isFavorite = state.isFavorite,
                 showFavorite = state.hasShelf,
                 onToggleFavorite = { onAction(DetailsAction.ToggleFavorite) },
+                onSwitchSource = { onAction(DetailsAction.OpenSourceSwitch) },
                 modifier = Modifier.align(Alignment.TopCenter),
             )
         }
@@ -714,6 +717,7 @@ private fun DetailsToolbar(
     isFavorite: Boolean,
     showFavorite: Boolean,
     onToggleFavorite: () -> Unit,
+    onSwitchSource: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val background = androidx.compose.ui.graphics.lerp(Color.Transparent, MaterialTheme.colorScheme.surface, collapseFraction)
@@ -747,6 +751,21 @@ private fun DetailsToolbar(
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface,
             )
+            IconButton(
+                onClick = onSwitchSource,
+                modifier = Modifier.alpha(collapseFraction).testTag(DETAILS_SOURCE_SWITCH_TOOLBAR_TAG)
+                    .semantics { contentDescription = "切换漫画源" },
+                // The expanded header is a full-bleed cover; controls only make sense once it is a bar.
+                enabled = collapseFraction >= 0.98f,
+            ) {
+                SwapSourceGlyph(
+                    color = androidx.compose.ui.graphics.lerp(
+                        Color.White,
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                        collapseFraction,
+                    ),
+                )
+            }
             if (showFavorite) {
                 IconButton(
                     onClick = onToggleFavorite,
@@ -1246,6 +1265,33 @@ private fun SourceSwitchRowSection(
     }
 }
 
+/**
+ * Two arrows pointing opposite ways: move this comic to another source.
+ *
+ * Drawn here like the screen's other glyphs so the icon set keeps one weight and one join style.
+ */
+@Composable
+private fun SwapSourceGlyph(color: Color) {
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val stroke = 1.6.dp.toPx()
+        val head = stroke * 1.9f
+        val inset = size.minDimension * 0.12f
+        val top = size.height * 0.33f
+        val bottom = size.height * 0.67f
+        val left = inset
+        val right = size.width - inset
+
+        // Out along the top, back along the bottom: the two halves of a source switch.
+        drawLine(color, Offset(left, top), Offset(right, top), stroke, StrokeCap.Round)
+        drawLine(color, Offset(right - head, top - head * 0.62f), Offset(right, top), stroke, StrokeCap.Round)
+        drawLine(color, Offset(right - head, top + head * 0.62f), Offset(right, top), stroke, StrokeCap.Round)
+
+        drawLine(color, Offset(right, bottom), Offset(left, bottom), stroke, StrokeCap.Round)
+        drawLine(color, Offset(left + head, bottom - head * 0.62f), Offset(left, bottom), stroke, StrokeCap.Round)
+        drawLine(color, Offset(left + head, bottom + head * 0.62f), Offset(left, bottom), stroke, StrokeCap.Round)
+    }
+}
+
 @Composable
 private fun CloseGlyph() {
     val color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1596,6 +1642,7 @@ internal const val DETAILS_CONTENT_TAG = "details-content"
 internal const val DETAILS_CHAPTER_SEARCH_TAG = "details-chapter-search"
 internal const val DETAILS_SOURCE_SWITCH_ENTRY_TAG = "details-source-switch-entry"
 internal const val DETAILS_SOURCE_SWITCH_QUERY_TAG = "details-source-switch-query"
+internal const val DETAILS_SOURCE_SWITCH_TOOLBAR_TAG = "details-source-switch-toolbar"
 
 /** Keeps a cover's cache entry apart from a page that happens to reuse the same URL. */
 private const val DETAIL_THUMBNAIL_VARIANT = "detail-thumbnail"

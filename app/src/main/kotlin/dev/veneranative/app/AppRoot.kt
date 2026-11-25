@@ -35,7 +35,6 @@ import dev.veneranative.core.model.PageProvider
 import dev.veneranative.core.navigation.AppRoute
 import dev.veneranative.core.navigation.backDestination
 import dev.veneranative.core.navigation.decodeAppRoute
-import dev.veneranative.core.navigation.detailsOriginAfterNavigation
 import dev.veneranative.core.navigation.readerDetailsDestination
 import dev.veneranative.core.navigation.encode
 import dev.veneranative.data.collection.CollectionRepository
@@ -90,9 +89,6 @@ internal fun AppRoot(
     var route by rememberSaveable(stateSaver = AppRouteSaver) {
         mutableStateOf<AppRoute>(AppRoute.Home)
     }
-    var detailsOrigin by rememberSaveable(stateSaver = AppRouteSaver) {
-        mutableStateOf<AppRoute>(AppRoute.Home)
-    }
     var readerOrigin by rememberSaveable(stateSaver = AppRouteSaver) {
         mutableStateOf<AppRoute>(AppRoute.Home)
     }
@@ -102,22 +98,26 @@ internal fun AppRoot(
         dev.veneranative.core.designsystem.component.LocalComicSourceNames provides comicSourceNames) {
         AppNavHost(
             route = route,
-            onAuthorWorksBack = { current ->
-                detailsOrigin = current.returnOrigin
-                route = AppRoute.ComicDetails(current.origin)
-            },
             onRouteChange = { next ->
-                detailsOrigin = detailsOriginAfterNavigation(route, next, detailsOrigin)
+                // A details screen records the page that opened it on its own route: six lists, the
+                // reader and another details screen all lead there, and a single "current origin"
+                // held beside the route was silently overwritten by whichever entry came next.
+                val destination = if (
+                    next is AppRoute.ComicDetails &&
+                    next.backTo == null &&
+                    route !is AppRoute.ComicDetails &&
+                    route !is AppRoute.Reader
+                ) {
+                    next.copy(backTo = route)
+                } else {
+                    next
+                }
                 if (next is AppRoute.Reader && route !is AppRoute.Reader) readerOrigin = route
-                route = next
+                route = destination
             },
-            detailsOrigin = detailsOrigin,
             readerOrigin = readerOrigin,
             onOpenReaderDetails = { current ->
-                readerDetailsDestination(current, readerOrigin, detailsOrigin)?.let { target ->
-                    detailsOrigin = target.detailsOrigin
-                    route = target.route
-                }
+                readerDetailsDestination(current, readerOrigin)?.let { route = it }
             },
             catalog = catalog,
             sourceRepository = sourceRepository,
@@ -143,9 +143,7 @@ internal fun AppRoot(
 @Composable
 private fun AppNavHost(
     route: AppRoute,
-    onAuthorWorksBack: (AppRoute.AuthorWorks) -> Unit,
     onRouteChange: (AppRoute) -> Unit,
-    detailsOrigin: AppRoute,
     readerOrigin: AppRoute,
     onOpenReaderDetails: (AppRoute.Reader) -> Unit,
     catalog: DefaultComicCatalog,
@@ -169,13 +167,11 @@ private fun AppNavHost(
     val updateStatus by selfUpdateService.updateStatus.collectAsStateWithLifecycle()
     val updateAvailable =
         updateStatus is SelfUpdateStatus.UpdateAvailable || updateStatus is SelfUpdateStatus.Downloaded
-    val backRoute = backDestination(route, detailsOrigin, readerOrigin)
+    val backRoute = backDestination(route, readerOrigin)
     val routeStateHolder = rememberSaveableStateHolder()
     val onBack: () -> Unit = {
         val destination = backRoute ?: AppRoute.Home
-        if (route is AppRoute.AuthorWorks) {
-            onAuthorWorksBack(route)
-        } else if (route is AppRoute.Reader) {
+        if (route is AppRoute.Reader) {
             appScope.launch {
                 progressTracker.get()?.let { tracker -> runCatching { tracker.flush() } }
                 onRouteChange(destination)
@@ -377,8 +373,12 @@ private fun AppNavHost(
                         onOpenChapter = { onRouteChange(AppRoute.Reader(ChapterRef.Remote(it.key, it.group))) },
                         onScheduleDownloads = { DownloadWorkScheduler.start(activity, expedited = true) },
                         onOpenDownloads = { onRouteChange(AppRoute.Downloads) },
-                        onOpenRelatedWorks = { author, target -> onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, detailsOrigin)) },
-                        onOpenOtherSource = { key, title -> onRouteChange(AppRoute.ComicDetails(key, title)) },
+                        onOpenRelatedWorks = { author, target ->
+                            onRouteChange(AppRoute.AuthorWorks(current.comicKey, author, target, current.backTo ?: AppRoute.Home))
+                        },
+                        onOpenOtherSource = { key, title ->
+                            onRouteChange(AppRoute.ComicDetails(key, title, current.backTo))
+                        },
                         onBack = onBack,
                     )
 

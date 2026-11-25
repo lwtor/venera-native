@@ -2,16 +2,20 @@ package dev.veneranative.core.navigation
 
 import dev.veneranative.core.model.ChapterRef
 
-data class ReaderDetailsDestination(val route: AppRoute.ComicDetails, val detailsOrigin: AppRoute)
-
-/** Replaces the reader: reuse matching details, otherwise return new details to the reader's entry. */
+/**
+ * The details screen the reader shows when the user asks for the comic it is reading.
+ *
+ * A reader covers its entry page, so it remembers where it came from in `readerOrigin`. Opening
+ * details from there reuses that answer: if the reader itself came from a details screen, the new
+ * one inherits the list *that* screen returned to, so back never lands on a duplicate details page.
+ */
 fun readerDetailsDestination(
     reader: AppRoute.Reader,
     readerOrigin: AppRoute,
-    previousDetailsOrigin: AppRoute,
-): ReaderDetailsDestination? {
+): AppRoute.ComicDetails? {
     val chapter = reader.chapter as? ChapterRef.Remote ?: return null
-    val details = AppRoute.ComicDetails(chapter.key.comicKey)
-    return if (readerOrigin == details) ReaderDetailsDestination(details, previousDetailsOrigin)
-    else ReaderDetailsDestination(details, readerOrigin)
+    return AppRoute.ComicDetails(
+        comicKey = chapter.key.comicKey,
+        backTo = if (readerOrigin is AppRoute.ComicDetails) readerOrigin.backTo else readerOrigin,
+    )
 }
