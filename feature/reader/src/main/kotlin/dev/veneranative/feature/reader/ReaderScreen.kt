@@ -69,7 +69,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -297,6 +299,8 @@ fun ReaderScreen(
     modifier: Modifier = Modifier,
     decoderFactory: ((DecodeStrategy) -> PageImageDecoder)? = null,
     onOpenComicDetails: (() -> Unit)? = null,
+    /** Wall-clock label for the status scrim. Injected so tests can pin it. */
+    clock: () -> String = { defaultReaderClock() },
 ) {
     var strategy by rememberSaveable { mutableStateOf(DecodeStrategy.Region) }
     val controlsScope = rememberCoroutineScope()
@@ -373,19 +377,22 @@ fun ReaderScreen(
                         val height = size.height.toFloat()
                         val current = latestState.value
                         if (current.status == ReaderStatus.Ready) {
-                            val inToolbarTarget = ReaderControlsTapTarget.contains(tap.x, tap.y, width, height)
+                            val inControlTarget = ReaderControlsTapTarget.contains(tap.x, tap.y, width, height)
+                            val inSplitTarget = ReaderControlsTapTarget.containsCompact(tap.x, tap.y, width, height)
                             when {
                                 controlsTimer.visible.value && wasTap -> controlsTimer.hide()
-                                !controlsTimer.visible.value && heldForOneSecond && inToolbarTarget ->
-                                    controlsTimer.toggle()
+                                // Split wins over the panel inside its tighter hotspot: both gestures
+                                // are a long press, and widening the panel to 90% must not swallow it.
                                 !controlsTimer.visible.value && heldForOneSecond && current.splitEnabled &&
-                                    current.pages.isNotEmpty() -> {
+                                    current.pages.isNotEmpty() && inSplitTarget -> {
                                     val fallback = current.pages
                                         .getOrNull(current.currentPageIndex.coerceIn(0, current.pages.lastIndex))
                                         ?.sourceIndex ?: 0
                                     splitMenuSourceIndex = pageHitTester.resolve?.invoke(tap.y) ?: fallback
                                     controlsTimer.hide()
                                 }
+                                !controlsTimer.visible.value && heldForOneSecond && inControlTarget ->
+                                    controlsTimer.toggle()
                             }
                         }
                     })
@@ -445,6 +452,24 @@ fun ReaderScreen(
             }
         }
         val showControls = controlsVisible && state.status == ReaderStatus.Ready
+        // Shown only while nothing else owns the bottom edge. Declared before the tool overlay so
+        // the panel is always above it, and suppressed whenever the panel or a bottom notice is up
+        // so the two never stack or fight for the same pixels.
+        val bottomNotice = state.endOfChaptersReached || state.nextChapterUnknown ||
+            state.nextChapterLoadFailed || state.previousChapterLoadFailed
+        AnimatedVisibility(
+            visible = state.status == ReaderStatus.Ready && !showControls && !bottomNotice,
+            enter = fadeIn(tween(200)),
+            exit = fadeOut(tween(120)),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            ReaderStatusScrim(
+                clock = clock,
+                chapter = state.chapterTitle,
+                pageNumber = state.currentPageNumber,
+                pageCount = state.currentChapterPageCount,
+            )
+        }
         AnimatedVisibility(
             visible = showControls,
             enter = fadeIn(tween(180)) + slideInVertically(
@@ -530,6 +555,97 @@ fun ReaderScreen(
         }
     }
 }
+
+/** Current wall clock as HH:mm, using the device's default time zone. */
+private fun defaultReaderClock(): String {
+    val now = java.time.LocalTime.now()
+    return "%02d:%02d".format(now.hour, now.minute)
+}
+
+/**
+ * Keeps [clock] text live without a per-frame recomposition: it refreshes once a second so the
+ * minute flips within a second of the boundary, and a pinned clock in tests stays constant. Scoped
+ * to this composable so a tick only redraws the pill, never the image canvas above it.
+ */
+@Composable
+private fun rememberReaderClockText(clock: () -> String): String {
+    var text by remember(clock) { mutableStateOf(clock()) }
+    LaunchedEffect(clock) {
+        while (true) {
+            delay(1_000L)
+            text = clock()
+        }
+    }
+    return text
+}
+
+/**
+ * Compact bottom HUD: time, chapter and page in one pill.
+ *
+ * It sits under the control panel in the parent Box and hides whenever the panel or a bottom
+ * notice is visible, so it never covers a control. Text is white over a dark scrim to stay legible
+ * on both black-and-white manga and bright colour pages.
+ */
+@Composable
+private fun ReaderStatusScrim(
+    clock: () -> String,
+    chapter: String,
+    pageNumber: Int,
+    pageCount: Int,
+) {
+    val time = rememberReaderClockText(clock)
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 10.dp)
+            .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
+            .testTag(READER_STATUS_SCRIM_TAG),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Black.copy(alpha = 0.62f),
+        shadowElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = time,
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                maxLines = 1,
+            )
+            ScrimSeparator()
+            Text(
+                text = chapter.ifBlank { "—" },
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            ScrimSeparator()
+            Text(
+                text = "$pageNumber / $pageCount",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScrimSeparator() {
+    Box(
+        modifier = Modifier
+            .size(width = 1.dp, height = 12.dp)
+            .clip(RoundedCornerShape(1.dp))
+            .background(Color.White.copy(alpha = 0.4f)),
+    )
+}
+
+private const val READER_STATUS_SCRIM_TAG = "reader-status-scrim"
 
 @Composable
 private fun ReaderToolOverlay(

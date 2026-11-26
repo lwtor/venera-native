@@ -2,6 +2,24 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## 当前任务：U-26 阅读器底部状态蒙层；长按热区扩到页面 90%（DONE）
+
+- 用户需求：阅读器底部加一个小蒙层展示当前时间 / 章节 / 页数；长按弹出的控制面板必须在蒙层之上、
+  不受遮挡；长按弹出面板的区域改到当前页面的 90%。
+- 蒙层 `ReaderStatusScrim`（`:feature:reader`）在 `BottomCenter` 渲染 `时间 · 章节 · 章节内页码`，
+  深色半透明胶囊 + 白字（黑白漫画与彩色页面上都可读），章节过长省略、缺失显示「—」。
+  - 时钟可注入（`ReaderScreen.clock`，默认 `LocalTime.now()` 的 HH:mm），每秒刷新、分钟跳变后 1 秒内跟上。
+    时钟状态 scoped 在蒙层内部，tick 只重绘胶囊，不重组上层图片画布。
+  - 层级：蒙层在根 Box 中声明于控制面板之前（z 序更低），且 `showControls` 或有底部 notice
+    （到末话 / 下一话未知 / 加载失败）时直接隐藏 —— 两者不叠压、不争同一块像素，面板绝不被遮挡。
+- 长按热区：`ReaderControlsTapTarget` 的面板热区从 x 0.20–0.80 / y 0.30–0.70 扩到 x/y 各 0.05–0.95
+  （页面中央 90%）。分页菜单改用独立的 `containsCompact`（原 60%×40% 区域）并在拆分开启时优先判定 ——
+  否则面板扩到 90% 后，菜单只剩 5% 外圈，实际按不到。
+- 验证：`:feature:reader:testDebugUnitTest` 48 项通过（热区单测重写为 90% / compact 两组）；
+  `:feature:reader:compileDebugAndroidTestKotlin`、`:app:assembleDebug` BUILD SUCCESSFUL。
+  androidTest 新增蒙层展示 / 随面板隐藏 / 随底部 notice 隐藏 / 边缘 8% 长按开面板四个用例
+  （本节点按约定只保证编译，未跑 instrumentation）。版本 2.8.0 / 2008000。
+
 ## 当前任务：U-25 顶栏在内容不足时也可用；换源提示改成一次性（DONE）
 
 - 用户第四轮反馈：①「章节过少的话，根本出现不了顶部的标题栏，导致上面的按钮无法点击」；

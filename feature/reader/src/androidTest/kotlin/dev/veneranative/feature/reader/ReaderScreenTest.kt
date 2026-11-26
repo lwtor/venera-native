@@ -302,6 +302,101 @@ class ReaderScreenTest {
     }
 
     @Test
+    fun statusScrimShowsPinnedTimeChapterAndPage() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "第 7 话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {}, onBack = {}, clock = { "21:47" },
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-status-scrim").assertIsDisplayed()
+        composeRule.onNodeWithText("21:47").assertIsDisplayed()
+        composeRule.onNodeWithText("第 7 话").assertIsDisplayed()
+        composeRule.onNodeWithText("1 / 3").assertIsDisplayed()
+    }
+
+    @Test
+    fun statusScrimHidesBehindControlPanelAndBottomNotices() {
+        val next = ChapterRef.Remote(
+            ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
+        )
+        val state = mutableStateOf(
+            ReaderUiState(
+                chapterTitle = "当前话",
+                pages = pages,
+                currentChapterPageCount = pages.size,
+                nextChapter = next,
+                status = ReaderStatus.Ready,
+            ),
+        )
+        composeRule.setContent {
+            ReaderScreen(
+                state = state.value,
+                onAction = {}, onBack = {}, clock = { "21:47" },
+            )
+        }
+        composeRule.onNodeWithTag("reader-status-scrim").assertIsDisplayed()
+
+        // The panel owns the bottom edge while it is up; the scrim must get out of its way.
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(center)
+            advanceEventTime(1_100)
+            up()
+        }
+        composeRule.waitUntil(timeoutMillis = 2_000) {
+            composeRule.onAllNodesWithTag("reader-status-scrim").fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    @Test
+    fun statusScrimHiddenOnEndOfChaptersNotice() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    endOfChaptersReached = true,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {}, onBack = {}, clock = { "21:47" },
+            )
+        }
+
+        composeRule.onNodeWithTag("reader-end-of-chapters").assertIsDisplayed()
+        composeRule.onAllNodesWithTag("reader-status-scrim").assertCountEquals(0)
+    }
+
+    @Test
+    fun longPressNearEdgeOpensPanelWithNinetyPercentHotspot() {
+        composeRule.setContent {
+            ReaderScreen(
+                state = ReaderUiState(
+                    chapterTitle = "当前话",
+                    pages = pages,
+                    currentChapterPageCount = pages.size,
+                    status = ReaderStatus.Ready,
+                ),
+                onAction = {}, onBack = {},
+            )
+        }
+
+        // 8% of the canvas: outside the old 60x40 hotspot but inside the new 90% one.
+        composeRule.onNodeWithTag("reader-canvas").performTouchInput {
+            down(Offset(width * 0.08f, height * 0.5f))
+            advanceEventTime(1_100)
+            up()
+        }
+        composeRule.onNodeWithContentDescription("上一话").assertIsDisplayed()
+    }
+
+    @Test
     fun offersRetryWhenLoadingFails() {
         var retried = false
         composeRule.setContent {
