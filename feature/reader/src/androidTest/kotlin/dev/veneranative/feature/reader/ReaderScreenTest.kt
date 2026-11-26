@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
@@ -322,7 +323,7 @@ class ReaderScreenTest {
     }
 
     @Test
-    fun statusScrimHidesBehindControlPanelAndBottomNotices() {
+    fun controlPanelRisesAboveStatusScrimWithoutCoveringIt() {
         val next = ChapterRef.Remote(
             ChapterKey(ComicKey(SourceId("test-source"), RemoteComicId("comic")), RemoteChapterId("next")),
         )
@@ -343,19 +344,26 @@ class ReaderScreenTest {
         }
         composeRule.onNodeWithTag("reader-status-scrim").assertIsDisplayed()
 
-        // The panel owns the bottom edge while it is up; the scrim must get out of its way.
         composeRule.onNodeWithTag("reader-canvas").performTouchInput {
             down(center)
             advanceEventTime(1_100)
             up()
         }
         composeRule.waitUntil(timeoutMillis = 2_000) {
-            composeRule.onAllNodesWithTag("reader-status-scrim").fetchSemanticsNodes().isEmpty()
+            composeRule.onAllNodesWithTag("reader-tool-overlay").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("reader-tool-overlay").assertIsDisplayed()
+        // The pill must remain on screen, and the sheet must end above its top edge.
+        composeRule.onNodeWithTag("reader-status-scrim").assertIsDisplayed()
+        val scrim = composeRule.onNodeWithTag("reader-status-scrim").getBoundsInRoot()
+        val sheet = composeRule.onNodeWithTag("reader-tool-overlay").getBoundsInRoot()
+        check(sheet.bottom <= scrim.top + 1.dp) {
+            "control sheet bottom ${sheet.bottom} must stay above scrim top ${scrim.top}"
         }
     }
 
     @Test
-    fun statusScrimHiddenOnEndOfChaptersNotice() {
+    fun statusScrimStaysVisibleOnEndOfChaptersNotice() {
         composeRule.setContent {
             ReaderScreen(
                 state = ReaderUiState(
@@ -370,7 +378,12 @@ class ReaderScreenTest {
         }
 
         composeRule.onNodeWithTag("reader-end-of-chapters").assertIsDisplayed()
-        composeRule.onAllNodesWithTag("reader-status-scrim").assertCountEquals(0)
+        composeRule.onNodeWithTag("reader-status-scrim").assertIsDisplayed()
+        val scrim = composeRule.onNodeWithTag("reader-status-scrim").getBoundsInRoot()
+        val notice = composeRule.onNodeWithTag("reader-end-of-chapters").getBoundsInRoot()
+        check(notice.bottom <= scrim.top + 1.dp) {
+            "notice bottom ${notice.bottom} must stay above scrim top ${scrim.top}"
+        }
     }
 
     @Test

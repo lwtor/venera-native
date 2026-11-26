@@ -79,6 +79,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
@@ -319,6 +320,10 @@ fun ReaderScreen(
     val window = remember(view) { view.context.findActivity()?.window }
     var chapterEndReached by remember(state.chapterTitle) { mutableStateOf(false) }
     var splitMenuSourceIndex by remember { mutableStateOf<Int?>(null) }
+    // Measured bottom edge taken by the status pill (including the gesture inset). Bottom sheets
+    // are lifted by this much so the pill stays visible and nothing is ever drawn on top of it.
+    var scrimBottomPx by remember { mutableStateOf(0) }
+    val scrimClearance = with(LocalDensity.current) { scrimBottomPx.toDp() }
     val pageHitTester = remember { PageHitTester() }
     // The tap gesture only restarts on a status change, so it must not close over [state]: doing so
     // would freeze the first Ready state's pages, page index and split flag for the rest of the
@@ -452,16 +457,14 @@ fun ReaderScreen(
             }
         }
         val showControls = controlsVisible && state.status == ReaderStatus.Ready
-        // Shown only while nothing else owns the bottom edge. Declared before the tool overlay so
-        // the panel is always above it, and suppressed whenever the panel or a bottom notice is up
-        // so the two never stack or fight for the same pixels.
-        val bottomNotice = state.endOfChaptersReached || state.nextChapterUnknown ||
-            state.nextChapterLoadFailed || state.previousChapterLoadFailed
+        // The pill is the bottom-most layer and never hides for another overlay. Everything else
+        // that wants the bottom edge is raised by its measured height instead, so the toolbar and
+        // notices sit above it without ever covering it.
         AnimatedVisibility(
-            visible = state.status == ReaderStatus.Ready && !showControls && !bottomNotice,
+            visible = state.status == ReaderStatus.Ready,
             enter = fadeIn(tween(200)),
             exit = fadeOut(tween(120)),
-            modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier.align(Alignment.BottomCenter).onSizeChanged { scrimBottomPx = it.height },
         ) {
             ReaderStatusScrim(
                 clock = clock,
@@ -484,6 +487,7 @@ fun ReaderScreen(
         ) {
             ReaderToolOverlay(
                 state = state,
+                bottomClearance = scrimClearance,
                 sliderPage = sliderPage,
                 onSliderPageChange = { controlsTimer.onInteraction(); sliderPage = it },
                 onSeek = { toolbarAction(ReaderAction.SeekPage(it - 1)) },
@@ -514,17 +518,19 @@ fun ReaderScreen(
             ReaderTopBar(state = state, onBack = onBack, onOpenComicDetails = onOpenComicDetails)
         }
         if (!showControls && state.status == ReaderStatus.Ready && state.endOfChaptersReached) {
-            EndOfChaptersNotice(modifier = Modifier.align(Alignment.BottomCenter))
+            EndOfChaptersNotice(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = scrimClearance))
         }
         if (!showControls && state.status == ReaderStatus.Ready && state.nextChapterUnknown) {
             UnknownNextChapterNotice(
                 onRetry = { onAction(ReaderAction.RetryNextChapter) },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = scrimClearance),
             )
         }
         if (!showControls && state.status == ReaderStatus.Ready && (state.nextChapterLoadFailed || state.previousChapterLoadFailed)) {
             Surface(
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp).testTag("reader-next-chapter-error"),
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp + scrimClearance)
+                    .testTag("reader-next-chapter-error"),
                 shape = MaterialTheme.shapes.large,
                 tonalElevation = 4.dp,
             ) {
@@ -582,9 +588,9 @@ private fun rememberReaderClockText(clock: () -> String): String {
 /**
  * Compact bottom HUD: time, chapter and page in one pill.
  *
- * It sits under the control panel in the parent Box and hides whenever the panel or a bottom
- * notice is visible, so it never covers a control. Text is white over a dark scrim to stay legible
- * on both black-and-white manga and bright colour pages.
+ * It is the bottom-most layer and stays visible while any bottom overlay is up; those overlays are
+ * raised by its measured height instead of hiding it. White text on a dark scrim stays legible on
+ * both black-and-white manga and bright colour pages.
  */
 @Composable
 private fun ReaderStatusScrim(
@@ -650,6 +656,7 @@ private const val READER_STATUS_SCRIM_TAG = "reader-status-scrim"
 @Composable
 private fun ReaderToolOverlay(
     state: ReaderUiState,
+    bottomClearance: androidx.compose.ui.unit.Dp,
     sliderPage: Float,
     onSliderPageChange: (Float) -> Unit,
     onSeek: (Int) -> Unit,
@@ -664,7 +671,12 @@ private fun ReaderToolOverlay(
     onSplitOverlapChange: (Float) -> Unit,
     onSplitOrderChange: (Boolean) -> Unit,
 ) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+    // The status pill owns the very bottom edge; lifting the panel by its height leaves both on
+    // screen at once, with the panel above the pill instead of covering it.
+    Box(
+        modifier = Modifier.fillMaxSize().padding(bottom = bottomClearance),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
         Surface(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)
                 .testTag("reader-tool-overlay"),
