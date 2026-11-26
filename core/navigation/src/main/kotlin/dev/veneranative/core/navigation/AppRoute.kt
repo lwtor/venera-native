@@ -3,6 +3,7 @@ package dev.veneranative.core.navigation
 import dev.veneranative.core.model.TagNavigation
 import dev.veneranative.core.model.ChapterRef
 import dev.veneranative.core.model.ComicKey
+import dev.veneranative.core.model.SourceId
 
 /**
  * A destination, with its arguments as types.
@@ -25,6 +26,16 @@ sealed interface AppRoute {
 
     /** Search source catalogs for a specific comic without embedding the form in source lists. */
     data object SourceComicSearch : AppRoute
+
+    /**
+     * Parameters and maintenance of one installed source.
+     *
+     * A destination rather than an expanding card: the source list is for scanning and reordering,
+     * and a page here can be as tall as the script's settings need without pushing its neighbours
+     * off screen. [sourceId] is nullable so a restored link whose source was removed still opens a
+     * page that says so, instead of being dropped on a silent blank screen.
+     */
+    data class SourceSettings(val sourceId: SourceId?) : AppRoute
 
     /** The shelf: favourite folders, downloads and imported comics. */
     data object Library : AppRoute

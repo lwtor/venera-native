@@ -2,6 +2,23 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## U-28 漫画源设置改为两段式（DONE）
+
+- 用户需求：把设置参数挪到二级页面；一级页只留开关与拖拽；拖拽改成长按直接拖，去掉触发按钮。
+- 路由：新增 `AppRoute.SourceSettings(sourceId)`（`source-settings:{id}`，可空以兼容源被移除后的恢复），
+  `BackDestination` 回 `Sources`，`AppRoot` 装配 `SourceSettingsRoute`。点卡片 = `onOpenSettings` → 该路由。
+- 一级页 `SourcesScreen`：删除卡片内设置手风琴、顶栏排序按钮、独立 reorder 模式与 `ReorderList`。
+  每张卡只有头像/名称/状态行 + 启用开关；点卡片进二级页，长按卡片用
+  `detectDragGesturesAfterLongPress` 原地拖拽排序——按 `layoutInfo` 实测的卡片中点判定落位，跨位后立即
+  重排并补偿位移让卡片跟手，无模式切换、无把手按钮。
+- 二级页 `SourceSettingsRoute`/`SourceSettingsScreen`：独立顶栏，复用 `SourceSettingsBody`（账号 + 脚本声明设置），
+  更新/移除 footer 从一级页搬来；进入 `OpenConfiguration`，离开 `CloseConfiguration`。
+- 修正：`CloseConfiguration` 不再取消正在进行 settings 防抖写入、不再清空待写队列——二级页返回是高频操作，
+  旧逻辑会丢弃防抖窗口内刚改的设置；现在只清显示状态，保存任务在 ViewModel scope 跑完。
+- 验证：`:core:navigation:test` 56 项、`:feature:sources:testDebugUnitTest` 54 项全绿；
+  `:feature:sources:compileDebugAndroidTestKotlin`、`:app:assembleDebug` BUILD SUCCESSFUL。
+  androidTest 更新「开关不导航、点卡片进设置」用例；导航测试覆盖新路由编解码与返回。
+
 ## U-27 修正：蒙层常驻，工具栏从蒙层上方开始（DONE）
 
 - 反馈：v2.8.0 把「工具栏不遮挡蒙层」做成了「面板弹出时隐藏蒙层」，用户明确指出要的是蒙层一直在、

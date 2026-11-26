@@ -23,6 +23,7 @@ fun AppRoute.encode(): String = when (this) {
     AppRoute.Home -> "home"
     AppRoute.Sources -> "sources"
     AppRoute.SourceComicSearch -> "source-comic-search"
+    is AppRoute.SourceSettings -> "source-settings:${sourceId?.value.escape()}"
     AppRoute.Library -> "library"
     AppRoute.ReadingHistory -> "reading-history"
     AppRoute.Downloads -> "downloads"
@@ -58,6 +59,9 @@ fun decodeAppRoute(encoded: String): AppRoute? {
         "home" -> AppRoute.Home
         "sources" -> AppRoute.Sources
         "source-comic-search" -> AppRoute.SourceComicSearch
+        "source-settings" -> AppRoute.SourceSettings(
+            parts.getOrNull(1)?.unescapeOrNull()?.takeIf(String::isNotEmpty)?.let(::SourceId)
+        )
         "library" -> AppRoute.Library
         "reading-history" -> AppRoute.ReadingHistory
         "downloads" -> AppRoute.Downloads

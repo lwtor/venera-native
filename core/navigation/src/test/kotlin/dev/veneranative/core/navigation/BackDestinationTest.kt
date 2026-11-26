@@ -41,6 +41,11 @@ class BackDestinationTest {
         }
     }
 
+    @Test fun aSourceSettingsPageReturnsToTheSourceList() {
+        assertEquals(AppRoute.Sources, backDestination(AppRoute.SourceSettings(SourceId("demo"))))
+        assertEquals(AppRoute.Sources, backDestination(AppRoute.SourceSettings(null)))
+    }
+
     @Test fun detailsReturnToTheListTheyRecordedWhenTheyWereOpened() {
         for (origin in listOf(
             AppRoute.Library,

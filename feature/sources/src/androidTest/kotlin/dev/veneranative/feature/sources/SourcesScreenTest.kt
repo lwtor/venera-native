@@ -280,8 +280,9 @@ class SourcesScreenTest {
     }
 
     @Test
-    fun `tapping the enabled switch does not expand the source settings`() {
+    fun `the switch toggles in place while tapping the card opens its settings page`() {
         val actions = mutableListOf<SourcesAction>()
+        val opened = mutableListOf<SourceId>()
         composeRule.setContent {
             VeneraNativeTheme {
                 SourcesScreen(
@@ -292,21 +293,21 @@ class SourcesScreenTest {
                     ),
                     onAction = { actions += it },
                     onBack = {},
+                    onOpenSettings = { opened += it },
                 )
             }
         }
 
         composeRule.onNodeWithTag(INSTALLED_SECTION_TAG).performClick()
-        // Toggling the switch fires SetEnabled but must NOT open the configuration.
+        // The switch only enables/disables; it never navigates to the settings page.
         composeRule.onNodeWithTag(SOURCE_ENABLED_TAG).performClick()
         assertEquals(listOf(SourcesAction.SetEnabled(SOURCE.sourceId, false)), actions)
+        assertEquals(emptyList<SourceId>(), opened)
 
-        // The expand target is the name block; tapping it opens configuration as before.
+        // The name block is the settings entry now, and it routes instead of expanding in place.
         composeRule.onNodeWithText("Demo Source").performClick()
-        assertEquals(
-            listOf(SourcesAction.SetEnabled(SOURCE.sourceId, false), SourcesAction.OpenConfiguration(SOURCE.sourceId)),
-            actions,
-        )
+        assertEquals(listOf(SOURCE.sourceId), opened)
+        assertEquals(listOf(SourcesAction.SetEnabled(SOURCE.sourceId, false)), actions)
     }
 
     private companion object {

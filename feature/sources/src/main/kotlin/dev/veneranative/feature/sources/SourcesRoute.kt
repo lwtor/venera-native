@@ -28,6 +28,7 @@ fun SourcesRoute(
     comicCatalog: ComicCatalog? = null,
     onOpenComic: (ComicKey) -> Unit = {},
     onSearchByComic: () -> Unit = {},
+    onOpenSettings: (dev.veneranative.core.model.SourceId) -> Unit = {},
     searchOnly: Boolean = false,
 ) {
     val viewModel: SourcesViewModel = viewModel { SourcesViewModel(repository, catalogRepository, screenPreferences, comicCatalog) }
@@ -47,6 +48,7 @@ fun SourcesRoute(
             onAction = viewModel::onAction,
             onBack = onBack,
             onSearchByComic = onSearchByComic,
+            onOpenSettings = onOpenSettings,
             onChooseScript = {
                 onRequestScript { location ->
                     viewModel.onAction(SourcesAction.InstallLocationChanged(location))

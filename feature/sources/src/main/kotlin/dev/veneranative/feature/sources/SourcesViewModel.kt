@@ -143,9 +143,9 @@ class SourcesViewModel(
 
             SourcesAction.CloseConfiguration -> {
                 configurationGeneration++
-                settingsSaveJob?.cancel()
-                pendingSettingChanges.clear()
-                pendingSettingSourceId = null
+                // Leaving the settings page must not drop an edit still inside the debounce window:
+                // the save job lives on the ViewModel scope, so let it finish instead of cancelling
+                // it and clearing the queue. Only the displayed state goes away.
                 _state.update {
                     it.copy(configuration = null, configurationLoading = false, settingsSaving = false, settingsMessage = null)
                 }

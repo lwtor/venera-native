@@ -1,14 +1,9 @@
 package dev.veneranative.feature.sources
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,9 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
@@ -41,7 +33,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -57,7 +48,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -68,12 +58,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -91,19 +79,16 @@ import dev.veneranative.core.model.SourceId
 import dev.veneranative.data.source.SourceCatalogEntry
 import dev.veneranative.data.source.SourceLoginCheckOutcome
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 private enum class SourcesSection { Available, Installed }
 
 /**
  * Installed sources and the catalog behind two tabs.
  *
- * A source is one card. The card answers "is this source on?" and "does it need attention"; every
- * other action lives inside it, because a header holding a name, a version, an update badge, a login
- * warning, a switch and an overflow menu cannot be read at a glance.
- *
- * Long-pressing a card, or the toolbar action, enters reorder mode: the cards collapse into one row
- * each and are dragged directly, which replaces nudging one position at a time with arrow buttons.
+ * This level answers only "is this source on?" and "where does it sit?". A card carries an enable
+ * switch, and everything that needs room — account, script settings, update and removal — moved to
+ * [SourceSettingsScreen], reached by tapping the card. Long-pressing a card drags it in place to
+ * reorder: no mode to enter and no button to find, just hold and move.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,50 +99,31 @@ fun SourcesScreen(
     modifier: Modifier = Modifier,
     onChooseScript: () -> Unit = {},
     onSearchByComic: () -> Unit = {},
+    onOpenSettings: (SourceId) -> Unit = {},
 ) {
-    var pendingUninstall by rememberSaveable { mutableStateOf<String?>(null) }
     var section by rememberSaveable { mutableStateOf(SourcesSection.Installed) }
     var manualInstallExpanded by rememberSaveable { mutableStateOf(false) }
     var showAddCatalogDialog by rememberSaveable { mutableStateOf(false) }
     var showSwitchCatalogDialog by rememberSaveable { mutableStateOf(false) }
     var newCatalogLocation by rememberSaveable { mutableStateOf("") }
-    var expandedSourceId by rememberSaveable { mutableStateOf<String?>(null) }
-    var reordering by rememberSaveable { mutableStateOf(false) }
-
-    fun exitReorder() {
-        reordering = false
-    }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             TopAppBar(
-                title = { Text(if (reordering) "调整顺序" else "漫画源") },
+                title = { Text("漫画源") },
                 navigationIcon = {
-                    if (reordering) {
-                        IconButton(onClick = ::exitReorder, modifier = Modifier.testTag(REORDER_DONE_TAG)) {
-                            Icon(Icons.Filled.Check, contentDescription = "完成调整顺序")
-                        }
-                    } else {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
-                    if (!reordering) {
-                        IconButton(onClick = onSearchByComic) {
-                            Icon(Icons.Filled.Search, contentDescription = "按漫画查找来源")
-                        }
-                        if (state.sources.size > 1) {
-                            IconButton(onClick = { reordering = true }, modifier = Modifier.testTag(REORDER_START_TAG)) {
-                                Icon(Icons.Filled.Menu, contentDescription = "调整来源顺序")
-                            }
-                        }
-                        IconButton(onClick = onChooseScript, enabled = !state.installing) {
-                            Icon(Icons.Filled.Add, contentDescription = "从文件安装漫画源")
-                        }
+                    IconButton(onClick = onSearchByComic) {
+                        Icon(Icons.Filled.Search, contentDescription = "按漫画查找来源")
+                    }
+                    IconButton(onClick = onChooseScript, enabled = !state.installing) {
+                        Icon(Icons.Filled.Add, contentDescription = "从文件安装漫画源")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -165,20 +131,6 @@ fun SourcesScreen(
         },
     ) { contentPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
-            if (reordering) {
-                Text(
-                    text = "按住卡片上下拖动即可换位",
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 10.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ReorderList(
-                    sources = state.sources,
-                    onReorder = { ordered -> onAction(SourcesAction.ReorderSources(ordered)) },
-                )
-                return@Column
-            }
-
             SectionTabs(section = section, state = state, onSelect = { section = it })
 
             state.message?.let { message ->
@@ -208,39 +160,12 @@ fun SourcesScreen(
                     InstalledContent(
                         state = state,
                         onAction = onAction,
-                        onUninstall = { pendingUninstall = it.sourceId.value },
                         onDiscover = { section = SourcesSection.Available },
-                        expandedSourceId = expandedSourceId,
-                        onToggleExpanded = { source ->
-                            if (expandedSourceId == source.sourceId.value) {
-                                expandedSourceId = null
-                                onAction(SourcesAction.CloseConfiguration)
-                            } else {
-                                expandedSourceId = source.sourceId.value
-                                onAction(SourcesAction.OpenConfiguration(source.sourceId))
-                            }
-                        },
-                        onEnterReorder = { reordering = true },
+                        onOpenSettings = onOpenSettings,
                     )
                 }
             }
         }
-    }
-
-    val uninstallSource = state.sources.firstOrNull { it.sourceId.value == pendingUninstall }
-    if (uninstallSource != null) {
-        AlertDialog(
-            onDismissRequest = { pendingUninstall = null },
-            title = { Text("移除漫画源？") },
-            text = { Text("${uninstallSource.name} 及其保存的脚本将从此设备移除。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    pendingUninstall = null
-                    onAction(SourcesAction.Uninstall(uninstallSource.sourceId))
-                }) { Text("移除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = { TextButton(onClick = { pendingUninstall = null }) { Text("取消") } },
-        )
     }
 
     if (showAddCatalogDialog) {
@@ -345,11 +270,8 @@ private fun SectionTabs(
 private fun InstalledContent(
     state: SourcesUiState,
     onAction: (SourcesAction) -> Unit,
-    onUninstall: (InstalledSource) -> Unit,
     onDiscover: () -> Unit,
-    expandedSourceId: String?,
-    onToggleExpanded: (InstalledSource) -> Unit,
-    onEnterReorder: () -> Unit,
+    onOpenSettings: (SourceId) -> Unit,
 ) {
     when (state.status) {
         SourcesStatus.Loading -> CenteredNotice {
@@ -378,14 +300,10 @@ private fun InstalledContent(
             }
         } else {
             val listState = rememberLazyListState()
-            val expandedIndex = state.sources.indexOfFirst { it.sourceId.value == expandedSourceId }
-            // Expanding a card near the bottom would push its own settings off-screen; bringing the
-            // header to the top keeps the settings and the source they belong to in view together.
-            LaunchedEffect(expandedSourceId, expandedIndex) {
-                if (expandedIndex < 0) return@LaunchedEffect
-                val bannerOffset = if (state.catalogUpdateCount >= 2) 1 else 0
-                listState.animateScrollToItem(expandedIndex + bannerOffset)
-            }
+            val haptics = LocalHapticFeedback.current
+            val latestSources = rememberUpdatedState(state.sources)
+            var draggingId by remember { mutableStateOf<String?>(null) }
+            var dragOffset by remember { mutableFloatStateOf(0f) }
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -402,22 +320,56 @@ private fun InstalledContent(
                     }
                 }
                 items(state.sources, key = { it.sourceId.value }) { source ->
-                    val update = state.catalogUpdateFor(source)
-                    SourceCard(
-                        source = source,
-                        update = update,
-                        state = state,
-                        expanded = expandedSourceId == source.sourceId.value,
-                        installing = state.installing,
-                        busy = source.sourceId in state.busySourceIds,
-                        configuration = state.configuration?.takeIf { it.source.sourceId == source.sourceId },
-                        onToggleExpanded = { onToggleExpanded(source) },
-                        onEnabledChange = { enabled -> onAction(SourcesAction.SetEnabled(source.sourceId, enabled)) },
-                        onUpdate = { update?.let { onAction(SourcesAction.InstallCatalogEntry(it)) } },
-                        onUninstall = { onUninstall(source) },
-                        onEnterReorder = onEnterReorder,
-                        onAction = onAction,
-                    )
+                    val dragging = draggingId == source.sourceId.value
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .zIndex(if (dragging) 1f else 0f)
+                            .graphicsLayer { translationY = if (dragging) dragOffset else 0f }
+                            .pointerInput(source.sourceId.value) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        draggingId = source.sourceId.value
+                                        dragOffset = 0f
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDragEnd = { draggingId = null; dragOffset = 0f },
+                                    onDragCancel = { draggingId = null; dragOffset = 0f },
+                                ) { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount.y
+                                    val visible = listState.layoutInfo.visibleItemsInfo
+                                    val self = visible.firstOrNull { it.key == source.sourceId.value }
+                                        ?: return@detectDragGesturesAfterLongPress
+                                    // The dragged card's visual centre decides which slot owns it;
+                                    // using measured offsets keeps this correct when the update banner
+                                    // shifts the indices or a title wraps to two lines.
+                                    val centerY = self.offset + self.size / 2f + dragOffset
+                                    val target = visible.firstOrNull { info ->
+                                        centerY >= info.offset && centerY < info.offset + info.size
+                                    } ?: return@detectDragGesturesAfterLongPress
+                                    if (target.index == self.index) return@detectDragGesturesAfterLongPress
+                                    val list = latestSources.value
+                                    val ordered = list.toMutableList().apply {
+                                        add(target.index, removeAt(self.index))
+                                    }.map { it.sourceId }
+                                    onAction(SourcesAction.ReorderSources(ordered))
+                                    // The card now lives at the target's old offset; move the finger
+                                    // reference with it so it stays under the finger, not jumping.
+                                    dragOffset -= (target.offset - self.offset)
+                                }
+                            },
+                    ) {
+                        SourceCard(
+                            source = source,
+                            update = state.catalogUpdateFor(source),
+                            state = state,
+                            busy = source.sourceId in state.busySourceIds,
+                            dragging = dragging,
+                            onOpenSettings = { onOpenSettings(source.sourceId) },
+                            onEnabledChange = { enabled -> onAction(SourcesAction.SetEnabled(source.sourceId, enabled)) },
+                        )
+                    }
                 }
             }
         }
@@ -425,25 +377,19 @@ private fun InstalledContent(
 }
 
 /**
- * One source. Collapsed it is a single readable line; expanded it grows into its own settings page
- * without leaving the list, which is what keeps "change something" and "come back to the list" the
- * same gesture.
+ * One source, one row: the enable switch and the signal that it needs attention. Tapping the card
+ * opens its settings page; long-pressing (handled by the parent) drags the card to reorder. Keeping
+ * the row this short is what makes the drag target predictable — the whole card is the handle.
  */
 @Composable
 private fun SourceCard(
     source: InstalledSource,
     update: SourceCatalogEntry?,
     state: SourcesUiState,
-    expanded: Boolean,
-    installing: Boolean,
     busy: Boolean,
-    configuration: dev.veneranative.core.model.InstalledSourceConfiguration?,
-    onToggleExpanded: () -> Unit,
+    dragging: Boolean,
+    onOpenSettings: () -> Unit,
     onEnabledChange: (Boolean) -> Unit,
-    onUpdate: () -> Unit,
-    onUninstall: () -> Unit,
-    onEnterReorder: () -> Unit,
-    onAction: (SourcesAction) -> Unit,
 ) {
     val check = state.loginCheckOutcomes[source.sourceId]
     val loginBroken = check == SourceLoginCheckOutcome.Invalid || check == SourceLoginCheckOutcome.Failed
@@ -462,142 +408,60 @@ private fun SourceCard(
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(SOURCE_CARD_TAG),
         shape = RoundedCornerShape(16.dp),
-        color = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface,
+        color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
-            if (expanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
+            if (dragging) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
             else MaterialTheme.colorScheme.outlineVariant,
         ),
+        tonalElevation = if (dragging) 4.dp else 0.dp,
     ) {
-        Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 11.dp, bottom = 11.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 11.dp, bottom = 11.dp),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onOpenSettings)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "${source.name}，$meta，点击打开设置"
+                    }
+                    .padding(vertical = 1.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .combinedClickable(onClick = onToggleExpanded, onLongClick = onEnterReorder)
-                        .semantics(mergeDescendants = true) {
-                            contentDescription =
-                                "${source.name}，$meta，${if (expanded) "已展开设置" else "点击展开设置"}"
-                        }
-                        .padding(vertical = 1.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SourceAvatar(
-                        name = source.name,
-                        sourceId = source.sourceId.value,
-                        dimmed = !source.enabled,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = source.name,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = if (source.enabled) MaterialTheme.colorScheme.onSurface
-                            else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = meta,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = metaColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp).rotate(if (expanded) 180f else 0f),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Spacer(Modifier.width(2.dp))
-                Switch(
-                    checked = source.enabled,
-                    onCheckedChange = onEnabledChange,
-                    enabled = !busy,
-                    modifier = Modifier
-                        .testTag(SOURCE_ENABLED_TAG)
-                        .semantics { contentDescription = "${source.name} 的启用开关" },
+                SourceAvatar(
+                    name = source.name,
+                    sourceId = source.sourceId.value,
+                    dimmed = !source.enabled,
                 )
-            }
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
-            ) {
-                Column(modifier = Modifier.testTag(SOURCE_SETTINGS_TAG)) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 14.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant,
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = source.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (source.enabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Box(modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 12.dp)) {
-                        SourceSettingsBody(
-                            configuration = configuration,
-                            configurationLoading = state.configurationLoading,
-                            state = state,
-                            busy = busy,
-                            onAction = onAction,
-                        )
-                    }
-                    SourceMaintenanceFooter(
-                        update = update,
-                        installing = installing,
-                        busy = busy,
-                        onUpdate = onUpdate,
-                        onUninstall = onUninstall,
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = metaColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-        }
-    }
-}
-
-/**
- * Update and remove, on one row along the card's bottom edge.
- *
- * They used to be a third labelled group — a heading, then one row per action with a two-line
- * explanation each — which cost roughly three rows of height under every expanded card for what is
- * two buttons. The heading also framed them as settings, and they are not: they act on the source
- * rather than configure it. At the card's edge, outside the settings body's inset, the row reads as
- * "actions on this source" and costs one row. The labels keep enough wording to stand alone, since
- * the explanation that used to sit beside them is gone.
- */
-@Composable
-private fun SourceMaintenanceFooter(
-    update: SourceCatalogEntry?,
-    installing: Boolean,
-    busy: Boolean,
-    onUpdate: () -> Unit,
-    onUninstall: () -> Unit,
-) {
-    HorizontalDivider(
-        modifier = Modifier.padding(horizontal = 14.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f),
-    )
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.End,
-    ) {
-        if (update?.version != null) {
-            TextButton(onClick = onUpdate, enabled = !busy && !installing) {
-                Text(
-                    text = if (installing) "更新中…" else "更新到 ${update.version}",
-                    style = MaterialTheme.typography.labelLarge,
-                )
-            }
-        }
-        TextButton(onClick = onUninstall, enabled = !busy) {
-            Text(
-                text = "移除来源",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.error,
+            Spacer(Modifier.width(2.dp))
+            Switch(
+                checked = source.enabled,
+                onCheckedChange = onEnabledChange,
+                enabled = !busy,
+                modifier = Modifier
+                    .testTag(SOURCE_ENABLED_TAG)
+                    .semantics { contentDescription = "${source.name} 的启用开关" },
             )
         }
     }
@@ -631,96 +495,6 @@ private fun SourceAvatar(name: String, sourceId: String, size: Dp = 38.dp, dimme
                 fontWeight = FontWeight.Medium,
                 color = tint.second,
             )
-        }
-    }
-}
-
-/**
- * Reorder mode: one fixed-height row per source, dragged directly.
- *
- * The rows carry no controls on purpose — anything tappable inside a drag target steals the gesture.
- * Movement is applied continuously: crossing half a row swaps it and gives the consumed distance
- * back to the offset, so the card stays under the finger instead of jumping out from under it.
- */
-@Composable
-private fun ReorderList(
-    sources: List<InstalledSource>,
-    onReorder: (List<SourceId>) -> Unit,
-) {
-    val density = LocalDensity.current
-    val stepPx = with(density) { (REORDER_ROW_HEIGHT + REORDER_GAP).toPx() }
-    val latest = rememberUpdatedState(sources)
-    val haptics = LocalHapticFeedback.current
-    var draggingId by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(REORDER_GAP),
-    ) {
-        items(sources, key = { it.sourceId.value }) { source ->
-            val dragging = draggingId == source.sourceId.value
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(REORDER_ROW_HEIGHT)
-                    .zIndex(if (dragging) 1f else 0f)
-                    .graphicsLayer { translationY = if (dragging) dragOffset else 0f }
-                    .pointerInput(source.sourceId.value) {
-                        detectDragGestures(
-                            onDragStart = {
-                                draggingId = source.sourceId.value
-                                dragOffset = 0f
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            },
-                            onDragEnd = { draggingId = null; dragOffset = 0f },
-                            onDragCancel = { draggingId = null; dragOffset = 0f },
-                        ) { change, amount ->
-                            change.consume()
-                            dragOffset += amount.y
-                            val list = latest.value
-                            val from = list.indexOfFirst { it.sourceId.value == source.sourceId.value }
-                            if (from < 0) return@detectDragGestures
-                            val to = (from + (dragOffset / stepPx).roundToInt()).coerceIn(0, list.lastIndex)
-                            if (to != from) {
-                                onReorder(list.toMutableList().apply { add(to, removeAt(from)) }.map { it.sourceId })
-                                dragOffset -= (to - from) * stepPx
-                            }
-                        }
-                    },
-                shape = RoundedCornerShape(14.dp),
-                color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                tonalElevation = if (dragging) 4.dp else 0.dp,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Filled.Menu,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    SourceAvatar(name = source.name, sourceId = source.sourceId.value, size = 30.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        text = source.name,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        text = "v${source.version}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
         }
     }
 }
@@ -933,7 +707,7 @@ private fun ManualInstallRow(state: SourcesUiState, onAction: (SourcesAction) ->
 }
 
 @Composable
-private fun MessageBanner(message: String, onDismiss: () -> Unit) {
+internal fun MessageBanner(message: String, onDismiss: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -972,12 +746,6 @@ internal const val UPDATE_ALL_BANNER_TAG = "source-update-all-banner"
 internal const val SOURCE_ENABLED_TAG = "source-enabled-switch"
 internal const val SOURCE_CARD_TAG = "source-card"
 internal const val SOURCE_SETTINGS_TAG = "source-settings"
-internal const val REORDER_START_TAG = "source-reorder-start"
-internal const val REORDER_DONE_TAG = "source-reorder-done"
-
-/** A drag row is a fixed height so a drag distance can be turned into an index without measuring. */
-private val REORDER_ROW_HEIGHT = 60.dp
-private val REORDER_GAP = 10.dp
 
 @Preview(showBackground = true)
 @Composable

@@ -22,6 +22,9 @@ class AppRouteEncodingTest {
         AppRoute.Home,
         AppRoute.Sources,
         AppRoute.SourceComicSearch,
+        AppRoute.SourceSettings(SourceId("demo")),
+        AppRoute.SourceSettings(SourceId("id:with:colons")),
+        AppRoute.SourceSettings(null),
         AppRoute.Library,
         AppRoute.ReadingHistory,
         AppRoute.Downloads,
@@ -82,6 +85,16 @@ class AppRouteEncodingTest {
     @Test
     fun `no source selected stays distinguishable from a source named empty`() {
         assertEquals(AppRoute.Explore(null), decodeAppRoute("explore:"))
+        assertEquals(AppRoute.SourceSettings(null), decodeAppRoute("source-settings:"))
+    }
+
+    @Test
+    fun `a settings page carries the source id through the encoding`() {
+        assertEquals("source-settings:manga_dex", AppRoute.SourceSettings(SourceId("manga_dex")).encode())
+        assertEquals(
+            AppRoute.SourceSettings(SourceId("id:with:colons")),
+            decodeAppRoute(AppRoute.SourceSettings(SourceId("id:with:colons")).encode()),
+        )
     }
 
     @Test

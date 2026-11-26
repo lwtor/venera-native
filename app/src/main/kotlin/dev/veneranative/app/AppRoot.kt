@@ -62,6 +62,7 @@ import dev.veneranative.feature.profile.ProfileRoute
 import dev.veneranative.feature.reader.ReaderRoute
 import dev.veneranative.feature.search.SearchRoute
 import dev.veneranative.feature.search.SourceSwitchRoute
+import dev.veneranative.feature.sources.SourceSettingsRoute
 import dev.veneranative.feature.sources.SourcesRoute
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
@@ -329,6 +330,7 @@ private fun AppNavHost(
                         comicCatalog = catalog,
                         onOpenComic = { onRouteChange(AppRoute.ComicDetails(it)) },
                         onSearchByComic = { onRouteChange(AppRoute.SourceComicSearch) },
+                        onOpenSettings = { onRouteChange(AppRoute.SourceSettings(it)) },
                         screenPreferences = screenPreferences,
                         onBack = onBack,
                         onRequestScript = { consume ->
@@ -345,6 +347,15 @@ private fun AppNavHost(
                         screenPreferences = screenPreferences,
                         onBack = onBack,
                         searchOnly = true,
+                    )
+
+                    is AppRoute.SourceSettings -> SourceSettingsRoute(
+                        sourceId = route.sourceId,
+                        repository = sourceRepository,
+                        catalogRepository = sourceCatalogRepository,
+                        comicCatalog = catalog,
+                        screenPreferences = screenPreferences,
+                        onBack = onBack,
                     )
 
                     is AppRoute.Explore -> ExploreRoute(
