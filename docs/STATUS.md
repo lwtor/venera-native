@@ -2,6 +2,21 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## U-33 修正源列表拖拽坐标污染导致的乱跳与卡顿（DONE）
+
+- 用户需求：v2.9.3 后首卡换位仍乱跳，且拖动其他项变卡。
+- 根因（U-32 未触及）：`pointerInput` 挂在 `.graphicsLayer` 内层。卡片的 `translationY` 会参与 pointer 坐标转换，
+  手势读到的 `change.position` / `dragAmount` 被卡片自身位移污染，形成「位移→坐标→再位移」的反馈循环；
+  换位后卡片槽位变化又叠加到 `self.offset`。两者共同导致首卡跳变、其余项拖动发抖。U-32 的公式本身没错，坏在 feeds 它的坐标源。
+- 修法：
+  - 手势节点与视觉变换节点**分离**：外层 `Box` 只挂 `pointerInput`（永不位移，坐标干净），内层 `Box` 挂 `graphicsLayer` 只做视觉位移。
+  - 手指位置改由**累计位移增量**推导：`dragDeltaY += amount.y`（dragAmount 与布局无关），视觉中心 = `initialLayoutCentre + dragDeltaY`。
+    `initialLayoutCentre` 在起拖瞬间读取一次，此后不再依赖任何变化的卡片槽位 offset。
+  - `draggedTranslation(initialCentre, dragDelta, layoutCentre) = (initialCentre + dragDelta) - layoutCentre`，
+    `layoutCentre` 绘制阶段读当前布局，换位/滚动自动抵消，无需补偿减法。
+  - 纯函数测试随签名更新，断言「初始中心 + 手指位移」恒定，换位/滚动不改变卡片视觉中心。
+- 验证：`:feature:sources:testDebugUnitTest` 9 项全过；kotlin 与 androidTest 编译通过；`:app:assembleRelease` 正式签名 APK 构建通过、签名指纹一致。
+
 ## U-32 修正源列表首卡换位时整列表上跳（DONE）
 
 - 用户需求：拖动第一张卡片触发换位后，整个列表会突然向上跳一下。
