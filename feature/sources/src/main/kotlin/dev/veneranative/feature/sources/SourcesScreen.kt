@@ -3,7 +3,6 @@ package dev.veneranative.feature.sources
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -310,11 +309,14 @@ private fun InstalledContent(
             val haptics = LocalHapticFeedback.current
             val density = LocalDensity.current
             var draggingId by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
-            // Reorder locally while dragging so the layout and the offset compensation change in
-            // the same frame. The ViewModel is told once, on release: its write is asynchronous,
-            // and committing on every drag event compensated against a layout that had not moved
-            // yet — which is what made the first card jump.
+            // Where the finger sits in the list's viewport, independent of which slot the dragged
+            // card currently occupies. NaN means no gesture is in progress.
+            var fingerY by remember { mutableFloatStateOf(Float.NaN) }
+            // Distance from the card's centre to the finger at grab time. Keeping it means the
+            // card does not snap its centre onto the finger when the drag starts.
+            var grabOffset by remember { mutableFloatStateOf(0f) }
+            // Reorder locally while dragging so the layout and the drawn offset change in the same
+            // frame. The ViewModel is told once, on release.
             var dragOrder by remember { mutableStateOf<List<SourceId>?>(null) }
             var swapPending by remember { mutableStateOf(false) }
             var autoScroll by remember { mutableFloatStateOf(0f) }
@@ -329,12 +331,15 @@ private fun InstalledContent(
 
             fun applyDragCenter() {
                 val dragged = draggingId ?: return
-                if (swapPending) return
+                val finger = fingerY
+                if (swapPending || !finger.isFinite()) return
+                // The card's visual centre tracks the finger minus the grab offset. Compare that
+                // against the live layout slots; no offset compensation is needed because the drawn
+                // translation is recomputed from the new layout centre on the very next frame.
+                val centre = finger - grabOffset
                 val visible = listState.layoutInfo.visibleItemsInfo
-                val self = visible.firstOrNull { it.key == dragged } ?: return
-                val centerY = self.offset + self.size / 2f + dragOffset
                 val target = visible.firstOrNull { info ->
-                    centerY >= info.offset && centerY < info.offset + info.size
+                    centre >= info.offset && centre < info.offset + info.size
                 } ?: return
                 val targetId = target.key as? String ?: return
                 val next = reorderedSourceIds(
@@ -343,9 +348,6 @@ private fun InstalledContent(
                     to = SourceId(targetId),
                 ) ?: return
                 dragOrder = next
-                // The card now sits at the target's old offset; shift the finger reference by the
-                // same amount so it stays under the finger instead of snapping back.
-                dragOffset -= (target.offset - self.offset)
                 swapPending = true
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             }
@@ -360,19 +362,16 @@ private fun InstalledContent(
             }
 
             // Holding a card against either edge scrolls the list, so sources beyond the viewport
-            // can be reached. The scroll shifts every item up; compensating dragOffset by the same
-            // amount keeps the dragged card under the finger while the list slides beneath it.
+            // can be reached. No manual translation compensation is needed here either: scrolling
+            // changes every item's layout centre, and the drawn offset follows that centre.
             LaunchedEffect(draggingId) {
                 if (draggingId == null) return@LaunchedEffect
                 while (true) {
                     val velocity = autoScroll
                     if (velocity != 0f) {
-                        // dispatchRawDelta is the non-suspend scroll used for drag-style panning;
-                        // it returns what the list actually consumed (clamped at the ends), which is
-                        // exactly the amount to compensate so the card stays under the finger.
-                        val moved = listState.dispatchRawDelta(velocity)
-                        dragOffset += moved
-                        if (moved != 0f) applyDragCenter()
+                        // dispatchRawDelta is the non-suspend scroll used for drag-style panning.
+                        listState.dispatchRawDelta(velocity)
+                        applyDragCenter()
                     }
                     withFrameNanos { }
                 }
@@ -399,12 +398,23 @@ private fun InstalledContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .zIndex(if (dragging) 1f else 0f)
-                            .graphicsLayer { translationY = if (dragging) dragOffset else 0f }
+                            .graphicsLayer {
+                                // Read the layout position at draw time, after any swap in this
+                                // frame has been laid out. Deriving the translation from the live
+                                // centre keeps the card under the finger without a compensation
+                                // step that could run a frame ahead of the layout change.
+                                translationY = if (dragging && fingerY.isFinite()) {
+                                    val centre = listState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull { it.key == source.sourceId.value }
+                                        ?.let { it.offset + it.size / 2f }
+                                    if (centre != null) draggedTranslation(fingerY, grabOffset, centre) else 0f
+                                } else 0f
+                            }
                             .pointerInput(source.sourceId.value) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
                                         draggingId = source.sourceId.value
-                                        dragOffset = 0f
+                                        fingerY = Float.NaN
                                         dragOrder = null
                                         swapPending = false
                                         autoScroll = 0f
@@ -412,7 +422,7 @@ private fun InstalledContent(
                                     },
                                     onDragEnd = {
                                         draggingId = null
-                                        dragOffset = 0f
+                                        fingerY = Float.NaN
                                         autoScroll = 0f
                                         // Persist once, after the gesture settles. During the drag
                                         // the local order already drove the layout, so there is no
@@ -423,27 +433,33 @@ private fun InstalledContent(
                                     },
                                     onDragCancel = {
                                         draggingId = null
-                                        dragOffset = 0f
+                                        fingerY = Float.NaN
                                         autoScroll = 0f
                                         dragOrder = null
                                         swapPending = false
                                     },
-                                ) { change, amount ->
+                                ) { change, _ ->
                                     change.consume()
-                                    dragOffset += amount.y
-                                    // Edge scrolling follows the finger, not the card's centre:
-                                    // change.position is local to the card, self.offset places the
-                                    // card in the viewport, so their sum is the finger's viewport Y.
                                     val self = listState.layoutInfo.visibleItemsInfo
                                         .firstOrNull { it.key == source.sourceId.value }
                                         ?: return@detectDragGesturesAfterLongPress
-                                    val fingerY = self.offset + change.position.y
+                                    val centre = self.offset + self.size / 2f
+                                    val viewportY = self.offset + change.position.y
+                                    if (!fingerY.isFinite()) {
+                                        // First movement: remember where on the card the finger
+                                        // grabbed so the card does not jump to centre under it.
+                                        grabOffset = viewportY - centre
+                                    }
+                                    // Track the finger in viewport coordinates. After a swap the
+                                    // card's own offset changes, so reading change.position alone
+                                    // would move the finger with the card and misjudge the edge.
+                                    fingerY = viewportY
                                     val viewport = listState.layoutInfo.viewportSize.height
                                     val edge = with(density) { 72.dp.toPx() }
                                     autoScroll = when {
-                                        fingerY < edge -> -(edge - fingerY) / edge * MAX_EDGE_SCROLL
-                                        fingerY > viewport - edge ->
-                                            (fingerY - (viewport - edge)) / edge * MAX_EDGE_SCROLL
+                                        viewportY < edge -> -(edge - viewportY) / edge * MAX_EDGE_SCROLL
+                                        viewportY > viewport - edge ->
+                                            (viewportY - (viewport - edge)) / edge * MAX_EDGE_SCROLL
                                         else -> 0f
                                     }
                                     applyDragCenter()
@@ -836,6 +852,20 @@ internal const val UPDATE_ALL_BANNER_TAG = "source-update-all-banner"
 internal const val SOURCE_ENABLED_TAG = "source-enabled-switch"
 internal const val SOURCE_CARD_TAG = "source-card"
 internal const val SOURCE_SETTINGS_TAG = "source-settings"
+
+/**
+ * Translation for the card being dragged, derived rather than accumulated.
+ *
+ * [fingerY] is the finger's absolute position in the list viewport, [grabOffset] keeps the card
+ * from snapping its centre onto the finger at grab time, and [layoutCentre] is the card's *current*
+ * position in that viewport. Because the translation is always recomputed from the live centre, a
+ * swap or an edge scroll that moves the card to a different slot changes [layoutCentre] and the
+ * translation with it in the same frame — the card stays under the finger with no compensation
+ * step. Accumulating a delta and subtracting the slot difference instead made the card snap by a
+ * whole slot whenever the first item was reordered.
+ */
+internal fun draggedTranslation(fingerY: Float, grabOffset: Float, layoutCentre: Float): Float =
+    (fingerY - grabOffset) - layoutCentre
 
 /**
  * Move the [from] source to wherever [to] currently sits, by identity.

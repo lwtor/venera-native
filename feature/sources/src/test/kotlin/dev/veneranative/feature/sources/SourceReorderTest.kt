@@ -4,6 +4,7 @@ import dev.veneranative.core.model.SourceId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlin.math.abs
 
 /**
  * The drag gesture hands us layout keys, not positions in the data list. A banner above the sources
@@ -53,5 +54,43 @@ class SourceReorderTest {
     @Test
     fun `an unknown dragged id is a no-op`() {
         assertNull(reorderedSourceIds(order("a", "b"), SourceId("gone"), SourceId("b")))
+    }
+
+    private fun assertVisualCentre(finger: Float, grab: Float, layoutCentre: Float) {
+        val visual = layoutCentre + draggedTranslation(finger, grab, layoutCentre)
+        assertEquals(finger - grab, visual, 0.0001f)
+    }
+
+    @Test
+    fun `translation keeps the card under the finger while it moves`() {
+        // Same layout slot, finger travels 120px: the whole travel becomes translation.
+        val grab = 12f
+        assertEquals(108f, draggedTranslation(120f, grab, 0f), 0.0001f)
+        assertVisualCentre(240f, grab, 0f)
+    }
+
+    @Test
+    fun `a swap that moves the layout centre does not shift the card under the finger`() {
+        val finger = 160f
+        val grab = 8f
+        // First card at centre 40; after reordering onto the second slot its centre is 130.
+        val before = draggedTranslation(finger, grab, 40f)
+        val after = draggedTranslation(finger, grab, 130f)
+        assertVisualCentre(finger, grab, 40f)
+        assertVisualCentre(finger, grab, 130f)
+        // The translation absorbs exactly the slot shift, so the card never jumps.
+        assertEquals(before - 90f, after, 0.0001f)
+        assertEquals(before - after, 90f, 0.0001f)
+    }
+
+    @Test
+    fun `edge scroll changes the layout centre without moving the card under the finger`() {
+        val finger = 40f
+        val grab = 4f
+        val centres = listOf(36f, 12f, -24f) // list scrolls, dragging card slides up
+        centres.forEach { assertVisualCentre(finger, grab, it) }
+        // Translation grows as the layout centre falls, i.e. it follows the scroll.
+        val translations = centres.map { draggedTranslation(finger, grab, it) }
+        assert(abs(translations[0] - translations[2]) > 0f)
     }
 }

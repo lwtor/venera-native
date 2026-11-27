@@ -2,6 +2,23 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## U-32 修正源列表首卡换位时整列表上跳（DONE）
+
+- 用户需求：拖动第一张卡片触发换位后，整个列表会突然向上跳一下。
+- 根因（U-31 未触及）：拖拽位移用累积 `dragOffset` + 换位时补偿 `dragOffset -= (target.offset - self.offset)`。
+  补偿是一个状态写入，立即影响当前帧的绘制；而 `dragOrder` 改变引发的 LazyColumn 重新布局要到下一帧才生效。
+  两帧不同步，被拖卡片先按旧布局减掉一个槽位高度再落到新槽位，视觉上整列表上跳一格；首个卡片起始 offset 最小、
+  跨越槽位差最大，最明显。边缘滚动同样靠累加 `dragOffset` 补偿，存在同类时序风险。
+- 修法：
+  - 位移改为**推导式**：`draggedTranslation(fingerY, grabOffset, layoutCentre) = (fingerY - grabOffset) - layoutCentre`。
+    `fingerY` 是手指在列表视口的绝对位置（`self.offset + change.position`，与卡片布局槽位无关），
+    `grabOffset` 保证起拖时卡片中心不对齐到手指而不跳。`layoutCentre` 在 `graphicsLayer` 绘制阶段读本次布局后的
+    真实卡片中心，因此换位/滚动改变布局中心时，位移在同一帧自动跟上，无需任何补偿减法。
+  - 边缘滚动保留 `dispatchRawDelta`，但不再手动补偿 `dragOffset`——滚动改变布局中心，位移跟随即可。
+  - 抽出纯函数 `draggedTranslation` 并加 3 项测试，断言换位/滚动改变布局中心后卡片视觉中心恒定（不跳）。
+- 验证：`:feature:sources:testDebugUnitTest` 9 项 `SourceReorderTest` 全过；编译与 androidTest 编译通过；
+  `:app:assembleRelease` 正式签名 APK 构建通过。
+
 ## U-31 重做源列表拖拽：同步换位 + 边缘自动滚动（DONE）
 
 - 用户需求：首卡仍乱跳；拖到底部不会自动滚动，无法跨出可视区调整顺序。
