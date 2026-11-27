@@ -348,11 +348,18 @@ private fun InstalledContent(
                                     val target = visible.firstOrNull { info ->
                                         centerY >= info.offset && centerY < info.offset + info.size
                                     } ?: return@detectDragGesturesAfterLongPress
-                                    if (target.index == self.index) return@detectDragGesturesAfterLongPress
-                                    val list = latestSources.value
-                                    val ordered = list.toMutableList().apply {
-                                        add(target.index, removeAt(self.index))
-                                    }.map { it.sourceId }
+                                    // The list can carry an update banner above the sources, so a
+                                    // card's layout index is not its position in state.sources. Map
+                                    // the gesture back to ids and reorder by identity: using the
+                                    // layout index removed the wrong source and duplicated the
+                                    // dragged one whenever the banner shifted the indices.
+                                    val targetId = (target.key as? String)?.let(::SourceId)
+                                        ?: return@detectDragGesturesAfterLongPress
+                                    val ordered = reorderedSourceIds(
+                                        current = latestSources.value.map { it.sourceId },
+                                        from = source.sourceId,
+                                        to = targetId,
+                                    ) ?: return@detectDragGesturesAfterLongPress
                                     onAction(SourcesAction.ReorderSources(ordered))
                                     // The card now lives at the target's old offset; move the finger
                                     // reference with it so it stays under the finger, not jumping.
@@ -746,6 +753,27 @@ internal const val UPDATE_ALL_BANNER_TAG = "source-update-all-banner"
 internal const val SOURCE_ENABLED_TAG = "source-enabled-switch"
 internal const val SOURCE_CARD_TAG = "source-card"
 internal const val SOURCE_SETTINGS_TAG = "source-settings"
+
+/**
+ * Move the [from] source to wherever [to] currently sits, by identity.
+ *
+ * The gesture reports layout keys, not data positions: the list may carry an update banner above
+ * the sources, so layout index N is not data index N. Reordering by layout index deleted the wrong
+ * entry and duplicated the dragged card whenever a banner was present — the first card appeared to
+ * jump. Returning null means there is nothing to do: the drop landed on itself, or on a non-source
+ * item such as the banner.
+ */
+internal fun reorderedSourceIds(
+    current: List<SourceId>,
+    from: SourceId,
+    to: SourceId,
+): List<SourceId>? {
+    if (from == to) return null
+    val fromIndex = current.indexOf(from)
+    val toIndex = current.indexOf(to)
+    if (fromIndex < 0 || toIndex < 0) return null
+    return current.toMutableList().apply { add(toIndex, removeAt(fromIndex)) }.toList()
+}
 
 @Preview(showBackground = true)
 @Composable

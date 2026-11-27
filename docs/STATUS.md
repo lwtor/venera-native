@@ -2,6 +2,17 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## U-30 修正漫画源列表首张卡片拖拽乱跳（DONE）
+
+- 用户需求：漫画源页面拖拽时第一张会乱跳。
+- 根因：拖拽重排用 LazyColumn 的 `layoutInfo.index` 去操作 `state.sources`。列表有更新横幅时横幅占 index 0，
+  所有来源的 layout index 比数据位置大 1 —— 拖第一张时 `removeAt(1)` 删掉第二张、`add(2, ...)` 把第一张插到错位，
+  出现重复与乱跳；无横幅时这种索引空间耦合同样脆弱。
+- 修法：新增纯函数 `reorderedSourceIds(current, from, to)` 按 `SourceId` 身份重排，落点 key 解析成 `SourceId`；
+  横幅 key 或自身落点返回 null 不重排。跟手补偿仍用布局 offset，与身份重排解耦。
+- 验证：`:feature:sources:testDebugUnitTest` 33 项通过（新增 `SourceReorderTest` 6 项覆盖首卡换位、跨位、上移、
+  横幅落点、自身落点、未知 id）；`:app:assembleDebug` 通过。
+
 ## U-28 漫画源设置改为两段式（DONE）
 
 - 用户需求：把设置参数挪到二级页面；一级页只留开关与拖拽；拖拽改成长按直接拖，去掉触发按钮。
