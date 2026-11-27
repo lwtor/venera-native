@@ -2,6 +2,16 @@
 
 本文件记录当前交付与验证情况。所有后续开发任务由用户指定，不从历史计划中自动选择任务。
 
+## U-31 重做源列表拖拽：同步换位 + 边缘自动滚动（DONE）
+
+- 用户需求：首卡仍乱跳；拖到底部不会自动滚动，无法跨出可视区调整顺序。
+- 根因（U-30 未触及）：UI 发出 `ReorderSources` 后立刻补偿 `dragOffset`，但 ViewModel 的 `reorder()` 异步写盘成功后才更新 state；空窗期布局没变、补偿已生效，持续拖动又用旧顺序重复发 action、重复补偿，越叠越乱。首卡 offset 最小、补偿量最大，跳得最明显。且完全无边缘滚动。
+- 修法：
+  - UI 层 `dragOrder` 在拖拽期维护临时顺序并直接驱动 `displaySources`，松手才提交一次 `ReorderSources`，补偿与布局同帧，无异步空窗。`swapPending` 经两帧布局后解锁，避免旧 offset 下重复换位。
+  - ViewModel `reorder()` 改乐观更新：先同步改 state（松手无旧顺序闪烁），后台写盘失败才回滚。
+  - 边缘自动滚动：`LaunchedEffect` 逐帧按手指视口 Y 计算速度，`dispatchRawDelta` 推进列表并用其实际返回值补偿 `dragOffset`，卡片始终跟手；滚动中继续跑换位判定。
+- 验证：`:feature:sources:testDebugUnitTest` 35 项通过（新增 VM 乐观更新/失败回滚 2 项）；androidTest 编译通过；`:app:assembleDebug` 通过。
+
 ## U-30 修正漫画源列表首张卡片拖拽乱跳（DONE）
 
 - 用户需求：漫画源页面拖拽时第一张会乱跳。

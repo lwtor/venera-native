@@ -3,6 +3,7 @@ package dev.veneranative.feature.sources
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +49,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -62,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -81,6 +85,9 @@ import dev.veneranative.data.source.SourceLoginCheckOutcome
 import kotlin.math.abs
 
 private enum class SourcesSection { Available, Installed }
+
+/** Top speed, in pixels per frame, of the list's edge auto-scroll during a long-press drag. */
+private const val MAX_EDGE_SCROLL = 14f
 
 /**
  * Installed sources and the catalog behind two tabs.
@@ -301,9 +308,76 @@ private fun InstalledContent(
         } else {
             val listState = rememberLazyListState()
             val haptics = LocalHapticFeedback.current
-            val latestSources = rememberUpdatedState(state.sources)
+            val density = LocalDensity.current
             var draggingId by remember { mutableStateOf<String?>(null) }
             var dragOffset by remember { mutableFloatStateOf(0f) }
+            // Reorder locally while dragging so the layout and the offset compensation change in
+            // the same frame. The ViewModel is told once, on release: its write is asynchronous,
+            // and committing on every drag event compensated against a layout that had not moved
+            // yet — which is what made the first card jump.
+            var dragOrder by remember { mutableStateOf<List<SourceId>?>(null) }
+            var swapPending by remember { mutableStateOf(false) }
+            var autoScroll by remember { mutableFloatStateOf(0f) }
+            val displaySources = remember(state.sources, dragOrder) {
+                val order = dragOrder
+                if (order == null) state.sources else {
+                    val rank = order.withIndex().associate { it.value to it.index }
+                    state.sources.sortedBy { rank[it.sourceId] ?: Int.MAX_VALUE }
+                }
+            }
+            val latestDisplay = rememberUpdatedState(displaySources)
+
+            fun applyDragCenter() {
+                val dragged = draggingId ?: return
+                if (swapPending) return
+                val visible = listState.layoutInfo.visibleItemsInfo
+                val self = visible.firstOrNull { it.key == dragged } ?: return
+                val centerY = self.offset + self.size / 2f + dragOffset
+                val target = visible.firstOrNull { info ->
+                    centerY >= info.offset && centerY < info.offset + info.size
+                } ?: return
+                val targetId = target.key as? String ?: return
+                val next = reorderedSourceIds(
+                    current = latestDisplay.value.map { it.sourceId },
+                    from = SourceId(dragged),
+                    to = SourceId(targetId),
+                ) ?: return
+                dragOrder = next
+                // The card now sits at the target's old offset; shift the finger reference by the
+                // same amount so it stays under the finger instead of snapping back.
+                dragOffset -= (target.offset - self.offset)
+                swapPending = true
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
+
+            // Unlock the next swap only after composition and layout have caught up. Until then
+            // the same target would be hit again against the old offsets and undo the swap.
+            LaunchedEffect(dragOrder, draggingId) {
+                if (dragOrder == null || draggingId == null) return@LaunchedEffect
+                withFrameNanos { }
+                withFrameNanos { }
+                swapPending = false
+            }
+
+            // Holding a card against either edge scrolls the list, so sources beyond the viewport
+            // can be reached. The scroll shifts every item up; compensating dragOffset by the same
+            // amount keeps the dragged card under the finger while the list slides beneath it.
+            LaunchedEffect(draggingId) {
+                if (draggingId == null) return@LaunchedEffect
+                while (true) {
+                    val velocity = autoScroll
+                    if (velocity != 0f) {
+                        // dispatchRawDelta is the non-suspend scroll used for drag-style panning;
+                        // it returns what the list actually consumed (clamped at the ends), which is
+                        // exactly the amount to compensate so the card stays under the finger.
+                        val moved = listState.dispatchRawDelta(velocity)
+                        dragOffset += moved
+                        if (moved != 0f) applyDragCenter()
+                    }
+                    withFrameNanos { }
+                }
+            }
+
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -319,7 +393,7 @@ private fun InstalledContent(
                         )
                     }
                 }
-                items(state.sources, key = { it.sourceId.value }) { source ->
+                items(displaySources, key = { it.sourceId.value }) { source ->
                     val dragging = draggingId == source.sourceId.value
                     Box(
                         modifier = Modifier
@@ -331,39 +405,48 @@ private fun InstalledContent(
                                     onDragStart = {
                                         draggingId = source.sourceId.value
                                         dragOffset = 0f
+                                        dragOrder = null
+                                        swapPending = false
+                                        autoScroll = 0f
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                     },
-                                    onDragEnd = { draggingId = null; dragOffset = 0f },
-                                    onDragCancel = { draggingId = null; dragOffset = 0f },
+                                    onDragEnd = {
+                                        draggingId = null
+                                        dragOffset = 0f
+                                        autoScroll = 0f
+                                        // Persist once, after the gesture settles. During the drag
+                                        // the local order already drove the layout, so there is no
+                                        // async gap to compensate against.
+                                        dragOrder?.let { onAction(SourcesAction.ReorderSources(it)) }
+                                        dragOrder = null
+                                        swapPending = false
+                                    },
+                                    onDragCancel = {
+                                        draggingId = null
+                                        dragOffset = 0f
+                                        autoScroll = 0f
+                                        dragOrder = null
+                                        swapPending = false
+                                    },
                                 ) { change, amount ->
                                     change.consume()
                                     dragOffset += amount.y
-                                    val visible = listState.layoutInfo.visibleItemsInfo
-                                    val self = visible.firstOrNull { it.key == source.sourceId.value }
+                                    // Edge scrolling follows the finger, not the card's centre:
+                                    // change.position is local to the card, self.offset places the
+                                    // card in the viewport, so their sum is the finger's viewport Y.
+                                    val self = listState.layoutInfo.visibleItemsInfo
+                                        .firstOrNull { it.key == source.sourceId.value }
                                         ?: return@detectDragGesturesAfterLongPress
-                                    // The dragged card's visual centre decides which slot owns it;
-                                    // using measured offsets keeps this correct when the update banner
-                                    // shifts the indices or a title wraps to two lines.
-                                    val centerY = self.offset + self.size / 2f + dragOffset
-                                    val target = visible.firstOrNull { info ->
-                                        centerY >= info.offset && centerY < info.offset + info.size
-                                    } ?: return@detectDragGesturesAfterLongPress
-                                    // The list can carry an update banner above the sources, so a
-                                    // card's layout index is not its position in state.sources. Map
-                                    // the gesture back to ids and reorder by identity: using the
-                                    // layout index removed the wrong source and duplicated the
-                                    // dragged one whenever the banner shifted the indices.
-                                    val targetId = (target.key as? String)?.let(::SourceId)
-                                        ?: return@detectDragGesturesAfterLongPress
-                                    val ordered = reorderedSourceIds(
-                                        current = latestSources.value.map { it.sourceId },
-                                        from = source.sourceId,
-                                        to = targetId,
-                                    ) ?: return@detectDragGesturesAfterLongPress
-                                    onAction(SourcesAction.ReorderSources(ordered))
-                                    // The card now lives at the target's old offset; move the finger
-                                    // reference with it so it stays under the finger, not jumping.
-                                    dragOffset -= (target.offset - self.offset)
+                                    val fingerY = self.offset + change.position.y
+                                    val viewport = listState.layoutInfo.viewportSize.height
+                                    val edge = with(density) { 72.dp.toPx() }
+                                    autoScroll = when {
+                                        fingerY < edge -> -(edge - fingerY) / edge * MAX_EDGE_SCROLL
+                                        fingerY > viewport - edge ->
+                                            (fingerY - (viewport - edge)) / edge * MAX_EDGE_SCROLL
+                                        else -> 0f
+                                    }
+                                    applyDragCenter()
                                 }
                             },
                     ) {

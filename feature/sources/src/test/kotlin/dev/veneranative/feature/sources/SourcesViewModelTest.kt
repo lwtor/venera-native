@@ -571,6 +571,41 @@ class SourcesViewModelTest {
         override suspend fun remove(key: String) { values.remove(key) }
     }
 
+    @Test
+    fun `reorder applies to state before the disk write completes`() = runTest(dispatcher) {
+        repository.sources = listOf(source("a"), source("b"), source("c"))
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+
+        viewModel.onAction(
+            SourcesAction.ReorderSources(listOf(SourceId("b"), SourceId("a"), SourceId("c"))),
+        )
+
+        // Optimistic: the order is visible immediately, without waiting for the write.
+        assertEquals(
+            listOf("b", "a", "c"),
+            viewModel.state.value.sources.map { it.sourceId.value },
+        )
+        advanceUntilIdle()
+        assertEquals(
+            listOf(SourceId("b"), SourceId("a"), SourceId("c")),
+            repository.reorderRequests.single(),
+        )
+    }
+
+    @Test
+    fun `a failed reorder restores the previous order`() = runTest(dispatcher) {
+        repository.sources = listOf(source("a"), source("b"))
+        val viewModel = SourcesViewModel(repository)
+        advanceUntilIdle()
+        repository.reorderResult = false
+
+        viewModel.onAction(SourcesAction.ReorderSources(listOf(SourceId("b"), SourceId("a"))))
+        advanceUntilIdle()
+
+        assertEquals(listOf("a", "b"), viewModel.state.value.sources.map { it.sourceId.value })
+    }
+
     private fun source(
         id: String,
         name: String = "Source $id",
@@ -586,6 +621,8 @@ class SourcesViewModelTest {
 
     private class FakeSourceRepository : SourceRepository {
         var sources: List<InstalledSource> = emptyList()
+        var reorderResult = true
+        val reorderRequests = mutableListOf<List<SourceId>>()
         var outcome: InstallOutcome = InstallOutcome.Failure(SourceInstallError.LocationUnreadable)
         var listFailure: Throwable? = null
         var loginOutcome: SourceLoginOutcome = SourceLoginOutcome.Unsupported
@@ -601,6 +638,11 @@ class SourcesViewModelTest {
         override suspend fun installed(): List<InstalledSource> {
             listFailure?.let { throw it }
             return sources
+        }
+
+        override suspend fun reorder(sourceIds: List<SourceId>): Boolean {
+            reorderRequests += sourceIds
+            return reorderResult
         }
 
         override suspend fun configuration(sourceId: SourceId) = configurationResult

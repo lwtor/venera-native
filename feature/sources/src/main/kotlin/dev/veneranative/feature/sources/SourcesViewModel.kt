@@ -263,12 +263,14 @@ class SourcesViewModel(
 
     private fun reorder(sourceIds: List<SourceId>) {
         if (sourceIds.size != _state.value.sources.size) return
+        val previous = _state.value.sources
+        val rank = sourceIds.withIndex().associate { it.value to it.index }
+        // Apply optimistically: the list has already reordered on screen during the drag, so
+        // waiting for the disk write would flash the old order back for one frame on release.
+        _state.update { it.copy(sources = previous.sortedBy { rank[it.sourceId] ?: Int.MAX_VALUE }) }
         viewModelScope.launch {
-            if (runCatching { repository.reorder(sourceIds) }.getOrDefault(false)) {
-                _state.update { current ->
-                    val rank = sourceIds.withIndex().associate { it.value to it.index }
-                    current.copy(sources = current.sources.sortedBy { rank[it.sourceId] ?: Int.MAX_VALUE })
-                }
+            if (!runCatching { repository.reorder(sourceIds) }.getOrDefault(false)) {
+                _state.update { it.copy(sources = previous) }
             }
         }
     }
